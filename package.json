@@ -1,0 +1,35 @@
+{
+  "name": "@swapback/monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SwapBack - Routeur d'exécution optimisé pour Solana avec mécanisme de cashback et burn",
+  "workspaces": [
+    "app",
+    "sdk",
+    "oracle",
+    "tests"
+  ],
+  "scripts": {
+    "anchor:build": "anchor build",
+    "anchor:test": "anchor test",
+    "anchor:deploy": "anchor deploy",
+    "app:dev": "cd app && npm run dev",
+    "app:build": "cd app && npm run build",
+    "sdk:build": "cd sdk && npm run build",
+    "oracle:dev": "cd oracle && npm run dev",
+    "test": "anchor test",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\""
+  },
+  "devDependencies": {
+    "@coral-xyz/anchor": "^0.30.1",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "prettier": "^3.0.0",
+    "eslint": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
