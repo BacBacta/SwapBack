@@ -29,7 +29,10 @@ pub mod swapback_router {
         global_state.total_volume = 0;
         global_state.total_npi = 0;
         global_state.total_rebates = 0;
-        global_state.bump = ctx.bumps.global_state;
+
+        // Calculer le bump pour Anchor 0.28.0
+        let (_pda, bump) = Pubkey::find_program_address(&[b"global_state"], ctx.program_id);
+        global_state.bump = bump;
 
         msg!("SwapBack Router initialisé avec succès");
         Ok(())

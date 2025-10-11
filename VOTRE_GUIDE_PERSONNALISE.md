@@ -9,6 +9,7 @@
 ## ✅ CE QUI EST DÉJÀ FAIT
 
 ### 📦 Infrastructure Complète
+
 - ✅ Architecture de 3000+ lignes de code
 - ✅ 2 programmes Solana (Rust/Anchor)
 - ✅ Frontend Next.js 14 avec 4 composants React
@@ -18,6 +19,7 @@
 - ✅ Scripts d'automatisation
 
 ### 🛠️ Installation des Outils (EN COURS)
+
 - ✅ Node.js v22.17.0
 - ✅ Rust 1.90.0
 - ✅ Solana CLI 2.3.13
@@ -138,6 +140,7 @@ async function getJupiterQuote(
 ```
 
 **Tester** :
+
 ```bash
 cd oracle
 npm run dev
@@ -150,6 +153,7 @@ curl http://localhost:3001/api/simulate-route
 **Documentation** : `docs/TECHNICAL.md` section Token-2022
 
 **Étapes** :
+
 1. Créer le mint avec Transfer Hook
 2. Implémenter le hook de burn automatique
 3. Déployer sur devnet
@@ -187,20 +191,24 @@ npm run dev
 ## 📚 DOCUMENTATION DE RÉFÉRENCE
 
 ### Pour Débuter
+
 - `START_HERE.md` - Point d'entrée
 - `QUICKSTART.md` - Installation rapide
 - `README.md` - Vue d'ensemble
 
 ### Pour Développer
+
 - `PROJECT_SUMMARY.md` - Architecture détaillée
 - `docs/TECHNICAL.md` - Documentation technique
 - `docs/BUILD.md` - Guide de construction
 
 ### Pour Déployer
+
 - `docs/DEPLOYMENT.md` - Guide de déploiement
 - `ROADMAP.md` - Plan 12 semaines
 
 ### Pour Contribuer
+
 - `CONTRIBUTING.md` - Standards de code
 - `NEXT_STEPS.md` - Actions immédiates
 
@@ -239,18 +247,21 @@ npm run build
 ## 📊 MÉTRIQUES DE SUCCÈS
 
 ### Après 24h :
+
 - ✅ Tous les outils installés
 - ✅ Build sans erreur
 - ✅ Tests passent
 - ✅ Frontend démarre
 
 ### Après 48h :
+
 - ✅ Jupiter API intégrée
 - ✅ Token $BACK créé
 - ✅ Déployé sur devnet
 - ✅ Premier swap test réussi
 
 ### Après 1 semaine :
+
 - ✅ UI complète fonctionnelle
 - ✅ Tests end-to-end passent
 - ✅ Documentation à jour
@@ -261,16 +272,19 @@ npm run build
 ## 💡 CONSEILS PRATIQUES
 
 ### Productivité
+
 - Utilisez `anchor test --skip-build` pour tests rapides
 - Lancez `solana logs` dans un terminal séparé
 - Configurez VS Code avec les extensions Rust et Solana
 
 ### Debugging
+
 - Ajoutez `msg!()` dans les programmes Rust
 - Utilisez `console.log()` dans le SDK
 - Testez avec `solana-test-validator --log`
 
 ### Git
+
 - Créez une branche par fonctionnalité
 - Commitez régulièrement
 - Suivez les conventions de `CONTRIBUTING.md`
@@ -280,15 +294,18 @@ npm run build
 ## 🎓 RESSOURCES D'APPRENTISSAGE
 
 ### Si vous débutez avec Solana :
+
 - [Solana Cookbook](https://solanacookbook.com/)
 - [Anchor Book](https://book.anchor-lang.com/)
 - [Solana Docs](https://docs.solana.com/)
 
 ### Si vous débutez avec Next.js :
+
 - [Next.js Docs](https://nextjs.org/docs)
 - [React Docs](https://react.dev/)
 
 ### Pour Jupiter :
+
 - [Jupiter API Docs](https://station.jup.ag/docs/apis/swap-api)
 
 ---

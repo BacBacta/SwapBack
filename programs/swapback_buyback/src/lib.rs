@@ -22,7 +22,8 @@ pub mod swapback_buyback {
         buyback_state.total_usdc_spent = 0;
         buyback_state.total_back_burned = 0;
         buyback_state.buyback_count = 0;
-        buyback_state.bump = ctx.bumps.buyback_state;
+    // Récupérer le bump depuis la map `ctx.bumps`
+    buyback_state.bump = ctx.bumps.get("buyback_state").copied().unwrap_or(0);
 
         msg!("Programme de buyback initialisé avec succès");
         Ok(())
@@ -125,8 +126,9 @@ pub mod swapback_buyback {
         );
 
         // Brûlage des tokens avec signature PDA
+        // seeds must be slices of bytes; utiliser .as_ref() pour forcer les types
         let seeds = &[
-            b"buyback_state",
+            b"buyback_state".as_ref(),
             &[buyback_state.bump],
         ];
         let signer = &[&seeds[..]];

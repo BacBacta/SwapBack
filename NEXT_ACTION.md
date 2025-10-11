@@ -60,10 +60,12 @@ docker run --rm -v $(pwd):/workdir projectserum/build:latest anchor build
 ### 💬 OPTION COMMUNAUTÉ (1-2h)
 
 Demander de l'aide sur :
+
 - [Anchor Discord](https://discord.gg/anchor)
 - [Solana StackExchange](https://solana.stackexchange.com/)
 
 **Question à poser** :
+
 > "Getting `Cargo.lock version 4 requires -Znext-lockfile-bump` error with Anchor 0.32.1 and Rust 1.90.0. How to resolve?"
 
 ---
@@ -77,7 +79,7 @@ Demander de l'aide sur :
 ✅ Service Oracle Express  
 ✅ 10 fichiers de documentation  
 ✅ Scripts automatisés  
-✅ Configuration devnet  
+✅ Configuration devnet
 
 ---
 

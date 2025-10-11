@@ -11,6 +11,7 @@
 ### 1. ✨ Installation Complète de l'Environnement
 
 **Outils installés et configurés :**
+
 - ✅ **Node.js** v22.17.0
 - ✅ **Rust** 1.79.0 + 1.90.0 (dual install)
 - ✅ **Solana CLI** 2.3.13 (Agave)
@@ -18,11 +19,13 @@
 - ✅ **AVM** (Anchor Version Manager) 0.32.1
 
 **Configuration Solana :**
+
 - ✅ Wallet créé : `578DGN45PsuxySc4T5VsZKeJu2Q83L5coCWR47ZJkwQf`
 - ✅ Réseau configuré sur devnet
 - ✅ Seed phrase sauvegardée
 
 **Environnement shell permanent :**
+
 ```bash
 # Ajoutez ces lignes à votre ~/.bashrc pour les prochaines sessions :
 source "$HOME/.cargo/env"
@@ -32,6 +35,7 @@ export PATH="/home/codespace/.local/share/solana/install/active_release/bin:$PAT
 ### 2. 📦 Installation des Dépendances NPM
 
 Toutes les dépendances sont installées et prêtes :
+
 - ✅ **Racine** : 1611 packages
 - ✅ **app/** : Next.js 14 + React + Tailwind
 - ✅ **sdk/** : TypeScript + Solana Web3
@@ -41,6 +45,7 @@ Toutes les dépendances sont installées et prêtes :
 ### 3. 🔧 Mises à Jour de Configuration
 
 **Fichiers modifiés pour compatibilité :**
+
 - ✅ `Anchor.toml` : Version 0.30.1 → 0.32.1
 - ✅ `programs/*/Cargo.toml` : anchor-lang 0.30.1 → 0.32.1
 - ✅ Suppression dépendances `solana-program` directes
@@ -58,6 +63,7 @@ Toutes les dépendances sont installées et prêtes :
 ### ⚠️ Incompatibilité Cargo.lock Version 4
 
 **Symptôme :**
+
 ```
 error: failed to parse lock file at: /workspaces/SwapBack/Cargo.lock
 Caused by:
@@ -65,12 +71,14 @@ Caused by:
 ```
 
 **Cause :**
+
 - Rust 1.90.0 (cargo 1.90.0) génère Cargo.lock v4
 - Anchor 0.32.1 utilise BPF toolchain avec Rust 1.75
 - Rust 1.75 ne supporte que Cargo.lock v3
 - Conflit de versions irrésolvable avec les outils actuels
 
 **Tentatives effectuées :**
+
 1. ✗ Downgrade vers Rust 1.79 → BPF utilise toujours 1.75
 2. ✗ Suppression et régénération de Cargo.lock
 3. ✗ Downgrade manuel de `toml_datetime` → Conflits de dépendances
@@ -131,11 +139,13 @@ docker run --rm -v $(pwd):/workdir projectserum/build:latest anchor build
 ### Option 4 : Demander de l'Aide à la Communauté
 
 **Channels recommandés :**
+
 - [Anchor Discord](https://discord.gg/anchor)
 - [Solana StackExchange](https://solana.stackexchange.com/)
 - [Anchor GitHub Issues](https://github.com/coral-xyz/anchor/issues)
 
 **Question à poser :**
+
 > "Getting `Cargo.lock version 4 requires -Znext-lockfile-bump` error with Anchor 0.32.1 and Rust 1.90.0. BPF toolchain uses Rust 1.75 which doesn't support lockfile v4. How to resolve?"
 
 ---
@@ -197,6 +207,7 @@ async function getJupiterQuote(
 ```
 
 **Tester** :
+
 ```bash
 cd oracle
 npm run dev
@@ -246,6 +257,7 @@ solana logs --url devnet
 ## 📊 ÉTAT ACTUEL DU PROJET
 
 ### ✅ Complété (70%)
+
 - Infrastructure de code (3000+ lignes)
 - Documentation exhaustive (10 fichiers)
 - Configuration environnement
@@ -253,10 +265,12 @@ solana logs --url devnet
 - Scripts automatisés
 
 ### 🚧 En Cours (20%)
+
 - Build des programmes Anchor
 - Résolution problème Cargo.lock
 
 ### ⏸️ En Attente (10%)
+
 - Déploiement devnet
 - Intégration Jupiter API
 - Tests end-to-end
@@ -267,6 +281,7 @@ solana logs --url devnet
 ## 💡 COMMANDES UTILES POUR LA SUITE
 
 ### Environnement
+
 ```bash
 # Charger l'environnement complet
 source "$HOME/.cargo/env"
@@ -280,6 +295,7 @@ anchor --version
 ```
 
 ### Solana
+
 ```bash
 # Balance
 solana balance
@@ -295,6 +311,7 @@ solana logs --url devnet
 ```
 
 ### Anchor
+
 ```bash
 # Build
 anchor build
@@ -313,6 +330,7 @@ anchor clean
 ```
 
 ### Debugging
+
 ```bash
 # Vérifier les Program IDs
 solana address -k target/deploy/swapback_router-keypair.json
@@ -330,6 +348,7 @@ solana confirm <SIGNATURE> -v --url devnet
 ## 📞 RESSOURCES & AIDE
 
 ### Documentation Projet
+
 - `START_HERE.md` - Point d'entrée
 - `VOTRE_GUIDE_PERSONNALISE.md` - Guide personnalisé
 - `NEXT_STEPS.md` - Actions 48h
@@ -337,6 +356,7 @@ solana confirm <SIGNATURE> -v --url devnet
 - `docs/TECHNICAL.md` - Doc technique
 
 ### Ressources Externes
+
 - **Anchor Book** : https://book.anchor-lang.com/
 - **Solana Cookbook** : https://solanacookbook.com/
 - **Jupiter API Docs** : https://station.jup.ag/docs/apis/swap-api
@@ -344,6 +364,7 @@ solana confirm <SIGNATURE> -v --url devnet
 - **Solana Discord** : https://discord.gg/solana
 
 ### Communauté
+
 - **Discord SwapBack** : https://discord.gg/swapback (à créer)
 - **Twitter** : @SwapBackProtocol (à créer)
 - **GitHub Issues** : https://github.com/BacBacta/SwapBack/issues
@@ -353,6 +374,7 @@ solana confirm <SIGNATURE> -v --url devnet
 ## ✨ CONCLUSION
 
 **Vous avez maintenant :**
+
 - ✅ Un environnement de développement complet
 - ✅ Tous les outils nécessaires installés
 - ✅ Une architecture de code solide (3000+ lignes)
@@ -360,6 +382,7 @@ solana confirm <SIGNATURE> -v --url devnet
 - ✅ Un plan d'action clair
 
 **Il reste uniquement :**
+
 - 🔧 Résoudre le problème de build Cargo.lock (Option 1 recommandée)
 - 🚀 Déployer et tester
 - 🎨 Intégrer Jupiter API
