@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useWallet } from '@solana/wallet-adapter-react';
-import { useEffect, useState } from 'react';
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useEffect, useState } from "react";
 
 interface UserStats {
   totalSwaps: number;
@@ -59,7 +59,9 @@ export const Dashboard = () => {
             </div>
           </div>
           <div className="stat-card">
-            <div className="text-sm text-gray-400 mb-1">Remises Distribuées</div>
+            <div className="text-sm text-gray-400 mb-1">
+              Remises Distribuées
+            </div>
             <div className="text-2xl font-bold text-green-400">
               ${globalStats.totalRebates.toLocaleString()}
             </div>
@@ -71,32 +73,34 @@ export const Dashboard = () => {
       {connected && stats && (
         <div className="swap-card">
           <h2 className="text-2xl font-bold mb-6">Vos Statistiques</h2>
-          
+
           <div className="space-y-4">
             <div className="flex justify-between items-center p-3 bg-black/30 rounded-lg">
               <span className="text-gray-400">Nombre de swaps</span>
               <span className="text-xl font-semibold">{stats.totalSwaps}</span>
             </div>
-            
+
             <div className="flex justify-between items-center p-3 bg-black/30 rounded-lg">
               <span className="text-gray-400">Volume total</span>
-              <span className="text-xl font-semibold">${stats.totalVolume.toLocaleString()}</span>
+              <span className="text-xl font-semibold">
+                ${stats.totalVolume.toLocaleString()}
+              </span>
             </div>
-            
+
             <div className="flex justify-between items-center p-3 bg-black/30 rounded-lg">
               <span className="text-gray-400">NPI accumulé</span>
               <span className="text-xl font-semibold text-green-400">
                 +${stats.totalNPI.toFixed(2)}
               </span>
             </div>
-            
+
             <div className="flex justify-between items-center p-3 bg-black/30 rounded-lg">
               <span className="text-gray-400">Remises réclamées</span>
               <span className="text-xl font-semibold text-green-400">
                 ${stats.totalRebates.toFixed(2)}
               </span>
             </div>
-            
+
             <div className="flex justify-between items-center p-3 bg-gradient-to-r from-[var(--primary)]/20 to-[var(--secondary)]/20 rounded-lg border border-[var(--primary)]/30">
               <span className="font-semibold">Remises en attente</span>
               <span className="text-xl font-bold text-[var(--primary)]">
@@ -116,11 +120,15 @@ export const Dashboard = () => {
             <div className="mt-6 p-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/30">
               <div className="flex justify-between items-center mb-2">
                 <span className="font-semibold">$BACK verrouillés</span>
-                <span className="text-xl font-bold">{stats.lockedAmount.toLocaleString()}</span>
+                <span className="text-xl font-bold">
+                  {stats.lockedAmount.toLocaleString()}
+                </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-400">Boost de remise</span>
-                <span className="text-lg font-semibold text-purple-400">+{stats.rebateBoost}%</span>
+                <span className="text-lg font-semibold text-purple-400">
+                  +{stats.rebateBoost}%
+                </span>
               </div>
             </div>
           )}

@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { useState } from "react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 
 interface RouteInfo {
-  type: 'Direct' | 'Aggregator' | 'RFQ' | 'Bundle';
+  type: "Direct" | "Aggregator" | "RFQ" | "Bundle";
   estimatedOutput: number;
   npi: number;
   rebate: number;
@@ -16,10 +16,10 @@ export const SwapInterface = () => {
   const { connected, publicKey } = useWallet();
   const { connection } = useConnection();
 
-  const [inputAmount, setInputAmount] = useState('');
-  const [outputAmount, setOutputAmount] = useState('');
-  const [inputToken, setInputToken] = useState('USDC');
-  const [outputToken, setOutputToken] = useState('SOL');
+  const [inputAmount, setInputAmount] = useState("");
+  const [outputAmount, setOutputAmount] = useState("");
+  const [inputToken, setInputToken] = useState("USDC");
+  const [outputToken, setOutputToken] = useState("SOL");
   const [slippage, setSlippage] = useState(0.5);
   const [loading, setLoading] = useState(false);
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
@@ -31,10 +31,10 @@ export const SwapInterface = () => {
     try {
       // TODO: Appeler l'API SwapBack pour simuler la route
       // Pour le MVP, on simule les données
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
       const mockRoute: RouteInfo = {
-        type: 'Aggregator',
+        type: "Aggregator",
         estimatedOutput: parseFloat(inputAmount) * 0.005, // Mock: 1 USDC = 0.005 SOL
         npi: parseFloat(inputAmount) * 0.002, // 0.2% NPI
         rebate: parseFloat(inputAmount) * 0.0015, // 75% du NPI
@@ -45,7 +45,7 @@ export const SwapInterface = () => {
       setRouteInfo(mockRoute);
       setOutputAmount(mockRoute.estimatedOutput.toFixed(6));
     } catch (error) {
-      console.error('Erreur lors de la simulation:', error);
+      console.error("Erreur lors de la simulation:", error);
     } finally {
       setLoading(false);
     }
@@ -57,18 +57,18 @@ export const SwapInterface = () => {
     setLoading(true);
     try {
       // TODO: Implémenter l'exécution du swap via le SDK SwapBack
-      console.log('Exécution du swap...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      alert('Swap exécuté avec succès!');
-      
+      console.log("Exécution du swap...");
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      alert("Swap exécuté avec succès!");
+
       // Reset
-      setInputAmount('');
-      setOutputAmount('');
+      setInputAmount("");
+      setOutputAmount("");
       setRouteInfo(null);
     } catch (error) {
-      console.error('Erreur lors du swap:', error);
-      alert('Erreur lors du swap');
+      console.error("Erreur lors du swap:", error);
+      alert("Erreur lors du swap");
     } finally {
       setLoading(false);
     }
@@ -163,15 +163,21 @@ export const SwapInterface = () => {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-400">NPI (Net Price Improvement)</span>
-              <span className="text-green-400">+{routeInfo.npi.toFixed(4)} USDC</span>
+              <span className="text-green-400">
+                +{routeInfo.npi.toFixed(4)} USDC
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Votre remise (75%)</span>
-              <span className="text-green-400">+{routeInfo.rebate.toFixed(4)} USDC</span>
+              <span className="text-green-400">
+                +{routeInfo.rebate.toFixed(4)} USDC
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Burn $BACK (25%)</span>
-              <span className="text-orange-400">{routeInfo.burn.toFixed(4)} USDC</span>
+              <span className="text-orange-400">
+                {routeInfo.burn.toFixed(4)} USDC
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Frais réseau</span>
@@ -193,7 +199,7 @@ export const SwapInterface = () => {
             disabled={!inputAmount || loading}
             className="btn-primary w-full"
           >
-            {loading ? 'Simulation...' : 'Simuler la route'}
+            {loading ? "Simulation..." : "Simuler la route"}
           </button>
         ) : (
           <button
@@ -201,7 +207,7 @@ export const SwapInterface = () => {
             disabled={loading}
             className="btn-primary w-full"
           >
-            {loading ? 'Exécution...' : `Swap ${inputToken} → ${outputToken}`}
+            {loading ? "Exécution..." : `Swap ${inputToken} → ${outputToken}`}
           </button>
         )}
       </div>
