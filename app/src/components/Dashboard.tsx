@@ -49,13 +49,13 @@ export const Dashboard = () => {
           <div className="stat-card">
             <div className="text-sm text-gray-400 mb-1">Volume Total</div>
             <div className="text-2xl font-bold text-[var(--primary)]">
-              ${globalStats.totalVolume.toLocaleString()}
+              ${globalStats.totalVolume.toLocaleString('en-US')}
             </div>
           </div>
           <div className="stat-card">
             <div className="text-sm text-gray-400 mb-1">$BACK Brûlés</div>
             <div className="text-2xl font-bold text-orange-400">
-              {globalStats.totalBurned.toLocaleString()}
+              {globalStats.totalBurned.toLocaleString('en-US')}
             </div>
           </div>
           <div className="stat-card">
@@ -63,7 +63,7 @@ export const Dashboard = () => {
               Remises Distribuées
             </div>
             <div className="text-2xl font-bold text-green-400">
-              ${globalStats.totalRebates.toLocaleString()}
+              ${globalStats.totalRebates.toLocaleString('en-US')}
             </div>
           </div>
         </div>
@@ -83,7 +83,7 @@ export const Dashboard = () => {
             <div className="flex justify-between items-center p-3 bg-black/30 rounded-lg">
               <span className="text-gray-400">Volume total</span>
               <span className="text-xl font-semibold">
-                ${stats.totalVolume.toLocaleString()}
+                ${stats.totalVolume.toLocaleString('en-US')}
               </span>
             </div>
 
@@ -121,7 +121,7 @@ export const Dashboard = () => {
               <div className="flex justify-between items-center mb-2">
                 <span className="font-semibold">$BACK verrouillés</span>
                 <span className="text-xl font-bold">
-                  {stats.lockedAmount.toLocaleString()}
+                  {stats.lockedAmount.toLocaleString('en-US')}
                 </span>
               </div>
               <div className="flex justify-between items-center">

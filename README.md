@@ -54,6 +54,16 @@ $BACK (SwapBack) est un routeur d'exécution pour Solana qui maximise le prix ne
 - 🔗 Support Blink/Action
 - 📊 Dashboard de suivi en temps réel
 
+### Token $BACK
+
+**Token natif de l'écosystème SwapBack avec mécanisme de burn automatique**
+
+- 🔥 **Burn automatique** : 0.1% de chaque transfert est brûlé
+- 🏦 **Token-2022** : Utilise les extensions avancées de Solana
+- 🔗 **Transfer Hook** : Burn exécuté automatiquement lors des transfers
+- 💰 **Supply initial** : 1 milliard de tokens
+- 📈 **Déflationniste** : Supply diminue avec chaque transaction
+
 ## 🏗️ Architecture
 
 ### Structure du Projet
@@ -257,6 +267,33 @@ function SwapButton() {
 - Transfer Hook Token-2022 pour automatisation
 - Pression déflationniste continue
 
+### Système cNFT Lock & Boost
+
+Le système de verrouillage utilise des **compressed NFTs (cNFTs)** pour représenter visuellement les niveaux de boost utilisateur :
+
+#### Niveaux de Boost
+
+| Niveau   | Seuil de Lock $BACK | Durée Min | Boost Remise | Couleur  |
+|----------|---------------------|-----------|--------------|----------|
+| Bronze   | 100 $BACK          | 90 jours  | +10%        | 🟫       |
+| Silver   | 1,000 $BACK        | 180 jours | +30%        | 🟦       |
+| Gold     | 10,000 $BACK       | 365 jours | +50%        | 🟨       |
+
+#### Fonctionnement cNFT
+
+- **Mint automatique** : cNFT créé lors du lock selon les critères atteints
+- **Représentation visuelle** : Badge Bronze/Silver/Gold dans le wallet
+- **Métadonnées** : Informations de lock (montant, durée, niveau)
+- **Statut dynamique** : NFT marqué comme inactif lors du unlock
+- **Collection unique** : Tous les cNFTs appartiennent à la collection SwapBack
+
+#### Avantages du Système
+
+- 🎨 **Visibilité** : Niveau visible dans tous les wallets supportant cNFTs
+- 🔄 **Transferibilité** : cNFTs peuvent être transférés (mais lock reste lié à l'utilisateur)
+- 📊 **Progression** : Gamification claire des niveaux utilisateur
+- ⚡ **Efficacité** : Stockage compressé pour scalabilité Solana
+
 ## 🗺️ Roadmap
 
 ### Phase 1 : MVP (Semaines 1-6)
@@ -265,6 +302,7 @@ function SwapButton() {
 - [x] SDK TypeScript
 - [x] Interface frontend
 - [x] Service Oracle
+- [x] Système cNFT Lock & Boost
 - [ ] Intégration Jupiter API
 - [ ] Tests unitaires
 

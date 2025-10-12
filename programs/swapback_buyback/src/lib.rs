@@ -22,8 +22,7 @@ pub mod swapback_buyback {
         buyback_state.total_usdc_spent = 0;
         buyback_state.total_back_burned = 0;
         buyback_state.buyback_count = 0;
-    // Récupérer le bump depuis la map `ctx.bumps`
-    buyback_state.bump = ctx.bumps.get("buyback_state").copied().unwrap_or(0);
+        buyback_state.bump = ctx.bumps.buyback_state;
 
         msg!("Programme de buyback initialisé avec succès");
         Ok(())
@@ -35,8 +34,6 @@ pub mod swapback_buyback {
         amount: u64,
     ) -> Result<()> {
         require!(amount > 0, ErrorCode::InvalidAmount);
-
-        let buyback_state = &mut ctx.accounts.buyback_state;
 
         // Transfert des USDC vers le vault
         let cpi_accounts = Transfer {

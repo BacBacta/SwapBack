@@ -16,5 +16,6 @@ cpi = ["no-entrypoint"]
 default = []
 
 [dependencies]
-anchor-lang = { version = "0.28.0", features = ["init-if-needed"] }
-anchor-spl = "0.28.0"
+anchor-lang = { workspace = true, features = ["init-if-needed"] }
+anchor-spl = { workspace = true }
+spl-token-2022 = { workspace = true }

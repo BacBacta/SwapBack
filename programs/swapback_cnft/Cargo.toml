@@ -1,12 +1,12 @@
 [package]
-name = "swapback_buyback"
+name = "swapback_cnft"
 version = "0.1.0"
-description = "Programme de buyback et burn pour le token $BACK"
+description = "Programme de gestion des compressed NFTs pour les niveaux SwapBack"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "swapback_buyback"
+name = "swapback_cnft"
 
 [features]
 no-entrypoint = []

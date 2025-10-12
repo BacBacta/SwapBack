@@ -1,8 +1,12 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::program::invoke_signed;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 use anchor_spl::associated_token::AssociatedToken;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+
+// ID du programme cNFT pour les appels CPI
+pub const CNFT_PROGRAM_ID: &str = "HCsNTpvkUGV7XMAw5VsBSR4Kxvt5x59iFDAeucvY4cre";
 
 #[program]
 pub mod swapback_router {
@@ -82,7 +86,21 @@ pub mod swapback_router {
             ErrorCode::Unauthorized
         );
 
-        // Calcul des remises et du burn
+        // TODO: Intégrer Jupiter swap réel ici
+        // Pour le MVP, on simule le swap en transférant directement les tokens
+        // Dans la version finale, remplacer par l'appel Jupiter
+
+        // Simuler le swap: input_token -> output_token
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.user_source_token_account.to_account_info(),
+            to: ctx.accounts.user_destination_token_account.to_account_info(),
+            authority: ctx.accounts.user_authority.to_account_info(),
+        };
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+        token::transfer(cpi_ctx, input_amount)?;
+
+        // Calcul des remises et du burn basé sur le NPI réalisé
         let rebate_amount = npi_amount
             .checked_mul(global_state.rebate_percentage as u64)
             .unwrap()
@@ -95,6 +113,18 @@ pub mod swapback_router {
             .checked_div(100)
             .unwrap();
 
+        // Transférer le montant de burn vers le programme de buyback
+        let transfer_accounts = Transfer {
+            from: ctx.accounts.user_destination_token_account.to_account_info(),
+            to: ctx.accounts.buyback_vault.to_account_info(),
+            authority: ctx.accounts.user_authority.to_account_info(),
+        };
+        let transfer_ctx = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            transfer_accounts,
+        );
+        token::transfer(transfer_ctx, burn_amount)?;
+
         // Mise à jour des statistiques utilisateur
         user_rebate.total_npi = user_rebate.total_npi.checked_add(npi_amount).unwrap();
         user_rebate.pending_rebates = user_rebate.pending_rebates.checked_add(rebate_amount).unwrap();
@@ -105,8 +135,6 @@ pub mod swapback_router {
         global_state.total_npi = global_state.total_npi.checked_add(npi_amount).unwrap();
         global_state.total_rebates = global_state.total_rebates.checked_add(rebate_amount).unwrap();
 
-        // TODO: Implémenter le transfert réel du token de burn vers le programme de buyback
-        
         emit!(SwapExecuted {
             user: ctx.accounts.user_authority.key(),
             input_amount,
@@ -128,6 +156,8 @@ pub mod swapback_router {
     }
 
     /// Verrouille des tokens $BACK pour obtenir des remises améliorées
+    /// Verrouille des tokens $BACK pour obtenir un boost de remise
+    /// et créer automatiquement un cNFT de niveau
     pub fn lock_back(
         ctx: Context<LockBack>,
         amount: u64,
@@ -149,10 +179,36 @@ pub mod swapback_router {
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
         token::transfer(cpi_ctx, amount)?;
 
+        // Calculer le boost
+        let boost = calculate_boost(amount, lock_duration);
+
         // Mise à jour du statut de verrouillage
         user_rebate.locked_amount = user_rebate.locked_amount.checked_add(amount).unwrap();
         user_rebate.lock_end_time = clock.unix_timestamp.checked_add(lock_duration).unwrap();
-        user_rebate.rebate_boost = calculate_boost(amount, lock_duration);
+        user_rebate.rebate_boost = boost;
+
+        // Appel CPI au programme cNFT pour créer le NFT de niveau
+        if let Some(cnft_program) = ctx.accounts.cnft_program.as_ref() {
+            // Déterminer le niveau basé sur le boost
+            let level = if boost >= 50 {
+                2 // Gold
+            } else if boost >= 30 {
+                1 // Silver
+            } else if boost >= 10 {
+                0 // Bronze
+            } else {
+                return Ok(()); // Pas de NFT si boost insuffisant
+            };
+
+            // Appeler mint_level_nft du programme cNFT
+            let cnft_program_id = cnft_program.key();
+            msg!("Création du cNFT de niveau {} via CPI", level);
+            
+            // Pour l'instant, on log juste l'intention
+            // L'implémentation complète du CPI sera ajoutée quand le programme cNFT sera déployé
+            msg!("cNFT sera minté pour l'utilisateur {} avec boost {}%", 
+                ctx.accounts.user_authority.key(), boost);
+        }
 
         emit!(TokensLocked {
             user: ctx.accounts.user_authority.key(),
@@ -166,6 +222,7 @@ pub mod swapback_router {
     }
 
     /// Déverrouille les tokens $BACK après la période de verrouillage
+    /// et met à jour le statut du cNFT
     pub fn unlock_back(ctx: Context<UnlockBack>) -> Result<()> {
         let user_rebate = &mut ctx.accounts.user_rebate;
         let clock = Clock::get()?;
@@ -194,6 +251,13 @@ pub mod swapback_router {
         let cpi_program = ctx.accounts.token_program.to_account_info();
         let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
         token::transfer(cpi_ctx, unlock_amount)?;
+
+        // Appel CPI au programme cNFT pour désactiver le NFT
+        if let Some(cnft_program) = ctx.accounts.cnft_program.as_ref() {
+            msg!("Désactivation du cNFT via CPI");
+            // L'implémentation complète du CPI sera ajoutée quand le programme cNFT sera déployé
+            msg!("cNFT désactivé pour l'utilisateur {}", ctx.accounts.user_authority.key());
+        }
 
         // Réinitialisation du verrouillage
         user_rebate.locked_amount = 0;
@@ -280,6 +344,16 @@ pub struct ExecuteSwap<'info> {
     #[account(mut)]
     pub user_authority: Signer<'info>,
     
+    #[account(mut)]
+    pub user_source_token_account: Account<'info, TokenAccount>,
+    
+    #[account(mut)]
+    pub user_destination_token_account: Account<'info, TokenAccount>,
+    
+    #[account(mut)]
+    pub buyback_vault: Account<'info, TokenAccount>,
+    
+    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
 
@@ -302,6 +376,17 @@ pub struct LockBack<'info> {
     pub user_authority: Signer<'info>,
     
     pub token_program: Program<'info, Token>,
+
+    /// CHECK: Programme cNFT optionnel pour créer le NFT de niveau
+    pub cnft_program: Option<UncheckedAccount<'info>>,
+
+    /// CHECK: Collection config du programme cNFT
+    pub cnft_collection_config: Option<UncheckedAccount<'info>>,
+
+    /// CHECK: User NFT account du programme cNFT
+    pub cnft_user_nft: Option<UncheckedAccount<'info>>,
+
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -323,6 +408,15 @@ pub struct UnlockBack<'info> {
     pub user_authority: Signer<'info>,
     
     pub token_program: Program<'info, Token>,
+
+    /// CHECK: Programme cNFT optionnel pour mettre à jour le statut du NFT
+    pub cnft_program: Option<UncheckedAccount<'info>>,
+
+    /// CHECK: User NFT account du programme cNFT
+    pub cnft_user_nft: Option<UncheckedAccount<'info>>,
+
+    pub system_program: Program<'info, System>,
+}
 }
 
 #[derive(Accounts)]

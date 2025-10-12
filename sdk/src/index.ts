@@ -326,3 +326,11 @@ export class SwapBackUtils {
 }
 
 export default SwapBackClient;
+
+// Export du client $BACK token
+export { BackTokenClient, createBackTokenClient, loadBackTokenConfig } from './backToken';
+export type { BackTokenConfig } from './backToken';
+
+// Export du client cNFT
+export { CnftClient, DEFAULT_CNFT_CONFIG } from './cnftClient';
+export type { CnftConfig } from './cnftClient';

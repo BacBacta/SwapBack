@@ -9,20 +9,20 @@ skip-lint = false
 [programs.localnet]
 swapback_router = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
 swapback_buyback = "Hn7cLGf4hYNd8F1RqYNdqxqLKxqVMiEUPPbRKZJd3zKx"
-swapback_transfer_hook = "99SBCaqTDvswXakvH54i94SS2eFXjEaXDNwgVDJahPJP"
-swapback_cnft = "HCsNTpvkUGV7XMAw5VsBSR4Kxvt5x59iFDAeucvY4cre"
+swapback_transfer_hook = "BACKTransferHook1111111111111111111111111111111"
+swapback_cnft = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 
 [programs.devnet]
 swapback_router = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
 swapback_buyback = "Hn7cLGf4hYNd8F1RqYNdqxqLKxqVMiEUPPbRKZJd3zKx"
-swapback_transfer_hook = "99SBCaqTDvswXakvH54i94SS2eFXjEaXDNwgVDJahPJP"
-swapback_cnft = "HCsNTpvkUGV7XMAw5VsBSR4Kxvt5x59iFDAeucvY4cre"
+swapback_transfer_hook = "BACKTransferHook1111111111111111111111111111111"
+swapback_cnft = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 
 [programs.mainnet]
 swapback_router = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
 swapback_buyback = "Hn7cLGf4hYNd8F1RqYNdqxqLKxqVMiEUPPbRKZJd3zKx"
-swapback_transfer_hook = "99SBCaqTDvswXakvH54i94SS2eFXjEaXDNwgVDJahPJP"
-swapback_cnft = "HCsNTpvkUGV7XMAw5VsBSR4Kxvt5x59iFDAeucvY4cre"
+swapback_transfer_hook = "BACKTransferHook1111111111111111111111111111111"
+swapback_cnft = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 
 [registry]
 url = "https://api.apr.dev"
@@ -41,7 +41,7 @@ startup_wait = 10000
 url = "https://api.devnet.solana.com"
 
 [[test.validator.clone]]
-address = "HCsNTpvkUGV7XMAw5VsBSR4Kxvt5x59iFDAeucvY4cre"
+address = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 
 [[test.validator.clone]]
 address = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
