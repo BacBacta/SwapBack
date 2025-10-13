@@ -51,14 +51,14 @@ app.post('/simulate', (req: Request, res: Response) => {
           label: 'Raydium',
           inputMint,
           outputMint: intermediateToken,
-          inAmount: inputAmount,
+          inAmount: baseAmount.toString(),
           outAmount: step1Output.toString(),
           fee: (baseAmount * 0.002).toString()
         },
         {
           label: 'Orca',
           inputMint: intermediateToken,
-          outputMint,
+          outputMint, // ✅ Correction: utiliser le outputMint final, pas l'intermédiaire
           inAmount: step1Output.toString(),
           outAmount: step2Output.toString(),
           fee: (step1Output * 0.003).toString()
@@ -70,7 +70,7 @@ app.post('/simulate', (req: Request, res: Response) => {
         label: 'Jupiter Aggregator',
         inputMint,
         outputMint,
-        inAmount: inputAmount,
+        inAmount: baseAmount.toString(),
         outAmount: (baseAmount * 0.995).toString(),
         fee: (baseAmount * 0.005).toString()
       }];

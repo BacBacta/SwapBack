@@ -74,6 +74,8 @@ export const SwapInterface = () => {
       }
 
       const data = await response.json();
+      
+      console.log('📥 Données reçues de l\'API:', data);
 
       // Transformer les données de l'API en format RouteInfo
       const route: RouteInfo = {
@@ -86,6 +88,9 @@ export const SwapInterface = () => {
         route: data.route || [],
         priceImpact: data.priceImpact || 0,
       };
+      
+      console.log('✅ RouteInfo transformé:', route);
+      console.log('🛣️ Nombre d\'étapes de route:', route.route?.length);
 
       setRouteInfo(route);
       setOutputAmount(route.estimatedOutput.toFixed(6));
@@ -133,7 +138,22 @@ export const SwapInterface = () => {
 
   return (
     <div className="swap-card">
-      <h2 className="text-2xl font-bold mb-6">Swap Optimisé</h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold">Swap Optimisé</h2>
+        
+        {/* Badge DEX Optimisé */}
+        {routeInfo && (
+          <div className="flex items-center gap-2 bg-gradient-to-r from-[var(--primary)]/20 to-purple-500/20 px-4 py-2 rounded-lg border border-[var(--primary)]/30">
+            <span className="text-xl">⚡</span>
+            <div className="flex flex-col">
+              <span className="text-xs text-gray-400">Route optimisée</span>
+              <span className="text-sm font-bold text-[var(--primary)]">
+                {routeInfo.type === "Direct" ? "Jupiter" : "Raydium + Orca"}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Input Token */}
       <div className="mb-4">
@@ -323,6 +343,47 @@ export const SwapInterface = () => {
                 </span>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Résumé Route Optimisée (avant le bouton) */}
+      {routeInfo && routeInfo.route && routeInfo.route.length > 0 && (
+        <div className="mb-4 p-4 bg-gradient-to-br from-[var(--primary)]/10 to-purple-500/10 rounded-lg border-2 border-[var(--primary)]/30">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🎯</span>
+              <span className="font-bold text-white">Route Optimisée Sélectionnée</span>
+            </div>
+            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+              routeInfo.type === "Direct" 
+                ? "bg-blue-500/20 text-blue-400 border border-blue-500/30" 
+                : "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+            }`}>
+              {routeInfo.type === "Direct" ? "⚡ DIRECT" : "🔀 AGGREGATOR"}
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-2 text-sm">
+            {routeInfo.route.map((step, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <span className="px-2 py-1 bg-gray-800/50 rounded text-xs font-semibold text-[var(--primary)] border border-gray-700">
+                  {step.label}
+                </span>
+                {index < routeInfo.route!.length - 1 && (
+                  <span className="text-gray-500">→</span>
+                )}
+              </div>
+            ))}
+          </div>
+          
+          <div className="mt-2 flex items-center justify-between text-xs">
+            <span className="text-gray-400">
+              {routeInfo.route.length} étape{routeInfo.route.length > 1 ? 's' : ''}
+            </span>
+            <span className="text-green-400 font-semibold">
+              Meilleur prix garanti
+            </span>
           </div>
         </div>
       )}
