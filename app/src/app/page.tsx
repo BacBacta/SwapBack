@@ -3,10 +3,11 @@
 import { SwapPage } from "@/components/SwapPage";
 import { Dashboard } from "@/components/Dashboard";
 import { Navigation } from "@/components/Navigation";
+import { KeyboardShortcutsHelper } from "@/components/KeyboardShortcutsHelper";
 
 export default function Home() {
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen" id="main-content">
       <Navigation />
 
       <div className="container mx-auto px-6 py-12">
@@ -95,6 +96,9 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* Keyboard Shortcuts Helper - Cmd/Ctrl + K */}
+      <KeyboardShortcutsHelper />
     </main>
   );
 }

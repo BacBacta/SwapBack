@@ -1,85 +1,110 @@
 "use client";
 
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CNFTCard } from "./CNFTCard";
 import { useCNFT } from "../hooks/useCNFT";
-
-interface UserStats {
-  totalSwaps: number;
-  totalVolume: number;
-  totalNPI: number;
-  totalRebates: number;
-  pendingRebates: number;
-  lockedAmount: number;
-  rebateBoost: number;
-}
+import { useRealtimeStats } from "../hooks/useRealtimeStats";
+import { VolumeChart, ActivityChart } from "./Charts";
+import { SkeletonLoader, ChartSkeleton } from "./Skeletons";
+import { NoActivityState, NoConnectionState } from "./EmptyState";
 
 export const Dashboard = () => {
   const { connected, publicKey } = useWallet();
-  const [stats, setStats] = useState<UserStats | null>(null);
-  const [globalStats] = useState({
-    totalVolume: 1234567,
-    totalBurned: 45678,
-    totalRebates: 98765,
-  });
+  const [activeTab, setActiveTab] = useState<"overview" | "analytics">("overview");
 
-  // 🔥 Utiliser le hook pour récupérer les vraies données blockchain
-  const { cnftData, lockData, levelName } = useCNFT();
+  const { cnftData, levelName } = useCNFT();
+  const { userStats, globalStats, loading } = useRealtimeStats(publicKey?.toString());
 
-  useEffect(() => {
-    if (connected && publicKey) {
-      // NOTE: Données mockées pour le MVP - à remplacer par vraies données on-chain
-      setStats({
-        totalSwaps: 23,
-        totalVolume: 15420,
-        totalNPI: 308.4,
-        totalRebates: 231.3,
-        pendingRebates: 12.45,
-        lockedAmount: lockData?.amount || 0, // Utiliser vraies données si disponibles
-        rebateBoost: lockData?.boost || 0,
-      });
-    } else {
-      setStats(null);
-    }
-  }, [connected, publicKey, lockData]);
+  // Mock chart data
+  const volumeData = {
+    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    volumes: [1200, 1900, 1500, 2100, 1800, 2400, 2200],
+  };
+
+  const activityData = {
+    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    swaps: [5, 8, 6, 10, 7, 12, 9],
+  };
+
+  if (!connected) {
+    return <NoConnectionState />;
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <SkeletonLoader />
+      </div>
+    );
+  }
+
+  if (userStats && userStats.totalSwaps === 0) {
+    return <NoActivityState />;
+  }
 
   return (
     <div className="space-y-8">
-      {/* Global Stats */}
+      {/* ARIA Live Region for updates - Screen reader announcements */}
+      <div
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+        role="status"
+      >
+        {loading ? "Loading dashboard data..." : `Dashboard updated. Total volume: $${globalStats.totalVolume.toLocaleString()}`}
+      </div>
+
+      {/* Global Stats avec animation */}
       <div className="swap-card">
         <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold">Protocol Statistics</h2>
-          <div className="px-3 py-1 bg-[var(--secondary)]/10 rounded-full border border-[var(--secondary)]/20">
+          <h2 className="text-2xl font-bold" id="protocol-stats-heading">Protocol Statistics</h2>
+          <div className="flex items-center gap-2 px-3 py-1 bg-[var(--secondary)]/10 rounded-full border border-[var(--secondary)]/20">
+            <span className="w-2 h-2 bg-[var(--secondary)] rounded-full animate-pulse" aria-hidden="true"></span>
             <span className="text-xs font-semibold text-[var(--secondary)]">Live</span>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-6">
-          <div className="stat-card text-center">
-            <div className="text-sm text-gray-400 mb-2">Total Volume</div>
-            <div className="text-2xl font-bold text-[var(--primary)]">
-              ${globalStats.totalVolume.toLocaleString('en-US')}
+        <div 
+          className="grid grid-cols-1 md:grid-cols-3 gap-6"
+          role="group"
+          aria-labelledby="protocol-stats-heading"
+        >
+          <div className="stat-card text-center group hover:scale-105 transition-transform">
+            <div className="text-sm text-gray-400 mb-2" id="total-volume-label">Total Volume</div>
+            <div 
+              className="text-3xl font-bold text-[var(--primary)]"
+              aria-labelledby="total-volume-label"
+              aria-live="polite"
+            >
+              ${globalStats.totalVolume.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+            </div>
+            <div className="text-xs text-gray-500 mt-2">
+              +{globalStats.swapsLast24h} swaps (24h)
             </div>
           </div>
-          <div className="stat-card text-center">
+          <div className="stat-card text-center group hover:scale-105 transition-transform">
             <div className="text-sm text-gray-400 mb-2">$BACK Burned</div>
-            <div className="text-2xl font-bold text-orange-400">
+            <div className="text-3xl font-bold text-orange-400">
               {globalStats.totalBurned.toLocaleString('en-US')}
             </div>
-          </div>
-          <div className="stat-card text-center">
-            <div className="text-sm text-gray-400 mb-2">
-              Rebates Distributed
+            <div className="text-xs text-gray-500 mt-2">
+              🔥 Deflationary
             </div>
-            <div className="text-2xl font-bold text-green-400">
-              ${globalStats.totalRebates.toLocaleString('en-US')}
+          </div>
+          <div className="stat-card text-center group hover:scale-105 transition-transform">
+            <div className="text-sm text-gray-400 mb-2">Rebates Distributed</div>
+            <div className="text-3xl font-bold text-[var(--secondary)]">
+              ${globalStats.totalRebates.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+            </div>
+            <div className="text-xs text-gray-500 mt-2">
+              {globalStats.activeUsers.toLocaleString()} active users
             </div>
           </div>
         </div>
       </div>
 
-      {/* cNFT Card - Affiché en premier quand connecté */}
-      {connected && cnftData && cnftData.exists && cnftData.isActive && (
+      {/* cNFT Card */}
+      {cnftData && cnftData.exists && cnftData.isActive && (
         <CNFTCard
           level={levelName || "Bronze"}
           boost={cnftData.boost}
@@ -90,151 +115,176 @@ export const Dashboard = () => {
         />
       )}
 
-      {/* User Stats */}
-      {connected && stats && (
-        <div className="swap-card">
-          <div className="flex items-center justify-center gap-3 mb-8">
-            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 border border-primary/30">
-              <span className="text-xl">📊</span>
+      {/* Tabs Navigation */}
+      <div className="flex gap-2 p-1 bg-black/30 rounded-xl border border-white/5">
+        <button
+          onClick={() => setActiveTab("overview")}
+          className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+            activeTab === "overview"
+              ? "bg-[var(--primary)] text-white shadow-[0_0_20px_rgba(153,69,255,0.3)]"
+              : "text-gray-400 hover:text-white hover:bg-white/5"
+          }`}
+        >
+          📊 Overview
+        </button>
+        <button
+          onClick={() => setActiveTab("analytics")}
+          className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+            activeTab === "analytics"
+              ? "bg-[var(--primary)] text-white shadow-[0_0_20px_rgba(153,69,255,0.3)]"
+              : "text-gray-400 hover:text-white hover:bg-white/5"
+          }`}
+        >
+          📈 Analytics
+        </button>
+      </div>
+
+      {/* Content based on active tab */}
+      {activeTab === "overview" && userStats && (
+        <div className="space-y-6">
+          {/* Quick Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="glass-effect rounded-xl p-5 border border-gray-700/50 hover:border-[var(--primary)]/30 transition-all group">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)]/20 to-[var(--primary)]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <span className="text-lg">🔄</span>
+                </div>
+                <span className="text-gray-400 text-sm">Swaps</span>
+              </div>
+              <div className="text-2xl font-bold">{userStats.totalSwaps}</div>
             </div>
-            <h2 className="section-title">Your Statistics</h2>
+
+            <div className="glass-effect rounded-xl p-5 border border-gray-700/50 hover:border-[var(--secondary)]/30 transition-all group">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--secondary)]/20 to-[var(--secondary)]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <span className="text-lg">💰</span>
+                </div>
+                <span className="text-gray-400 text-sm">Volume</span>
+              </div>
+              <div className="text-2xl font-bold">${userStats.totalVolume.toLocaleString()}</div>
+            </div>
+
+            <div className="glass-effect rounded-xl p-5 border border-gray-700/50 hover:border-[var(--secondary)]/30 transition-all group">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--secondary)]/20 to-[var(--secondary)]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <span className="text-lg">📈</span>
+                </div>
+                <span className="text-gray-400 text-sm">NPI</span>
+              </div>
+              <div className="text-2xl font-bold text-[var(--secondary)]">
+                +${userStats.totalNPI.toFixed(2)}
+              </div>
+            </div>
+
+            <div className="glass-effect rounded-xl p-5 border border-gray-700/50 hover:border-[var(--secondary)]/30 transition-all group">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--secondary)]/20 to-[var(--secondary)]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <span className="text-lg">✅</span>
+                </div>
+                <span className="text-gray-400 text-sm">Rebates</span>
+              </div>
+              <div className="text-2xl font-bold text-[var(--secondary)]">
+                ${userStats.totalRebates.toFixed(2)}
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="glass-effect rounded-lg p-5 border border-gray-700/50 hover:border-primary/30 transition-all group">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary-dark/20 border border-primary/30 group-hover:scale-110 transition-transform">
-                    <span className="text-lg">🔄</span>
+          {/* Pending Rebates Card */}
+          {userStats.pendingRebates > 0 && (
+            <div className="glass-effect rounded-xl p-6 border border-[var(--primary)]/30 bg-gradient-to-r from-[var(--primary)]/10 to-[var(--accent)]/5 hover:scale-[1.02] transition-all relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-[var(--primary)]/5 via-[var(--accent)]/5 to-transparent animate-shimmer"></div>
+              <div className="relative flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[var(--primary)]/30 to-[var(--accent)]/30 flex items-center justify-center animate-pulse-glow">
+                    <span className="text-2xl">💎</span>
                   </div>
-                  <span className="text-gray-400 font-medium">Swap count</span>
-                </div>
-                <span className="text-2xl font-bold">{stats.totalSwaps}</span>
-              </div>
-            </div>
-
-            <div className="glass-effect rounded-lg p-5 border border-gray-700/50 hover:border-secondary/30 transition-all group">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-secondary/20 to-green-500/20 border border-secondary/30 group-hover:scale-110 transition-transform">
-                    <span className="text-lg">💰</span>
-                  </div>
-                  <span className="text-gray-400 font-medium">Total volume</span>
-                </div>
-                <span className="text-2xl font-bold">
-                  ${stats.totalVolume.toLocaleString('en-US')}
-                </span>
-              </div>
-            </div>
-
-            <div className="glass-effect rounded-lg p-5 border border-gray-700/50 hover:border-secondary/30 transition-all group relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-radial from-secondary/10 to-transparent rounded-full blur-xl"></div>
-              <div className="relative flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-secondary/20 to-green-500/20 border border-secondary/30 group-hover:scale-110 transition-transform">
-                    <span className="text-lg">📈</span>
-                  </div>
-                  <span className="text-gray-400 font-medium">NPI accumulated</span>
-                </div>
-                <span className="text-2xl font-bold text-secondary">
-                  +${stats.totalNPI.toFixed(2)}
-                </span>
-              </div>
-            </div>
-
-            <div className="glass-effect rounded-lg p-5 border border-gray-700/50 hover:border-secondary/30 transition-all group">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-secondary/20 to-green-500/20 border border-secondary/30 group-hover:scale-110 transition-transform">
-                    <span className="text-lg">✅</span>
-                  </div>
-                  <span className="text-gray-400 font-medium">Rebates claimed</span>
-                </div>
-                <span className="text-2xl font-bold text-secondary">
-                  ${stats.totalRebates.toFixed(2)}
-                </span>
-              </div>
-            </div>
-
-            <div className="glass-effect rounded-lg p-6 border border-primary/30 bg-gradient-to-r from-primary/10 to-accent/5 hover:scale-[1.02] transition-all group relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-accent/5 to-transparent animate-shimmer"></div>
-              <div className="relative flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 border border-primary/40 group-hover:scale-110 transition-transform animate-pulse-glow">
-                    <span className="text-xl">💎</span>
-                  </div>
-                  <span className="font-bold text-lg">Pending rebates</span>
-                </div>
-                <span className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                  ${stats.pendingRebates.toFixed(2)}
-                </span>
-              </div>
-            </div>
-
-            {stats.pendingRebates > 0 && (
-              <button className="btn-primary w-full py-4 text-lg font-bold relative overflow-hidden group">
-                <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-transparent animate-shimmer"></div>
-                <span className="relative flex items-center justify-center gap-2">
-                  <span>🎁</span>
-                  <span>Claim rebates</span>
-                </span>
-              </button>
-            )}
-          </div>
-
-          {/* Lock Info */}
-          {stats.lockedAmount > 0 && (
-            <div className="mt-6 p-6 glass-effect rounded-xl border border-primary/30 bg-gradient-to-br from-primary/10 via-accent/5 to-transparent relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-radial from-primary/20 to-transparent rounded-full blur-2xl"></div>
-              <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-radial from-accent/15 to-transparent rounded-full blur-2xl"></div>
-              
-              <div className="relative">
-                <div className="flex items-center gap-2 mb-5">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 border border-primary/40">
-                    <span className="text-sm">🔒</span>
-                  </div>
-                  <span className="font-bold text-primary">Lock Information</span>
-                </div>
-                
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400 font-medium">$BACK locked</span>
-                    <span className="text-2xl font-bold">
-                      {stats.lockedAmount.toLocaleString('en-US')}
-                    </span>
-                  </div>
-                  
-                  <div className="h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent"></div>
-                  
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400 font-medium">Rebate boost</span>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-3xl font-bold bg-gradient-to-r from-secondary to-green-400 bg-clip-text text-transparent">
-                        +{stats.rebateBoost}%
-                      </span>
+                  <div>
+                    <div className="font-bold text-lg mb-1">Pending Rebates</div>
+                    <div className="text-3xl font-bold bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] bg-clip-text text-transparent">
+                      ${userStats.pendingRebates.toFixed(2)}
                     </div>
                   </div>
                 </div>
-                
-                <div className="mt-4 pt-4 border-t border-gray-700/50">
-                  <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
-                    <div className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></div>
-                    <span>Boost actif sur tous vos swaps</span>
-                  </div>
-                </div>
+                <button className="btn-primary px-8 py-3 text-lg font-bold">
+                  🎁 Claim Now
+                </button>
               </div>
             </div>
           )}
         </div>
       )}
 
-      {!connected && (
-        <div className="swap-card text-center py-12">
-          <div className="flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 border border-primary/30 mx-auto mb-6">
-            <span className="text-4xl">👛</span>
+      {/* Analytics Tab avec Charts */}
+      {activeTab === "analytics" && (
+        <div className="space-y-6">
+          {/* Volume Chart */}
+          <div className="swap-card">
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <span>📊</span>
+              <span>Volume Trend (7 Days)</span>
+            </h3>
+            <div className="h-64">
+              <VolumeChart data={volumeData} />
+            </div>
           </div>
-          <p className="text-gray-400 text-lg mb-4">Wallet non connecté</p>
-          <p className="text-gray-500 text-sm">Connectez votre wallet pour voir vos statistiques</p>
+
+          {/* Activity Chart */}
+          <div className="swap-card">
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <span>📈</span>
+              <span>Trading Activity (7 Days)</span>
+            </h3>
+            <div className="h-64">
+              <ActivityChart data={activityData} />
+            </div>
+          </div>
+
+          {/* Stats Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="swap-card">
+              <h4 className="font-bold mb-4 text-[var(--primary)]">Performance</h4>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Avg. Swap Size</span>
+                  <span className="font-semibold">${(userStats?.totalVolume || 0 / (userStats?.totalSwaps || 1)).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Avg. NPI per Swap</span>
+                  <span className="font-semibold text-[var(--secondary)]">
+                    ${(userStats?.totalNPI || 0 / (userStats?.totalSwaps || 1)).toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Rebate Rate</span>
+                  <span className="font-semibold text-[var(--secondary)]">
+                    {(((userStats?.totalRebates || 0) / (userStats?.totalVolume || 1)) * 100).toFixed(2)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="swap-card">
+              <h4 className="font-bold mb-4 text-[var(--secondary)]">Rewards</h4>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Total Earned</span>
+                  <span className="font-semibold text-[var(--secondary)]">
+                    ${((userStats?.totalNPI || 0) + (userStats?.totalRebates || 0)).toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Rebate Boost</span>
+                  <span className="font-semibold">+{userStats?.rebateBoost || 0}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Locked Amount</span>
+                  <span className="font-semibold">
+                    {(userStats?.lockedAmount || 0).toLocaleString()} $BACK
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

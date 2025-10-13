@@ -3,8 +3,6 @@
 import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useBlockchainTracer } from "../hooks/useBlockchainTracer";
-import { useTokenData } from "../hooks/useTokenData";
-import { TokenSelector } from "./TokenSelector";
 
 interface RouteStep {
   label: string;
@@ -48,24 +46,13 @@ export const SwapInterface = () => {
   const [loading, setLoading] = useState(false);
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
   const [lastOperation, setLastOperation] = useState<string | null>(null);
-  const [showInputTokenSelector, setShowInputTokenSelector] = useState(false);
-  const [showOutputTokenSelector, setShowOutputTokenSelector] = useState(false);
 
   // Mapping des tokens vers leurs adresses Solana
   const tokenAddresses: { [key: string]: string } = {
     SOL: "So11111111111111111111111111111111111111112",
     USDC: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
     USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-    BONK: "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs",
-    PYTH: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
-    mSOL: "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
-    JUP: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
-    JTO: "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr",
   };
-
-  // Récupérer balance + prix USD pour chaque token
-  const inputTokenData = useTokenData(tokenAddresses[inputToken]);
-  const outputTokenData = useTokenData(tokenAddresses[outputToken]);
 
   const handleSimulateRoute = async () => {
     if (!inputAmount || !connected) return;
@@ -201,36 +188,11 @@ export const SwapInterface = () => {
     }
   };
 
-  const setMaxBalance = () => {
-    if (inputTokenData.balance > 0) {
-      setInputAmount(inputTokenData.balance.toString());
-      setRouteInfo(null);
-    }
-  };
-
-  const setHalfBalance = () => {
-    if (inputTokenData.balance > 0) {
-      setInputAmount((inputTokenData.balance / 2).toString());
-      setRouteInfo(null);
-    }
-  };
-
-  const swapTokens = () => {
-    const tempToken = inputToken;
-    const tempAmount = inputAmount;
-    setInputToken(outputToken);
-    setOutputToken(tempToken);
-    setInputAmount(outputAmount);
-    setOutputAmount(tempAmount);
-    setRouteInfo(null);
-  };
-
   return (
-    <>
-      <div className="swap-card max-w-2xl mx-auto relative">
-        {/* Decorative gradient */}
-        <div className="absolute -top-20 -right-20 w-40 h-40 bg-[var(--primary)]/10 rounded-full blur-3xl -z-10"></div>
-        <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-[var(--secondary)]/10 rounded-full blur-3xl -z-10"></div>
+    <div className="swap-card max-w-2xl mx-auto relative">
+      {/* Decorative gradient */}
+      <div className="absolute -top-20 -right-20 w-40 h-40 bg-[var(--primary)]/10 rounded-full blur-3xl -z-10"></div>
+      <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-[var(--secondary)]/10 rounded-full blur-3xl -z-10"></div>
       
       <div className="text-center mb-8">
         <div className="inline-flex items-center gap-2 mb-4 px-4 py-2 bg-[var(--primary)]/10 rounded-full border border-[var(--primary)]/20">
@@ -242,115 +204,61 @@ export const SwapInterface = () => {
       </div>
 
       {/* Input Token */}
-      <div className="mb-4">
-        <div className="flex justify-between items-center mb-3">
-          <label className="label-text">You pay</label>
-          {connected && (
-            <div className="text-sm text-gray-400">
-              Balance: <span className="font-semibold text-white">
-                {inputTokenData.loading ? "..." : inputTokenData.balance.toFixed(4)}
-              </span> {inputToken}
-            </div>
-          )}
-        </div>
-        <div className="flex gap-3">
-          <div className="flex-1">
-            <input
-              type="number"
-              value={inputAmount}
-              onChange={(e) => {
-                setInputAmount(e.target.value);
-                setRouteInfo(null);
-              }}
-              placeholder="0.00"
-              className="input-field w-full text-2xl font-bold"
-              disabled={!connected}
-            />
-            {inputAmount && inputTokenData.usdPrice > 0 && (
-              <div className="mt-2 text-sm text-gray-400">
-                ≈ ${(parseFloat(inputAmount) * inputTokenData.usdPrice).toFixed(2)} USD
-              </div>
-            )}
-          </div>
-          <button
-            onClick={() => setShowInputTokenSelector(true)}
-            className="px-4 py-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 hover:border-white/20 transition-all flex items-center gap-2 min-w-[120px]"
+      <div className="mb-6">
+        <label className="label-text mb-3 block text-center">You pay</label>
+        <div className="flex gap-3 justify-center">
+          <input
+            type="number"
+            value={inputAmount}
+            onChange={(e) => {
+              setInputAmount(e.target.value);
+              setRouteInfo(null);
+            }}
+            placeholder="0.00"
+            className="input-field flex-1 max-w-xs"
+            disabled={!connected}
+          />
+          <select
+            value={inputToken}
+            onChange={(e) => setInputToken(e.target.value)}
+            className="input-field w-32"
             disabled={!connected}
           >
-            <span className="font-semibold">{inputToken}</span>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
+            <option value="USDC">USDC</option>
+            <option value="SOL">SOL</option>
+            <option value="USDT">USDT</option>
+          </select>
         </div>
-        {connected && inputTokenData.balance > 0 && (
-          <div className="flex gap-2 mt-3">
-            <button
-              onClick={setHalfBalance}
-              className="px-3 py-1.5 text-xs font-semibold bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
-            >
-              HALF
-            </button>
-            <button
-              onClick={setMaxBalance}
-              className="px-3 py-1.5 text-xs font-semibold bg-[var(--primary)]/10 hover:bg-[var(--primary)]/20 text-[var(--primary)] rounded-lg transition-colors border border-[var(--primary)]/20"
-            >
-              MAX
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Swap Icon */}
       <div className="flex justify-center my-6">
-        <button
-          className="p-3 rounded-full bg-white/10 hover:bg-white/20 transition-all border border-white/20 hover:scale-110"
-          onClick={swapTokens}
-          disabled={!connected}
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-          </svg>
+        <button className="p-3 rounded-full bg-white/10 hover:bg-white/20 transition-colors border border-white/20">
+          <span className="text-xl">↓</span>
         </button>
       </div>
 
       {/* Output Token */}
       <div className="mb-8">
-        <div className="flex justify-between items-center mb-3">
-          <label className="label-text">You receive</label>
-          {connected && (
-            <div className="text-sm text-gray-400">
-              Balance: <span className="font-semibold text-white">
-                {outputTokenData.loading ? "..." : outputTokenData.balance.toFixed(4)}
-              </span> {outputToken}
-            </div>
-          )}
-        </div>
-        <div className="flex gap-3">
-          <div className="flex-1">
-            <input
-              type="number"
-              value={outputAmount}
-              placeholder="0.00"
-              className="input-field w-full text-2xl font-bold"
-              disabled
-            />
-            {outputAmount && outputTokenData.usdPrice > 0 && (
-              <div className="mt-2 text-sm text-gray-400">
-                ≈ ${(parseFloat(outputAmount) * outputTokenData.usdPrice).toFixed(2)} USD
-              </div>
-            )}
-          </div>
-          <button
-            onClick={() => setShowOutputTokenSelector(true)}
-            className="px-4 py-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 hover:border-white/20 transition-all flex items-center gap-2 min-w-[120px]"
+        <label className="label-text mb-3 block text-center">You receive</label>
+        <div className="flex gap-3 justify-center">
+          <input
+            type="number"
+            value={outputAmount}
+            placeholder="0.00"
+            className="input-field flex-1 max-w-xs"
+            disabled
+          />
+          <select
+            value={outputToken}
+            onChange={(e) => setOutputToken(e.target.value)}
+            className="input-field w-32"
             disabled={!connected}
           >
-            <span className="font-semibold">{outputToken}</span>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
+            <option value="SOL">SOL</option>
+            <option value="USDC">USDC</option>
+            <option value="USDT">USDT</option>
+          </select>
         </div>
       </div>
 
@@ -657,24 +565,7 @@ export const SwapInterface = () => {
             )}
           </button>
         )}
-        </div>
       </div>
-
-      {/* Token Selectors */}
-      {showInputTokenSelector && (
-        <TokenSelector
-          selectedToken={inputToken}
-          onSelect={(token) => setInputToken(token.symbol)}
-          onClose={() => setShowInputTokenSelector(false)}
-        />
-      )}
-      {showOutputTokenSelector && (
-        <TokenSelector
-          selectedToken={outputToken}
-          onSelect={(token) => setOutputToken(token.symbol)}
-          onClose={() => setShowOutputTokenSelector(false)}
-        />
-      )}
-    </>
+    </div>
   );
 };
