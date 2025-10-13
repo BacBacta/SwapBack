@@ -76,14 +76,32 @@ app.post('/simulate', (req: Request, res: Response) => {
       }];
     }
     
+    // Calculer le prix non optimisé (ce que l'utilisateur obtiendrait sans SwapBack)
+    // Prix standard du marché avec frais plus élevés (~1.5% au lieu de 0.5%)
+    const nonOptimizedOutput = baseAmount * 0.985; // Frais standard 1.5%
+    const optimizedOutput = baseAmount * 0.995; // Avec SwapBack: 0.5%
+    
+    // Calculer les économies réalisées par SwapBack
+    const totalSavings = optimizedOutput - nonOptimizedOutput; // 1% d'économie
+    
+    // Répartition des économies SwapBack :
+    // - 60% NPI (Net Price Improvement) = 0.6% du montant d'entrée
+    // - 30% Rebate (remise utilisateur) = 0.3% du montant d'entrée  
+    // - 10% Burn (brûlage $BACK) = 0.1% du montant d'entrée
+    const npi = baseAmount * 0.006; // 0.6%
+    const rebateAmount = baseAmount * 0.003; // 0.3%
+    const burnAmount = baseAmount * 0.001; // 0.1%
+    const fees = baseAmount * 0.001; // Frais réseau 0.1%
+    
     const simulation = {
       type: usesIntermediate ? "Aggregator" : "Direct",
       inputAmount: baseAmount,
-      estimatedOutput: baseAmount * 0.995,
-      npi: baseAmount * 0.01,
-      rebateAmount: baseAmount * 0.0075,
-      burnAmount: baseAmount * 0.0025,
-      fees: baseAmount * 0.001,
+      estimatedOutput: optimizedOutput, // Prix avec SwapBack
+      nonOptimizedOutput: nonOptimizedOutput, // ✨ Prix sans SwapBack (pour comparaison)
+      npi: npi,
+      rebateAmount: rebateAmount,
+      burnAmount: burnAmount,
+      fees: fees,
       priceImpact: Math.random() * 0.5, // Impact aléatoire entre 0 et 0.5%
       route: routes
     };

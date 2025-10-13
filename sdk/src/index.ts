@@ -3,6 +3,11 @@ import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
 import axios from 'axios';
 
 /**
+ * Export du tracer blockchain
+ */
+export * from './blockchain-tracer';
+
+/**
  * Types pour les routes de swap
  */
 export enum RouteType {

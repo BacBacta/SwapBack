@@ -45,26 +45,27 @@ export const Dashboard = () => {
   }, [connected, publicKey, lockData]);
 
   return (
-    <div className="space-y-6">
+      return (
+    <div className="space-y-8">
       {/* Global Stats */}
       <div className="swap-card">
-        <h2 className="text-2xl font-bold mb-6">Statistiques Globales</h2>
-        <div className="grid grid-cols-3 gap-4">
-          <div className="stat-card">
-            <div className="text-sm text-gray-400 mb-1">Volume Total</div>
+        <h2 className="text-2xl font-bold mb-8 text-center">Global Statistics</h2>
+        <div className="grid grid-cols-3 gap-6">
+          <div className="stat-card text-center">
+            <div className="text-sm text-gray-400 mb-2">Total Volume</div>
             <div className="text-2xl font-bold text-[var(--primary)]">
               ${globalStats.totalVolume.toLocaleString('en-US')}
             </div>
           </div>
-          <div className="stat-card">
-            <div className="text-sm text-gray-400 mb-1">$BACK Brûlés</div>
+          <div className="stat-card text-center">
+            <div className="text-sm text-gray-400 mb-2">$BACK Burned</div>
             <div className="text-2xl font-bold text-orange-400">
               {globalStats.totalBurned.toLocaleString('en-US')}
             </div>
           </div>
-          <div className="stat-card">
-            <div className="text-sm text-gray-400 mb-1">
-              Remises Distribuées
+          <div className="stat-card text-center">
+            <div className="text-sm text-gray-400 mb-2">
+              Rebates Distributed
             </div>
             <div className="text-2xl font-bold text-green-400">
               ${globalStats.totalRebates.toLocaleString('en-US')}
@@ -88,37 +89,37 @@ export const Dashboard = () => {
       {/* User Stats */}
       {connected && stats && (
         <div className="swap-card">
-          <h2 className="text-2xl font-bold mb-6">Vos Statistiques</h2>
+          <h2 className="text-2xl font-bold mb-8 text-center">Your Statistics</h2>
 
-          <div className="space-y-4">
-            <div className="flex justify-between items-center p-3 bg-black/30 rounded-lg">
-              <span className="text-gray-400">Nombre de swaps</span>
+          <div className="space-y-6">
+            <div className="flex justify-between items-center p-4 bg-black/20 rounded-lg">
+              <span className="text-gray-400">Swap count</span>
               <span className="text-xl font-semibold">{stats.totalSwaps}</span>
             </div>
 
-            <div className="flex justify-between items-center p-3 bg-black/30 rounded-lg">
-              <span className="text-gray-400">Volume total</span>
+            <div className="flex justify-between items-center p-4 bg-black/20 rounded-lg">
+              <span className="text-gray-400">Total volume</span>
               <span className="text-xl font-semibold">
                 ${stats.totalVolume.toLocaleString('en-US')}
               </span>
             </div>
 
-            <div className="flex justify-between items-center p-3 bg-black/30 rounded-lg">
-              <span className="text-gray-400">NPI accumulé</span>
+            <div className="flex justify-between items-center p-4 bg-black/20 rounded-lg">
+              <span className="text-gray-400">NPI accumulated</span>
               <span className="text-xl font-semibold text-green-400">
                 +${stats.totalNPI.toFixed(2)}
               </span>
             </div>
 
-            <div className="flex justify-between items-center p-3 bg-black/30 rounded-lg">
-              <span className="text-gray-400">Remises réclamées</span>
+            <div className="flex justify-between items-center p-4 bg-black/20 rounded-lg">
+              <span className="text-gray-400">Rebates claimed</span>
               <span className="text-xl font-semibold text-green-400">
                 ${stats.totalRebates.toFixed(2)}
               </span>
             </div>
 
-            <div className="flex justify-between items-center p-3 bg-gradient-to-r from-[var(--primary)]/20 to-[var(--secondary)]/20 rounded-lg border border-[var(--primary)]/30">
-              <span className="font-semibold">Remises en attente</span>
+            <div className="flex justify-between items-center p-4 bg-gradient-to-r from-[var(--primary)]/20 to-[var(--secondary)]/20 rounded-lg border border-[var(--primary)]/30">
+              <span className="font-semibold">Pending rebates</span>
               <span className="text-xl font-bold text-[var(--primary)]">
                 ${stats.pendingRebates.toFixed(2)}
               </span>
@@ -126,22 +127,22 @@ export const Dashboard = () => {
 
             {stats.pendingRebates > 0 && (
               <button className="btn-primary w-full">
-                Réclamer les remises
+                Claim rebates
               </button>
             )}
           </div>
 
           {/* Lock Info */}
           {stats.lockedAmount > 0 && (
-            <div className="mt-6 p-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/30">
-              <div className="flex justify-between items-center mb-2">
-                <span className="font-semibold">$BACK verrouillés</span>
+            <div className="mt-8 p-6 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/30">
+              <div className="flex justify-between items-center mb-4">
+                <span className="font-semibold">$BACK locked</span>
                 <span className="text-xl font-bold">
                   {stats.lockedAmount.toLocaleString('en-US')}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-400">Boost de remise</span>
+                <span className="text-sm text-gray-400">Rebate boost</span>
                 <span className="text-lg font-semibold text-purple-400">
                   +{stats.rebateBoost}%
                 </span>

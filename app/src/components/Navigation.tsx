@@ -5,8 +5,8 @@ import Link from "next/link";
 
 export const Navigation = () => {
   return (
-    <nav className="border-b border-gray-800 bg-black/50 backdrop-blur-lg sticky top-0 z-50">
-      <div className="container mx-auto px-4 py-4">
+    <nav className="border-b border-white/10 bg-black/50 backdrop-blur-lg sticky top-0 z-50">
+      <div className="container mx-auto px-6 py-4">
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-8">
             <Link
@@ -18,27 +18,27 @@ export const Navigation = () => {
             <div className="hidden md:flex space-x-6">
               <Link
                 href="/"
-                className="text-gray-300 hover:text-white transition"
+                className="text-gray-300 hover:text-white transition-colors"
               >
                 Swap
               </Link>
               <Link
                 href="/lock"
-                className="text-gray-300 hover:text-white transition"
+                className="text-gray-300 hover:text-white transition-colors"
               >
                 Lock & Earn
               </Link>
               <Link
                 href="/stats"
-                className="text-gray-300 hover:text-white transition"
+                className="text-gray-300 hover:text-white transition-colors"
               >
-                Statistiques
+                Stats
               </Link>
               <Link
                 href="/docs"
-                className="text-gray-300 hover:text-white transition"
+                className="text-gray-300 hover:text-white transition-colors"
               >
-                Documentation
+                Docs
               </Link>
             </div>
           </div>

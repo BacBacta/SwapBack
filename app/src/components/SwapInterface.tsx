@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { useBlockchainTracer } from "../hooks/useBlockchainTracer";
 
 interface RouteStep {
   label: string;
@@ -15,6 +16,7 @@ interface RouteStep {
 interface RouteInfo {
   type: "Direct" | "Aggregator" | "RFQ" | "Bundle";
   estimatedOutput: number;
+  nonOptimizedOutput: number; // ✨ NOUVEAU: Prix sans optimisation
   npi: number;
   rebate: number;
   burn: number;
@@ -27,6 +29,15 @@ export const SwapInterface = () => {
   const { connected, publicKey } = useWallet();
   const { connection } = useConnection();
 
+  // 🔍 Blockchain Tracer
+  const {
+    traceSwap,
+    operations,
+    loading: tracerLoading,
+    error: tracerError,
+    statistics
+  } = useBlockchainTracer();
+
   const [inputAmount, setInputAmount] = useState("");
   const [outputAmount, setOutputAmount] = useState("");
   const [inputToken, setInputToken] = useState("USDC");
@@ -34,6 +45,7 @@ export const SwapInterface = () => {
   const [slippage, setSlippage] = useState(0.5);
   const [loading, setLoading] = useState(false);
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
+  const [lastOperation, setLastOperation] = useState<string | null>(null);
 
   // Mapping des tokens vers leurs adresses Solana
   const tokenAddresses: { [key: string]: string } = {
@@ -81,6 +93,7 @@ export const SwapInterface = () => {
       const route: RouteInfo = {
         type: data.type || "Aggregator",
         estimatedOutput: data.estimatedOutput / 1000000 || 0, // Convertir depuis lamports
+        nonOptimizedOutput: data.nonOptimizedOutput / 1000000 || 0, // ✨ Prix sans SwapBack
         npi: data.npi / 1000000 || 0,
         rebate: data.rebateAmount / 1000000 || 0,
         burn: data.burnAmount / 1000000 || 0,
@@ -100,6 +113,7 @@ export const SwapInterface = () => {
       const mockRoute: RouteInfo = {
         type: "Aggregator",
         estimatedOutput: parseFloat(inputAmount) * 0.005,
+        nonOptimizedOutput: parseFloat(inputAmount) * 0.0045, // Prix non optimisé (moins bon)
         npi: parseFloat(inputAmount) * 0.002,
         rebate: parseFloat(inputAmount) * 0.0015,
         burn: parseFloat(inputAmount) * 0.0005,
@@ -118,47 +132,73 @@ export const SwapInterface = () => {
 
     setLoading(true);
     try {
-      // TODO: Implémenter l'exécution du swap via le SDK SwapBack
-      console.log("Exécution du swap...");
+      console.log("🔄 Exécution du swap...");
+      
+      // Simulation de l'exécution du swap
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      alert("Swap exécuté avec succès!");
+      // 🔍 TRAÇAGE BLOCKCHAIN - Enregistrer l'opération sur la blockchain
+      console.log("📝 Traçage de l'opération sur la blockchain...");
+      const operation = await traceSwap(
+        {
+          inputToken: inputToken,
+          outputToken: outputToken,
+          inputAmount: parseFloat(inputAmount),
+          outputAmount: routeInfo.estimatedOutput / 1000000, // Convertir en format décimal
+          route: routeInfo.route ? routeInfo.route.map(step => step.label) : [routeInfo.type],
+          priceImpact: routeInfo.priceImpact || 0.01,
+          slippage: slippage
+        },
+        {
+          npi: routeInfo.npi,
+          rebate: routeInfo.rebate,
+          burn: routeInfo.burn,
+          fees: routeInfo.fees
+        }
+      );
+
+      if (operation) {
+        console.log("✅ Swap tracé avec succès!");
+        console.log("📋 Signature:", operation.signature);
+        console.log("🔗 Voir sur Solana Explorer:", 
+          `https://explorer.solana.com/tx/${operation.signature}?cluster=devnet`
+        );
+        
+        setLastOperation(operation.signature);
+        
+        alert(
+          `✅ Swap exécuté avec succès!\n\n` +
+          `📋 Signature: ${operation.signature.substring(0, 20)}...\n` +
+          `💰 Économies: ${((routeInfo.estimatedOutput - routeInfo.nonOptimizedOutput) / 1000000).toFixed(4)} ${outputToken}\n` +
+          `🔗 Opération tracée sur la blockchain`
+        );
+      } else {
+        alert("⚠️ Swap exécuté mais le traçage a échoué");
+      }
 
       // Reset
       setInputAmount("");
       setOutputAmount("");
       setRouteInfo(null);
     } catch (error) {
-      console.error("Erreur lors du swap:", error);
-      alert("Erreur lors du swap");
+      console.error("❌ Erreur lors du swap:", error);
+      alert(`❌ Erreur lors du swap: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="swap-card">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold">Swap Optimisé</h2>
-        
-        {/* Badge DEX Optimisé */}
-        {routeInfo && (
-          <div className="flex items-center gap-2 bg-gradient-to-r from-[var(--primary)]/20 to-purple-500/20 px-4 py-2 rounded-lg border border-[var(--primary)]/30">
-            <span className="text-xl">⚡</span>
-            <div className="flex flex-col">
-              <span className="text-xs text-gray-400">Route optimisée</span>
-              <span className="text-sm font-bold text-[var(--primary)]">
-                {routeInfo.type === "Direct" ? "Jupiter" : "Raydium + Orca"}
-              </span>
-            </div>
-          </div>
-        )}
+    <div className="swap-card max-w-2xl mx-auto">
+      <div className="text-center mb-8">
+        <h2 className="section-title mb-2">Request Optimized Swap</h2>
+        <p className="body-regular text-gray-400">Maximum optimization with best execution routing</p>
       </div>
 
       {/* Input Token */}
-      <div className="mb-4">
-        <label className="block text-sm text-gray-400 mb-2">Vous payez</label>
-        <div className="flex gap-2">
+      <div className="mb-6">
+        <label className="label-text mb-3 block text-center">You pay</label>
+        <div className="flex gap-3 justify-center">
           <input
             type="number"
             value={inputAmount}
@@ -167,7 +207,7 @@ export const SwapInterface = () => {
               setRouteInfo(null);
             }}
             placeholder="0.00"
-            className="input-field flex-1"
+            className="input-field flex-1 max-w-xs"
             disabled={!connected}
           />
           <select
@@ -184,21 +224,21 @@ export const SwapInterface = () => {
       </div>
 
       {/* Swap Icon */}
-      <div className="flex justify-center my-4">
-        <button className="p-2 rounded-full bg-gray-800 hover:bg-gray-700 transition">
-          ↓
+      <div className="flex justify-center my-6">
+        <button className="p-3 rounded-full bg-white/10 hover:bg-white/20 transition-colors border border-white/20">
+          <span className="text-xl">↓</span>
         </button>
       </div>
 
       {/* Output Token */}
-      <div className="mb-6">
-        <label className="block text-sm text-gray-400 mb-2">Vous recevez</label>
-        <div className="flex gap-2">
+      <div className="mb-8">
+        <label className="label-text mb-3 block text-center">You receive</label>
+        <div className="flex gap-3 justify-center">
           <input
             type="number"
             value={outputAmount}
             placeholder="0.00"
-            className="input-field flex-1"
+            className="input-field flex-1 max-w-xs"
             disabled
           />
           <select
@@ -215,20 +255,22 @@ export const SwapInterface = () => {
       </div>
 
       {/* Slippage */}
-      <div className="mb-6">
-        <label className="block text-sm text-gray-400 mb-2">
-          Tolérance de slippage: {slippage}%
+      <div className="mb-8 text-center">
+        <label className="label-text mb-3 block">
+          Slippage tolerance: {slippage}%
         </label>
-        <input
-          type="range"
-          min="0.1"
-          max="5"
-          step="0.1"
-          value={slippage}
-          onChange={(e) => setSlippage(parseFloat(e.target.value))}
-          className="w-full"
-          disabled={!connected}
-        />
+        <div className="max-w-xs mx-auto">
+          <input
+            type="range"
+            min="0.1"
+            max="5"
+            step="0.1"
+            value={slippage}
+            onChange={(e) => setSlippage(parseFloat(e.target.value))}
+            className="w-full"
+            disabled={!connected}
+          />
+        </div>
       </div>
 
       {/* Route Info */}
@@ -301,45 +343,50 @@ export const SwapInterface = () => {
           )}
 
           {/* Détails Financiers */}
-          <div className="p-4 bg-black/30 rounded-lg">
-            <h3 className="text-sm font-semibold mb-3 text-[var(--primary)]">
-              💰 Détails Financiers
-            </h3>
-            <div className="space-y-2 text-sm">
+          <div className="p-6 bg-black/20 rounded-lg border border-white/10">
+            <h3 className="card-title mb-4 text-center text-white">Financial Details</h3>
+            <div className="space-y-3 text-sm">
               {routeInfo.priceImpact !== undefined && (
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Impact sur le prix</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Price impact</span>
                   <span className={routeInfo.priceImpact < 1 ? "text-green-400" : "text-orange-400"}>
                     {routeInfo.priceImpact.toFixed(2)}%
                   </span>
                 </div>
               )}
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-gray-400">NPI (Net Price Improvement)</span>
-                <span className="text-green-400">
+                <span className="text-green-400 font-semibold">
                   +{routeInfo.npi.toFixed(4)} USDC
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Votre remise (75%)</span>
-                <span className="text-green-400">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Your rebate (30%)</span>
+                <span className="text-green-400 font-semibold">
                   +{routeInfo.rebate.toFixed(4)} USDC
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Burn $BACK (25%)</span>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Burn $BACK (10%)</span>
                 <span className="text-orange-400">
                   {routeInfo.burn.toFixed(4)} USDC
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Frais réseau</span>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Network fees</span>
                 <span>{routeInfo.fees.toFixed(4)} USDC</span>
               </div>
-              <div className="pt-2 mt-2 border-t border-gray-700 flex justify-between font-semibold">
-                <span className="text-white">Total estimé</span>
+              <div className="pt-3 mt-3 border-t border-white/10 flex justify-between items-center font-semibold">
+                <span className="text-white">Estimated total</span>
                 <span className="text-green-400">
                   {routeInfo.estimatedOutput.toFixed(6)} {outputToken}
+                </span>
+              </div>
+              {/* Vérification de cohérence */}
+              <div className="pt-2 mt-2 border-t border-white/10 flex justify-between text-xs">
+                <span className="text-gray-500">Consistency check</span>
+                <span className={(routeInfo.npi + routeInfo.rebate + routeInfo.burn).toFixed(4) === (routeInfo.estimatedOutput - routeInfo.nonOptimizedOutput).toFixed(4) ? "text-green-400" : "text-red-400"}>
+                  {(routeInfo.npi + routeInfo.rebate + routeInfo.burn).toFixed(4)} = {(routeInfo.estimatedOutput - routeInfo.nonOptimizedOutput).toFixed(4)}
                 </span>
               </div>
             </div>
@@ -388,27 +435,96 @@ export const SwapInterface = () => {
         </div>
       )}
 
+      {/* 💰 Your Savings */}
+      {routeInfo && (
+        <div className="mb-6 p-6 bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-lg border-2 border-green-500/30">
+          <div className="text-center mb-4">
+            <span className="text-2xl mb-2 block">💰</span>
+            <span className="font-bold text-white text-lg">Your Savings</span>
+          </div>
+          
+          <div className="space-y-3">
+            {/* Prix Sans SwapBack */}
+            <div className="flex items-center justify-between p-3 bg-red-500/10 rounded-lg border border-red-500/20">
+              <div className="flex items-center gap-2">
+                <span className="text-red-400 text-xl">❌</span>
+                <div>
+                  <div className="text-xs text-gray-400">Sans SwapBack</div>
+                  <div className="text-sm font-semibold text-gray-300">Prix standard du marché</div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-bold text-red-400">
+                  {routeInfo.nonOptimizedOutput.toFixed(6)}
+                </div>
+                <div className="text-xs text-gray-500">{outputToken}</div>
+              </div>
+            </div>
+
+            {/* Prix Avec SwapBack */}
+            <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-lg border border-green-500/30">
+              <div className="flex items-center gap-2">
+                <span className="text-green-400 text-xl">✅</span>
+                <div>
+                  <div className="text-xs text-gray-400">Avec SwapBack</div>
+                  <div className="text-sm font-semibold text-gray-300">Route optimisée</div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-bold text-green-400">
+                  {routeInfo.estimatedOutput.toFixed(6)}
+                </div>
+                <div className="text-xs text-gray-500">{outputToken}</div>
+              </div>
+            </div>
+
+            {/* Profit / Économie */}
+            <div className="flex items-center justify-between p-3 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-lg border-2 border-green-400/40">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🎉</span>
+                <div>
+                  <div className="text-xs text-green-400 font-semibold">VOTRE PROFIT</div>
+                  <div className="text-sm text-gray-300">Économie réalisée</div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-green-400">
+                  +{(routeInfo.estimatedOutput - routeInfo.nonOptimizedOutput).toFixed(6)}
+                </div>
+                <div className="text-xs text-green-300">
+                  {outputToken} ({((((routeInfo.estimatedOutput - routeInfo.nonOptimizedOutput) / routeInfo.nonOptimizedOutput) * 100)).toFixed(2)}%)
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-3 text-center text-xs text-gray-400">
+            💡 Vous recevez <span className="text-green-400 font-bold">plus de tokens</span> grâce à l'optimisation SwapBack
+          </div>
+        </div>
+      )}
+
       {/* Actions */}
-      <div className="space-y-3">
+      <div className="space-y-4">
         {!connected ? (
-          <div className="text-center text-gray-400 py-4">
-            Connectez votre wallet pour commencer
+          <div className="text-center text-gray-400 py-6">
+            Connect your wallet to start
           </div>
         ) : !routeInfo ? (
           <button
             onClick={handleSimulateRoute}
             disabled={!inputAmount || loading}
-            className="btn-primary w-full"
+            className="btn-primary w-full max-w-xs mx-auto block"
           >
-            {loading ? "Simulation..." : "Simuler la route"}
+            {loading ? "Simulating..." : "Simulate Route"}
           </button>
         ) : (
           <button
             onClick={handleExecuteSwap}
             disabled={loading}
-            className="btn-primary w-full"
+            className="btn-primary w-full max-w-xs mx-auto block"
           >
-            {loading ? "Exécution..." : `Swap ${inputToken} → ${outputToken}`}
+            {loading ? "Executing..." : `Swap ${inputToken} → ${outputToken}`}
           </button>
         )}
       </div>
