@@ -59,7 +59,11 @@ pub mod swapback_cnft {
             timestamp: Clock::get()?.unix_timestamp,
         });
 
-        msg!("cNFT de niveau {:?} enregistré pour {}", level, ctx.accounts.user.key());
+        msg!(
+            "cNFT de niveau {:?} enregistré pour {}",
+            level,
+            ctx.accounts.user.key()
+        );
         Ok(())
     }
 

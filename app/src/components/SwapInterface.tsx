@@ -3,6 +3,15 @@
 import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 
+interface RouteStep {
+  label: string;
+  inputMint: string;
+  outputMint: string;
+  inAmount: string;
+  outAmount: string;
+  fee: string;
+}
+
 interface RouteInfo {
   type: "Direct" | "Aggregator" | "RFQ" | "Bundle";
   estimatedOutput: number;
@@ -10,6 +19,8 @@ interface RouteInfo {
   rebate: number;
   burn: number;
   fees: number;
+  route?: RouteStep[];
+  priceImpact?: number;
 }
 
 export const SwapInterface = () => {
@@ -72,6 +83,8 @@ export const SwapInterface = () => {
         rebate: data.rebateAmount / 1000000 || 0,
         burn: data.burnAmount / 1000000 || 0,
         fees: data.fees / 1000000 || 0,
+        route: data.route || [],
+        priceImpact: data.priceImpact || 0,
       };
 
       setRouteInfo(route);
@@ -200,32 +213,115 @@ export const SwapInterface = () => {
 
       {/* Route Info */}
       {routeInfo && (
-        <div className="mb-6 p-4 bg-black/30 rounded-lg">
-          <h3 className="text-sm font-semibold mb-3 text-[var(--primary)]">
-            Route Optimisée ({routeInfo.type})
-          </h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-400">NPI (Net Price Improvement)</span>
-              <span className="text-green-400">
-                +{routeInfo.npi.toFixed(4)} USDC
-              </span>
+        <div className="mb-6 space-y-4">
+          {/* Chemin de Route Visuel */}
+          {routeInfo.route && routeInfo.route.length > 0 && (
+            <div className="p-4 bg-black/30 rounded-lg border border-[var(--primary)]/20">
+              <h3 className="text-sm font-semibold mb-3 text-[var(--primary)] flex items-center gap-2">
+                <span>🛣️</span>
+                <span>Chemin de Route ({routeInfo.type})</span>
+              </h3>
+              <div className="space-y-3">
+                {routeInfo.route.map((step, index) => {
+                  const inputSymbol = Object.keys(tokenAddresses).find(
+                    key => tokenAddresses[key] === step.inputMint
+                  ) || 'TOKEN';
+                  const outputSymbol = Object.keys(tokenAddresses).find(
+                    key => tokenAddresses[key] === step.outputMint
+                  ) || 'TOKEN';
+                  
+                  return (
+                    <div key={index} className="relative">
+                      {/* Étape de la route */}
+                      <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700 hover:border-[var(--primary)]/40 transition-colors">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="bg-[var(--primary)]/20 text-[var(--primary)] px-2 py-1 rounded text-xs font-semibold">
+                              Étape {index + 1}
+                            </span>
+                            <span className="text-sm font-medium text-gray-300">
+                              {step.label}
+                            </span>
+                          </div>
+                          <span className="text-xs text-gray-500">
+                            Frais: {(parseFloat(step.fee) / 1000000).toFixed(4)}
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 bg-gray-900/50 rounded p-2">
+                            <div className="text-xs text-gray-500 mb-1">Entrée</div>
+                            <div className="font-semibold text-white">
+                              {(parseFloat(step.inAmount) / 1000000).toFixed(4)} {inputSymbol}
+                            </div>
+                          </div>
+                          
+                          <div className="text-[var(--primary)] text-xl">→</div>
+                          
+                          <div className="flex-1 bg-gray-900/50 rounded p-2">
+                            <div className="text-xs text-gray-500 mb-1">Sortie</div>
+                            <div className="font-semibold text-green-400">
+                              {(parseFloat(step.outAmount) / 1000000).toFixed(4)} {outputSymbol}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Flèche de connexion entre les étapes */}
+                      {index < routeInfo.route!.length - 1 && (
+                        <div className="flex justify-center py-2">
+                          <div className="text-gray-600 text-sm">↓</div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Votre remise (75%)</span>
-              <span className="text-green-400">
-                +{routeInfo.rebate.toFixed(4)} USDC
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Burn $BACK (25%)</span>
-              <span className="text-orange-400">
-                {routeInfo.burn.toFixed(4)} USDC
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Frais réseau</span>
-              <span>{routeInfo.fees.toFixed(4)} USDC</span>
+          )}
+
+          {/* Détails Financiers */}
+          <div className="p-4 bg-black/30 rounded-lg">
+            <h3 className="text-sm font-semibold mb-3 text-[var(--primary)]">
+              💰 Détails Financiers
+            </h3>
+            <div className="space-y-2 text-sm">
+              {routeInfo.priceImpact !== undefined && (
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Impact sur le prix</span>
+                  <span className={routeInfo.priceImpact < 1 ? "text-green-400" : "text-orange-400"}>
+                    {routeInfo.priceImpact.toFixed(2)}%
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-gray-400">NPI (Net Price Improvement)</span>
+                <span className="text-green-400">
+                  +{routeInfo.npi.toFixed(4)} USDC
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Votre remise (75%)</span>
+                <span className="text-green-400">
+                  +{routeInfo.rebate.toFixed(4)} USDC
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Burn $BACK (25%)</span>
+                <span className="text-orange-400">
+                  {routeInfo.burn.toFixed(4)} USDC
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Frais réseau</span>
+                <span>{routeInfo.fees.toFixed(4)} USDC</span>
+              </div>
+              <div className="pt-2 mt-2 border-t border-gray-700 flex justify-between font-semibold">
+                <span className="text-white">Total estimé</span>
+                <span className="text-green-400">
+                  {routeInfo.estimatedOutput.toFixed(6)} {outputToken}
+                </span>
+              </div>
             </div>
           </div>
         </div>

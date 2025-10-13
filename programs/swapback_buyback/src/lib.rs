@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Burn, Mint, Token, TokenAccount, Transfer};
 use anchor_spl::associated_token::AssociatedToken;
+use anchor_spl::token::{self, Burn, Mint, Token, TokenAccount, Transfer};
 
 declare_id!("75nEwGH4cpRq13PG2eEioQE1wBqSvxvK9bhWfvpvZvP7");
 
@@ -9,12 +9,9 @@ pub mod swapback_buyback {
     use super::*;
 
     /// Initialise le programme de buyback
-    pub fn initialize(
-        ctx: Context<Initialize>,
-        min_buyback_amount: u64,
-    ) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>, min_buyback_amount: u64) -> Result<()> {
         let buyback_state = &mut ctx.accounts.buyback_state;
-        
+
         buyback_state.authority = ctx.accounts.authority.key();
         buyback_state.back_mint = ctx.accounts.back_mint.key();
         buyback_state.usdc_vault = ctx.accounts.usdc_vault.key();
@@ -29,10 +26,7 @@ pub mod swapback_buyback {
     }
 
     /// Dépose des USDC pour le buyback (appelé par le routeur)
-    pub fn deposit_usdc(
-        ctx: Context<DepositUSDC>,
-        amount: u64,
-    ) -> Result<()> {
+    pub fn deposit_usdc(ctx: Context<DepositUSDC>, amount: u64) -> Result<()> {
         require!(amount > 0, ErrorCode::InvalidAmount);
 
         // Transfert des USDC vers le vault
@@ -62,12 +56,12 @@ pub mod swapback_buyback {
         min_back_amount: u64,
     ) -> Result<()> {
         let buyback_state = &mut ctx.accounts.buyback_state;
-        
+
         require!(
             ctx.accounts.usdc_vault.amount >= buyback_state.min_buyback_amount,
             ErrorCode::InsufficientFunds
         );
-        
+
         require!(max_usdc_amount > 0, ErrorCode::InvalidAmount);
         require!(min_back_amount > 0, ErrorCode::InvalidAmount);
 
@@ -85,12 +79,11 @@ pub mod swapback_buyback {
         let back_bought = min_back_amount; // Sera remplacé par le montant réel du swap
 
         // Mise à jour des statistiques
-        buyback_state.total_usdc_spent = buyback_state.total_usdc_spent
+        buyback_state.total_usdc_spent = buyback_state
+            .total_usdc_spent
             .checked_add(actual_usdc)
             .unwrap();
-        buyback_state.buyback_count = buyback_state.buyback_count
-            .checked_add(1)
-            .unwrap();
+        buyback_state.buyback_count = buyback_state.buyback_count.checked_add(1).unwrap();
 
         emit!(BuybackExecuted {
             usdc_amount: actual_usdc,
@@ -108,10 +101,7 @@ pub mod swapback_buyback {
     }
 
     /// Brûle les tokens $BACK achetés
-    pub fn burn_back(
-        ctx: Context<BurnBack>,
-        amount: u64,
-    ) -> Result<()> {
+    pub fn burn_back(ctx: Context<BurnBack>, amount: u64) -> Result<()> {
         require!(amount > 0, ErrorCode::InvalidAmount);
 
         let buyback_state = &mut ctx.accounts.buyback_state;
@@ -124,10 +114,7 @@ pub mod swapback_buyback {
 
         // Brûlage des tokens avec signature PDA
         // seeds must be slices of bytes; utiliser .as_ref() pour forcer les types
-        let seeds = &[
-            b"buyback_state".as_ref(),
-            &[buyback_state.bump],
-        ];
+        let seeds = &[b"buyback_state".as_ref(), &[buyback_state.bump]];
         let signer = &[&seeds[..]];
 
         let cpi_accounts = Burn {
@@ -140,9 +127,8 @@ pub mod swapback_buyback {
         token::burn(cpi_ctx, amount)?;
 
         // Mise à jour des statistiques
-        buyback_state.total_back_burned = buyback_state.total_back_burned
-            .checked_add(amount)
-            .unwrap();
+        buyback_state.total_back_burned =
+            buyback_state.total_back_burned.checked_add(amount).unwrap();
 
         emit!(BackBurned {
             amount,
@@ -150,15 +136,16 @@ pub mod swapback_buyback {
             timestamp: Clock::get()?.unix_timestamp,
         });
 
-        msg!("Brûlage de {} $BACK (total brûlé: {})", amount, buyback_state.total_back_burned);
+        msg!(
+            "Brûlage de {} $BACK (total brûlé: {})",
+            amount,
+            buyback_state.total_back_burned
+        );
         Ok(())
     }
 
     /// Met à jour les paramètres du buyback
-    pub fn update_params(
-        ctx: Context<UpdateParams>,
-        new_min_buyback: Option<u64>,
-    ) -> Result<()> {
+    pub fn update_params(ctx: Context<UpdateParams>, new_min_buyback: Option<u64>) -> Result<()> {
         let buyback_state = &mut ctx.accounts.buyback_state;
 
         require!(
@@ -187,9 +174,9 @@ pub struct Initialize<'info> {
         bump
     )]
     pub buyback_state: Account<'info, BuybackState>,
-    
+
     pub back_mint: Account<'info, Mint>,
-    
+
     #[account(
         init,
         payer = authority,
@@ -199,12 +186,12 @@ pub struct Initialize<'info> {
         bump
     )]
     pub usdc_vault: Account<'info, TokenAccount>,
-    
+
     pub usdc_mint: Account<'info, Mint>,
-    
+
     #[account(mut)]
     pub authority: Signer<'info>,
-    
+
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
@@ -214,17 +201,17 @@ pub struct Initialize<'info> {
 pub struct DepositUSDC<'info> {
     #[account(mut, seeds = [b"buyback_state"], bump = buyback_state.bump)]
     pub buyback_state: Account<'info, BuybackState>,
-    
+
     #[account(mut)]
     pub source_usdc: Account<'info, TokenAccount>,
-    
+
     #[account(
         mut,
         seeds = [b"usdc_vault"],
         bump
     )]
     pub usdc_vault: Account<'info, TokenAccount>,
-    
+
     pub depositor: Signer<'info>,
     pub token_program: Program<'info, Token>,
 }
@@ -233,13 +220,13 @@ pub struct DepositUSDC<'info> {
 pub struct ExecuteBuyback<'info> {
     #[account(mut, seeds = [b"buyback_state"], bump = buyback_state.bump)]
     pub buyback_state: Account<'info, BuybackState>,
-    
+
     #[account(mut, seeds = [b"usdc_vault"], bump)]
     pub usdc_vault: Account<'info, TokenAccount>,
-    
+
     #[account(mut)]
     pub back_vault: Account<'info, TokenAccount>,
-    
+
     pub authority: Signer<'info>,
     pub token_program: Program<'info, Token>,
 }
@@ -248,13 +235,13 @@ pub struct ExecuteBuyback<'info> {
 pub struct BurnBack<'info> {
     #[account(mut, seeds = [b"buyback_state"], bump = buyback_state.bump)]
     pub buyback_state: Account<'info, BuybackState>,
-    
+
     #[account(mut)]
     pub back_mint: Account<'info, Mint>,
-    
+
     #[account(mut)]
     pub back_vault: Account<'info, TokenAccount>,
-    
+
     pub authority: Signer<'info>,
     pub token_program: Program<'info, Token>,
 }
@@ -263,7 +250,7 @@ pub struct BurnBack<'info> {
 pub struct UpdateParams<'info> {
     #[account(mut, seeds = [b"buyback_state"], bump = buyback_state.bump)]
     pub buyback_state: Account<'info, BuybackState>,
-    
+
     pub authority: Signer<'info>,
 }
 
