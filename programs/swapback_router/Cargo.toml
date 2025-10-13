@@ -19,4 +19,4 @@ default = []
 [dependencies]
 anchor-lang = { workspace = true, features = ["init-if-needed"] }
 anchor-spl = { workspace = true }
-spl-token-2022 = { workspace = true }
+spl-token-2022 = "6.0.0"

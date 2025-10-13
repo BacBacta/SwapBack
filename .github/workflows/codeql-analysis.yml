@@ -1,0 +1,64 @@
+name: "CodeQL"
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '0 0 * * 1'  # Tous les lundis à minuit
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'javascript', 'typescript', 'rust' ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        queries: security-extended,security-and-quality
+
+    - name: Setup Node.js (for JavaScript/TypeScript)
+      if: matrix.language == 'javascript' || matrix.language == 'typescript'
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies (JavaScript/TypeScript)
+      if: matrix.language == 'javascript' || matrix.language == 'typescript'
+      run: |
+        npm ci --prefix app
+        npm ci --prefix oracle
+        npm ci --prefix sdk
+
+    - name: Setup Rust (for Rust)
+      if: matrix.language == 'rust'
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
+    - name: Build Rust programs
+      if: matrix.language == 'rust'
+      run: |
+        cargo build --release --manifest-path Cargo.toml
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"

@@ -24,28 +24,72 @@ export const SwapInterface = () => {
   const [loading, setLoading] = useState(false);
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
 
+  // Mapping des tokens vers leurs adresses Solana
+  const tokenAddresses: { [key: string]: string } = {
+    SOL: "So11111111111111111111111111111111111111112",
+    USDC: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+  };
+
   const handleSimulateRoute = async () => {
     if (!inputAmount || !connected) return;
 
     setLoading(true);
     try {
-      // TODO: Appeler l'API SwapBack pour simuler la route
-      // Pour le MVP, on simule les données
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const inputMint = tokenAddresses[inputToken];
+      const outputMint = tokenAddresses[outputToken];
 
+      if (!inputMint || !outputMint) {
+        throw new Error("Token non supporté");
+      }
+
+      // Appeler l'API SwapBack pour simuler la route
+      const response = await fetch('http://localhost:3003/simulate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          inputMint,
+          outputMint,
+          inputAmount: (parseFloat(inputAmount) * 1000000).toString(), // Convertir en lamports pour USDC
+          slippage: slippage / 100,
+          userPubkey: publicKey?.toString(),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de la simulation de route');
+      }
+
+      const data = await response.json();
+
+      // Transformer les données de l'API en format RouteInfo
+      const route: RouteInfo = {
+        type: data.type || "Aggregator",
+        estimatedOutput: data.estimatedOutput / 1000000 || 0, // Convertir depuis lamports
+        npi: data.npi / 1000000 || 0,
+        rebate: data.rebateAmount / 1000000 || 0,
+        burn: data.burnAmount / 1000000 || 0,
+        fees: data.fees / 1000000 || 0,
+      };
+
+      setRouteInfo(route);
+      setOutputAmount(route.estimatedOutput.toFixed(6));
+    } catch (error) {
+      console.error("Erreur lors de la simulation:", error);
+      // Fallback vers les données mockées en cas d'erreur
       const mockRoute: RouteInfo = {
         type: "Aggregator",
-        estimatedOutput: parseFloat(inputAmount) * 0.005, // Mock: 1 USDC = 0.005 SOL
-        npi: parseFloat(inputAmount) * 0.002, // 0.2% NPI
-        rebate: parseFloat(inputAmount) * 0.0015, // 75% du NPI
-        burn: parseFloat(inputAmount) * 0.0005, // 25% du NPI
+        estimatedOutput: parseFloat(inputAmount) * 0.005,
+        npi: parseFloat(inputAmount) * 0.002,
+        rebate: parseFloat(inputAmount) * 0.0015,
+        burn: parseFloat(inputAmount) * 0.0005,
         fees: parseFloat(inputAmount) * 0.001,
       };
 
       setRouteInfo(mockRoute);
       setOutputAmount(mockRoute.estimatedOutput.toFixed(6));
-    } catch (error) {
-      console.error("Erreur lors de la simulation:", error);
     } finally {
       setLoading(false);
     }

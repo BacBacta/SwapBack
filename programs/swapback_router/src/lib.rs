@@ -3,10 +3,10 @@ use anchor_lang::solana_program::program::invoke_signed;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("FPK46poe53iX6Bcv3q8cgmc1jm7dJKQ9Qs9oESFxGN55");
 
 // ID du programme cNFT pour les appels CPI
-pub const CNFT_PROGRAM_ID: &str = "HCsNTpvkUGV7XMAw5VsBSR4Kxvt5x59iFDAeucvY4cre";
+pub const CNFT_PROGRAM_ID: &str = "FPNibu4RhrTt9yLDxcc8nQuHiVkFCfLVJ7DZUn6yn8K8";
 
 #[program]
 pub mod swapback_router {
@@ -209,7 +209,10 @@ pub mod swapback_router {
 
         // Mettre à jour les statistiques globales
         global_state.total_volume = global_state.total_volume.checked_add(input_amount).unwrap();
-        global_state.total_rebates = global_state.total_rebates.checked_add(rebate_amount).unwrap();
+        global_state.total_rebates = global_state
+            .total_rebates
+            .checked_add(rebate_amount)
+            .unwrap();
 
         // TODO: Distribuer le rebate à l'utilisateur
         // TODO: Mettre à jour le cNFT de l'utilisateur
@@ -426,7 +429,6 @@ pub struct ExecuteOptimizedSwap<'info> {
     #[account(mut)]
     pub user_authority: Signer<'info>,
 }
-
 
 #[derive(Accounts)]
 pub struct LockBack<'info> {
