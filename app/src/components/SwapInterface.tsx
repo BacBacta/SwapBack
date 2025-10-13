@@ -189,10 +189,18 @@ export const SwapInterface = () => {
   };
 
   return (
-    <div className="swap-card max-w-2xl mx-auto">
+    <div className="swap-card max-w-2xl mx-auto relative">
+      {/* Decorative gradient */}
+      <div className="absolute -top-20 -right-20 w-40 h-40 bg-[var(--primary)]/10 rounded-full blur-3xl -z-10"></div>
+      <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-[var(--secondary)]/10 rounded-full blur-3xl -z-10"></div>
+      
       <div className="text-center mb-8">
-        <h2 className="section-title mb-2">Request Optimized Swap</h2>
-        <p className="body-regular text-gray-400">Maximum optimization with best execution routing</p>
+        <div className="inline-flex items-center gap-2 mb-4 px-4 py-2 bg-[var(--primary)]/10 rounded-full border border-[var(--primary)]/20">
+          <span className="w-2 h-2 bg-[var(--primary)] rounded-full animate-pulse"></span>
+          <span className="text-xs font-semibold text-[var(--primary)]">Smart Router Active</span>
+        </div>
+        <h2 className="section-title mb-3">Swap Tokens</h2>
+        <p className="body-regular text-gray-400">Get the best price across all Solana DEXs</p>
       </div>
 
       {/* Input Token */}
@@ -507,8 +515,12 @@ export const SwapInterface = () => {
       {/* Actions */}
       <div className="space-y-4">
         {!connected ? (
-          <div className="text-center text-gray-400 py-6">
-            Connect your wallet to start
+          <div className="text-center py-8">
+            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-[var(--primary)]/20 to-[var(--primary)]/5 rounded-2xl flex items-center justify-center">
+              <span className="text-3xl">👛</span>
+            </div>
+            <p className="text-gray-400 mb-4">Connect your wallet to start trading</p>
+            <p className="text-xs text-gray-500">Powered by Solana Wallet Adapter</p>
           </div>
         ) : !routeInfo ? (
           <button
@@ -516,7 +528,20 @@ export const SwapInterface = () => {
             disabled={!inputAmount || loading}
             className="btn-primary w-full max-w-xs mx-auto block"
           >
-            {loading ? "Simulating..." : "Simulate Route"}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Finding best route...</span>
+              </span>
+            ) : (
+              <span className="flex items-center justify-center gap-2">
+                <span>🔍</span>
+                <span>Find Best Route</span>
+              </span>
+            )}
           </button>
         ) : (
           <button
@@ -524,7 +549,20 @@ export const SwapInterface = () => {
             disabled={loading}
             className="btn-primary w-full max-w-xs mx-auto block"
           >
-            {loading ? "Executing..." : `Swap ${inputToken} → ${outputToken}`}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Executing swap...</span>
+              </span>
+            ) : (
+              <span className="flex items-center justify-center gap-2">
+                <span>⚡</span>
+                <span>Execute Swap: {inputToken} → {outputToken}</span>
+              </span>
+            )}
           </button>
         )}
       </div>

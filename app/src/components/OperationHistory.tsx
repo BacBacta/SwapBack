@@ -83,36 +83,81 @@ export const OperationHistory = () => {
       {/* Header avec statistiques */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold">🔍 Operation History</h2>
+          <div>
+            <h2 className="text-2xl font-bold mb-2">Operation History</h2>
+            <p className="text-sm text-gray-400">Track all your blockchain transactions</p>
+          </div>
           <button
             onClick={refreshOperations}
             disabled={loading}
-            className="px-4 py-2 bg-[var(--primary)]/20 hover:bg-[var(--primary)]/30 rounded-lg transition-colors"
+            className="px-5 py-2.5 bg-gradient-to-r from-[var(--primary)]/20 to-[var(--secondary)]/20 hover:from-[var(--primary)]/30 hover:to-[var(--secondary)]/30 rounded-lg transition-all duration-300 font-semibold border border-[var(--primary)]/30 hover:border-[var(--primary)]/50 hover:scale-105"
           >
-            {loading ? "⏳" : "🔄"} Refresh
+            <span className="flex items-center gap-2">
+              {loading ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>Loading...</span>
+                </>
+              ) : (
+                <>
+                  <span>🔄</span>
+                  <span>Refresh</span>
+                </>
+              )}
+            </span>
           </button>
         </div>
 
         {/* Statistiques */}
         {statistics && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 p-4 rounded-lg border border-blue-500/20">
+            <div className="stat-card group cursor-pointer">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500/20 to-blue-600/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <span className="text-2xl">🔄</span>
+                </div>
+                <span className="text-xs text-blue-400 font-semibold">+12%</span>
+              </div>
               <div className="text-sm text-gray-400 mb-1">Total Swaps</div>
-              <div className="text-2xl font-bold text-blue-400">{statistics.totalSwaps}</div>
+              <div className="text-2xl font-bold text-white">{statistics.totalSwaps}</div>
             </div>
-            <div className="bg-gradient-to-br from-green-500/10 to-green-600/10 p-4 rounded-lg border border-green-500/20">
+            
+            <div className="stat-card group cursor-pointer">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-[var(--secondary)]/20 to-[var(--secondary)]/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <span className="text-2xl">🔒</span>
+                </div>
+                <span className="text-xs text-[var(--secondary)] font-semibold">+8%</span>
+              </div>
               <div className="text-sm text-gray-400 mb-1">Total Locks</div>
-              <div className="text-2xl font-bold text-green-400">{statistics.totalLocks}</div>
+              <div className="text-2xl font-bold text-white">{statistics.totalLocks}</div>
             </div>
-            <div className="bg-gradient-to-br from-purple-500/10 to-purple-600/10 p-4 rounded-lg border border-purple-500/20">
-              <div className="text-sm text-gray-400 mb-1">Volume Total</div>
-              <div className="text-2xl font-bold text-purple-400">
+            
+            <div className="stat-card group cursor-pointer">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-[var(--primary)]/20 to-[var(--primary)]/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <span className="text-2xl">💎</span>
+                </div>
+                <span className="text-xs text-[var(--primary)] font-semibold">+25%</span>
+              </div>
+              <div className="text-sm text-gray-400 mb-1">Total Volume</div>
+              <div className="text-2xl font-bold text-white">
                 ${formatAmount(statistics.totalVolume)}
               </div>
             </div>
-            <div className="bg-gradient-to-br from-[var(--primary)]/10 to-[var(--primary)]/20 p-4 rounded-lg border border-[var(--primary)]/30">
-              <div className="text-sm text-gray-400 mb-1">Économies</div>
-              <div className="text-2xl font-bold text-[var(--primary)]">
+            
+            <div className="stat-card group cursor-pointer">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-[var(--accent)]/20 to-[var(--accent)]/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <span className="text-2xl">💰</span>
+                </div>
+                <span className="text-xs text-[var(--accent)] font-semibold">+18%</span>
+              </div>
+              <div className="text-sm text-gray-400 mb-1">Total Savings</div>
+              <div className="text-2xl font-bold text-white">
                 ${formatAmount(statistics.totalSavings)}
               </div>
             </div>
@@ -123,25 +168,31 @@ export const OperationHistory = () => {
         <div className="flex gap-2 flex-wrap justify-center">
           <button
             onClick={() => setFilterType(undefined)}
-            className={`px-4 py-2 rounded-lg transition-all ${
+            className={`px-4 py-2 rounded-lg transition-all duration-300 font-semibold ${
               !filterType
-                ? "bg-white/10 text-white"
-                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                ? "bg-gradient-to-r from-[var(--primary)] to-[var(--primary-hover)] text-white shadow-lg shadow-[var(--primary)]/30"
+                : "bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 border border-white/10"
             }`}
           >
-            All
+            <span className="flex items-center gap-1.5">
+              <span>🎯</span>
+              <span>All</span>
+            </span>
           </button>
           {Object.values(OperationType).map((type) => (
             <button
               key={type}
               onClick={() => setFilterType(type)}
-              className={`px-4 py-2 rounded-lg transition-all ${
+              className={`px-4 py-2 rounded-lg transition-all duration-300 font-semibold ${
                 filterType === type
-                  ? "bg-white/10 text-white"
-                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  ? "bg-gradient-to-r from-[var(--primary)] to-[var(--primary-hover)] text-white shadow-lg shadow-[var(--primary)]/30"
+                  : "bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 border border-white/10"
               }`}
             >
-              {getOperationIcon(type)} {type}
+              <span className="flex items-center gap-1.5">
+                <span>{getOperationIcon(type)}</span>
+                <span>{type}</span>
+              </span>
             </button>
           ))}
         </div>
@@ -156,18 +207,27 @@ export const OperationHistory = () => {
 
       {/* Liste des opérations */}
       {loading && operations.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="animate-spin text-4xl mb-4">⏳</div>
-          <p className="text-gray-400">Chargement des opérations...</p>
+        <div className="text-center py-16">
+          <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-[var(--primary)]/20 to-[var(--primary)]/5 rounded-2xl flex items-center justify-center">
+            <svg className="animate-spin h-8 w-8 text-[var(--primary)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          </div>
+          <p className="text-gray-400 font-medium">Loading operations...</p>
+          <p className="text-xs text-gray-500 mt-2">Fetching from blockchain</p>
         </div>
       ) : filteredOps.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="text-4xl mb-4">📭</div>
-          <p className="text-gray-400">
+        <div className="text-center py-16">
+          <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-gray-500/20 to-gray-500/5 rounded-2xl flex items-center justify-center">
+            <span className="text-4xl">📭</span>
+          </div>
+          <p className="text-gray-400 font-medium mb-2">
             {filterType
-              ? `Aucune opération de type ${filterType}`
-              : "Aucune opération trouvée"}
+              ? `No ${filterType} operations found`
+              : "No operations yet"}
           </p>
+          <p className="text-xs text-gray-500">Start trading to see your history here</p>
         </div>
       ) : (
         <div className="space-y-3">

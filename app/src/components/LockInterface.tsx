@@ -249,17 +249,22 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
   const quickAmounts = [100, 500, 1000, 5000];
 
   return (
-    <div className="bg-gray-800 rounded-lg p-6 max-w-lg mx-auto">
-      <h2 className="text-2xl font-bold mb-6 text-white">
-        🔒 Verrouiller $BACK
-      </h2>
+    <div className="glass-effect rounded-xl p-6 max-w-lg mx-auto border border-gray-700/50">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary-dark/20 border border-primary/30">
+          <span className="text-xl">🔒</span>
+        </div>
+        <h2 className="card-title">
+          Verrouiller $BACK
+        </h2>
+      </div>
 
       {/* Affichage du solde */}
-      <div className="mb-6 p-4 bg-gray-700 rounded-lg">
+      <div className="mb-6 p-4 glass-effect rounded-lg border border-primary/10">
         <div className="flex justify-between items-center">
-          <span className="text-gray-400">Solde disponible :</span>
+          <span className="text-gray-400">Solde disponible</span>
           <span className="text-white font-bold text-lg">
-            {balance.toLocaleString()} $BACK
+            {balance.toLocaleString()} <span className="text-primary">$BACK</span>
           </span>
         </div>
       </div>
@@ -269,20 +274,28 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         <label className="block text-gray-300 mb-2 font-medium">
           Montant à verrouiller
         </label>
-        <input
-          type="number"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="0.00"
-          className={`w-full px-4 py-3 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 ${
-            amountError
-              ? 'border-2 border-red-500 focus:ring-red-500'
-              : 'focus:ring-blue-500'
-          }`}
-          disabled={isLoading}
-        />
+        <div className="relative">
+          <input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.00"
+            className={`w-full px-4 py-3 glass-effect text-white rounded-lg focus:outline-none focus:ring-2 transition-all ${
+              amountError
+                ? 'border border-red-500/50 focus:ring-red-500/50 focus:border-red-500'
+                : 'border border-gray-700/50 focus:ring-primary/50 focus:border-primary'
+            }`}
+            disabled={isLoading}
+          />
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-primary font-semibold text-sm">
+            $BACK
+          </div>
+        </div>
         {amountError && (
-          <p className="text-red-400 text-sm mt-1">{amountError}</p>
+          <p className="text-red-400 text-sm mt-2 flex items-center gap-1">
+            <span>⚠️</span>
+            {amountError}
+          </p>
         )}
 
         {/* Boutons de montant rapide */}
@@ -291,15 +304,15 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
             <button
               key={amt}
               onClick={() => setAmount(amt.toString())}
-              className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded text-sm transition"
+              className="flex-1 px-3 py-2 glass-effect border border-gray-700/50 hover:border-primary/30 text-white rounded-lg text-sm transition-all hover:scale-105"
               disabled={isLoading}
             >
-              {amt}
+              {amt.toLocaleString()}
             </button>
           ))}
           <button
             onClick={() => setAmount(balance.toString())}
-            className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm transition"
+            className="px-4 py-2 bg-gradient-to-r from-primary to-primary-dark text-white rounded-lg text-sm font-semibold transition-all hover:scale-105 hover:shadow-glow"
             disabled={isLoading}
           >
             Max
@@ -312,48 +325,56 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         <label className="block text-gray-300 mb-2 font-medium">
           Durée de verrouillage (jours)
         </label>
-        <input
-          type="number"
-          value={duration}
-          onChange={(e) => setDuration(e.target.value)}
-          placeholder="30"
-          className={`w-full px-4 py-3 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 ${
-            durationError
-              ? 'border-2 border-red-500 focus:ring-red-500'
-              : 'focus:ring-blue-500'
-          }`}
-          disabled={isLoading}
-        />
+        <div className="relative">
+          <input
+            type="number"
+            value={duration}
+            onChange={(e) => setDuration(e.target.value)}
+            placeholder="30"
+            className={`w-full px-4 py-3 glass-effect text-white rounded-lg focus:outline-none focus:ring-2 transition-all ${
+              durationError
+                ? 'border border-red-500/50 focus:ring-red-500/50 focus:border-red-500'
+                : 'border border-gray-700/50 focus:ring-primary/50 focus:border-primary'
+            }`}
+            disabled={isLoading}
+          />
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">
+            jours
+          </div>
+        </div>
         {durationError && (
-          <p className="text-red-400 text-sm mt-1">{durationError}</p>
+          <p className="text-red-400 text-sm mt-2 flex items-center gap-1">
+            <span>⚠️</span>
+            {durationError}
+          </p>
         )}
 
         {/* Boutons de durée rapide */}
-        <div className="flex gap-2 mt-3">
+        <div className="grid grid-cols-4 gap-2 mt-3">
           <button
             onClick={() => setDuration('7')}
-            className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded text-sm transition"
+            className="px-3 py-2 glass-effect border border-orange-500/20 hover:border-orange-500/40 text-orange-400 rounded-lg text-sm font-medium transition-all hover:scale-105"
             disabled={isLoading}
           >
             7j
           </button>
           <button
             onClick={() => setDuration('30')}
-            className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded text-sm transition"
+            className="px-3 py-2 glass-effect border border-gray-500/20 hover:border-gray-400/40 text-gray-300 rounded-lg text-sm font-medium transition-all hover:scale-105"
             disabled={isLoading}
           >
             30j
           </button>
           <button
             onClick={() => setDuration('90')}
-            className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded text-sm transition"
+            className="px-3 py-2 glass-effect border border-yellow-500/20 hover:border-yellow-500/40 text-yellow-400 rounded-lg text-sm font-medium transition-all hover:scale-105"
             disabled={isLoading}
           >
             90j
           </button>
           <button
             onClick={() => setDuration('180')}
-            className="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white rounded text-sm transition"
+            className="px-3 py-2 glass-effect border border-yellow-500/20 hover:border-yellow-500/40 text-yellow-400 rounded-lg text-sm font-medium transition-all hover:scale-105"
             disabled={isLoading}
           >
             180j
@@ -362,33 +383,49 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
       </div>
 
       {/* Prévisualisation du niveau et du boost */}
-      <div className="mb-6 p-4 bg-gradient-to-r from-gray-700 to-gray-600 rounded-lg">
-        <div className="flex justify-between items-center mb-3">
-          <span className="text-gray-300">Niveau prédit :</span>
-          <span
-            className={`px-3 py-1 rounded-full border font-bold ${levelColor}`}
-          >
-            {predictedLevel}
-          </span>
-        </div>
-        <div className="flex justify-between items-center">
-          <span className="text-gray-300">Boost prédit :</span>
-          <span className="text-green-400 font-bold text-lg">
-            +{predictedBoost}%
-          </span>
+      <div className="mb-6 p-5 glass-effect rounded-lg border border-primary/20 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-radial from-primary/10 to-transparent rounded-full blur-2xl"></div>
+        
+        <div className="relative">
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-gray-400 font-medium">Niveau prédit</span>
+            <span
+              className={`px-4 py-1.5 rounded-full border font-bold ${levelColor} transition-all hover:scale-105`}
+            >
+              {predictedLevel}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-gray-400 font-medium">Boost prédit</span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-3xl font-bold bg-gradient-to-r from-secondary to-green-400 bg-clip-text text-transparent">
+                +{predictedBoost}%
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Messages d'erreur et de succès */}
       {error && (
-        <div className="mb-4 p-3 bg-red-500/20 border border-red-500 rounded-lg text-red-300">
-          {error}
+        <div className="mb-4 p-4 glass-effect border border-red-500/30 rounded-lg text-red-300 animate-slide-up">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">❌</span>
+            <div className="flex-1">
+              <p className="font-medium">{error}</p>
+            </div>
+          </div>
         </div>
       )}
 
       {success && (
-        <div className="mb-4 p-3 bg-green-500/20 border border-green-500 rounded-lg text-green-300">
-          {success}
+        <div className="mb-4 p-4 glass-effect border border-green-500/30 rounded-lg text-green-300 animate-slide-up">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">✅</span>
+            <div className="flex-1">
+              <p className="font-medium">{success}</p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -403,19 +440,29 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
           !amount ||
           !duration
         }
-        className={`w-full py-3 rounded-lg font-bold text-white transition ${
+        className={`w-full py-4 rounded-lg font-bold text-white transition-all duration-300 relative overflow-hidden group ${
           isLoading ||
           !publicKey ||
           !!amountError ||
           !!durationError ||
           !amount ||
           !duration
-            ? 'bg-gray-600 cursor-not-allowed'
-            : 'bg-blue-600 hover:bg-blue-500'
+            ? 'bg-gray-700 cursor-not-allowed opacity-50'
+            : 'bg-gradient-to-r from-primary to-primary-dark hover:scale-[1.02] shadow-glow'
         }`}
       >
+        {!isLoading && !(
+          !publicKey ||
+          !!amountError ||
+          !!durationError ||
+          !amount ||
+          !duration
+        ) && (
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-transparent animate-shimmer"></div>
+        )}
+        
         {isLoading ? (
-          <span className="flex items-center justify-center">
+          <span className="flex items-center justify-center relative">
             <svg
               className="animate-spin h-5 w-5 mr-3"
               viewBox="0 0 24 24"
@@ -438,21 +485,44 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
             Verrouillage en cours...
           </span>
         ) : !publicKey ? (
-          'Connecter le wallet'
+          <span className="relative">Connecter le wallet</span>
         ) : (
-          '🔒 Verrouiller $BACK'
+          <span className="relative flex items-center justify-center gap-2">
+            <span>🔒</span>
+            <span>Verrouiller $BACK</span>
+          </span>
         )}
       </button>
 
       {/* Informations supplémentaires */}
-      <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-        <h4 className="text-blue-300 font-bold mb-2">ℹ️ Informations</h4>
-        <ul className="text-gray-400 text-sm space-y-1">
-          <li>• Bronze (7-29j) : +5% de boost</li>
-          <li>• Silver (30-89j) : +10% de boost</li>
-          <li>• Gold (90j+) : +20% de boost</li>
-          <li>• Les tokens seront verrouillés jusqu&apos;à la fin de la période</li>
-          <li>• Vous recevrez un cNFT représentant votre lock</li>
+      <div className="mt-6 p-5 glass-effect border border-primary/20 rounded-lg">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 border border-primary/30">
+            <span className="text-sm">ℹ️</span>
+          </div>
+          <h4 className="text-primary font-bold">Informations importantes</h4>
+        </div>
+        <ul className="text-gray-400 text-sm space-y-2">
+          <li className="flex items-start gap-2">
+            <span className="text-orange-400 mt-0.5">🥉</span>
+            <span>Bronze (7-29j) : +5% de boost sur vos rebates</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-gray-400 mt-0.5">🥈</span>
+            <span>Silver (30-89j) : +10% de boost sur vos rebates</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-yellow-400 mt-0.5">🥇</span>
+            <span>Gold (90j+) : +20% de boost sur vos rebates</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-primary mt-0.5">🔒</span>
+            <span>Les tokens seront verrouillés jusqu&apos;à la fin de la période</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-secondary mt-0.5">💎</span>
+            <span>Vous recevrez un cNFT représentant votre verrouillage</span>
+          </li>
         </ul>
       </div>
     </div>

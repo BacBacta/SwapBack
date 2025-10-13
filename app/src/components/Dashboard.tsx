@@ -48,7 +48,12 @@ export const Dashboard = () => {
     <div className="space-y-8">
       {/* Global Stats */}
       <div className="swap-card">
-        <h2 className="text-2xl font-bold mb-8 text-center">Global Statistics</h2>
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="text-2xl font-bold">Protocol Statistics</h2>
+          <div className="px-3 py-1 bg-[var(--secondary)]/10 rounded-full border border-[var(--secondary)]/20">
+            <span className="text-xs font-semibold text-[var(--secondary)]">Live</span>
+          </div>
+        </div>
         <div className="grid grid-cols-3 gap-6">
           <div className="stat-card text-center">
             <div className="text-sm text-gray-400 mb-2">Total Volume</div>
@@ -88,63 +93,135 @@ export const Dashboard = () => {
       {/* User Stats */}
       {connected && stats && (
         <div className="swap-card">
-          <h2 className="text-2xl font-bold mb-8 text-center">Your Statistics</h2>
+          <div className="flex items-center justify-center gap-3 mb-8">
+            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 border border-primary/30">
+              <span className="text-xl">📊</span>
+            </div>
+            <h2 className="section-title">Your Statistics</h2>
+          </div>
 
-          <div className="space-y-6">
-            <div className="flex justify-between items-center p-4 bg-black/20 rounded-lg">
-              <span className="text-gray-400">Swap count</span>
-              <span className="text-xl font-semibold">{stats.totalSwaps}</span>
+          <div className="space-y-4">
+            <div className="glass-effect rounded-lg p-5 border border-gray-700/50 hover:border-primary/30 transition-all group">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary-dark/20 border border-primary/30 group-hover:scale-110 transition-transform">
+                    <span className="text-lg">🔄</span>
+                  </div>
+                  <span className="text-gray-400 font-medium">Swap count</span>
+                </div>
+                <span className="text-2xl font-bold">{stats.totalSwaps}</span>
+              </div>
             </div>
 
-            <div className="flex justify-between items-center p-4 bg-black/20 rounded-lg">
-              <span className="text-gray-400">Total volume</span>
-              <span className="text-xl font-semibold">
-                ${stats.totalVolume.toLocaleString('en-US')}
-              </span>
+            <div className="glass-effect rounded-lg p-5 border border-gray-700/50 hover:border-secondary/30 transition-all group">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-secondary/20 to-green-500/20 border border-secondary/30 group-hover:scale-110 transition-transform">
+                    <span className="text-lg">💰</span>
+                  </div>
+                  <span className="text-gray-400 font-medium">Total volume</span>
+                </div>
+                <span className="text-2xl font-bold">
+                  ${stats.totalVolume.toLocaleString('en-US')}
+                </span>
+              </div>
             </div>
 
-            <div className="flex justify-between items-center p-4 bg-black/20 rounded-lg">
-              <span className="text-gray-400">NPI accumulated</span>
-              <span className="text-xl font-semibold text-green-400">
-                +${stats.totalNPI.toFixed(2)}
-              </span>
+            <div className="glass-effect rounded-lg p-5 border border-gray-700/50 hover:border-secondary/30 transition-all group relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-radial from-secondary/10 to-transparent rounded-full blur-xl"></div>
+              <div className="relative flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-secondary/20 to-green-500/20 border border-secondary/30 group-hover:scale-110 transition-transform">
+                    <span className="text-lg">📈</span>
+                  </div>
+                  <span className="text-gray-400 font-medium">NPI accumulated</span>
+                </div>
+                <span className="text-2xl font-bold text-secondary">
+                  +${stats.totalNPI.toFixed(2)}
+                </span>
+              </div>
             </div>
 
-            <div className="flex justify-between items-center p-4 bg-black/20 rounded-lg">
-              <span className="text-gray-400">Rebates claimed</span>
-              <span className="text-xl font-semibold text-green-400">
-                ${stats.totalRebates.toFixed(2)}
-              </span>
+            <div className="glass-effect rounded-lg p-5 border border-gray-700/50 hover:border-secondary/30 transition-all group">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-secondary/20 to-green-500/20 border border-secondary/30 group-hover:scale-110 transition-transform">
+                    <span className="text-lg">✅</span>
+                  </div>
+                  <span className="text-gray-400 font-medium">Rebates claimed</span>
+                </div>
+                <span className="text-2xl font-bold text-secondary">
+                  ${stats.totalRebates.toFixed(2)}
+                </span>
+              </div>
             </div>
 
-            <div className="flex justify-between items-center p-4 bg-gradient-to-r from-[var(--primary)]/20 to-[var(--secondary)]/20 rounded-lg border border-[var(--primary)]/30">
-              <span className="font-semibold">Pending rebates</span>
-              <span className="text-xl font-bold text-[var(--primary)]">
-                ${stats.pendingRebates.toFixed(2)}
-              </span>
+            <div className="glass-effect rounded-lg p-6 border border-primary/30 bg-gradient-to-r from-primary/10 to-accent/5 hover:scale-[1.02] transition-all group relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-accent/5 to-transparent animate-shimmer"></div>
+              <div className="relative flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 border border-primary/40 group-hover:scale-110 transition-transform animate-pulse-glow">
+                    <span className="text-xl">💎</span>
+                  </div>
+                  <span className="font-bold text-lg">Pending rebates</span>
+                </div>
+                <span className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                  ${stats.pendingRebates.toFixed(2)}
+                </span>
+              </div>
             </div>
 
             {stats.pendingRebates > 0 && (
-              <button className="btn-primary w-full">
-                Claim rebates
+              <button className="btn-primary w-full py-4 text-lg font-bold relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-transparent animate-shimmer"></div>
+                <span className="relative flex items-center justify-center gap-2">
+                  <span>🎁</span>
+                  <span>Claim rebates</span>
+                </span>
               </button>
             )}
           </div>
 
           {/* Lock Info */}
           {stats.lockedAmount > 0 && (
-            <div className="mt-8 p-6 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/30">
-              <div className="flex justify-between items-center mb-4">
-                <span className="font-semibold">$BACK locked</span>
-                <span className="text-xl font-bold">
-                  {stats.lockedAmount.toLocaleString('en-US')}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-400">Rebate boost</span>
-                <span className="text-lg font-semibold text-purple-400">
-                  +{stats.rebateBoost}%
-                </span>
+            <div className="mt-6 p-6 glass-effect rounded-xl border border-primary/30 bg-gradient-to-br from-primary/10 via-accent/5 to-transparent relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-radial from-primary/20 to-transparent rounded-full blur-2xl"></div>
+              <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-radial from-accent/15 to-transparent rounded-full blur-2xl"></div>
+              
+              <div className="relative">
+                <div className="flex items-center gap-2 mb-5">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 border border-primary/40">
+                    <span className="text-sm">🔒</span>
+                  </div>
+                  <span className="font-bold text-primary">Lock Information</span>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400 font-medium">$BACK locked</span>
+                    <span className="text-2xl font-bold">
+                      {stats.lockedAmount.toLocaleString('en-US')}
+                    </span>
+                  </div>
+                  
+                  <div className="h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent"></div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400 font-medium">Rebate boost</span>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl font-bold bg-gradient-to-r from-secondary to-green-400 bg-clip-text text-transparent">
+                        +{stats.rebateBoost}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-4 pt-4 border-t border-gray-700/50">
+                  <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
+                    <div className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></div>
+                    <span>Boost actif sur tous vos swaps</span>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -152,8 +229,12 @@ export const Dashboard = () => {
       )}
 
       {!connected && (
-        <div className="swap-card text-center text-gray-400 py-8">
-          Connectez votre wallet pour voir vos statistiques
+        <div className="swap-card text-center py-12">
+          <div className="flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 border border-primary/30 mx-auto mb-6">
+            <span className="text-4xl">👛</span>
+          </div>
+          <p className="text-gray-400 text-lg mb-4">Wallet non connecté</p>
+          <p className="text-gray-500 text-sm">Connectez votre wallet pour voir vos statistiques</p>
         </div>
       )}
     </div>
