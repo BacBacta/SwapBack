@@ -62,25 +62,26 @@ export const LevelBadge = ({ level, boost, isActive = true, size = "md" }: Level
   return (
     <div
       className={`
-        relative inline-flex items-center gap-2 rounded-lg
+        relative inline-flex items-center gap-2 rounded-xl
         bg-gradient-to-r ${config.gradient}
         ${sizeClasses[size]}
-        ${isActive ? `shadow-lg ${config.glow}` : "opacity-50 grayscale"}
+        ${isActive ? `shadow-lg ${config.glow} animate-pulse-glow` : "opacity-50 grayscale"}
         font-bold ${config.color}
-        transition-all duration-300 hover:scale-105
+        transition-all duration-300 hover:scale-105 hover:shadow-xl
+        border-2 border-white/20
       `}
     >
-      <span className={getIconSize()}>
+      <span className={`${getIconSize()} animate-bounce-slow`}>
         {config.icon}
       </span>
       <div className="flex flex-col">
-        <span className="font-extrabold">{level}</span>
-        <span className={`${size === "sm" ? "text-xs" : "text-sm"} opacity-90`}>
+        <span className="font-extrabold tracking-wide">{level}</span>
+        <span className={`${size === "sm" ? "text-xs" : "text-sm"} opacity-90 font-semibold`}>
           +{boost}% boost
         </span>
       </div>
       {!isActive && (
-        <span className="absolute top-0 right-0 bg-red-500 text-white text-xs px-2 py-0.5 rounded-bl-lg rounded-tr-lg">
+        <span className="absolute top-0 right-0 bg-red-500 text-white text-xs px-2 py-0.5 rounded-bl-lg rounded-tr-xl font-bold border border-red-400">
           Inactif
         </span>
       )}
