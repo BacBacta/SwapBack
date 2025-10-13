@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwapBack</title>
+    <style>
+        body {
+            width: 350px;
+            height: 500px;
+            margin: 0;
+            font-family: system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            padding: 20px;
+            text-align: center;
+        }
+        .logo {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        .title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 24px;
+        }
+        .stats {
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .stat:last-child {
+            margin-bottom: 0;
+        }
+        .stat-value {
+            font-weight: 600;
+        }
+        .button {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 12px;
+        }
+        .button:hover {
+            background: #059669;
+        }
+        .button.secondary {
+            background: rgba(255,255,255,0.2);
+        }
+        .button.secondary:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        .status {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🔄</div>
+        <div class="title">SwapBack</div>
+        <div class="subtitle">Better swaps for Solana</div>
+
+        <div class="stats">
+            <div class="stat">
+                <span>Total Rebates:</span>
+                <span class="stat-value" id="total-rebates">$1,247</span>
+            </div>
+            <div class="stat">
+                <span>Swaps Optimized:</span>
+                <span class="stat-value" id="total-swaps">1,234</span>
+            </div>
+            <div class="stat">
+                <span>cNFT Level:</span>
+                <span class="stat-value" id="cnft-level">Silver</span>
+            </div>
+        </div>
+
+        <button class="button" onclick="openDashboard()">📊 Open Dashboard</button>
+        <button class="button secondary" onclick="openSettings()">⚙️ Settings</button>
+
+        <div class="status" id="status">
+            ✅ Active on supported sites
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

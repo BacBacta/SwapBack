@@ -12,10 +12,12 @@ export interface CnftConfig {
 export class CnftClient {
   private program: Program | null = null;
   private readonly connection: Connection;
+  private readonly wallet: Wallet;
   private readonly config: CnftConfig;
 
   constructor(connection: Connection, wallet: Wallet, config: CnftConfig) {
     this.connection = connection;
+    this.wallet = wallet;
     this.config = config;
     // Le programme sera initialisé après génération de l'IDL
   }
@@ -24,8 +26,8 @@ export class CnftClient {
    * Initialise le programme (à appeler après génération de l'IDL)
    */
   setProgram(idl: any) {
-    const provider = new AnchorProvider(this.connection, {} as Wallet, {});
-    this.program = new Program(idl, this.config.programId, provider as any);
+    const provider = new AnchorProvider(this.connection, this.wallet, {});
+    this.program = new Program(idl as any, provider);
   }
 
   /**

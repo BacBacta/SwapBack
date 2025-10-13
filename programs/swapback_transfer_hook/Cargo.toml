@@ -13,11 +13,12 @@ no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 default = []
 
 [dependencies]
-anchor-lang = { version = "0.32.0", features = ["init-if-needed"] }
-anchor-spl = { version = "0.32.0", features = ["token_2022"] }
-spl-transfer-hook-interface = "0.6.0"
-spl-tlv-account-resolution = "0.6.0"
-spl-type-length-value = "0.4.0"
+anchor-lang = { workspace = true, features = ["init-if-needed"] }
+anchor-spl = { workspace = true, features = ["token_2022"] }
+spl-transfer-hook-interface = "0.7.0"
+spl-tlv-account-resolution = "0.7.0"
+spl-type-length-value = "0.5.0"

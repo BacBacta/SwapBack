@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::invoke_signed;
-use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 use anchor_spl::associated_token::AssociatedToken;
+use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
@@ -50,14 +50,14 @@ pub mod swapback_router {
         route_type: RouteType,
     ) -> Result<()> {
         let global_state = &ctx.accounts.global_state;
-        
+
         // Validation des paramètres
         require!(input_amount > 0, ErrorCode::InvalidAmount);
         require!(minimum_output_amount > 0, ErrorCode::InvalidAmount);
 
         // TODO: Implémenter la logique de simulation avec oracle off-chain
         // Pour le MVP, on crée simplement l'enregistrement de simulation
-        
+
         msg!(
             "Route simulée: input={}, min_output={}, type={:?}",
             input_amount,
@@ -93,7 +93,10 @@ pub mod swapback_router {
         // Simuler le swap: input_token -> output_token
         let cpi_accounts = Transfer {
             from: ctx.accounts.user_source_token_account.to_account_info(),
-            to: ctx.accounts.user_destination_token_account.to_account_info(),
+            to: ctx
+                .accounts
+                .user_destination_token_account
+                .to_account_info(),
             authority: ctx.accounts.user_authority.to_account_info(),
         };
         let cpi_program = ctx.accounts.token_program.to_account_info();
@@ -106,7 +109,7 @@ pub mod swapback_router {
             .unwrap()
             .checked_div(100)
             .unwrap();
-        
+
         let burn_amount = npi_amount
             .checked_mul(global_state.burn_percentage as u64)
             .unwrap()
@@ -115,7 +118,10 @@ pub mod swapback_router {
 
         // Transférer le montant de burn vers le programme de buyback
         let transfer_accounts = Transfer {
-            from: ctx.accounts.user_destination_token_account.to_account_info(),
+            from: ctx
+                .accounts
+                .user_destination_token_account
+                .to_account_info(),
             to: ctx.accounts.buyback_vault.to_account_info(),
             authority: ctx.accounts.user_authority.to_account_info(),
         };
@@ -127,13 +133,19 @@ pub mod swapback_router {
 
         // Mise à jour des statistiques utilisateur
         user_rebate.total_npi = user_rebate.total_npi.checked_add(npi_amount).unwrap();
-        user_rebate.pending_rebates = user_rebate.pending_rebates.checked_add(rebate_amount).unwrap();
+        user_rebate.pending_rebates = user_rebate
+            .pending_rebates
+            .checked_add(rebate_amount)
+            .unwrap();
         user_rebate.swap_count = user_rebate.swap_count.checked_add(1).unwrap();
 
         // Mise à jour des statistiques globales
         global_state.total_volume = global_state.total_volume.checked_add(input_amount).unwrap();
         global_state.total_npi = global_state.total_npi.checked_add(npi_amount).unwrap();
-        global_state.total_rebates = global_state.total_rebates.checked_add(rebate_amount).unwrap();
+        global_state.total_rebates = global_state
+            .total_rebates
+            .checked_add(rebate_amount)
+            .unwrap();
 
         emit!(SwapExecuted {
             user: ctx.accounts.user_authority.key(),
@@ -155,14 +167,60 @@ pub mod swapback_router {
         Ok(())
     }
 
+    /// Exécute un swap optimisé via l'extension browser
+    pub fn execute_optimized_swap(
+        ctx: Context<ExecuteOptimizedSwap>,
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+        input_amount: u64,
+        expected_output: u64,
+        route_provider: String,
+        user_boost: u8,
+    ) -> Result<()> {
+        let global_state = &mut ctx.accounts.global_state;
+
+        // Validation de sécurité
+        require!(input_amount > 0, ErrorCode::InvalidAmount);
+        require!(expected_output > 0, ErrorCode::InvalidAmount);
+        require!(route_provider.len() <= 20, ErrorCode::InvalidRouteProvider);
+
+        // Calculer le rebate rate avec boost utilisateur
+        let base_rebate_rate = 3; // 0.3%
+        let total_rebate_rate = base_rebate_rate + user_boost as u64;
+
+        // Calculer le montant de rebate
+        let rebate_amount = expected_output
+            .checked_mul(total_rebate_rate)
+            .unwrap()
+            .checked_div(1000) // Diviser par 1000 pour les décimales
+            .unwrap();
+
+        // TODO: Intégrer l'appel réel au DEX (Jupiter, Raydium, etc.)
+        // Pour le MVP, simuler le swap
+        msg!(
+            "Swap optimisé exécuté: {} -> {}, Montant={}, Provider={}, Boost={}%, Rebate={}",
+            input_mint,
+            output_mint,
+            input_amount,
+            route_provider,
+            user_boost,
+            rebate_amount
+        );
+
+        // Mettre à jour les statistiques globales
+        global_state.total_volume = global_state.total_volume.checked_add(input_amount).unwrap();
+        global_state.total_rebates = global_state.total_rebates.checked_add(rebate_amount).unwrap();
+
+        // TODO: Distribuer le rebate à l'utilisateur
+        // TODO: Mettre à jour le cNFT de l'utilisateur
+
+        Ok(())
+    }
+
     /// Verrouille des tokens $BACK pour obtenir des remises améliorées
     /// Verrouille des tokens $BACK pour obtenir un boost de remise
     /// et créer automatiquement un cNFT de niveau
-    pub fn lock_back(
-        ctx: Context<LockBack>,
-        amount: u64,
-        lock_duration: i64,
-    ) -> Result<()> {
+    pub fn lock_back(ctx: Context<LockBack>, amount: u64, lock_duration: i64) -> Result<()> {
         require!(amount > 0, ErrorCode::InvalidAmount);
         require!(lock_duration > 0, ErrorCode::InvalidLockDuration);
 
@@ -203,11 +261,14 @@ pub mod swapback_router {
             // Appeler mint_level_nft du programme cNFT
             let cnft_program_id = cnft_program.key();
             msg!("Création du cNFT de niveau {} via CPI", level);
-            
+
             // Pour l'instant, on log juste l'intention
             // L'implémentation complète du CPI sera ajoutée quand le programme cNFT sera déployé
-            msg!("cNFT sera minté pour l'utilisateur {} avec boost {}%", 
-                ctx.accounts.user_authority.key(), boost);
+            msg!(
+                "cNFT sera minté pour l'utilisateur {} avec boost {}%",
+                ctx.accounts.user_authority.key(),
+                boost
+            );
         }
 
         emit!(TokensLocked {
@@ -256,7 +317,10 @@ pub mod swapback_router {
         if let Some(cnft_program) = ctx.accounts.cnft_program.as_ref() {
             msg!("Désactivation du cNFT via CPI");
             // L'implémentation complète du CPI sera ajoutée quand le programme cNFT sera déployé
-            msg!("cNFT désactivé pour l'utilisateur {}", ctx.accounts.user_authority.key());
+            msg!(
+                "cNFT désactivé pour l'utilisateur {}",
+                ctx.accounts.user_authority.key()
+            );
         }
 
         // Réinitialisation du verrouillage
@@ -276,16 +340,13 @@ pub mod swapback_router {
     /// Récupère les remises accumulées
     pub fn claim_rewards(ctx: Context<ClaimRewards>) -> Result<()> {
         let user_rebate = &mut ctx.accounts.user_rebate;
-        
-        require!(
-            user_rebate.pending_rebates > 0,
-            ErrorCode::NoRewardsToClaim
-        );
+
+        require!(user_rebate.pending_rebates > 0, ErrorCode::NoRewardsToClaim);
 
         let claim_amount = user_rebate.pending_rebates;
 
         // TODO: Implémenter le transfert réel des remises en USDC ou $BACK
-        
+
         user_rebate.total_claimed = user_rebate.total_claimed.checked_add(claim_amount).unwrap();
         user_rebate.pending_rebates = 0;
 
@@ -311,13 +372,13 @@ pub struct Initialize<'info> {
         bump
     )]
     pub global_state: Account<'info, GlobalState>,
-    
+
     #[account(mut)]
     pub authority: Signer<'info>,
-    
+
     /// CHECK: Compte de trésorerie USDC
     pub treasury: AccountInfo<'info>,
-    
+
     pub system_program: Program<'info, System>,
 }
 
@@ -331,7 +392,7 @@ pub struct SimulateRoute<'info> {
 pub struct ExecuteSwap<'info> {
     #[account(mut, seeds = [b"global_state"], bump = global_state.bump)]
     pub global_state: Account<'info, GlobalState>,
-    
+
     #[account(
         init_if_needed,
         payer = user_authority,
@@ -340,22 +401,32 @@ pub struct ExecuteSwap<'info> {
         bump
     )]
     pub user_rebate: Account<'info, UserRebate>,
-    
+
     #[account(mut)]
     pub user_authority: Signer<'info>,
-    
+
     #[account(mut)]
     pub user_source_token_account: Account<'info, TokenAccount>,
-    
+
     #[account(mut)]
     pub user_destination_token_account: Account<'info, TokenAccount>,
-    
+
     #[account(mut)]
     pub buyback_vault: Account<'info, TokenAccount>,
-    
+
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
+
+#[derive(Accounts)]
+pub struct ExecuteOptimizedSwap<'info> {
+    #[account(mut, seeds = [b"global_state"], bump = global_state.bump)]
+    pub global_state: Account<'info, GlobalState>,
+
+    #[account(mut)]
+    pub user_authority: Signer<'info>,
+}
+
 
 #[derive(Accounts)]
 pub struct LockBack<'info> {
@@ -365,16 +436,16 @@ pub struct LockBack<'info> {
         bump = user_rebate.bump
     )]
     pub user_rebate: Account<'info, UserRebate>,
-    
+
     #[account(mut)]
     pub user_token_account: Account<'info, TokenAccount>,
-    
+
     #[account(mut)]
     pub lock_account: Account<'info, TokenAccount>,
-    
+
     #[account(mut)]
     pub user_authority: Signer<'info>,
-    
+
     pub token_program: Program<'info, Token>,
 
     /// CHECK: Programme cNFT optionnel pour créer le NFT de niveau
@@ -397,16 +468,16 @@ pub struct UnlockBack<'info> {
         bump = user_rebate.bump
     )]
     pub user_rebate: Account<'info, UserRebate>,
-    
+
     #[account(mut)]
     pub user_token_account: Account<'info, TokenAccount>,
-    
+
     #[account(mut)]
     pub lock_account: Account<'info, TokenAccount>,
-    
+
     #[account(mut)]
     pub user_authority: Signer<'info>,
-    
+
     pub token_program: Program<'info, Token>,
 
     /// CHECK: Programme cNFT optionnel pour mettre à jour le statut du NFT
@@ -426,7 +497,7 @@ pub struct ClaimRewards<'info> {
         bump = user_rebate.bump
     )]
     pub user_rebate: Account<'info, UserRebate>,
-    
+
     #[account(mut)]
     pub user_authority: Signer<'info>,
 }
@@ -437,9 +508,9 @@ pub struct ClaimRewards<'info> {
 #[derive(InitSpace)]
 pub struct GlobalState {
     pub authority: Pubkey,
-    pub rebate_percentage: u8,      // 70-80%
-    pub burn_percentage: u8,         // 20-30%
-    pub npi_threshold: u64,          // Seuil NPI pour utiliser bundles
+    pub rebate_percentage: u8, // 70-80%
+    pub burn_percentage: u8,   // 20-30%
+    pub npi_threshold: u64,    // Seuil NPI pour utiliser bundles
     pub treasury: Pubkey,
     pub total_volume: u64,
     pub total_npi: u64,
@@ -457,7 +528,7 @@ pub struct UserRebate {
     pub swap_count: u64,
     pub locked_amount: u64,
     pub lock_end_time: i64,
-    pub rebate_boost: u8,            // Boost en pourcentage (0-50%)
+    pub rebate_boost: u8, // Boost en pourcentage (0-50%)
     pub bump: u8,
 }
 
@@ -539,6 +610,8 @@ pub enum ErrorCode {
     LockPeriodNotEnded,
     #[msg("Aucune récompense à réclamer")]
     NoRewardsToClaim,
+    #[msg("Fournisseur de route invalide")]
+    InvalidRouteProvider,
 }
 
 // === FONCTIONS UTILITAIRES ===
@@ -547,7 +620,7 @@ fn calculate_boost(amount: u64, duration: i64) -> u8 {
     // Calcul simple du boost basé sur le montant et la durée
     // Plus le montant et la durée sont élevés, plus le boost est important
     let days = duration / 86400; // Conversion en jours
-    
+
     if amount >= 10_000_000_000 && days >= 365 {
         50 // Gold: 50% boost
     } else if amount >= 1_000_000_000 && days >= 180 {

@@ -2,13 +2,14 @@
 members = [
     "programs/swapback_router",
     "programs/swapback_buyback",
-    "programs/swapback_cnft"
+    "programs/swapback_cnft",
+    "programs/swapback_transfer_hook"
 ]
 resolver = "2"
 
 [workspace.dependencies]
-anchor-lang = "0.32.0"
-anchor-spl = "0.32.0"
+anchor-lang = "0.32.1"
+anchor-spl = "0.32.1"
 spl-token-2022 = "9.0.0"
 
 [profile.release]

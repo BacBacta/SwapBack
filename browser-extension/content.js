@@ -155,7 +155,8 @@ function showSwapBackNotification(data) {
       font-family: system-ui, -apple-system, sans-serif;
       z-index: 10001;
       animation: slideIn 0.3s ease;
-    ">
+      cursor: pointer;
+    " onclick="this.remove()">
       <div style="font-size: 16px; font-weight: 700; margin-bottom: 4px;">
         ✅ Swap via SwapBack
       </div>
@@ -163,6 +164,7 @@ function showSwapBackNotification(data) {
         ${data.estimatedRebate ? `Rebate estimé: ${data.estimatedRebate}` : 'Meilleur route trouvé!'}
       </div>
       ${data.boost ? `<div style="font-size: 12px; margin-top: 4px;">Boost ${data.boost}% appliqué</div>` : ''}
+      <div style="font-size: 11px; margin-top: 8px; opacity: 0.8;">Cliquez pour voir les détails</div>
     </div>
     <style>
       @keyframes slideIn {
@@ -172,12 +174,187 @@ function showSwapBackNotification(data) {
     </style>
   `;
   
+  notification.addEventListener('click', () => {
+    showOptimizationModal(data);
+  });
+  
   document.body.appendChild(notification);
   
   setTimeout(() => {
-    notification.style.animation = 'slideOut 0.3s ease';
-    setTimeout(() => notification.remove(), 300);
-  }, 5000);
+    if (notification.parentNode) {
+      notification.style.animation = 'slideOut 0.3s ease';
+      setTimeout(() => notification.remove(), 300);
+    }
+  }, 8000);
+}
+
+/**
+ * Affiche un modal détaillé d'optimisation
+ */
+function showOptimizationModal(data) {
+  const modal = document.createElement('div');
+  modal.innerHTML = `
+    <div style="
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(5px);
+      z-index: 10002;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.3s ease;
+    " onclick="this.remove()">
+      <div style="
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        max-width: 400px;
+        width: 90%;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        font-family: system-ui, -apple-system, sans-serif;
+      " onclick="event.stopPropagation()">
+        <div style="display: flex; align-items: center; margin-bottom: 20px;">
+          <span style="font-size: 24px; margin-right: 12px;">🔄</span>
+          <div>
+            <h3 style="margin: 0; font-size: 18px; font-weight: 700;">SwapBack Optimization</h3>
+            <p style="margin: 4px 0 0 0; font-size: 14px; color: #666;">Route optimisée trouvée</p>
+          </div>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span>Route originale:</span>
+            <span style="color: #dc3545;">${data.originalCost || 'N/A'}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span>Route SwapBack:</span>
+            <span style="color: #10b981; font-weight: 600;">${data.optimizedCost || 'N/A'}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid #eee;">
+            <span style="font-weight: 600;">Économie:</span>
+            <span style="color: #10b981; font-weight: 700;">${data.savings || 'N/A'}</span>
+          </div>
+        </div>
+        
+        ${data.boost ? `
+        <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+          <div style="font-size: 14px; color: #666;">🎁 Boost cNFT appliqué</div>
+          <div style="font-size: 16px; font-weight: 600; color: #10b981;">+${data.boost}% de rebate supplémentaire</div>
+        </div>
+        ` : ''}
+        
+        <div style="display: flex; gap: 12px;">
+          <button style="
+            flex: 1;
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+          " onclick="this.closest('[onclick]').click(); executeOptimizedSwap()">
+            ✅ Utiliser SwapBack
+          </button>
+          <button style="
+            flex: 1;
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+          " onclick="this.closest('[onclick]').remove()">
+            ✕ Continuer normal
+          </button>
+        </div>
+      </div>
+    </div>
+    <style>
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+    </style>
+  `;
+  
+  document.body.appendChild(modal);
+}
+
+/**
+ * Exécute le swap optimisé
+ */
+function executeOptimizedSwap() {
+  chrome.runtime.sendMessage({ action: 'executeOptimizedSwap' }, (response) => {
+    if (response.success) {
+      showSuccessNotification('Swap exécuté avec succès via SwapBack!');
+    } else {
+      showErrorNotification('Erreur lors du swap optimisé');
+    }
+  });
+}
+
+/**
+ * Notification de succès
+ */
+function showSuccessNotification(message) {
+  const notification = document.createElement('div');
+  notification.innerHTML = `
+    <div style="
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #10b981;
+      color: white;
+      padding: 16px 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+      font-family: system-ui, -apple-system, sans-serif;
+      z-index: 10001;
+      animation: slideIn 0.3s ease;
+    ">
+      <div style="font-size: 16px; font-weight: 700;">
+        ✅ ${message}
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(notification);
+  setTimeout(() => notification.remove(), 5000);
+}
+
+/**
+ * Notification d'erreur
+ */
+function showErrorNotification(message) {
+  const notification = document.createElement('div');
+  notification.innerHTML = `
+    <div style="
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #dc3545;
+      color: white;
+      padding: 16px 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+      font-family: system-ui, -apple-system, sans-serif;
+      z-index: 10001;
+      animation: slideIn 0.3s ease;
+    ">
+      <div style="font-size: 16px; font-weight: 700;">
+        ❌ ${message}
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(notification);
+  setTimeout(() => notification.remove(), 5000);
 }
 
 /**
