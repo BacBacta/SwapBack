@@ -45,7 +45,6 @@ export const Dashboard = () => {
   }, [connected, publicKey, lockData]);
 
   return (
-      return (
     <div className="space-y-8">
       {/* Global Stats */}
       <div className="swap-card">
