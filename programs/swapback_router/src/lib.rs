@@ -417,7 +417,6 @@ pub struct UnlockBack<'info> {
 
     pub system_program: Program<'info, System>,
 }
-}
 
 #[derive(Accounts)]
 pub struct ClaimRewards<'info> {

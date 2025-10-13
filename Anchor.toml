@@ -1,6 +1,5 @@
 [toolchain]
-anchor_version = "0.31.2"
-solana_version = "1.18.22"
+anchor_version = "0.32.0"
 
 [features]
 resolution = true
@@ -13,10 +12,9 @@ swapback_transfer_hook = "99SBCaqTDvswXakvH54i94SS2eFXjEaXDNwgVDJahPJP"
 swapback_cnft = "HCsNTpvkUGV7XMAw5VsBSR4Kxvt5x59iFDAeucvY4cre"
 
 [programs.devnet]
-swapback_router = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
-swapback_buyback = "Hn7cLGf4hYNd8F1RqYNdqxqLKxqVMiEUPPbRKZJd3zKx"
-swapback_transfer_hook = "99SBCaqTDvswXakvH54i94SS2eFXjEaXDNwgVDJahPJP"
-swapback_cnft = "HCsNTpvkUGV7XMAw5VsBSR4Kxvt5x59iFDAeucvY4cre"
+swapback_router = "FPK46poe53iX6Bcv3q8cgmc1jm7dJKQ9Qs9oESFxGN55"
+swapback_buyback = "75nEwGH4cpRq13PG2eEioQE1wBqSvxvK9bhWfvpvZvP7"
+swapback_cnft = "FPNibu4RhrTt9yLDxcc8nQuHiVkFCfLVJ7DZUn6yn8K8"
 
 [programs.mainnet]
 swapback_router = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"

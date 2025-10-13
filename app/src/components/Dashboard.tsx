@@ -2,6 +2,8 @@
 
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useEffect, useState } from "react";
+import { CNFTCard } from "./CNFTCard";
+import { useCNFT } from "../hooks/useCNFT";
 
 interface UserStats {
   totalSwaps: number;
@@ -16,29 +18,31 @@ interface UserStats {
 export const Dashboard = () => {
   const { connected, publicKey } = useWallet();
   const [stats, setStats] = useState<UserStats | null>(null);
-  const [globalStats, setGlobalStats] = useState({
+  const [globalStats] = useState({
     totalVolume: 1234567,
     totalBurned: 45678,
     totalRebates: 98765,
   });
 
+  // 🔥 Utiliser le hook pour récupérer les vraies données blockchain
+  const { cnftData, lockData, levelName } = useCNFT();
+
   useEffect(() => {
     if (connected && publicKey) {
-      // TODO: Charger les stats réelles depuis la blockchain
-      // Pour le MVP, on utilise des données simulées
+      // NOTE: Données mockées pour le MVP - à remplacer par vraies données on-chain
       setStats({
         totalSwaps: 23,
         totalVolume: 15420,
         totalNPI: 308.4,
         totalRebates: 231.3,
         pendingRebates: 12.45,
-        lockedAmount: 1000,
-        rebateBoost: 10,
+        lockedAmount: lockData?.amount || 0, // Utiliser vraies données si disponibles
+        rebateBoost: lockData?.boost || 0,
       });
     } else {
       setStats(null);
     }
-  }, [connected, publicKey]);
+  }, [connected, publicKey, lockData]);
 
   return (
     <div className="space-y-6">
@@ -68,6 +72,18 @@ export const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* cNFT Card - Affiché en premier quand connecté */}
+      {connected && cnftData && cnftData.exists && cnftData.isActive && (
+        <CNFTCard
+          level={levelName || "Bronze"}
+          boost={cnftData.boost}
+          lockedAmount={cnftData.lockedAmount}
+          lockDuration={cnftData.lockDuration}
+          isActive={cnftData.isActive}
+          unlockDate={cnftData.unlockDate}
+        />
+      )}
 
       {/* User Stats */}
       {connected && stats && (
