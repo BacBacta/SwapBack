@@ -11,6 +11,7 @@ export const Navigation = () => {
 
   const navLinks = [
     { href: "/", label: "Swap" },
+    { href: "/jupiter", label: "Jupiter" },
     { href: "/lock", label: "Lock & Earn" },
     { href: "/stats", label: "Stats" },
     { href: "/docs", label: "Docs" },

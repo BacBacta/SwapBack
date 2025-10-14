@@ -8,6 +8,7 @@
     "build": "tsc",
     "test": "jest",
     "test:back-token": "npx tsx test_back_token.ts",
+    "test:jupiter": "npx tsx scripts/test-jupiter.ts",
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {

@@ -17,6 +17,12 @@ export * from "./blockchain-tracer";
  * Export Smart Router Services (Phase 6)
  */
 export { SwapExecutor } from "./services/SwapExecutor";
+export { JupiterService } from "./services/JupiterService";
+export type {
+  JupiterQuote,
+  JupiterSwapResponse,
+  RouteInfo,
+} from "./services/JupiterService";
 export type {
   SwapParams,
   SwapResult as SwapExecutorResult,
