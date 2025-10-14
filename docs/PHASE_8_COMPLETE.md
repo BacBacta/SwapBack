@@ -1,6 +1,7 @@
 # Phase 8 - Frontend Development ✅
 
 ## 🎯 Objectif
+
 Créer une interface utilisateur avancée pour SwapBack avec gestion d'état en temps réel, WebSocket pour les mises à jour de transactions, et visualisations de données complètes.
 
 ---
@@ -8,9 +9,11 @@ Créer une interface utilisateur avancée pour SwapBack avec gestion d'état en 
 ## 📦 Composants Créés
 
 ### 1. **State Management (Zustand)**
+
 **Fichier**: `/app/src/store/swapStore.ts`
 
 Architecture complète de gestion d'état avec :
+
 - **Swap State**: tokens (input/output), montants, slippage, MEV protection, priority level
 - **Route State**: routes disponibles, route sélectionnée, loading, errors
 - **Transaction State**: status (idle → preparing → signing → sending → confirming → confirmed), signature, confirmations, errors
@@ -18,6 +21,7 @@ Architecture complète de gestion d'état avec :
 - **Actions**: setInputToken, setOutputToken, fetchRoutes, selectRoute, executeSwap, etc.
 
 **Fonctionnalités**:
+
 - ✅ Persistance localStorage (slippage, MEV settings, historique)
 - ✅ DevTools integration (Redux DevTools)
 - ✅ Auto-refresh routes quand input change
@@ -26,14 +30,17 @@ Architecture complète de gestion d'état avec :
 ---
 
 ### 2. **WebSocket Service**
+
 **Fichier**: `/app/src/lib/websocket.ts`
 
 Service de communication temps réel avec Solana blockchain :
+
 - **Transaction Tracking**: écoute les confirmations via `connection.onSignature()`
 - **Price Updates**: polling des prix toutes les 10 secondes (à intégrer avec Pyth/Switchboard)
 - **Event System**: `swap.pending`, `swap.confirmed`, `swap.finalized`, `swap.error`, `price.updated`
 
 **Fonctionnalités**:
+
 - ✅ Subscription aux signatures de transaction
 - ✅ Détection automatique de finalisation
 - ✅ Event listeners pour composants React
@@ -42,17 +49,20 @@ Service de communication temps réel avec Solana blockchain :
 ---
 
 ### 3. **React Hook - useSwapWebSocket**
+
 **Fichier**: `/app/src/hooks/useSwapWebSocket.ts`
 
 Hook personnalisé pour connecter WebSocket au Zustand store :
+
 - Auto-subscribe aux transactions actives
 - Update du status dans le store en temps réel
 - Gestion des confirmations et erreurs
 - Cleanup automatique on unmount
 
 **Usage**:
+
 ```tsx
-import { useSwapWebSocket } from '@/hooks/useSwapWebSocket';
+import { useSwapWebSocket } from "@/hooks/useSwapWebSocket";
 
 function MyComponent() {
   useSwapWebSocket(); // That's it!
@@ -63,9 +73,11 @@ function MyComponent() {
 ---
 
 ### 4. **Enhanced Swap Interface**
+
 **Fichier**: `/app/src/components/EnhancedSwapInterface.tsx`
 
 Interface de swap avancée avec :
+
 - **Token Selectors**: Boutons pour sélectionner input/output tokens (avec logos)
 - **Input Validation**: Montants en temps réel, affichage du balance
 - **Slippage Modal**: Presets (0.1%, 0.5%, 1%) + custom slippage
@@ -76,6 +88,7 @@ Interface de swap avancée avec :
 - **Auto-Refresh**: Fetches routes automatiquement avec debounce de 500ms
 
 **Intégrations**:
+
 - ✅ Zustand store pour state management
 - ✅ WebSocket hook pour real-time updates
 - ✅ API routes (/api/swap, /api/execute)
@@ -84,9 +97,11 @@ Interface de swap avancée avec :
 ---
 
 ### 5. **Transaction Tracker**
+
 **Fichier**: `/app/src/components/TransactionTracker.tsx`
 
 Suivi visuel des transactions en temps réel :
+
 - **Progress Bar**: 5 étapes avec icons animés (Preparing → Signing → Sending → Confirming → Finalized)
 - **Transaction Details**: Signature (tronquée), confirmations, liens Solscan
 - **Error Handling**: Message d'erreur + bouton Retry
@@ -94,6 +109,7 @@ Suivi visuel des transactions en temps réel :
 - **History**: Liste des 10 dernières transactions (statut, montants, date, liens explorer)
 
 **Features**:
+
 - ✅ Real-time updates via WebSocket
 - ✅ Animated progress indicators
 - ✅ Solana Explorer integration (solscan.io)
@@ -102,15 +118,18 @@ Suivi visuel des transactions en temps réel :
 ---
 
 ### 6. **Route Comparison Chart**
+
 **Fichier**: `/app/src/components/RouteComparison.tsx`
 
 Visualisation comparative des routes avec Recharts :
+
 - **Bar Chart**: Compare Expected Output, Total Cost, MEV Risk
 - **Route List**: Détails de chaque route (venues, output, cost, MEV)
 - **Route Selection**: Cliquable pour changer la route sélectionnée
 - **Visual Highlighting**: Route sélectionnée en bleu avec checkmark
 
 **Technologies**:
+
 - ✅ Recharts (BarChart, CartesianGrid, Tooltip, Legend)
 - ✅ Responsive design
 - ✅ Dark theme styling
@@ -118,32 +137,47 @@ Visualisation comparative des routes avec Recharts :
 ---
 
 ### 7. **Dashboard Analytics**
+
 **Fichier**: `/app/src/components/DashboardAnalytics.tsx`
 
 Tableau de bord analytique complet :
+
 - **Volume Chart**: Area chart 7 jours (Recharts)
 - **MEV Savings Counter**: Total $ économisé avec gradient card
 - **Route Performance Table**: Success rate %, avg time par venue
 - **Popular Pairs**: Top 4 paires tradées (24h volume + count)
 
 **Mock Data** (à remplacer par API):
+
 ```javascript
-volumeData: { date, volume }[]
-performanceData: { venue, successRate, avgTime }[]
-popularPairs: { pair, volume, count }[]
+volumeData: {
+  (date, volume);
+}
+[];
+performanceData: {
+  (venue, successRate, avgTime);
+}
+[];
+popularPairs: {
+  (pair, volume, count);
+}
+[];
 ```
 
 ---
 
 ### 8. **Enhanced Swap Page**
+
 **Fichier**: `/app/src/app/swap-enhanced/page.tsx`
 
 Page de démonstration complète avec layout 3 colonnes :
+
 - **Colonne 1**: SwapInterface + TransactionTracker
 - **Colonne 2**: RouteComparison
 - **Colonne 3**: DashboardAnalytics
 
 **Features**:
+
 - ✅ Responsive grid layout (3 cols desktop, 1 col mobile)
 - ✅ WalletProvider wrapper
 - ✅ Gradient background
@@ -160,6 +194,7 @@ npm install recharts           # Data visualization
 ```
 
 **Déjà installées**:
+
 - `@solana/wallet-adapter-react` (wallet connection)
 - `@solana/web3.js` (blockchain interaction)
 - `next` (framework)
@@ -170,21 +205,25 @@ npm install recharts           # Data visualization
 ## 🚀 Comment Utiliser
 
 ### 1. Démarrer le serveur de développement
+
 ```bash
 cd app
 npm run dev
 ```
 
 ### 2. Accéder à l'interface
+
 ```
 http://localhost:3000/swap-enhanced
 ```
 
 ### 3. Connecter un wallet Solana
+
 - Cliquer sur "Connect Wallet" (Phantom, Solflare, etc.)
 - Approuver la connexion
 
 ### 4. Effectuer un swap
+
 1. Sélectionner input/output tokens
 2. Entrer un montant
 3. Les routes se chargent automatiquement (debounced 500ms)
@@ -196,6 +235,7 @@ http://localhost:3000/swap-enhanced
 ## 📊 Architecture des Données
 
 ### Zustand Store Structure
+
 ```typescript
 {
   swap: {
@@ -231,13 +271,14 @@ http://localhost:3000/swap-enhanced
 ```
 
 ### WebSocket Events
+
 ```typescript
 type SwapEvent =
-  | { type: 'swap.pending'; signature: string }
-  | { type: 'swap.confirmed'; signature: string; confirmations: number }
-  | { type: 'swap.finalized'; signature: string }
-  | { type: 'swap.error'; signature: string; error: string }
-  | { type: 'price.updated'; token: string; price: number };
+  | { type: "swap.pending"; signature: string }
+  | { type: "swap.confirmed"; signature: string; confirmations: number }
+  | { type: "swap.finalized"; signature: string }
+  | { type: "swap.error"; signature: string; error: string }
+  | { type: "price.updated"; token: string; price: number };
 ```
 
 ---
@@ -247,6 +288,7 @@ type SwapEvent =
 ### API Routes Utilisées
 
 **POST /api/swap**
+
 ```json
 Request:
 {
@@ -275,6 +317,7 @@ Response:
 ```
 
 **POST /api/execute**
+
 ```json
 Request:
 {
@@ -296,17 +339,20 @@ Response:
 ## 🧪 Tests à Ajouter (Phase 9)
 
 ### Unit Tests
+
 - [ ] SwapStore actions (setInputToken, fetchRoutes, etc.)
 - [ ] WebSocket event handling
 - [ ] Route comparison calculations
 - [ ] Transaction status transitions
 
 ### Integration Tests
+
 - [ ] Full swap flow (input → routes → execute → confirm)
 - [ ] WebSocket → Store updates
 - [ ] API route error handling
 
 ### E2E Tests (Playwright)
+
 - [ ] User clicks through swap interface
 - [ ] Token selection
 - [ ] Slippage modal interaction
@@ -327,6 +373,7 @@ Response:
 ## 🎯 Prochaines Étapes
 
 ### Phase 9 - Coverage >80%
+
 1. Generate coverage report: `npx vitest run --coverage`
 2. Add missing tests (SwapExecutor, OraclePriceService edge cases)
 3. Setup GitHub Actions CI/CD pipeline
@@ -334,6 +381,7 @@ Response:
 5. Integrate Codecov for badges
 
 ### Phase 10 - Production Deployment
+
 1. Setup .env.production (mainnet RPC, Jito endpoint)
 2. Deploy to Vercel (`vercel --prod`)
 3. Configure monitoring (Sentry, DataDog)
@@ -346,19 +394,24 @@ Response:
 ## 📝 Notes Techniques
 
 ### Recharts Theme
+
 Tous les charts utilisent un dark theme cohérent :
+
 - Background: `#1F2937` (gray-900)
 - Grid: `#374151` (gray-700)
 - Text: `#9CA3AF` (gray-400)
 - Accent: `#3B82F6` (blue-600)
 
 ### Tailwind Classes Communes
+
 - Cards: `bg-gray-900 rounded-2xl p-6 shadow-xl`
 - Buttons: `bg-blue-600 hover:bg-blue-700 text-white rounded-xl`
 - Inputs: `bg-gray-800 text-white rounded-lg outline-none`
 
 ### TypeScript Strict Mode
+
 Tous les composants sont full TypeScript avec :
+
 - Strict null checks
 - No implicit any
 - Proper interface definitions
@@ -368,6 +421,7 @@ Tous les composants sont full TypeScript avec :
 ## ✅ Phase 8 Status: **COMPLETE**
 
 **Réalisations**:
+
 - ✅ 8 nouveaux composants créés
 - ✅ State management complet (Zustand)
 - ✅ Real-time WebSocket integration
@@ -377,6 +431,7 @@ Tous les composants sont full TypeScript avec :
 - ✅ Demo page fonctionnelle
 
 **Metrics**:
+
 - Composants: 8
 - Lignes de code: ~1,500
 - Dépendances ajoutées: 3

@@ -3,18 +3,18 @@
  * Listens to Solana transaction confirmations and price updates
  */
 
-import { Connection } from '@solana/web3.js';
+import { Connection } from "@solana/web3.js";
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
 export type SwapEvent =
-  | { type: 'swap.pending'; signature: string }
-  | { type: 'swap.confirmed'; signature: string; confirmations: number }
-  | { type: 'swap.finalized'; signature: string }
-  | { type: 'swap.error'; signature: string; error: string }
-  | { type: 'price.updated'; token: string; price: number };
+  | { type: "swap.pending"; signature: string }
+  | { type: "swap.confirmed"; signature: string; confirmations: number }
+  | { type: "swap.finalized"; signature: string }
+  | { type: "swap.error"; signature: string; error: string }
+  | { type: "price.updated"; token: string; price: number };
 
 export type EventListener = (event: SwapEvent) => void;
 
@@ -29,8 +29,10 @@ export class SwapWebSocketService {
 
   constructor(rpcUrl: string) {
     // Use WebSocket URL
-    const wsUrl = rpcUrl.replace('https://', 'wss://').replace('http://', 'ws://');
-    this.connection = new Connection(wsUrl, 'confirmed');
+    const wsUrl = rpcUrl
+      .replace("https://", "wss://")
+      .replace("http://", "ws://");
+    this.connection = new Connection(wsUrl, "confirmed");
   }
 
   /**
@@ -42,7 +44,7 @@ export class SwapWebSocketService {
     }
 
     // Emit pending event
-    this.emit({ type: 'swap.pending', signature });
+    this.emit({ type: "swap.pending", signature });
 
     // Subscribe to signature status
     const subscriptionId = this.connection.onSignature(
@@ -51,7 +53,7 @@ export class SwapWebSocketService {
         if (result.err) {
           // Transaction failed
           this.emit({
-            type: 'swap.error',
+            type: "swap.error",
             signature,
             error: JSON.stringify(result.err),
           });
@@ -59,7 +61,7 @@ export class SwapWebSocketService {
           // Transaction confirmed
           const confirmations = context.slot;
           this.emit({
-            type: 'swap.confirmed',
+            type: "swap.confirmed",
             signature,
             confirmations,
           });
@@ -71,7 +73,7 @@ export class SwapWebSocketService {
         // Cleanup
         this.activeSignatures.delete(signature);
       },
-      'confirmed'
+      "confirmed"
     );
 
     this.activeSignatures.set(signature, subscriptionId);
@@ -83,14 +85,14 @@ export class SwapWebSocketService {
   private async checkFinalization(signature: string): Promise<void> {
     try {
       const status = await this.connection.getSignatureStatus(signature);
-      if (status?.value?.confirmationStatus === 'finalized') {
-        this.emit({ type: 'swap.finalized', signature });
+      if (status?.value?.confirmationStatus === "finalized") {
+        this.emit({ type: "swap.finalized", signature });
       } else {
         // Poll again in 5 seconds
         setTimeout(() => this.checkFinalization(signature), 5000);
       }
     } catch (error) {
-      console.error('Error checking finalization:', error);
+      console.error("Error checking finalization:", error);
     }
   }
 
@@ -113,9 +115,9 @@ export class SwapWebSocketService {
     const intervalId = setInterval(async () => {
       try {
         const price = await this.fetchTokenPrice(tokenMint);
-        this.emit({ type: 'price.updated', token: tokenMint, price });
+        this.emit({ type: "price.updated", token: tokenMint, price });
       } catch (error) {
-        console.error('Error fetching price:', error);
+        console.error("Error fetching price:", error);
       }
     }, 10000);
 
@@ -164,7 +166,7 @@ export class SwapWebSocketService {
 
     // Clear price update intervals
     Object.keys(this).forEach((key) => {
-      if (key.startsWith('priceInterval_')) {
+      if (key.startsWith("priceInterval_")) {
         clearInterval((this as any)[key]);
         delete (this as any)[key];
       }
@@ -183,7 +185,9 @@ let wsInstance: SwapWebSocketService | null = null;
 
 export function getWebSocketService(): SwapWebSocketService {
   if (!wsInstance) {
-    const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+    const rpcUrl =
+      process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
+      "https://api.mainnet-beta.solana.com";
     wsInstance = new SwapWebSocketService(rpcUrl);
   }
   return wsInstance;

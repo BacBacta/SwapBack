@@ -99,6 +99,7 @@ Phase 6.2 **successfully implemented the SwapExecutor** - the main orchestrator 
 **Location**: `sdk/src/services/SwapExecutor.ts` (570 lines)
 
 **Dependencies**:
+
 - ✅ `LiquidityDataCollector` - Real-time liquidity from all venues
 - ✅ `RouteOptimizationEngine` - Greedy cost minimization
 - ✅ `OraclePriceService` - Pyth + Switchboard price verification
@@ -106,9 +107,10 @@ Phase 6.2 **successfully implemented the SwapExecutor** - the main orchestrator 
 - ✅ `CircuitBreaker` - Failsafe pattern for error handling
 
 **Public Interface**:
+
 ```typescript
 class SwapExecutor {
-  async executeSwap(params: SwapParams): Promise<SwapResult>
+  async executeSwap(params: SwapParams): Promise<SwapResult>;
 }
 ```
 
@@ -119,17 +121,19 @@ class SwapExecutor {
 **Pattern**: Circuit Breaker for preventing cascading failures
 
 **States**:
+
 - `CLOSED`: Normal operation, requests pass through
 - `OPEN`: Too many failures (3+), requests blocked for 60s
 - `HALF_OPEN`: Testing if service recovered (2 successes = close)
 
 **Configuration**:
+
 ```typescript
 new CircuitBreaker({
-  failureThreshold: 3,      // Open after 3 consecutive failures
-  resetTimeoutMs: 60000,    // Wait 60s before retry
-  successThreshold: 2,      // Need 2 successes to close
-})
+  failureThreshold: 3, // Open after 3 consecutive failures
+  resetTimeoutMs: 60000, // Wait 60s before retry
+  successThreshold: 2, // Need 2 successes to close
+});
 ```
 
 ---
@@ -141,42 +145,45 @@ new CircuitBreaker({
 Execute atomic multi-venue swap with full orchestration.
 
 **Parameters**:
+
 ```typescript
 interface SwapParams {
-  inputMint: string;              // Input token mint address
-  outputMint: string;             // Output token mint address
-  inputAmount: number;            // Amount to swap (token decimals)
-  maxSlippageBps: number;         // Max slippage (50 = 0.5%)
-  userPublicKey: PublicKey;       // User's wallet public key
-  signer: Signer;                 // User's wallet signer
-  minOutputAmount?: number;       // Optional minimum output
+  inputMint: string; // Input token mint address
+  outputMint: string; // Output token mint address
+  inputAmount: number; // Amount to swap (token decimals)
+  maxSlippageBps: number; // Max slippage (50 = 0.5%)
+  userPublicKey: PublicKey; // User's wallet public key
+  signer: Signer; // User's wallet signer
+  minOutputAmount?: number; // Optional minimum output
   routePreferences?: {
     preferredVenues?: VenueName[];
     excludedVenues?: VenueName[];
     maxHops?: number;
-    enableMevProtection?: boolean;  // Default: true
+    enableMevProtection?: boolean; // Default: true
   };
 }
 ```
 
 **Returns**:
+
 ```typescript
 interface SwapResult {
-  signature: string;              // Transaction signature
-  routes: RouteCandidate[];       // Routes used
-  metrics: SwapMetrics;           // Execution metrics
-  success: boolean;               // Whether swap succeeded
-  error?: string;                 // Error message if failed
+  signature: string; // Transaction signature
+  routes: RouteCandidate[]; // Routes used
+  metrics: SwapMetrics; // Execution metrics
+  success: boolean; // Whether swap succeeded
+  error?: string; // Error message if failed
 }
 ```
 
 **Example Usage**:
+
 ```typescript
-import { SwapExecutor } from '@swapback/sdk';
-import { Connection, Keypair } from '@solana/web3.js';
+import { SwapExecutor } from "@swapback/sdk";
+import { Connection, Keypair } from "@solana/web3.js";
 
 // Initialize services
-const connection = new Connection('https://api.mainnet-beta.solana.com');
+const connection = new Connection("https://api.mainnet-beta.solana.com");
 const liquidityCollector = new LiquidityDataCollector(connection);
 const optimizer = new RouteOptimizationEngine(liquidityCollector);
 const oracleService = new OraclePriceService(connection);
@@ -199,25 +206,25 @@ const executor = new SwapExecutor(
 
 // Execute swap
 const result = await executor.executeSwap({
-  inputMint: 'So11111111111111111111111111111111111111112',  // SOL
-  outputMint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
-  inputAmount: 1.5,                                         // 1.5 SOL
-  maxSlippageBps: 50,                                       // 0.5%
+  inputMint: "So11111111111111111111111111111111111111112", // SOL
+  outputMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+  inputAmount: 1.5, // 1.5 SOL
+  maxSlippageBps: 50, // 0.5%
   userPublicKey: wallet.publicKey,
   signer: wallet.payer,
   routePreferences: {
     enableMevProtection: true,
-    preferredVenues: ['PHOENIX', 'ORCA'],
+    preferredVenues: ["PHOENIX", "ORCA"],
     maxHops: 3,
   },
 });
 
-console.log('✅ Swap successful!');
-console.log('Signature:', result.signature);
-console.log('Output:', result.metrics.outputAmount, 'USDC');
-console.log('Slippage:', result.metrics.actualSlippage.toFixed(4), '%');
-console.log('MEV savings:', result.metrics.mevSavings, 'SOL');
-console.log('Venues:', result.metrics.venueBreakdown);
+console.log("✅ Swap successful!");
+console.log("Signature:", result.signature);
+console.log("Output:", result.metrics.outputAmount, "USDC");
+console.log("Slippage:", result.metrics.actualSlippage.toFixed(4), "%");
+console.log("MEV savings:", result.metrics.mevSavings, "SOL");
+console.log("Venues:", result.metrics.venueBreakdown);
 ```
 
 ---
@@ -229,32 +236,32 @@ console.log('Venues:', result.metrics.venueBreakdown);
 ```typescript
 interface SwapMetrics {
   // Performance
-  executionTimeMs: number;        // Total execution time
-  
+  executionTimeMs: number; // Total execution time
+
   // Output
-  outputAmount: number;           // Actual tokens received
-  actualSlippage: number;         // Slippage experienced (%)
-  priceImpact: number;            // Price impact (%)
-  
+  outputAmount: number; // Actual tokens received
+  actualSlippage: number; // Slippage experienced (%)
+  priceImpact: number; // Price impact (%)
+
   // Costs
-  totalFees: number;              // All fees combined
+  totalFees: number; // All fees combined
   feeBreakdown: {
-    dexFees: number;              // DEX swap fees
-    networkFees: number;          // Solana network fees
-    priorityFees: number;         // Priority fee for faster inclusion
-    jitoTip: number;              // Jito bundle tip
+    dexFees: number; // DEX swap fees
+    networkFees: number; // Solana network fees
+    priorityFees: number; // Priority fee for faster inclusion
+    jitoTip: number; // Jito bundle tip
   };
-  
+
   // MEV Protection
-  mevSavings: number;             // Estimated MEV savings
-  
+  mevSavings: number; // Estimated MEV savings
+
   // Routing
-  venueBreakdown: Record<VenueName, number>;  // Amount per venue
-  routeCount: number;             // Number of routes used
-  
+  venueBreakdown: Record<VenueName, number>; // Amount per venue
+  routeCount: number; // Number of routes used
+
   // Oracle
-  oraclePrice: number;            // Oracle price at execution
-  oracleVerified: boolean;        // Whether oracle check passed
+  oraclePrice: number; // Oracle price at execution
+  oracleVerified: boolean; // Whether oracle check passed
 }
 ```
 
@@ -293,15 +300,17 @@ interface SwapMetrics {
 **Purpose**: Prevent cascading failures from repeated errors
 
 **Behavior**:
+
 - Trips after **3 consecutive failures**
 - Blocks all requests for **60 seconds**
 - Requires **2 successes** to recover
 
 **Implementation**:
+
 ```typescript
 // Before every swap
 if (circuitBreaker.isTripped()) {
-  throw new Error('Circuit breaker active. Retry in X seconds.');
+  throw new Error("Circuit breaker active. Retry in X seconds.");
 }
 
 // On success
@@ -316,18 +325,20 @@ circuitBreaker.recordFailure();
 **Purpose**: Detect price manipulation and oracle deviation
 
 **Validation**:
+
 - Compare route price vs oracle price
 - Max deviation: **5%**
 - Pyth primary, Switchboard fallback
 
 **Implementation**:
+
 ```typescript
 const oraclePrice = inputPrice / outputPrice;
 const weightedRoutePrice = totalInput / totalOutput;
 const deviation = Math.abs(weightedRoutePrice - oraclePrice) / oraclePrice;
 
 if (deviation > 0.05) {
-  throw new Error('Route price deviates 5%+ from oracle');
+  throw new Error("Route price deviates 5%+ from oracle");
 }
 ```
 
@@ -340,22 +351,23 @@ if (deviation > 0.05) {
 **Status**: `confirmed` or `finalized`
 
 **Implementation**:
+
 ```typescript
 while (Date.now() - startTime < 30000) {
   const status = await connection.getSignatureStatus(signature);
-  
-  if (status?.value?.confirmationStatus === 'confirmed') {
+
+  if (status?.value?.confirmationStatus === "confirmed") {
     return; // Success
   }
-  
+
   if (status?.value?.err) {
-    throw new Error('Transaction failed');
+    throw new Error("Transaction failed");
   }
-  
+
   await sleep(1000);
 }
 
-throw new Error('Confirmation timeout');
+throw new Error("Confirmation timeout");
 ```
 
 ---
@@ -367,14 +379,14 @@ throw new Error('Confirmation timeout');
 ```typescript
 interface RoutePreferences {
   // Venue selection
-  preferredVenues?: VenueName[];      // Prioritize these venues
-  excludedVenues?: VenueName[];       // Exclude these venues
-  
+  preferredVenues?: VenueName[]; // Prioritize these venues
+  excludedVenues?: VenueName[]; // Exclude these venues
+
   // Route complexity
-  maxHops?: number;                   // Max swaps in route (default: 3)
-  
+  maxHops?: number; // Max swaps in route (default: 3)
+
   // MEV protection
-  enableMevProtection?: boolean;      // Use Jito bundling (default: true)
+  enableMevProtection?: boolean; // Use Jito bundling (default: true)
 }
 ```
 
@@ -382,16 +394,16 @@ interface RoutePreferences {
 
 ```typescript
 interface OptimizationConfig {
-  slippageTolerance: number;          // Max slippage (0.01 = 1%)
-  maxRoutes?: number;                 // Max routes to consider (default: 5)
-  prioritizeCLOB: boolean;            // Always try CLOBs first
-  maxHops: number;                    // Max swaps per route
-  enableSplitRoutes: boolean;         // Allow splitting across venues
-  maxSplits: number;                  // Max venues to split across
-  useBundling: boolean;               // Use Jito bundling
-  maxPriorityFee: number;             // Max lamports for priority fee
-  enableFallback: boolean;            // Try backup routes on failure
-  maxRetries: number;                 // Max retry attempts
+  slippageTolerance: number; // Max slippage (0.01 = 1%)
+  maxRoutes?: number; // Max routes to consider (default: 5)
+  prioritizeCLOB: boolean; // Always try CLOBs first
+  maxHops: number; // Max swaps per route
+  enableSplitRoutes: boolean; // Allow splitting across venues
+  maxSplits: number; // Max venues to split across
+  useBundling: boolean; // Use Jito bundling
+  maxPriorityFee: number; // Max lamports for priority fee
+  enableFallback: boolean; // Try backup routes on failure
+  maxRetries: number; // Max retry attempts
 }
 ```
 
@@ -401,32 +413,32 @@ interface OptimizationConfig {
 
 ### Error Types
 
-| Error | Cause | Recovery |
-|-------|-------|----------|
-| `Circuit breaker active` | 3+ consecutive failures | Wait 60s for reset |
-| `No liquidity available` | No venues have liquidity | Try different pair or wait |
-| `No optimal routes found` | All routes exceed slippage | Increase slippage tolerance |
-| `Route price deviates 5%+ from oracle` | Price manipulation or stale oracle | Wait for oracle update |
-| `Transaction confirmation timeout` | Network congestion | Retry with higher priority fee |
-| `Transaction failed` | Instruction error | Check account balances/approvals |
+| Error                                  | Cause                              | Recovery                         |
+| -------------------------------------- | ---------------------------------- | -------------------------------- |
+| `Circuit breaker active`               | 3+ consecutive failures            | Wait 60s for reset               |
+| `No liquidity available`               | No venues have liquidity           | Try different pair or wait       |
+| `No optimal routes found`              | All routes exceed slippage         | Increase slippage tolerance      |
+| `Route price deviates 5%+ from oracle` | Price manipulation or stale oracle | Wait for oracle update           |
+| `Transaction confirmation timeout`     | Network congestion                 | Retry with higher priority fee   |
+| `Transaction failed`                   | Instruction error                  | Check account balances/approvals |
 
 ### Example Error Handling
 
 ```typescript
 try {
   const result = await executor.executeSwap(params);
-  console.log('✅ Success:', result.signature);
+  console.log("✅ Success:", result.signature);
 } catch (error) {
-  if (error.message.includes('Circuit breaker')) {
-    console.error('⏸️  System paused, retry later');
-  } else if (error.message.includes('No liquidity')) {
-    console.error('💧 Insufficient liquidity');
-  } else if (error.message.includes('oracle')) {
-    console.error('📊 Price verification failed');
-  } else if (error.message.includes('timeout')) {
-    console.error('⏱️  Confirmation timeout, may still land');
+  if (error.message.includes("Circuit breaker")) {
+    console.error("⏸️  System paused, retry later");
+  } else if (error.message.includes("No liquidity")) {
+    console.error("💧 Insufficient liquidity");
+  } else if (error.message.includes("oracle")) {
+    console.error("📊 Price verification failed");
+  } else if (error.message.includes("timeout")) {
+    console.error("⏱️  Confirmation timeout, may still land");
   } else {
-    console.error('❌ Unknown error:', error);
+    console.error("❌ Unknown error:", error);
   }
 }
 ```
@@ -437,15 +449,15 @@ try {
 
 ### Typical Execution Times
 
-| Step | Duration | % of Total |
-|------|----------|------------|
-| Liquidity Collection | 300ms | 13% |
-| Route Optimization | 150ms | 6% |
-| Oracle Verification | 200ms | 9% |
-| Transaction Build | 50ms | 2% |
-| Jito Bundle Submit | 800ms | 35% |
-| Confirmation Wait | 800ms | 35% |
-| **Total** | **~2.3s** | **100%** |
+| Step                 | Duration  | % of Total |
+| -------------------- | --------- | ---------- |
+| Liquidity Collection | 300ms     | 13%        |
+| Route Optimization   | 150ms     | 6%         |
+| Oracle Verification  | 200ms     | 9%         |
+| Transaction Build    | 50ms      | 2%         |
+| Jito Bundle Submit   | 800ms     | 35%        |
+| Confirmation Wait    | 800ms     | 35%        |
+| **Total**            | **~2.3s** | **100%**   |
 
 ### Optimization Opportunities
 
@@ -493,14 +505,14 @@ const jupiterIx = await createJupiterSwapInstruction({
 Calculate precise compute units:
 
 ```typescript
-import { ComputeBudgetProgram } from '@solana/web3.js';
+import { ComputeBudgetProgram } from "@solana/web3.js";
 
 const computeIx = ComputeBudgetProgram.setComputeUnitLimit({
-  units: estimatedComputeUnits,  // From simulation
+  units: estimatedComputeUnits, // From simulation
 });
 
 const priorityIx = ComputeBudgetProgram.setComputeUnitPrice({
-  microLamports: 5000,  // Dynamic based on network congestion
+  microLamports: 5000, // Dynamic based on network congestion
 });
 ```
 
@@ -510,7 +522,7 @@ Send metrics to analytics service:
 
 ```typescript
 // Mixpanel, Amplitude, Segment, etc.
-analytics.track('Swap Executed', {
+analytics.track("Swap Executed", {
   inputMint,
   outputMint,
   inputAmount,
@@ -532,7 +544,7 @@ Send failures to error tracking service:
 // Sentry, Bugsnag, Rollbar, etc.
 Sentry.captureException(error, {
   tags: {
-    service: 'SwapExecutor',
+    service: "SwapExecutor",
     inputMint,
     outputMint,
   },
@@ -549,27 +561,29 @@ Sentry.captureException(error, {
 Write comprehensive test suite:
 
 ```typescript
-describe('SwapExecutor', () => {
-  it('should execute successful swap', async () => {
+describe("SwapExecutor", () => {
+  it("should execute successful swap", async () => {
     const result = await executor.executeSwap(validParams);
     expect(result.success).toBe(true);
     expect(result.signature).toBeDefined();
     expect(result.metrics.actualSlippage).toBeLessThan(0.5);
   });
 
-  it('should reject oracle deviation > 5%', async () => {
+  it("should reject oracle deviation > 5%", async () => {
     // Mock oracle with manipulated price
-    await expect(executor.executeSwap(params)).rejects.toThrow('oracle');
+    await expect(executor.executeSwap(params)).rejects.toThrow("oracle");
   });
 
-  it('should trip circuit breaker after 3 failures', async () => {
+  it("should trip circuit breaker after 3 failures", async () => {
     // Cause 3 consecutive failures
     for (let i = 0; i < 3; i++) {
       await expect(executor.executeSwap(badParams)).rejects.toThrow();
     }
-    
+
     // 4th attempt should fail with circuit breaker
-    await expect(executor.executeSwap(validParams)).rejects.toThrow('Circuit breaker');
+    await expect(executor.executeSwap(validParams)).rejects.toThrow(
+      "Circuit breaker"
+    );
   });
 });
 ```
@@ -614,16 +628,16 @@ const weightedRoutePrice = totalInput / totalOutput;
 
 ```typescript
 if (state === OPEN && Date.now() >= nextRetryTime) {
-  state = HALF_OPEN;  // Test recovery
+  state = HALF_OPEN; // Test recovery
   successCount = 0;
 }
 
 if (state === HALF_OPEN && successCount >= 2) {
-  state = CLOSED;  // Recovered!
+  state = CLOSED; // Recovered!
 }
 
 if (failureCount >= 3) {
-  state = OPEN;  // Trip breaker
+  state = OPEN; // Trip breaker
   nextRetryTime = Date.now() + 60000;
 }
 ```
@@ -664,15 +678,18 @@ With SwapExecutor complete, SwapBack now has:
 ## 📚 Files Created/Modified
 
 ### New Files:
+
 - `sdk/src/services/SwapExecutor.ts` (570 lines) - Main orchestrator
 - `sdk/src/utils/circuit-breaker.ts` (130 lines) - Failsafe pattern
 - `docs/PHASE_6.2_COMPLETE.md` (this file) - Comprehensive documentation
 
 ### Modified Files:
+
 - `sdk/src/services/OraclePriceService.ts` - Made `getTokenPrice()` public
 - `sdk/src/index.ts` - Exported SwapExecutor and related types
 
 ### Build Status:
+
 ```bash
 $ npm run build
 ✅ Success - No errors
@@ -682,6 +699,6 @@ $ npm run build
 
 **Phase 6 (Complete)**: Smart Router with Real APIs ✅  
 **Phase 6.1**: Pyth, Switchboard, Jupiter, Phoenix, Orca ✅  
-**Phase 6.2**: SwapExecutor orchestrator ✅  
+**Phase 6.2**: SwapExecutor orchestrator ✅
 
 **Next**: Phase 7 - Testing & Deployment 🚀

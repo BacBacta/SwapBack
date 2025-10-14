@@ -3,9 +3,9 @@
  * Connects WebSocket service to Zustand store
  */
 
-import { useEffect } from 'react';
-import { useSwapStore } from '@/store/swapStore';
-import { getWebSocketService, SwapEvent } from '@/lib/websocket';
+import { useEffect } from "react";
+import { useSwapStore } from "@/store/swapStore";
+import { getWebSocketService, SwapEvent } from "@/lib/websocket";
 
 export function useSwapWebSocket() {
   const {
@@ -20,24 +20,24 @@ export function useSwapWebSocket() {
 
     const handleEvent = (event: SwapEvent) => {
       switch (event.type) {
-        case 'swap.pending':
-          setTransactionStatus('sending');
+        case "swap.pending":
+          setTransactionStatus("sending");
           break;
 
-        case 'swap.confirmed':
-          setTransactionStatus('confirming');
+        case "swap.confirmed":
+          setTransactionStatus("confirming");
           incrementConfirmations();
           break;
 
-        case 'swap.finalized':
-          setTransactionStatus('confirmed');
+        case "swap.finalized":
+          setTransactionStatus("confirmed");
           break;
 
-        case 'swap.error':
+        case "swap.error":
           setTransactionError(event.error);
           break;
 
-        case 'price.updated':
+        case "price.updated":
           // Could update token prices in store if needed
           break;
       }
@@ -52,7 +52,7 @@ export function useSwapWebSocket() {
 
   // Subscribe to transaction when signature changes
   useEffect(() => {
-    if (transaction.signature && transaction.status === 'sending') {
+    if (transaction.signature && transaction.status === "sending") {
       const wsService = getWebSocketService();
       wsService.subscribeToTransaction(transaction.signature);
 

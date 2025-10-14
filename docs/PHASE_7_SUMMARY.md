@@ -10,13 +10,13 @@
 
 ## Test Suites ✅
 
-| Suite | Tests | Status |
-|-------|-------|--------|
-| CircuitBreaker | 14/14 | ✅ PASS |
-| SwapExecutor | 6/6 | ✅ PASS |
-| SwapExecutor Debug | 2/2 | ✅ PASS |
-| OraclePriceService | 13/13 | ✅ PASS |
-| LiquidityDataCollector | 9/9 | ✅ PASS |
+| Suite                   | Tests | Status  |
+| ----------------------- | ----- | ------- |
+| CircuitBreaker          | 14/14 | ✅ PASS |
+| SwapExecutor            | 6/6   | ✅ PASS |
+| SwapExecutor Debug      | 2/2   | ✅ PASS |
+| OraclePriceService      | 13/13 | ✅ PASS |
+| LiquidityDataCollector  | 9/9   | ✅ PASS |
 | RouteOptimizationEngine | 14/14 | ✅ PASS |
 
 **Total:** 58 tests, 35.88s execution time

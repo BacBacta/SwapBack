@@ -1,0 +1,25 @@
+
+ RUN  v3.2.4 /workspaces/SwapBack
+      Coverage enabled with v8
+
+ ✓ tests/jito-bundle-service.test.ts (27 tests) 1536ms
+   ✓ JitoBundleService > Bundle Waiting > should wait for bundle to land successfully  502ms
+   ✓ JitoBundleService > Bundle Waiting > should throw error on timeout  1002ms
+ ✓ tests/liquidity-data-collector.test.ts (9 tests) 362ms
+ ✓ tests/oracle-price-service.test.ts (13 tests) 179ms
+ ✓ tests/swap-executor-debug.test.ts (2 tests) 111ms
+ ✓ tests/route-optimization-engine.test.ts (14 tests) 18ms
+ ✓ tests/circuit-breaker.test.ts (14 tests) 5071ms
+   ✓ CircuitBreaker > State Transitions > should transition to HALF_OPEN after timeout  1102ms
+   ✓ CircuitBreaker > State Transitions > should transition from HALF_OPEN to CLOSED after success threshold  1102ms
+   ✓ CircuitBreaker > State Transitions > should transition from HALF_OPEN back to OPEN on failure  1101ms
+   ✓ CircuitBreaker > Timeout Behavior > should remain tripped before timeout expires  501ms
+   ✓ CircuitBreaker > Timeout Behavior > should allow retry after timeout expires  1102ms
+ ✓ tests/swap-executor.test.ts (6 tests) 30230ms
+   ✓ SwapExecutor > Transaction Timeout > should timeout when transaction confirmation exceeds 30s  30037ms
+
+ Test Files  2 failed | 7 passed (9)
+      Tests  85 passed (85)
+   Start at  12:04:40
+   Duration  35.24s (transform 607ms, setup 0ms, collect 1.76s, tests 37.51s, environment 3ms, prepare 1.40s)
+

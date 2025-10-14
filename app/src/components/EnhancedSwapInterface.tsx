@@ -3,13 +3,13 @@
  * Uses Zustand state management + WebSocket real-time updates
  */
 
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
-import { useSwapStore } from '@/store/swapStore';
-import { useSwapWebSocket } from '@/hooks/useSwapWebSocket';
-import { debounce } from 'lodash';
+import { useState, useEffect, useCallback } from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useSwapStore } from "@/store/swapStore";
+import { useSwapWebSocket } from "@/hooks/useSwapWebSocket";
+import { debounce } from "lodash";
 
 // ============================================================================
 // TYPES
@@ -27,32 +27,32 @@ interface Token {
 // Popular Solana tokens
 const POPULAR_TOKENS: Token[] = [
   {
-    mint: 'So11111111111111111111111111111111111111112',
-    symbol: 'SOL',
-    name: 'Solana',
+    mint: "So11111111111111111111111111111111111111112",
+    symbol: "SOL",
+    name: "Solana",
     decimals: 9,
-    logoURI: '/tokens/sol.png',
+    logoURI: "/tokens/sol.png",
   },
   {
-    mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-    symbol: 'USDC',
-    name: 'USD Coin',
+    mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    symbol: "USDC",
+    name: "USD Coin",
     decimals: 6,
-    logoURI: '/tokens/usdc.png',
+    logoURI: "/tokens/usdc.png",
   },
   {
-    mint: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
-    symbol: 'USDT',
-    name: 'Tether USD',
+    mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+    symbol: "USDT",
+    name: "Tether USD",
     decimals: 6,
-    logoURI: '/tokens/usdt.png',
+    logoURI: "/tokens/usdt.png",
   },
   {
-    mint: 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',
-    symbol: 'JUP',
-    name: 'Jupiter',
+    mint: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+    symbol: "JUP",
+    name: "Jupiter",
     decimals: 6,
-    logoURI: '/tokens/jup.png',
+    logoURI: "/tokens/jup.png",
   },
 ];
 
@@ -83,7 +83,7 @@ export function EnhancedSwapInterface() {
   const [showInputTokenSelector, setShowInputTokenSelector] = useState(false);
   const [showOutputTokenSelector, setShowOutputTokenSelector] = useState(false);
   const [showSlippageModal, setShowSlippageModal] = useState(false);
-  const [customSlippage, setCustomSlippage] = useState('');
+  const [customSlippage, setCustomSlippage] = useState("");
 
   // Auto-fetch routes when input changes (debounced)
   const debouncedFetchRoutes = useCallback(
@@ -103,7 +103,7 @@ export function EnhancedSwapInterface() {
   // Calculate price impact
   const priceImpact = routes.selectedRoute
     ? Math.abs(
-        ((typeof routes.selectedRoute.expectedOutput === 'string'
+        ((typeof routes.selectedRoute.expectedOutput === "string"
           ? parseFloat(routes.selectedRoute.expectedOutput)
           : routes.selectedRoute.expectedOutput) /
           (parseFloat(swap.inputAmount) * 100)) *
@@ -113,7 +113,11 @@ export function EnhancedSwapInterface() {
     : 0;
 
   const priceImpactColor =
-    priceImpact > 5 ? 'text-red-500' : priceImpact > 1 ? 'text-yellow-500' : 'text-green-500';
+    priceImpact > 5
+      ? "text-red-500"
+      : priceImpact > 1
+        ? "text-yellow-500"
+        : "text-green-500";
 
   // Handle token selection
   const handleInputTokenSelect = (token: Token) => {
@@ -186,7 +190,9 @@ export function EnhancedSwapInterface() {
                     className="w-6 h-6 rounded-full"
                   />
                 )}
-                <span className="text-white font-semibold">{swap.inputToken.symbol}</span>
+                <span className="text-white font-semibold">
+                  {swap.inputToken.symbol}
+                </span>
               </>
             ) : (
               <span className="text-gray-400">Select token</span>
@@ -202,7 +208,12 @@ export function EnhancedSwapInterface() {
           className="p-2 bg-gray-700 hover:bg-gray-600 rounded-full"
           disabled={!connected}
         >
-          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg
+            className="w-6 h-6 text-white"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -226,7 +237,7 @@ export function EnhancedSwapInterface() {
         <div className="flex items-center gap-3">
           <input
             type="text"
-            value={routes.selectedRoute?.expectedOutput || '0.00'}
+            value={routes.selectedRoute?.expectedOutput || "0.00"}
             placeholder="0.00"
             className="flex-1 bg-transparent text-3xl text-white outline-none"
             disabled
@@ -244,7 +255,9 @@ export function EnhancedSwapInterface() {
                     className="w-6 h-6 rounded-full"
                   />
                 )}
-                <span className="text-white font-semibold">{swap.outputToken.symbol}</span>
+                <span className="text-white font-semibold">
+                  {swap.outputToken.symbol}
+                </span>
               </>
             ) : (
               <span className="text-gray-400">Select token</span>
@@ -262,7 +275,9 @@ export function EnhancedSwapInterface() {
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-gray-400">Route</span>
-            <span className="text-white">{routes.selectedRoute.venues.join(' → ')}</span>
+            <span className="text-white">
+              {routes.selectedRoute.venues.join(" → ")}
+            </span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-gray-400">MEV Risk</span>
@@ -271,7 +286,9 @@ export function EnhancedSwapInterface() {
           <div className="flex justify-between text-sm">
             <span className="text-gray-400">Est. time</span>
             <span className="text-white">
-              {(routes.selectedRoute as any).estimatedTime || routes.selectedRoute.estimatedComputeUnits / 100}ms
+              {(routes.selectedRoute as any).estimatedTime ||
+                routes.selectedRoute.estimatedComputeUnits / 100}
+              ms
             </span>
           </div>
         </div>
@@ -288,12 +305,12 @@ export function EnhancedSwapInterface() {
         <button
           onClick={() => setUseMEVProtection(!swap.useMEVProtection)}
           className={`relative w-12 h-6 rounded-full transition-colors ${
-            swap.useMEVProtection ? 'bg-green-500' : 'bg-gray-600'
+            swap.useMEVProtection ? "bg-green-500" : "bg-gray-600"
           }`}
         >
           <div
             className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
-              swap.useMEVProtection ? 'transform translate-x-6' : ''
+              swap.useMEVProtection ? "transform translate-x-6" : ""
             }`}
           />
         </button>
@@ -303,14 +320,14 @@ export function EnhancedSwapInterface() {
       <div className="mb-4">
         <span className="text-sm text-gray-400 mb-2 block">Priority</span>
         <div className="grid grid-cols-3 gap-2">
-          {(['low', 'medium', 'high'] as const).map((level) => (
+          {(["low", "medium", "high"] as const).map((level) => (
             <button
               key={level}
               onClick={() => setPriorityLevel(level)}
               className={`px-4 py-2 rounded-lg capitalize ${
                 swap.priorityLevel === level
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-800 text-gray-400 hover:bg-gray-700"
               }`}
             >
               {level}
@@ -328,19 +345,21 @@ export function EnhancedSwapInterface() {
         className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold rounded-xl transition-colors"
       >
         {!connected
-          ? 'Connect Wallet'
+          ? "Connect Wallet"
           : routes.isLoading
-          ? 'Finding routes...'
-          : !routes.selectedRoute
-          ? 'Enter amount'
-          : 'Swap'}
+            ? "Finding routes..."
+            : !routes.selectedRoute
+              ? "Enter amount"
+              : "Swap"}
       </button>
 
       {/* Slippage Modal */}
       {showSlippageModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-gray-900 rounded-2xl p-6 max-w-sm w-full mx-4">
-            <h3 className="text-xl font-bold text-white mb-4">Slippage Settings</h3>
+            <h3 className="text-xl font-bold text-white mb-4">
+              Slippage Settings
+            </h3>
             <div className="grid grid-cols-3 gap-2 mb-4">
               {[0.1, 0.5, 1.0].map((value) => (
                 <button

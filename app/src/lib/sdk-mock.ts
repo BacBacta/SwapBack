@@ -22,8 +22,8 @@ export class LiquidityDataCollector {
   constructor(connection: any) {}
   async collectLiquidity(tokenA: string, tokenB: string) {
     return [
-      { venue: 'Orca', liquidity: 1000000 },
-      { venue: 'Raydium', liquidity: 800000 },
+      { venue: "Orca", liquidity: 1000000 },
+      { venue: "Raydium", liquidity: 800000 },
     ];
   }
 }
@@ -38,12 +38,12 @@ export class RouteOptimizationEngine {
   async findOptimalRoutes(config: any) {
     return [
       {
-        id: 'route-1',
-        venues: ['Orca'],
+        id: "route-1",
+        venues: ["Orca"],
         expectedOutput: 0.95,
         effectiveRate: 1.05,
         totalCost: 0.002,
-        mevRisk: 'low',
+        mevRisk: "low",
         estimatedTime: 1200,
         splits: [],
       },
@@ -66,8 +66,8 @@ export class SwapExecutor {
 
   async executeSwap(params: any) {
     return {
-      signature: '5xK7MockSignature',
-      blockhash: '9xTMockBlockhash',
+      signature: "5xK7MockSignature",
+      blockhash: "9xTMockBlockhash",
       lastValidBlockHeight: 123456,
     };
   }

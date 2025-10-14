@@ -3,14 +3,16 @@
  * Executes the selected swap route and returns transaction signature
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { Connection, Transaction, VersionedTransaction } from '@solana/web3.js';
+import { NextRequest, NextResponse } from "next/server";
+import { Connection, Transaction, VersionedTransaction } from "@solana/web3.js";
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
 
-const RPC_ENDPOINT = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+const RPC_ENDPOINT =
+  process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
+  "https://api.mainnet-beta.solana.com";
 
 // ============================================================================
 // API HANDLER
@@ -26,16 +28,16 @@ export async function POST(request: NextRequest) {
 
     if (!signedTransaction) {
       return NextResponse.json(
-        { error: 'Missing signedTransaction' },
+        { error: "Missing signedTransaction" },
         { status: 400 }
       );
     }
 
     // Initialize connection
-    const connection = new Connection(RPC_ENDPOINT, 'confirmed');
+    const connection = new Connection(RPC_ENDPOINT, "confirmed");
 
     // Decode transaction
-    const txBuffer = Buffer.from(signedTransaction, 'base64');
+    const txBuffer = Buffer.from(signedTransaction, "base64");
     let signature: string;
 
     try {
@@ -55,8 +57,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Wait for confirmation (initial)
-    const latestBlockhash = await connection.getLatestBlockhash('confirmed');
-    
+    const latestBlockhash = await connection.getLatestBlockhash("confirmed");
+
     return NextResponse.json({
       success: true,
       signature,
@@ -64,11 +66,11 @@ export async function POST(request: NextRequest) {
       lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
     });
   } catch (error) {
-    console.error('Transaction execution error:', error);
+    console.error("Transaction execution error:", error);
     return NextResponse.json(
       {
-        error: 'Transaction execution failed',
-        message: error instanceof Error ? error.message : 'Unknown error',
+        error: "Transaction execution failed",
+        message: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }
     );

@@ -3,13 +3,13 @@
  * Showcases all new components with Zustand + WebSocket
  */
 
-'use client';
+"use client";
 
-import { EnhancedSwapInterface } from '@/components/EnhancedSwapInterface';
-import { TransactionTracker } from '@/components/TransactionTracker';
-import { RouteComparison } from '@/components/RouteComparison';
-import { DashboardAnalytics } from '@/components/DashboardAnalytics';
-import { WalletProvider } from '@/components/WalletProvider';
+import { EnhancedSwapInterface } from "@/components/EnhancedSwapInterface";
+import { TransactionTracker } from "@/components/TransactionTracker";
+import { RouteComparison } from "@/components/RouteComparison";
+import { DashboardAnalytics } from "@/components/DashboardAnalytics";
+import { WalletProvider } from "@/components/WalletProvider";
 
 export default function EnhancedSwapPage() {
   return (
@@ -22,7 +22,8 @@ export default function EnhancedSwapPage() {
               SwapBack <span className="text-blue-400">Enhanced</span>
             </h1>
             <p className="text-gray-400 text-lg">
-              Advanced Solana DEX aggregator with MEV protection & real-time analytics
+              Advanced Solana DEX aggregator with MEV protection & real-time
+              analytics
             </p>
           </div>
 
@@ -49,7 +50,8 @@ export default function EnhancedSwapPage() {
           <div className="mt-12 text-center text-gray-500 text-sm">
             <p>Powered by Jito MEV Protection • Phase 8 Complete ✅</p>
             <p className="mt-2">
-              85/85 tests passing • Real-time WebSocket • Zustand State Management
+              85/85 tests passing • Real-time WebSocket • Zustand State
+              Management
             </p>
           </div>
         </div>

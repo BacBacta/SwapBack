@@ -3,10 +3,19 @@
  * Visual comparison of route options
  */
 
-'use client';
+"use client";
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { useSwapStore } from '@/store/swapStore';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { useSwapStore } from "@/store/swapStore";
 
 export function RouteComparison() {
   const { routes } = useSwapStore();
@@ -18,11 +27,13 @@ export function RouteComparison() {
   // Transform routes data for chart
   const chartData = routes.routes.map((route, index) => ({
     name: `Route ${index + 1}`,
-    'Expected Output': typeof route.expectedOutput === 'string' 
-      ? parseFloat(route.expectedOutput) 
-      : route.expectedOutput,
-    'Total Cost': route.totalCost,
-    'MEV Risk': route.mevRisk === 'low' ? 1 : route.mevRisk === 'medium' ? 2 : 3,
+    "Expected Output":
+      typeof route.expectedOutput === "string"
+        ? parseFloat(route.expectedOutput)
+        : route.expectedOutput,
+    "Total Cost": route.totalCost,
+    "MEV Risk":
+      route.mevRisk === "low" ? 1 : route.mevRisk === "medium" ? 2 : 3,
   }));
 
   return (
@@ -35,11 +46,11 @@ export function RouteComparison() {
           <YAxis stroke="#9CA3AF" />
           <Tooltip
             contentStyle={{
-              backgroundColor: '#1F2937',
-              border: '1px solid #374151',
-              borderRadius: '8px',
+              backgroundColor: "#1F2937",
+              border: "1px solid #374151",
+              borderRadius: "8px",
             }}
-            labelStyle={{ color: '#F3F4F6' }}
+            labelStyle={{ color: "#F3F4F6" }}
           />
           <Legend />
           <Bar dataKey="Expected Output" fill="#3B82F6" />
@@ -55,18 +66,22 @@ export function RouteComparison() {
             key={route.id}
             className={`p-3 rounded-lg cursor-pointer transition-colors ${
               routes.selectedRoute?.id === route.id
-                ? 'bg-blue-900 bg-opacity-30 border border-blue-500'
-                : 'bg-gray-800 hover:bg-gray-750'
+                ? "bg-blue-900 bg-opacity-30 border border-blue-500"
+                : "bg-gray-800 hover:bg-gray-750"
             }`}
-            onClick={() => routes.selectedRoute?.id !== route.id && console.log('Select route', route)}
+            onClick={() =>
+              routes.selectedRoute?.id !== route.id &&
+              console.log("Select route", route)
+            }
           >
             <div className="flex justify-between items-center">
               <div>
                 <div className="text-sm font-semibold text-white">
-                  Route {index + 1}: {route.venues.join(' → ')}
+                  Route {index + 1}: {route.venues.join(" → ")}
                 </div>
                 <div className="text-xs text-gray-400 mt-1">
-                  Output: {route.expectedOutput} | Cost: {route.totalCost} | MEV: {route.mevRisk}
+                  Output: {route.expectedOutput} | Cost: {route.totalCost} |
+                  MEV: {route.mevRisk}
                 </div>
               </div>
               {routes.selectedRoute?.id === route.id && (

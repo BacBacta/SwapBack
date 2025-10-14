@@ -3,10 +3,12 @@
  * Returns mock routes until SDK is integrated
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { Connection } from '@solana/web3.js';
+import { NextRequest, NextResponse } from "next/server";
+import { Connection } from "@solana/web3.js";
 
-const RPC_ENDPOINT = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+const RPC_ENDPOINT =
+  process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
+  "https://api.mainnet-beta.solana.com";
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,13 +18,15 @@ export async function POST(request: NextRequest) {
       inputAmount,
       slippageTolerance = 0.01,
       useMEVProtection = true,
-      priorityLevel = 'medium',
+      priorityLevel = "medium",
     } = await request.json();
 
     // Validate inputs
     if (!inputMint || !outputMint || !inputAmount) {
       return NextResponse.json(
-        { error: 'Missing required fields: inputMint, outputMint, inputAmount' },
+        {
+          error: "Missing required fields: inputMint, outputMint, inputAmount",
+        },
         { status: 400 }
       );
     }
@@ -30,22 +34,22 @@ export async function POST(request: NextRequest) {
     // Return mock routes (replace with actual SDK integration later)
     const routes = [
       {
-        id: 'route-1',
-        venues: ['Orca'],
+        id: "route-1",
+        venues: ["Orca"],
         expectedOutput: (inputAmount * 0.99).toString(),
         effectiveRate: 0.99,
         totalCost: inputAmount * 0.01,
-        mevRisk: useMEVProtection ? 'low' : 'medium',
+        mevRisk: useMEVProtection ? "low" : "medium",
         estimatedTime: 1200,
         splits: [],
       },
       {
-        id: 'route-2',
-        venues: ['Raydium'],
+        id: "route-2",
+        venues: ["Raydium"],
         expectedOutput: (inputAmount * 0.98).toString(),
         effectiveRate: 0.98,
         totalCost: inputAmount * 0.02,
-        mevRisk: useMEVProtection ? 'low' : 'high',
+        mevRisk: useMEVProtection ? "low" : "high",
         estimatedTime: 1500,
         splits: [],
       },
@@ -53,9 +57,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ routes, success: true });
   } catch (error) {
-    console.error('Error in /api/swap:', error);
+    console.error("Error in /api/swap:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
@@ -67,14 +71,14 @@ export async function GET() {
     const slot = await connection.getSlot();
 
     return NextResponse.json({
-      status: 'ok',
+      status: "ok",
       rpc: RPC_ENDPOINT,
       currentSlot: slot,
       timestamp: Date.now(),
     });
   } catch (error) {
     return NextResponse.json(
-      { status: 'error', error: 'RPC connection failed' },
+      { status: "error", error: "RPC connection failed" },
       { status: 500 }
     );
   }
