@@ -12,16 +12,22 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.30.1",
-    "@solana/web3.js": "^1.95.0",
-    "@solana/spl-token": "^0.4.8",
-    "@solana/spl-account-compression": "^0.2.1",
+    "@ellipsis-labs/phoenix-sdk": "^2.0.3",
     "@metaplex-foundation/mpl-bubblegum": "^0.8.0",
+    "@orca-so/common-sdk": "^0.6.11",
+    "@orca-so/whirlpools-sdk": "^0.16.0",
+    "@pythnetwork/client": "^2.22.1",
+    "@pythnetwork/pyth-solana-receiver": "^0.12.0",
+    "@solana/spl-account-compression": "^0.2.1",
+    "@solana/spl-token": "^0.4.8",
+    "@solana/web3.js": "^1.95.0",
+    "@switchboard-xyz/solana.js": "^3.2.5",
     "axios": "^1.7.0"
   },
   "devDependencies": {
+    "@types/jest": "^29.0.0",
     "@types/node": "^20.0.0",
-    "typescript": "^5.0.0",
     "jest": "^29.0.0",
-    "@types/jest": "^29.0.0"
+    "typescript": "^5.0.0"
   }
 }
