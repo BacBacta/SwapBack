@@ -107,7 +107,7 @@ export class OraclePriceService {
   /**
    * Get current price for a token from oracles
    */
-  private async getTokenPrice(mint: string): Promise<OraclePriceData> {
+  public async getTokenPrice(mint: string): Promise<OraclePriceData> {
     // Check cache first
     const cached = this.priceCache.get(mint);
     if (cached && Date.now() - cached.timestamp < this.cacheExpiryMs) {

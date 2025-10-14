@@ -8,6 +8,17 @@ import axios from 'axios';
 export * from './blockchain-tracer';
 
 /**
+ * Export Smart Router Services (Phase 6)
+ */
+export { SwapExecutor } from './services/SwapExecutor';
+export type { SwapParams, SwapResult as SwapExecutorResult, SwapMetrics, RoutePreferences } from './services/SwapExecutor';
+export { LiquidityDataCollector } from './services/LiquidityDataCollector';
+export { RouteOptimizationEngine } from './services/RouteOptimizationEngine';
+export { OraclePriceService } from './services/OraclePriceService';
+export { JitoBundleService } from './services/JitoBundleService';
+export * from './types/smart-router';
+
+/**
  * Types pour les routes de swap
  */
 export enum RouteType {
