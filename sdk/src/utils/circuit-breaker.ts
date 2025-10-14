@@ -1,21 +1,21 @@
 /**
  * Circuit Breaker Pattern Implementation
- * 
+ *
  * Prevents cascading failures by temporarily blocking requests
  * after a threshold of consecutive failures is reached.
- * 
+ *
  * States:
  * - CLOSED: Normal operation, requests pass through
  * - OPEN: Too many failures, requests blocked
  * - HALF_OPEN: Testing if service recovered
- * 
+ *
  * @module circuit-breaker
  */
 
 export enum CircuitState {
-  CLOSED = 'CLOSED',
-  OPEN = 'OPEN',
-  HALF_OPEN = 'HALF_OPEN',
+  CLOSED = "CLOSED",
+  OPEN = "OPEN",
+  HALF_OPEN = "HALF_OPEN",
 }
 
 export interface CircuitBreakerConfig {
@@ -32,7 +32,7 @@ export class CircuitBreaker {
   private failureCount: number = 0;
   private successCount: number = 0;
   private nextRetryTime: number = 0;
-  
+
   private readonly config: CircuitBreakerConfig;
 
   constructor(config: CircuitBreakerConfig) {
@@ -68,7 +68,7 @@ export class CircuitBreaker {
 
     if (this.state === CircuitState.HALF_OPEN) {
       this.successCount++;
-      
+
       // If enough successes in HALF_OPEN, close the circuit
       if (this.successCount >= (this.config.successThreshold || 2)) {
         this.state = CircuitState.CLOSED;

@@ -1,6 +1,6 @@
 /**
  * SwapExecutor - Main orchestrator for atomic multi-venue swaps
- * 
+ *
  * Coordinates all services to execute swaps with:
  * - Real-time liquidity aggregation (CLOBs, AMMs, RFQs)
  * - Intelligent route optimization (greedy cost minimization)
@@ -8,28 +8,28 @@
  * - MEV protection via Jito atomic bundling
  * - Circuit breaker safety
  * - Comprehensive analytics logging
- * 
+ *
  * @module SwapExecutor
  */
 
-import { 
-  Connection, 
-  PublicKey, 
-  Transaction, 
+import {
+  Connection,
+  PublicKey,
+  Transaction,
   TransactionInstruction,
   VersionedTransaction,
   Signer,
-} from '@solana/web3.js';
-import { LiquidityDataCollector } from './LiquidityDataCollector';
-import { RouteOptimizationEngine } from './RouteOptimizationEngine';
-import { OraclePriceService } from './OraclePriceService';
-import { JitoBundleService } from './JitoBundleService';
-import { CircuitBreaker } from '../utils/circuit-breaker';
-import { 
-  RouteCandidate, 
+} from "@solana/web3.js";
+import { LiquidityDataCollector } from "./LiquidityDataCollector";
+import { RouteOptimizationEngine } from "./RouteOptimizationEngine";
+import { OraclePriceService } from "./OraclePriceService";
+import { JitoBundleService } from "./JitoBundleService";
+import { CircuitBreaker } from "../utils/circuit-breaker";
+import {
+  RouteCandidate,
   OptimizationConfig,
   VenueName,
-} from '../types/smart-router';
+} from "../types/smart-router";
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -161,10 +161,10 @@ export class SwapExecutor {
 
   /**
    * Execute atomic multi-venue swap
-   * 
+   *
    * @param params - Swap parameters
    * @returns Swap result with signature and metrics
-   * 
+   *
    * @example
    * ```typescript
    * const result = await executor.executeSwap({
@@ -175,7 +175,7 @@ export class SwapExecutor {
    *   userPublicKey: wallet.publicKey,
    *   signer: wallet.payer,
    * });
-   * 
+   *
    * console.log('Swap signature:', result.signature);
    * console.log('Output amount:', result.metrics.outputAmount, 'USDC');
    * console.log('MEV savings:', result.metrics.mevSavings);
@@ -193,8 +193,8 @@ export class SwapExecutor {
       await this.checkCircuitBreaker();
 
       // Step 2: Fetch aggregated liquidity from all venues (real data)
-      console.log('📊 Fetching aggregated liquidity...');
-      
+      console.log("📊 Fetching aggregated liquidity...");
+
       // Step 3: Optimize routes using greedy algorithm
       const optimizationConfig: Partial<OptimizationConfig> = {
         slippageTolerance: params.maxSlippageBps / 10000,
@@ -220,7 +220,7 @@ export class SwapExecutor {
       );
 
       if (ctx.routes.length === 0) {
-        throw new Error('No optimal routes found');
+        throw new Error("No optimal routes found");
       }
 
       // Step 4: Verify price with oracle (Pyth + Switchboard)
@@ -262,17 +262,18 @@ export class SwapExecutor {
       };
     } catch (error) {
       // Handle errors and log failure
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+
       // Record failure in circuit breaker (unless it's already tripped)
       if (!this.circuitBreaker.isTripped()) {
         this.circuitBreaker.recordFailure();
       }
-      
+
       await this.logSwapFailure(params, ctx, errorMessage);
 
       return {
-        signature: ctx.signature || '',
+        signature: ctx.signature || "",
         routes: ctx.routes,
         metrics: this.getEmptyMetrics(),
         success: false,
@@ -288,10 +289,10 @@ export class SwapExecutor {
     if (this.circuitBreaker.isTripped()) {
       const nextRetry = this.circuitBreaker.getNextRetryTime();
       const waitTime = Math.ceil((nextRetry - Date.now()) / 1000);
-      
+
       throw new Error(
         `Circuit breaker is active. System paused due to repeated failures. ` +
-        `Retry in ${waitTime} seconds.`
+          `Retry in ${waitTime} seconds.`
       );
     }
   }
@@ -317,7 +318,7 @@ export class SwapExecutor {
     const totalInput = routes.reduce((sum, r) => {
       return sum + r.splits.reduce((s, split) => s + split.inputAmount, 0);
     }, 0);
-    
+
     // Route rate: how much output per input
     const routeRate = totalOutput / totalInput;
 
@@ -328,7 +329,7 @@ export class SwapExecutor {
     if (deviation > MAX_ORACLE_DEVIATION) {
       throw new Error(
         `Route price deviates ${(deviation * 100).toFixed(2)}% from oracle. ` +
-        `Oracle: ${oracleRate.toFixed(6)}, Route: ${routeRate.toFixed(6)}`
+          `Oracle: ${oracleRate.toFixed(6)}, Route: ${routeRate.toFixed(6)}`
       );
     }
 
@@ -355,7 +356,7 @@ export class SwapExecutor {
     }
 
     // Set recent blockhash
-    const { blockhash } = await this.connection.getLatestBlockhash('confirmed');
+    const { blockhash } = await this.connection.getLatestBlockhash("confirmed");
     transaction.recentBlockhash = blockhash;
     transaction.feePayer = params.userPublicKey;
 
@@ -370,7 +371,7 @@ export class SwapExecutor {
     // For now, return placeholder
     return new TransactionInstruction({
       keys: [],
-      programId: new PublicKey('ComputeBudget111111111111111111111111111111'),
+      programId: new PublicKey("ComputeBudget111111111111111111111111111111"),
       data: Buffer.from([]),
     });
   }
@@ -384,11 +385,11 @@ export class SwapExecutor {
   ): Promise<TransactionInstruction> {
     // TODO: Implement venue-specific swap instructions
     // This will vary by venue (Phoenix, Orca, Jupiter, etc.)
-    
+
     // Placeholder instruction
     return new TransactionInstruction({
       keys: [],
-      programId: new PublicKey('11111111111111111111111111111111'),
+      programId: new PublicKey("11111111111111111111111111111111"),
       data: Buffer.from([]),
     });
   }
@@ -415,15 +416,12 @@ export class SwapExecutor {
     transaction.sign(signer);
 
     // Submit via Jito bundle service
-    const bundle = await this.jitoService.submitBundle(
-      [transaction],
-      {
-        enabled: true,
-        tipLamports: 10000, // 0.00001 SOL tip
-        maxRetries: 3,
-      }
-    );
-    
+    const bundle = await this.jitoService.submitBundle([transaction], {
+      enabled: true,
+      tipLamports: 10000, // 0.00001 SOL tip
+      maxRetries: 3,
+    });
+
     return {
       signature: bundle.bundleId,
       tip: 10000, // Tip amount in lamports
@@ -441,20 +439,24 @@ export class SwapExecutor {
     while (Date.now() - startTime < TIMEOUT_MS) {
       const status = await this.connection.getSignatureStatus(signature);
 
-      if (status?.value?.confirmationStatus === 'confirmed' ||
-          status?.value?.confirmationStatus === 'finalized') {
+      if (
+        status?.value?.confirmationStatus === "confirmed" ||
+        status?.value?.confirmationStatus === "finalized"
+      ) {
         return; // Success
       }
 
       if (status?.value?.err) {
-        throw new Error(`Transaction failed: ${JSON.stringify(status.value.err)}`);
+        throw new Error(
+          `Transaction failed: ${JSON.stringify(status.value.err)}`
+        );
       }
 
       // Wait before next poll
-      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     }
 
-    throw new Error('Transaction confirmation timeout after 30 seconds');
+    throw new Error("Transaction confirmation timeout after 30 seconds");
   }
 
   /**
@@ -467,7 +469,10 @@ export class SwapExecutor {
     const executionTimeMs = Date.now() - ctx.startTime;
 
     // Calculate total output amount from routes
-    const outputAmount = ctx.routes.reduce((sum, r) => sum + r.expectedOutput, 0);
+    const outputAmount = ctx.routes.reduce(
+      (sum, r) => sum + r.expectedOutput,
+      0
+    );
 
     // Calculate total input amount from routes
     const totalInput = ctx.routes.reduce((sum, r) => {
@@ -476,11 +481,13 @@ export class SwapExecutor {
 
     // Calculate actual slippage
     const expectedOutput = totalInput / ctx.oraclePrice;
-    const actualSlippage = ((expectedOutput - outputAmount) / expectedOutput) * 100;
+    const actualSlippage =
+      ((expectedOutput - outputAmount) / expectedOutput) * 100;
 
     // Calculate price impact
     const weightedRate = totalInput / outputAmount;
-    const priceImpact = ((weightedRate - ctx.oraclePrice) / ctx.oraclePrice) * 100;
+    const priceImpact =
+      ((weightedRate - ctx.oraclePrice) / ctx.oraclePrice) * 100;
 
     // Calculate fees from total cost
     const dexFees = ctx.routes.reduce((sum, r) => sum + r.totalCost, 0);
@@ -498,7 +505,8 @@ export class SwapExecutor {
     for (const route of ctx.routes) {
       for (const split of route.splits) {
         const venue = split.venue;
-        venueBreakdown[venue] = (venueBreakdown[venue] || 0) + split.inputAmount;
+        venueBreakdown[venue] =
+          (venueBreakdown[venue] || 0) + split.inputAmount;
       }
     }
 
@@ -530,15 +538,15 @@ export class SwapExecutor {
     ctx: ExecutionContext,
     metrics: SwapMetrics
   ): Promise<void> {
-    console.log('✅ Swap executed successfully');
-    console.log('📝 Signature:', ctx.signature);
-    console.log('⏱️  Execution time:', metrics.executionTimeMs, 'ms');
-    console.log('💰 Output amount:', metrics.outputAmount.toFixed(6));
-    console.log('📉 Actual slippage:', metrics.actualSlippage.toFixed(4), '%');
-    console.log('💸 Total fees:', metrics.totalFees.toFixed(6));
-    console.log('🛡️  MEV savings:', metrics.mevSavings.toFixed(6));
-    console.log('🔀 Routes used:', metrics.routeCount);
-    console.log('🏦 Venue breakdown:', metrics.venueBreakdown);
+    console.log("✅ Swap executed successfully");
+    console.log("📝 Signature:", ctx.signature);
+    console.log("⏱️  Execution time:", metrics.executionTimeMs, "ms");
+    console.log("💰 Output amount:", metrics.outputAmount.toFixed(6));
+    console.log("📉 Actual slippage:", metrics.actualSlippage.toFixed(4), "%");
+    console.log("💸 Total fees:", metrics.totalFees.toFixed(6));
+    console.log("🛡️  MEV savings:", metrics.mevSavings.toFixed(6));
+    console.log("🔀 Routes used:", metrics.routeCount);
+    console.log("🏦 Venue breakdown:", metrics.venueBreakdown);
 
     // TODO: Send to analytics service (Mixpanel, Amplitude, etc.)
   }
@@ -551,10 +559,10 @@ export class SwapExecutor {
     ctx: ExecutionContext,
     error: string
   ): Promise<void> {
-    console.error('❌ Swap execution failed');
-    console.error('🔴 Error:', error);
-    console.error('⏱️  Time to failure:', Date.now() - ctx.startTime, 'ms');
-    console.error('🔀 Routes attempted:', ctx.routes.length);
+    console.error("❌ Swap execution failed");
+    console.error("🔴 Error:", error);
+    console.error("⏱️  Time to failure:", Date.now() - ctx.startTime, "ms");
+    console.error("🔀 Routes attempted:", ctx.routes.length);
 
     // TODO: Send to error tracking service (Sentry, etc.)
   }

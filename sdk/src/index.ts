@@ -1,31 +1,42 @@
-import { Connection, PublicKey, Transaction, TransactionInstruction, Keypair } from '@solana/web3.js';
-import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
-import axios from 'axios';
+import {
+  Connection,
+  PublicKey,
+  Transaction,
+  TransactionInstruction,
+  Keypair,
+} from "@solana/web3.js";
+import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
+import axios from "axios";
 
 /**
  * Export du tracer blockchain
  */
-export * from './blockchain-tracer';
+export * from "./blockchain-tracer";
 
 /**
  * Export Smart Router Services (Phase 6)
  */
-export { SwapExecutor } from './services/SwapExecutor';
-export type { SwapParams, SwapResult as SwapExecutorResult, SwapMetrics, RoutePreferences } from './services/SwapExecutor';
-export { LiquidityDataCollector } from './services/LiquidityDataCollector';
-export { RouteOptimizationEngine } from './services/RouteOptimizationEngine';
-export { OraclePriceService } from './services/OraclePriceService';
-export { JitoBundleService } from './services/JitoBundleService';
-export * from './types/smart-router';
+export { SwapExecutor } from "./services/SwapExecutor";
+export type {
+  SwapParams,
+  SwapResult as SwapExecutorResult,
+  SwapMetrics,
+  RoutePreferences,
+} from "./services/SwapExecutor";
+export { LiquidityDataCollector } from "./services/LiquidityDataCollector";
+export { RouteOptimizationEngine } from "./services/RouteOptimizationEngine";
+export { OraclePriceService } from "./services/OraclePriceService";
+export { JitoBundleService } from "./services/JitoBundleService";
+export * from "./types/smart-router";
 
 /**
  * Types pour les routes de swap
  */
 export enum RouteType {
-  Direct = 'Direct',
-  Aggregator = 'Aggregator',
-  RFQ = 'RFQ',
-  Bundle = 'Bundle',
+  Direct = "Direct",
+  Aggregator = "Aggregator",
+  RFQ = "RFQ",
+  Bundle = "Bundle",
 }
 
 export interface RouteSimulation {
@@ -83,7 +94,7 @@ export class SwapBackClient {
     this.wallet = config.wallet;
     this.routerProgramId = config.routerProgramId;
     this.buybackProgramId = config.buybackProgramId;
-    this.oracleEndpoint = config.oracleEndpoint || 'https://api.swapback.io';
+    this.oracleEndpoint = config.oracleEndpoint || "https://api.swapback.io";
   }
 
   /**
@@ -107,7 +118,7 @@ export class SwapBackClient {
 
       return response.data as RouteSimulation;
     } catch (error) {
-      console.error('Erreur lors de la simulation:', error);
+      console.error("Erreur lors de la simulation:", error);
       throw error;
     }
   }
@@ -123,7 +134,7 @@ export class SwapBackClient {
     route: RouteSimulation
   ): Promise<SwapResult> {
     if (!this.wallet.publicKey) {
-      throw new Error('Wallet non connecté');
+      throw new Error("Wallet non connecté");
     }
 
     try {
@@ -132,8 +143,11 @@ export class SwapBackClient {
       const transaction = new Transaction();
 
       // Signature et envoi
-      const signature = await this.wallet.sendTransaction(transaction, this.connection);
-      await this.connection.confirmTransaction(signature, 'confirmed');
+      const signature = await this.wallet.sendTransaction(
+        transaction,
+        this.connection
+      );
+      await this.connection.confirmTransaction(signature, "confirmed");
 
       return {
         signature,
@@ -143,7 +157,7 @@ export class SwapBackClient {
         burnExecuted: route.burnAmount,
       };
     } catch (error) {
-      console.error('Erreur lors du swap:', error);
+      console.error("Erreur lors du swap:", error);
       throw error;
     }
   }
@@ -154,19 +168,19 @@ export class SwapBackClient {
   async getUserStats(userPubkey?: PublicKey): Promise<UserStats> {
     const pubkey = userPubkey || this.wallet.publicKey;
     if (!pubkey) {
-      throw new Error('Clé publique requise');
+      throw new Error("Clé publique requise");
     }
 
     try {
       // Dérivation du PDA pour UserRebate
       const [userRebatePDA] = PublicKey.findProgramAddressSync(
-        [Buffer.from('user_rebate'), pubkey.toBuffer()],
+        [Buffer.from("user_rebate"), pubkey.toBuffer()],
         this.routerProgramId
       );
 
       // Lecture du compte
       const accountInfo = await this.connection.getAccountInfo(userRebatePDA);
-      
+
       if (!accountInfo) {
         // Utilisateur n'a jamais swappé
         return {
@@ -192,7 +206,7 @@ export class SwapBackClient {
         rebateBoost: 10,
       };
     } catch (error) {
-      console.error('Erreur lors de la récupération des stats:', error);
+      console.error("Erreur lors de la récupération des stats:", error);
       throw error;
     }
   }
@@ -202,19 +216,22 @@ export class SwapBackClient {
    */
   async lockTokens(amount: number, durationDays: number): Promise<string> {
     if (!this.wallet.publicKey) {
-      throw new Error('Wallet non connecté');
+      throw new Error("Wallet non connecté");
     }
 
     try {
       // TODO: Construire la transaction de lock
       const transaction = new Transaction();
-      
-      const signature = await this.wallet.sendTransaction(transaction, this.connection);
-      await this.connection.confirmTransaction(signature, 'confirmed');
+
+      const signature = await this.wallet.sendTransaction(
+        transaction,
+        this.connection
+      );
+      await this.connection.confirmTransaction(signature, "confirmed");
 
       return signature;
     } catch (error) {
-      console.error('Erreur lors du lock:', error);
+      console.error("Erreur lors du lock:", error);
       throw error;
     }
   }
@@ -224,19 +241,22 @@ export class SwapBackClient {
    */
   async unlockTokens(): Promise<string> {
     if (!this.wallet.publicKey) {
-      throw new Error('Wallet non connecté');
+      throw new Error("Wallet non connecté");
     }
 
     try {
       // TODO: Construire la transaction de unlock
       const transaction = new Transaction();
-      
-      const signature = await this.wallet.sendTransaction(transaction, this.connection);
-      await this.connection.confirmTransaction(signature, 'confirmed');
+
+      const signature = await this.wallet.sendTransaction(
+        transaction,
+        this.connection
+      );
+      await this.connection.confirmTransaction(signature, "confirmed");
 
       return signature;
     } catch (error) {
-      console.error('Erreur lors du unlock:', error);
+      console.error("Erreur lors du unlock:", error);
       throw error;
     }
   }
@@ -246,19 +266,22 @@ export class SwapBackClient {
    */
   async claimRewards(): Promise<string> {
     if (!this.wallet.publicKey) {
-      throw new Error('Wallet non connecté');
+      throw new Error("Wallet non connecté");
     }
 
     try {
       // TODO: Construire la transaction de claim
       const transaction = new Transaction();
-      
-      const signature = await this.wallet.sendTransaction(transaction, this.connection);
-      await this.connection.confirmTransaction(signature, 'confirmed');
+
+      const signature = await this.wallet.sendTransaction(
+        transaction,
+        this.connection
+      );
+      await this.connection.confirmTransaction(signature, "confirmed");
 
       return signature;
     } catch (error) {
-      console.error('Erreur lors du claim:', error);
+      console.error("Erreur lors du claim:", error);
       throw error;
     }
   }
@@ -269,14 +292,14 @@ export class SwapBackClient {
   async getGlobalStats() {
     try {
       const [globalStatePDA] = PublicKey.findProgramAddressSync(
-        [Buffer.from('global_state')],
+        [Buffer.from("global_state")],
         this.routerProgramId
       );
 
       const accountInfo = await this.connection.getAccountInfo(globalStatePDA);
-      
+
       if (!accountInfo) {
-        throw new Error('Global state non initialisé');
+        throw new Error("Global state non initialisé");
       }
 
       // TODO: Désérialiser le compte avec Anchor
@@ -287,7 +310,10 @@ export class SwapBackClient {
         totalBurned: 5000,
       };
     } catch (error) {
-      console.error('Erreur lors de la récupération des stats globales:', error);
+      console.error(
+        "Erreur lors de la récupération des stats globales:",
+        error
+      );
       throw error;
     }
   }
@@ -314,7 +340,11 @@ export class SwapBackUtils {
   /**
    * Calcule la remise pour un NPI donné
    */
-  static calculateRebate(npi: number, rebatePercentage: number, boost: number): number {
+  static calculateRebate(
+    npi: number,
+    rebatePercentage: number,
+    boost: number
+  ): number {
     const baseRebate = npi * (rebatePercentage / 100);
     return baseRebate * (1 + boost / 100);
   }
@@ -344,9 +374,13 @@ export class SwapBackUtils {
 export default SwapBackClient;
 
 // Export du client $BACK token
-export { BackTokenClient, createBackTokenClient, loadBackTokenConfig } from './backToken';
-export type { BackTokenConfig } from './backToken';
+export {
+  BackTokenClient,
+  createBackTokenClient,
+  loadBackTokenConfig,
+} from "./backToken";
+export type { BackTokenConfig } from "./backToken";
 
 // Export du client cNFT
-export { CnftClient, DEFAULT_CNFT_CONFIG } from './cnftClient';
-export type { CnftConfig } from './cnftClient';
+export { CnftClient, DEFAULT_CNFT_CONFIG } from "./cnftClient";
+export type { CnftConfig } from "./cnftClient";

@@ -3,26 +3,26 @@
  * Validates route prices against Pyth and Switchboard oracles
  */
 
-import { Connection, PublicKey } from '@solana/web3.js';
-import { parsePriceData } from '@pythnetwork/client';
-import { AggregatorAccount } from '@switchboard-xyz/solana.js';
+import { Connection, PublicKey } from "@solana/web3.js";
+import { parsePriceData } from "@pythnetwork/client";
+import { AggregatorAccount } from "@switchboard-xyz/solana.js";
 import {
   OraclePriceData,
   PriceVerification,
   RouteCandidate,
-} from '../types/smart-router';
+} from "../types/smart-router";
 import {
   getPythFeedAccount,
   getPythFeedByMint,
   MAX_PRICE_AGE_SECONDS,
   MAX_CONFIDENCE_INTERVAL_PERCENT,
-} from '../config/pyth-feeds';
+} from "../config/pyth-feeds";
 import {
   getSwitchboardFeedAccount,
   getSwitchboardFeedByMint,
   SWITCHBOARD_MAX_STALENESS_SECONDS,
   SWITCHBOARD_MAX_VARIANCE_THRESHOLD,
-} from '../config/switchboard-feeds';
+} from "../config/switchboard-feeds";
 
 // ============================================================================
 // ORACLE PRICE SERVICE
@@ -36,9 +36,9 @@ export class OraclePriceService {
   // Price feed addresses (examples - replace with actual addresses)
   private readonly PRICE_FEEDS = {
     // Pyth price feeds
-    'SOL/USD': new PublicKey('H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG'),
-    'USDC/USD': new PublicKey('Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD'),
-    'USDT/USD': new PublicKey('3vxLXJqLqF3JG5TCbYycbKWRBbCJQLxQmBGCkyqEEefL'),
+    "SOL/USD": new PublicKey("H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG"),
+    "USDC/USD": new PublicKey("Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD"),
+    "USDT/USD": new PublicKey("3vxLXJqLqF3JG5TCbYycbKWRBbCJQLxQmBGCkyqEEefL"),
   };
 
   constructor(connection: Connection, cacheExpiryMs = 5000) {
@@ -70,7 +70,8 @@ export class OraclePriceService {
 
       // Calculate route's effective price
       const routeOutput = route.expectedOutput;
-      const deviation = Math.abs(routeOutput - oracleExpectedOutput) / oracleExpectedOutput;
+      const deviation =
+        Math.abs(routeOutput - oracleExpectedOutput) / oracleExpectedOutput;
 
       // Determine if acceptable
       const isAcceptable = deviation <= maxDeviationPercent;
@@ -91,15 +92,16 @@ export class OraclePriceService {
         warning,
       };
     } catch (error) {
-      console.error('Oracle price verification failed:', error);
-      
+      console.error("Oracle price verification failed:", error);
+
       // If oracle check fails, default to accepting (don't block user)
       return {
         oraclePrice: 0,
         routePrice: route.expectedOutput,
         deviation: 0,
         isAcceptable: true,
-        warning: 'Oracle price verification unavailable. Proceeding with caution.',
+        warning:
+          "Oracle price verification unavailable. Proceeding with caution.",
       };
     }
   }
@@ -122,7 +124,7 @@ export class OraclePriceService {
         return pythPrice;
       }
     } catch (error) {
-      console.warn('Pyth price fetch failed:', error);
+      console.warn("Pyth price fetch failed:", error);
     }
 
     // Fallback to Switchboard
@@ -133,7 +135,7 @@ export class OraclePriceService {
         return switchboardPrice;
       }
     } catch (error) {
-      console.warn('Switchboard price fetch failed:', error);
+      console.warn("Switchboard price fetch failed:", error);
     }
 
     throw new Error(`No oracle price available for ${mint}`);
@@ -147,7 +149,7 @@ export class OraclePriceService {
     try {
       // Get Pyth price feed account for this token
       let feedAccount = getPythFeedByMint(mint);
-      
+
       // If not found by mint, try by symbol (extract from common patterns)
       if (!feedAccount) {
         // Try to extract symbol from mint (this is a heuristic)
@@ -156,7 +158,7 @@ export class OraclePriceService {
           feedAccount = getPythFeedAccount(symbol);
         }
       }
-      
+
       if (!feedAccount) {
         console.warn(`No Pyth feed found for mint ${mint}`);
         return null;
@@ -171,9 +173,9 @@ export class OraclePriceService {
 
       // Parse Pyth price account data using the official SDK parser
       const priceData = parsePriceData(accountInfo.data);
-      
+
       if (!priceData?.price) {
-        console.warn('Failed to parse Pyth price data');
+        console.warn("Failed to parse Pyth price data");
         return null;
       }
 
@@ -181,8 +183,9 @@ export class OraclePriceService {
       const currentTime = Math.floor(Date.now() / 1000);
       const publishTime = Number(priceData.lastSlot || 0);
       const priceAge = currentTime - publishTime;
-      
-      if (priceAge > MAX_PRICE_AGE_SECONDS * 100) { // Slots are faster than seconds
+
+      if (priceAge > MAX_PRICE_AGE_SECONDS * 100) {
+        // Slots are faster than seconds
         console.warn(`Pyth price stale: ${priceAge} slots old`);
         return null;
       }
@@ -191,31 +194,32 @@ export class OraclePriceService {
       const exponent = priceData.exponent || 0;
       const rawPrice = Number(priceData.price);
       const rawConfidence = Number(priceData.confidence || 0);
-      
+
       const price = rawPrice * Math.pow(10, exponent);
       const confidence = rawConfidence * Math.pow(10, exponent);
-      
+
       // Validate confidence interval
-      const confidencePercent = Math.abs(price) > 0 ? (confidence / Math.abs(price)) * 100 : 100;
-      
+      const confidencePercent =
+        Math.abs(price) > 0 ? (confidence / Math.abs(price)) * 100 : 100;
+
       if (confidencePercent > MAX_CONFIDENCE_INTERVAL_PERCENT) {
         console.warn(
           `Pyth confidence interval too wide: ${confidencePercent.toFixed(2)}% ` +
-          `(max ${MAX_CONFIDENCE_INTERVAL_PERCENT}%)`
+            `(max ${MAX_CONFIDENCE_INTERVAL_PERCENT}%)`
         );
         return null;
       }
 
       // Return validated price data
       return {
-        provider: 'pyth',
+        provider: "pyth",
         price,
         confidence,
         timestamp: Date.now(), // Use current time since Pyth uses slots
         exponent,
       };
     } catch (error) {
-      console.error('Pyth price fetch error:', error);
+      console.error("Pyth price fetch error:", error);
       return null;
     }
   }
@@ -227,15 +231,15 @@ export class OraclePriceService {
   private guessSymbolFromMint(mint: string): string | null {
     // Common Solana token patterns
     const patterns: Record<string, string> = {
-      'So11111111111111111111111111111111111111112': 'SOL',
-      'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 'USDC',
-      'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': 'USDT',
-      '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R': 'RAY',
-      'SRMuApVNdxXokk5GT7XD5cUUgXMBCoAz2LHeuAoKWRt': 'SRM',
-      'orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE': 'ORCA',
-      'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN': 'JUP',
+      So11111111111111111111111111111111111111112: "SOL",
+      EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v: "USDC",
+      Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB: "USDT",
+      "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R": "RAY",
+      SRMuApVNdxXokk5GT7XD5cUUgXMBCoAz2LHeuAoKWRt: "SRM",
+      orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE: "ORCA",
+      JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN: "JUP",
     };
-    
+
     return patterns[mint] || null;
   }
 
@@ -243,11 +247,13 @@ export class OraclePriceService {
    * Fetch price from Switchboard
    * Real implementation using Switchboard v3 SDK
    */
-  private async fetchSwitchboardPrice(mint: string): Promise<OraclePriceData | null> {
+  private async fetchSwitchboardPrice(
+    mint: string
+  ): Promise<OraclePriceData | null> {
     try {
       // Get Switchboard aggregator account for this token
       let feedAccount = getSwitchboardFeedByMint(mint);
-      
+
       // If not found by mint, try by symbol
       if (!feedAccount) {
         const symbol = this.guessSymbolFromMint(mint);
@@ -255,7 +261,7 @@ export class OraclePriceService {
           feedAccount = getSwitchboardFeedAccount(symbol);
         }
       }
-      
+
       if (!feedAccount) {
         console.warn(`No Switchboard feed found for mint ${mint}`);
         return null;
@@ -263,7 +269,7 @@ export class OraclePriceService {
 
       // Fetch account data directly from Solana
       const accountInfo = await this.connection.getAccountInfo(feedAccount);
-      
+
       if (!accountInfo) {
         console.warn(`Switchboard account ${feedAccount.toBase58()} not found`);
         return null;
@@ -273,34 +279,34 @@ export class OraclePriceService {
       // Switchboard v3 stores data in a specific format
       // Using manual parsing since SDK is deprecated
       const data = accountInfo.data;
-      
+
       // Switchboard AggregatorAccountData layout (simplified)
       // Offset 240: latest_confirmed_round.result (f64)
       // Offset 256: latest_confirmed_round.std_deviation (f64)
       // Offset 272: latest_confirmed_round.round_open_timestamp (i64)
-      
+
       let price = 0;
       let stdDeviation = 0;
       let timestamp = Math.floor(Date.now() / 1000);
-      
+
       try {
         // Read latest result (f64 at offset 240)
         const resultBuffer = data.slice(240, 248);
         price = resultBuffer.readDoubleLE(0);
-        
+
         // Read std deviation (f64 at offset 256)
         const stdDevBuffer = data.slice(256, 264);
         stdDeviation = stdDevBuffer.readDoubleLE(0);
-        
+
         // Read timestamp (i64 at offset 272)
         const timestampBuffer = data.slice(272, 280);
         timestamp = Number(timestampBuffer.readBigInt64LE(0));
       } catch (parseError) {
-        console.warn('Switchboard data parsing failed:', parseError);
+        console.warn("Switchboard data parsing failed:", parseError);
         // If parsing fails, return null to fallback to Pyth
         return null;
       }
-      
+
       if (isNaN(price) || price <= 0) {
         console.warn(`Invalid Switchboard price: ${price}`);
         return null;
@@ -309,36 +315,36 @@ export class OraclePriceService {
       // Validate staleness
       const currentTime = Math.floor(Date.now() / 1000);
       const staleness = currentTime - timestamp;
-      
+
       if (staleness > SWITCHBOARD_MAX_STALENESS_SECONDS) {
         console.warn(
           `Switchboard data stale: ${staleness}s old ` +
-          `(max ${SWITCHBOARD_MAX_STALENESS_SECONDS}s)`
+            `(max ${SWITCHBOARD_MAX_STALENESS_SECONDS}s)`
         );
         return null;
       }
 
       // Validate variance
-      const variancePercent = price > 0 ? (stdDeviation / price) : 0;
-      
+      const variancePercent = price > 0 ? stdDeviation / price : 0;
+
       if (variancePercent > SWITCHBOARD_MAX_VARIANCE_THRESHOLD) {
         console.warn(
           `Switchboard variance too high: ${(variancePercent * 100).toFixed(2)}% ` +
-          `(max ${SWITCHBOARD_MAX_VARIANCE_THRESHOLD * 100}%)`
+            `(max ${SWITCHBOARD_MAX_VARIANCE_THRESHOLD * 100}%)`
         );
         return null;
       }
 
       // Return validated Switchboard price
       return {
-        provider: 'switchboard',
+        provider: "switchboard",
         price,
         confidence: stdDeviation,
         timestamp: timestamp * 1000, // Convert to ms
         exponent: 0, // Switchboard returns normalized values
       };
     } catch (error) {
-      console.error('Switchboard price fetch error:', error);
+      console.error("Switchboard price fetch error:", error);
       return null;
     }
   }
@@ -346,16 +352,18 @@ export class OraclePriceService {
   /**
    * Get multiple token prices in parallel
    */
-  async getMultiplePrices(mints: string[]): Promise<Map<string, OraclePriceData>> {
+  async getMultiplePrices(
+    mints: string[]
+  ): Promise<Map<string, OraclePriceData>> {
     const prices = new Map<string, OraclePriceData>();
-    
+
     const results = await Promise.allSettled(
-      mints.map(mint => this.getTokenPrice(mint))
+      mints.map((mint) => this.getTokenPrice(mint))
     );
 
     mints.forEach((mint, index) => {
       const result = results[index];
-      if (result.status === 'fulfilled') {
+      if (result.status === "fulfilled") {
         prices.set(mint, result.value);
       }
     });
@@ -395,12 +403,12 @@ export class OraclePriceService {
   /**
    * Get price confidence level
    */
-  getPriceQuality(price: OraclePriceData): 'high' | 'medium' | 'low' {
+  getPriceQuality(price: OraclePriceData): "high" | "medium" | "low" {
     const confidencePercent = (price.confidence / price.price) * 100;
-    
-    if (confidencePercent < 0.1) return 'high';
-    if (confidencePercent < 0.5) return 'medium';
-    return 'low';
+
+    if (confidencePercent < 0.1) return "high";
+    if (confidencePercent < 0.5) return "medium";
+    return "low";
   }
 }
 
@@ -437,7 +445,8 @@ export class PriceCircuitBreaker {
     if (this.consecutiveFailures >= this.maxConsecutiveFailures) {
       return {
         allowed: false,
-        reason: 'Circuit breaker tripped due to consecutive price verification failures',
+        reason:
+          "Circuit breaker tripped due to consecutive price verification failures",
       };
     }
 
@@ -454,7 +463,7 @@ export class PriceCircuitBreaker {
       this.consecutiveFailures++;
       return {
         allowed: false,
-        reason: verification.warning || 'Price verification failed',
+        reason: verification.warning || "Price verification failed",
       };
     }
 

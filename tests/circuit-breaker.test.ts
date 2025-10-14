@@ -1,19 +1,19 @@
 /**
  * CircuitBreaker Unit Tests
- * 
+ *
  * Tests for the circuit breaker failsafe pattern covering:
  * - State transitions (CLOSED → OPEN → HALF_OPEN → CLOSED)
  * - Failure threshold behavior
  * - Timeout and recovery
  * - Success threshold in HALF_OPEN state
- * 
+ *
  * @module circuit-breaker.test
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { CircuitBreaker, CircuitState } from '../sdk/src/utils/circuit-breaker';
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { CircuitBreaker, CircuitState } from "../sdk/src/utils/circuit-breaker";
 
-describe('CircuitBreaker', () => {
+describe("CircuitBreaker", () => {
   let circuitBreaker: CircuitBreaker;
 
   beforeEach(() => {
@@ -28,13 +28,13 @@ describe('CircuitBreaker', () => {
   // STATE TRANSITIONS
   // ============================================================================
 
-  describe('State Transitions', () => {
-    it('should start in CLOSED state', () => {
+  describe("State Transitions", () => {
+    it("should start in CLOSED state", () => {
       expect(circuitBreaker.getState()).toBe(CircuitState.CLOSED);
       expect(circuitBreaker.isTripped()).toBe(false);
     });
 
-    it('should transition to OPEN after failure threshold', () => {
+    it("should transition to OPEN after failure threshold", () => {
       // Record 3 failures
       circuitBreaker.recordFailure();
       circuitBreaker.recordFailure();
@@ -45,7 +45,7 @@ describe('CircuitBreaker', () => {
       expect(circuitBreaker.getFailureCount()).toBe(3);
     });
 
-    it('should transition to HALF_OPEN after timeout', async () => {
+    it("should transition to HALF_OPEN after timeout", async () => {
       // Trip the breaker
       circuitBreaker.recordFailure();
       circuitBreaker.recordFailure();
@@ -54,7 +54,7 @@ describe('CircuitBreaker', () => {
       expect(circuitBreaker.getState()).toBe(CircuitState.OPEN);
 
       // Wait for timeout (1 second)
-      await new Promise(resolve => setTimeout(resolve, 1100));
+      await new Promise((resolve) => setTimeout(resolve, 1100));
 
       // Check if tripped - should now be HALF_OPEN
       const isTripped = circuitBreaker.isTripped();
@@ -64,14 +64,14 @@ describe('CircuitBreaker', () => {
       expect(circuitBreaker.getState()).toBe(CircuitState.HALF_OPEN);
     });
 
-    it('should transition from HALF_OPEN to CLOSED after success threshold', async () => {
+    it("should transition from HALF_OPEN to CLOSED after success threshold", async () => {
       // Trip the breaker
       circuitBreaker.recordFailure();
       circuitBreaker.recordFailure();
       circuitBreaker.recordFailure();
 
       // Wait for timeout
-      await new Promise(resolve => setTimeout(resolve, 1100));
+      await new Promise((resolve) => setTimeout(resolve, 1100));
 
       // Trigger HALF_OPEN state
       circuitBreaker.isTripped();
@@ -85,14 +85,14 @@ describe('CircuitBreaker', () => {
       expect(circuitBreaker.getFailureCount()).toBe(0);
     });
 
-    it('should transition from HALF_OPEN back to OPEN on failure', async () => {
+    it("should transition from HALF_OPEN back to OPEN on failure", async () => {
       // Trip the breaker
       circuitBreaker.recordFailure();
       circuitBreaker.recordFailure();
       circuitBreaker.recordFailure();
 
       // Wait for timeout
-      await new Promise(resolve => setTimeout(resolve, 1100));
+      await new Promise((resolve) => setTimeout(resolve, 1100));
 
       // Trigger HALF_OPEN state
       circuitBreaker.isTripped();
@@ -108,8 +108,8 @@ describe('CircuitBreaker', () => {
   // FAILURE COUNTING
   // ============================================================================
 
-  describe('Failure Counting', () => {
-    it('should increment failure count on recordFailure', () => {
+  describe("Failure Counting", () => {
+    it("should increment failure count on recordFailure", () => {
       expect(circuitBreaker.getFailureCount()).toBe(0);
 
       circuitBreaker.recordFailure();
@@ -119,7 +119,7 @@ describe('CircuitBreaker', () => {
       expect(circuitBreaker.getFailureCount()).toBe(2);
     });
 
-    it('should reset failure count on recordSuccess', () => {
+    it("should reset failure count on recordSuccess", () => {
       circuitBreaker.recordFailure();
       circuitBreaker.recordFailure();
       expect(circuitBreaker.getFailureCount()).toBe(2);
@@ -128,7 +128,7 @@ describe('CircuitBreaker', () => {
       expect(circuitBreaker.getFailureCount()).toBe(0);
     });
 
-    it('should not trip before threshold', () => {
+    it("should not trip before threshold", () => {
       circuitBreaker.recordFailure();
       expect(circuitBreaker.isTripped()).toBe(false);
 
@@ -145,8 +145,8 @@ describe('CircuitBreaker', () => {
   // TIMEOUT BEHAVIOR
   // ============================================================================
 
-  describe('Timeout Behavior', () => {
-    it('should set next retry time when tripped', () => {
+  describe("Timeout Behavior", () => {
+    it("should set next retry time when tripped", () => {
       const beforeTrip = Date.now();
 
       circuitBreaker.recordFailure();
@@ -154,13 +154,13 @@ describe('CircuitBreaker', () => {
       circuitBreaker.recordFailure();
 
       const nextRetryTime = circuitBreaker.getNextRetryTime();
-      
+
       // Should be approximately 1 second in the future
       expect(nextRetryTime).toBeGreaterThan(beforeTrip);
       expect(nextRetryTime).toBeLessThan(beforeTrip + 2000);
     });
 
-    it('should remain tripped before timeout expires', async () => {
+    it("should remain tripped before timeout expires", async () => {
       circuitBreaker.recordFailure();
       circuitBreaker.recordFailure();
       circuitBreaker.recordFailure();
@@ -168,13 +168,13 @@ describe('CircuitBreaker', () => {
       expect(circuitBreaker.isTripped()).toBe(true);
 
       // Wait 500ms (half of timeout)
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       // Should still be tripped
       expect(circuitBreaker.isTripped()).toBe(true);
     });
 
-    it('should allow retry after timeout expires', async () => {
+    it("should allow retry after timeout expires", async () => {
       circuitBreaker.recordFailure();
       circuitBreaker.recordFailure();
       circuitBreaker.recordFailure();
@@ -182,7 +182,7 @@ describe('CircuitBreaker', () => {
       expect(circuitBreaker.isTripped()).toBe(true);
 
       // Wait for full timeout
-      await new Promise(resolve => setTimeout(resolve, 1100));
+      await new Promise((resolve) => setTimeout(resolve, 1100));
 
       // Should now allow retry (HALF_OPEN)
       expect(circuitBreaker.isTripped()).toBe(false);
@@ -193,8 +193,8 @@ describe('CircuitBreaker', () => {
   // RESET FUNCTIONALITY
   // ============================================================================
 
-  describe('Manual Reset', () => {
-    it('should reset to CLOSED state', () => {
+  describe("Manual Reset", () => {
+    it("should reset to CLOSED state", () => {
       circuitBreaker.recordFailure();
       circuitBreaker.recordFailure();
       circuitBreaker.recordFailure();
@@ -213,8 +213,8 @@ describe('CircuitBreaker', () => {
   // CUSTOM CONFIGURATION
   // ============================================================================
 
-  describe('Custom Configuration', () => {
-    it('should respect custom failure threshold', () => {
+  describe("Custom Configuration", () => {
+    it("should respect custom failure threshold", () => {
       const customBreaker = new CircuitBreaker({
         failureThreshold: 5,
         resetTimeoutMs: 1000,
@@ -233,7 +233,7 @@ describe('CircuitBreaker', () => {
       expect(customBreaker.isTripped()).toBe(true);
     });
 
-    it('should respect custom success threshold', async () => {
+    it("should respect custom success threshold", async () => {
       const customBreaker = new CircuitBreaker({
         failureThreshold: 3,
         resetTimeoutMs: 100,
@@ -246,7 +246,7 @@ describe('CircuitBreaker', () => {
       customBreaker.recordFailure();
 
       // Wait for timeout
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await new Promise((resolve) => setTimeout(resolve, 150));
       customBreaker.isTripped(); // Trigger HALF_OPEN
 
       // 2 successes should not close

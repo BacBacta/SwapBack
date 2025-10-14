@@ -3,10 +3,19 @@
  * Tests bundle submission, retry logic, tip calculation, MEV risk analysis
  */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { Connection, Transaction, PublicKey } from '@solana/web3.js';
-import { JitoBundleService, MEVProtectionAnalyzer } from '../sdk/src/services/JitoBundleService';
-import { RouteCandidate, VenueName, VenueType, RouteSplit, LiquiditySource } from '../sdk/src/types/smart-router';
+import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+import { Connection, Transaction, PublicKey } from "@solana/web3.js";
+import {
+  JitoBundleService,
+  MEVProtectionAnalyzer,
+} from "../sdk/src/services/JitoBundleService";
+import {
+  RouteCandidate,
+  VenueName,
+  VenueType,
+  RouteSplit,
+  LiquiditySource,
+} from "../sdk/src/types/smart-router";
 
 // ============================================================================
 // MOCKS
@@ -22,7 +31,7 @@ global.fetch = vi.fn();
 const createMockTransaction = (): Transaction => {
   const tx = new Transaction();
   tx.add = vi.fn().mockReturnThis();
-  tx.serialize = vi.fn().mockReturnValue(Buffer.from('mock-serialized-tx'));
+  tx.serialize = vi.fn().mockReturnValue(Buffer.from("mock-serialized-tx"));
   return tx;
 };
 
@@ -33,12 +42,12 @@ const createMockLiquiditySource = (
 ): LiquiditySource => ({
   venue,
   venueType: type,
-  tokenPair: ['SOL', 'USDC'],
+  tokenPair: ["SOL", "USDC"],
   depth: 100000,
   effectivePrice: 100,
   feeAmount: 0.003,
   slippagePercent,
-  route: ['SOL', 'USDC'],
+  route: ["SOL", "USDC"],
   timestamp: Date.now(),
 });
 
@@ -47,25 +56,29 @@ const createMockRouteCandidate = (
   inputAmount: number,
   slippagePercent = 0.005
 ): RouteCandidate => {
-  const splits: RouteSplit[] = venues.map(venue => ({
+  const splits: RouteSplit[] = venues.map((venue) => ({
     venue,
     percentage: 100 / venues.length,
     inputAmount: inputAmount / venues.length,
     expectedOutput: (inputAmount / venues.length) * 100,
-    liquiditySource: createMockLiquiditySource(venue, VenueType.AMM, slippagePercent),
+    liquiditySource: createMockLiquiditySource(
+      venue,
+      VenueType.AMM,
+      slippagePercent
+    ),
   }));
 
   return {
     id: `test-route-${Date.now()}`,
     venues,
-    path: ['SOL', 'USDC'],
+    path: ["SOL", "USDC"],
     hops: 1,
     splits,
     expectedOutput: inputAmount * 100,
     totalCost: 0.01,
     effectiveRate: 100,
     riskScore: 0,
-    mevRisk: 'low',
+    mevRisk: "low",
     instructions: [],
     estimatedComputeUnits: 100000,
   };
@@ -75,7 +88,7 @@ const createMockRouteCandidate = (
 // TEST SUITE - JitoBundleService
 // ============================================================================
 
-describe('JitoBundleService', () => {
+describe("JitoBundleService", () => {
   let service: JitoBundleService;
   let mockConnection: any;
 
@@ -84,14 +97,14 @@ describe('JitoBundleService', () => {
 
     mockConnection = {
       getRecentBlockhash: vi.fn().mockResolvedValue({
-        blockhash: 'mock-blockhash',
+        blockhash: "mock-blockhash",
         feeCalculator: { lamportsPerSignature: 5000 },
       }),
     };
 
     service = new JitoBundleService(
       mockConnection as Connection,
-      'https://test-jito-url.com/api/v1/bundles',
+      "https://test-jito-url.com/api/v1/bundles",
       10000
     );
   });
@@ -104,17 +117,17 @@ describe('JitoBundleService', () => {
   // TEST 1: BUNDLE SUBMISSION
   // ============================================================================
 
-  describe('Bundle Submission', () => {
-    it('should submit bundle successfully', async () => {
+  describe("Bundle Submission", () => {
+    it("should submit bundle successfully", async () => {
       const mockTx = createMockTransaction();
       const transactions = [mockTx];
 
       // Mock successful Jito response
       (global.fetch as any).mockResolvedValue({
         json: async () => ({
-          jsonrpc: '2.0',
+          jsonrpc: "2.0",
           id: 1,
-          result: 'bundle-id-12345',
+          result: "bundle-id-12345",
         }),
       });
 
@@ -124,26 +137,26 @@ describe('JitoBundleService', () => {
       });
 
       expect(result).toBeDefined();
-      expect(result.bundleId).toBe('bundle-id-12345');
-      expect(result.status).toBe('pending');
+      expect(result.bundleId).toBe("bundle-id-12345");
+      expect(result.status).toBe("pending");
       expect(result.signatures).toBeDefined();
 
       // Verify fetch was called with correct params
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://test-jito-url.com/api/v1/bundles',
+        "https://test-jito-url.com/api/v1/bundles",
         expect.objectContaining({
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
         })
       );
     });
 
-    it('should add tip instruction to first transaction', async () => {
+    it("should add tip instruction to first transaction", async () => {
       const mockTx = createMockTransaction();
       const transactions = [mockTx];
 
       (global.fetch as any).mockResolvedValue({
-        json: async () => ({ result: 'bundle-id' }),
+        json: async () => ({ result: "bundle-id" }),
       });
 
       await service.submitBundle(transactions, {
@@ -161,13 +174,13 @@ describe('JitoBundleService', () => {
       );
     });
 
-    it('should serialize transactions correctly', async () => {
+    it("should serialize transactions correctly", async () => {
       const mockTx1 = createMockTransaction();
       const mockTx2 = createMockTransaction();
       const transactions = [mockTx1, mockTx2];
 
       (global.fetch as any).mockResolvedValue({
-        json: async () => ({ result: 'bundle-id' }),
+        json: async () => ({ result: "bundle-id" }),
       });
 
       await service.submitBundle(transactions);
@@ -177,16 +190,16 @@ describe('JitoBundleService', () => {
       expect(mockTx2.serialize).toHaveBeenCalled();
     });
 
-    it('should throw error when bundling is disabled', async () => {
+    it("should throw error when bundling is disabled", async () => {
       const mockTx = createMockTransaction();
       const transactions = [mockTx];
 
       await expect(
         service.submitBundle(transactions, { enabled: false })
-      ).rejects.toThrow('Jito bundling is disabled');
+      ).rejects.toThrow("Jito bundling is disabled");
     });
 
-    it('should handle Jito API errors', async () => {
+    it("should handle Jito API errors", async () => {
       const mockTx = createMockTransaction();
       const transactions = [mockTx];
 
@@ -194,25 +207,25 @@ describe('JitoBundleService', () => {
         json: async () => ({
           error: {
             code: -32000,
-            message: 'Bundle simulation failed',
+            message: "Bundle simulation failed",
           },
         }),
       });
 
-      await expect(
-        service.submitBundle(transactions)
-      ).rejects.toThrow('Jito bundle submission failed');
+      await expect(service.submitBundle(transactions)).rejects.toThrow(
+        "Jito bundle submission failed"
+      );
     });
 
-    it('should handle network errors', async () => {
+    it("should handle network errors", async () => {
       const mockTx = createMockTransaction();
       const transactions = [mockTx];
 
-      (global.fetch as any).mockRejectedValue(new Error('Network timeout'));
+      (global.fetch as any).mockRejectedValue(new Error("Network timeout"));
 
-      await expect(
-        service.submitBundle(transactions)
-      ).rejects.toThrow('Network timeout');
+      await expect(service.submitBundle(transactions)).rejects.toThrow(
+        "Network timeout"
+      );
     });
   });
 
@@ -220,68 +233,62 @@ describe('JitoBundleService', () => {
   // TEST 2: BUNDLE STATUS
   // ============================================================================
 
-  describe('Bundle Status Checking', () => {
+  describe("Bundle Status Checking", () => {
     it('should return "landed" for confirmed bundle', async () => {
       (global.fetch as any).mockResolvedValue({
         json: async () => ({
           result: {
-            value: [
-              { confirmation_status: 'confirmed' },
-            ],
+            value: [{ confirmation_status: "confirmed" }],
           },
         }),
       });
 
-      const status = await service.getBundleStatus('test-bundle-id');
-      expect(status).toBe('landed');
+      const status = await service.getBundleStatus("test-bundle-id");
+      expect(status).toBe("landed");
     });
 
     it('should return "landed" for finalized bundle', async () => {
       (global.fetch as any).mockResolvedValue({
         json: async () => ({
           result: {
-            value: [
-              { confirmation_status: 'finalized' },
-            ],
+            value: [{ confirmation_status: "finalized" }],
           },
         }),
       });
 
-      const status = await service.getBundleStatus('test-bundle-id');
-      expect(status).toBe('landed');
+      const status = await service.getBundleStatus("test-bundle-id");
+      expect(status).toBe("landed");
     });
 
     it('should return "pending" for unconfirmed bundle', async () => {
       (global.fetch as any).mockResolvedValue({
         json: async () => ({
           result: {
-            value: [
-              { confirmation_status: 'pending' },
-            ],
+            value: [{ confirmation_status: "pending" }],
           },
         }),
       });
 
-      const status = await service.getBundleStatus('test-bundle-id');
-      expect(status).toBe('pending');
+      const status = await service.getBundleStatus("test-bundle-id");
+      expect(status).toBe("pending");
     });
 
     it('should return "failed" on API error', async () => {
       (global.fetch as any).mockResolvedValue({
         json: async () => ({
-          error: { message: 'Bundle not found' },
+          error: { message: "Bundle not found" },
         }),
       });
 
-      const status = await service.getBundleStatus('invalid-bundle-id');
-      expect(status).toBe('failed');
+      const status = await service.getBundleStatus("invalid-bundle-id");
+      expect(status).toBe("failed");
     });
 
     it('should return "failed" on network error', async () => {
-      (global.fetch as any).mockRejectedValue(new Error('Network error'));
+      (global.fetch as any).mockRejectedValue(new Error("Network error"));
 
-      const status = await service.getBundleStatus('test-bundle-id');
-      expect(status).toBe('failed');
+      const status = await service.getBundleStatus("test-bundle-id");
+      expect(status).toBe("failed");
     });
   });
 
@@ -289,8 +296,8 @@ describe('JitoBundleService', () => {
   // TEST 3: BUNDLE WAITING
   // ============================================================================
 
-  describe('Bundle Waiting', () => {
-    it('should wait for bundle to land successfully', async () => {
+  describe("Bundle Waiting", () => {
+    it("should wait for bundle to land successfully", async () => {
       // First call: pending, second call: landed
       let callCount = 0;
       (global.fetch as any).mockImplementation(async () => {
@@ -299,45 +306,48 @@ describe('JitoBundleService', () => {
           json: async () => ({
             result: {
               value: [
-                { confirmation_status: callCount === 1 ? 'pending' : 'confirmed' },
+                {
+                  confirmation_status:
+                    callCount === 1 ? "pending" : "confirmed",
+                },
               ],
             },
           }),
         };
       });
 
-      const result = await service.waitForBundle('test-bundle-id', 5000);
+      const result = await service.waitForBundle("test-bundle-id", 5000);
 
-      expect(result.bundleId).toBe('test-bundle-id');
-      expect(result.status).toBe('landed');
+      expect(result.bundleId).toBe("test-bundle-id");
+      expect(result.status).toBe("landed");
       expect(global.fetch).toHaveBeenCalledTimes(2);
     });
 
-    it('should throw error when bundle fails', async () => {
+    it("should throw error when bundle fails", async () => {
       (global.fetch as any).mockResolvedValue({
         json: async () => ({
-          error: { message: 'Bundle rejected' },
+          error: { message: "Bundle rejected" },
         }),
       });
 
       await expect(
-        service.waitForBundle('test-bundle-id', 2000)
-      ).rejects.toThrow('Bundle failed to land');
+        service.waitForBundle("test-bundle-id", 2000)
+      ).rejects.toThrow("Bundle failed to land");
     });
 
-    it('should throw error on timeout', async () => {
+    it("should throw error on timeout", async () => {
       // Always return pending
       (global.fetch as any).mockResolvedValue({
         json: async () => ({
           result: {
-            value: [{ confirmation_status: 'pending' }],
+            value: [{ confirmation_status: "pending" }],
           },
         }),
       });
 
       await expect(
-        service.waitForBundle('test-bundle-id', 1000)
-      ).rejects.toThrow('Bundle timeout');
+        service.waitForBundle("test-bundle-id", 1000)
+      ).rejects.toThrow("Bundle timeout");
     }, 10000); // Increase test timeout to 10s
   });
 
@@ -345,23 +355,23 @@ describe('JitoBundleService', () => {
   // TEST 4: TIP CALCULATION
   // ============================================================================
 
-  describe('Tip Calculation', () => {
-    it('should calculate low priority tip', async () => {
-      const tip = await service.calculateOptimalTip('low');
+  describe("Tip Calculation", () => {
+    it("should calculate low priority tip", async () => {
+      const tip = await service.calculateOptimalTip("low");
       expect(tip).toBe(5000);
     });
 
-    it('should calculate medium priority tip', async () => {
-      const tip = await service.calculateOptimalTip('medium');
+    it("should calculate medium priority tip", async () => {
+      const tip = await service.calculateOptimalTip("medium");
       expect(tip).toBe(10000);
     });
 
-    it('should calculate high priority tip', async () => {
-      const tip = await service.calculateOptimalTip('high');
+    it("should calculate high priority tip", async () => {
+      const tip = await service.calculateOptimalTip("high");
       expect(tip).toBe(50000);
     });
 
-    it('should default to medium priority', async () => {
+    it("should default to medium priority", async () => {
       const tip = await service.calculateOptimalTip();
       expect(tip).toBe(10000);
     });
@@ -372,7 +382,7 @@ describe('JitoBundleService', () => {
 // TEST SUITE - MEVProtectionAnalyzer
 // ============================================================================
 
-describe('MEVProtectionAnalyzer', () => {
+describe("MEVProtectionAnalyzer", () => {
   let analyzer: MEVProtectionAnalyzer;
 
   beforeEach(() => {
@@ -383,60 +393,83 @@ describe('MEVProtectionAnalyzer', () => {
   // TEST 5: MEV RISK ASSESSMENT
   // ============================================================================
 
-  describe('MEV Risk Assessment', () => {
-    it('should assess low risk for small CLOB trade', () => {
+  describe("MEV Risk Assessment", () => {
+    it("should assess low risk for small CLOB trade", () => {
       const route = createMockRouteCandidate([VenueName.PHOENIX], 100, 0.001);
       route.splits[0].liquiditySource.venueType = VenueType.CLOB;
 
       const assessment = analyzer.assessMEVRisk(route);
 
-      expect(assessment.riskLevel).toBe('low');
+      expect(assessment.riskLevel).toBe("low");
       expect(assessment.vulnerabilities.length).toBe(0);
-      expect(assessment.recommendations).toContain('Standard transaction submission is acceptable');
+      expect(assessment.recommendations).toContain(
+        "Standard transaction submission is acceptable"
+      );
     });
 
-    it('should assess high risk for large AMM trade', () => {
+    it("should assess high risk for large AMM trade", () => {
       const route = createMockRouteCandidate([VenueName.ORCA], 15000, 0.015);
       route.splits[0].liquiditySource.venueType = VenueType.AMM;
 
       const assessment = analyzer.assessMEVRisk(route);
 
-      expect(assessment.riskLevel).toBe('high');
+      expect(assessment.riskLevel).toBe("high");
       expect(assessment.vulnerabilities.length).toBeGreaterThan(0);
-      expect(assessment.vulnerabilities).toContain('Large trade size makes it attractive to MEV bots');
-      expect(assessment.vulnerabilities).toContain('AMM swaps are predictable and sandwich-able');
-      expect(assessment.recommendations).toContain('Strongly recommend Jito bundling + TWAP strategy');
+      expect(assessment.vulnerabilities).toContain(
+        "Large trade size makes it attractive to MEV bots"
+      );
+      expect(assessment.vulnerabilities).toContain(
+        "AMM swaps are predictable and sandwich-able"
+      );
+      expect(assessment.recommendations).toContain(
+        "Strongly recommend Jito bundling + TWAP strategy"
+      );
     });
 
-    it('should detect AMM-only vulnerability', () => {
+    it("should detect AMM-only vulnerability", () => {
       const route = createMockRouteCandidate([VenueName.ORCA], 1000, 0.005);
       route.splits[0].liquiditySource.venueType = VenueType.AMM;
 
       const assessment = analyzer.assessMEVRisk(route);
 
-      expect(assessment.vulnerabilities).toContain('AMM swaps are predictable and sandwich-able');
-      expect(assessment.recommendations).toContain('Use Jito bundling for atomic execution');
+      expect(assessment.vulnerabilities).toContain(
+        "AMM swaps are predictable and sandwich-able"
+      );
+      expect(assessment.recommendations).toContain(
+        "Use Jito bundling for atomic execution"
+      );
     });
 
-    it('should detect high slippage vulnerability', () => {
+    it("should detect high slippage vulnerability", () => {
       const route = createMockRouteCandidate([VenueName.RAYDIUM], 5000, 0.02); // 2% slippage
 
       const assessment = analyzer.assessMEVRisk(route);
 
-      expect(assessment.vulnerabilities).toContain('High slippage tolerance leaves room for sandwich attacks');
-      expect(assessment.recommendations).toContain('Tighten slippage tolerance or use smaller trade size');
+      expect(assessment.vulnerabilities).toContain(
+        "High slippage tolerance leaves room for sandwich attacks"
+      );
+      expect(assessment.recommendations).toContain(
+        "Tighten slippage tolerance or use smaller trade size"
+      );
     });
 
-    it('should detect multi-venue complexity', () => {
-      const route = createMockRouteCandidate([VenueName.ORCA, VenueName.RAYDIUM], 5000);
+    it("should detect multi-venue complexity", () => {
+      const route = createMockRouteCandidate(
+        [VenueName.ORCA, VenueName.RAYDIUM],
+        5000
+      );
 
       const assessment = analyzer.assessMEVRisk(route);
 
-      expect(assessment.vulnerabilities).toContain('Multi-venue execution increases attack surface');
-      expect(assessment.recommendations).toContain('Ensure all instructions are in same bundle');
+      expect(assessment.vulnerabilities).toContain(
+        "Multi-venue execution increases attack surface"
+      );
+      expect(assessment.recommendations).toContain(
+        "Ensure all instructions are in same bundle"
+      );
     });
 
-    it('should assess medium risk for moderate conditions', () => {
+    it("should assess medium risk for moderate conditions", () => {
       // Create a route with moderate risk factors
       const route = createMockRouteCandidate([VenueName.ORCA], 8000, 0.012);
       route.splits[0].liquiditySource.venueType = VenueType.AMM;
@@ -444,8 +477,10 @@ describe('MEVProtectionAnalyzer', () => {
       const assessment = analyzer.assessMEVRisk(route);
 
       // Should be medium due to: AMM-only (25) + high slippage (20) = 45
-      expect(assessment.riskLevel).toBe('medium');
-      expect(assessment.recommendations).toContain('Consider Jito bundling for MEV protection');
+      expect(assessment.riskLevel).toBe("medium");
+      expect(assessment.recommendations).toContain(
+        "Consider Jito bundling for MEV protection"
+      );
     });
   });
 
@@ -453,8 +488,8 @@ describe('MEVProtectionAnalyzer', () => {
   // TEST 6: TIP RECOMMENDATION
   // ============================================================================
 
-  describe('Tip Recommendation', () => {
-    it('should calculate tip based on trade value', () => {
+  describe("Tip Recommendation", () => {
+    it("should calculate tip based on trade value", () => {
       const tradeValueUSD = 10000; // $10k trade
       const tip = analyzer.calculateRecommendedTip(tradeValueUSD);
 
@@ -463,7 +498,7 @@ describe('MEVProtectionAnalyzer', () => {
       expect(tip).toBeLessThan(100000000); // Less than 1 SOL
     });
 
-    it('should have minimum tip floor', () => {
+    it("should have minimum tip floor", () => {
       const smallTradeValueUSD = 10; // $10 trade
       const tip = analyzer.calculateRecommendedTip(smallTradeValueUSD);
 
@@ -471,22 +506,22 @@ describe('MEVProtectionAnalyzer', () => {
       expect(tip).toBeGreaterThanOrEqual(5000);
     });
 
-    it('should scale tip with trade value and respect min/max bounds', () => {
-      const tinyTip = analyzer.calculateRecommendedTip(1);       // $1 trade
-      const smallTip = analyzer.calculateRecommendedTip(100);    // $100 trade
+    it("should scale tip with trade value and respect min/max bounds", () => {
+      const tinyTip = analyzer.calculateRecommendedTip(1); // $1 trade
+      const smallTip = analyzer.calculateRecommendedTip(100); // $100 trade
       const largeTip = analyzer.calculateRecommendedTip(1000000); // $1M trade
 
       // All tips should be within bounds
-      expect(tinyTip).toBeGreaterThanOrEqual(5000);   // >= min
-      expect(tinyTip).toBeLessThanOrEqual(100000);    // <= max
+      expect(tinyTip).toBeGreaterThanOrEqual(5000); // >= min
+      expect(tinyTip).toBeLessThanOrEqual(100000); // <= max
       expect(smallTip).toBeGreaterThanOrEqual(5000);
       expect(smallTip).toBeLessThanOrEqual(100000);
       expect(largeTip).toBeGreaterThanOrEqual(5000);
       expect(largeTip).toBeLessThanOrEqual(100000);
-      
+
       // Large tip should hit the max (100000 lamports)
       expect(largeTip).toBe(100000);
-      
+
       // Tiny tip should be at minimum (5000 lamports)
       expect(tinyTip).toBe(5000);
     });

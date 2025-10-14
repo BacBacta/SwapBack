@@ -1,33 +1,38 @@
 /**
  * SwapExecutor Integration Tests
- * 
+ *
  * Tests for the main swap orchestrator covering:
  * - Successful swap execution
  * - Oracle verification failure
  * - Circuit breaker behavior
  * - Insufficient liquidity
  * - Transaction timeout scenarios
- * 
+ *
  * @module swap-executor.test
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Keypair } from '@solana/web3.js';
-import { SwapExecutor } from '../sdk/src/services/SwapExecutor';
-import type { SwapParams } from '../sdk/src/services/SwapExecutor';
-import type { AggregatedLiquidity, RouteCandidate, OraclePriceData, LiquiditySource } from '../sdk/src/types/smart-router';
-import { VenueName, VenueType } from '../sdk/src/types/smart-router';
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { Keypair } from "@solana/web3.js";
+import { SwapExecutor } from "../sdk/src/services/SwapExecutor";
+import type { SwapParams } from "../sdk/src/services/SwapExecutor";
+import type {
+  AggregatedLiquidity,
+  RouteCandidate,
+  OraclePriceData,
+  LiquiditySource,
+} from "../sdk/src/types/smart-router";
+import { VenueName, VenueType } from "../sdk/src/types/smart-router";
 
 // Mock Solana Transaction to avoid real signing
-vi.mock('@solana/web3.js', async () => {
-  const actual = await vi.importActual('@solana/web3.js');
+vi.mock("@solana/web3.js", async () => {
+  const actual = await vi.importActual("@solana/web3.js");
   return {
     ...actual,
     Transaction: vi.fn().mockImplementation(() => ({
       add: vi.fn().mockReturnThis(),
       sign: vi.fn(),
-      serialize: vi.fn().mockReturnValue(Buffer.from('mock-serialized-tx')),
-      recentBlockhash: '',
+      serialize: vi.fn().mockReturnValue(Buffer.from("mock-serialized-tx")),
+      recentBlockhash: "",
       feePayer: null,
     })),
   };
@@ -64,14 +69,14 @@ const mockCircuitBreaker = {
   recordFailure: vi.fn(),
   getNextRetryTime: vi.fn().mockReturnValue(null),
   reset: vi.fn(),
-  getState: vi.fn().mockReturnValue('CLOSED'),
+  getState: vi.fn().mockReturnValue("CLOSED"),
 };
 
 // Mock Connection
 const mockConnection = {
   getSignatureStatus: vi.fn(),
   getLatestBlockhash: vi.fn().mockResolvedValue({
-    blockhash: 'test-blockhash',
+    blockhash: "test-blockhash",
     lastValidBlockHeight: 12345,
   }),
 };
@@ -80,16 +85,18 @@ const mockConnection = {
 // TEST SETUP
 // ============================================================================
 
-describe('SwapExecutor', () => {
+describe("SwapExecutor", () => {
   let executor: SwapExecutor;
   let testKeypair: Keypair;
 
   // Valid Solana token addresses
-  const SOL_MINT = 'So11111111111111111111111111111111111111112';
-  const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+  const SOL_MINT = "So11111111111111111111111111111111111111112";
+  const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
   // Helper: Create mock liquidity source
-  const createMockLiquiditySource = (effectivePrice: number): LiquiditySource => ({
+  const createMockLiquiditySource = (
+    effectivePrice: number
+  ): LiquiditySource => ({
     venue: VenueName.ORCA,
     venueType: VenueType.AMM,
     tokenPair: [SOL_MINT, USDC_MINT],
@@ -103,14 +110,16 @@ describe('SwapExecutor', () => {
   });
 
   // Helper: Create mock aggregated liquidity
-  const createMockAggregatedLiquidity = (sources: LiquiditySource[]): AggregatedLiquidity => ({
+  const createMockAggregatedLiquidity = (
+    sources: LiquiditySource[]
+  ): AggregatedLiquidity => ({
     tokenPair: [SOL_MINT, USDC_MINT],
     totalDepth: sources.reduce((sum, s) => sum + s.depth, 0),
     sources,
     bestSingleVenue: sources[0]?.venue || VenueName.ORCA,
     bestCombinedRoute: {
-      id: 'route-best',
-      venues: sources.map(s => s.venue),
+      id: "route-best",
+      venues: sources.map((s) => s.venue),
       path: [SOL_MINT, USDC_MINT],
       hops: 1,
       splits: [],
@@ -118,7 +127,7 @@ describe('SwapExecutor', () => {
       totalCost: 0.05,
       effectiveRate: sources[0]?.effectivePrice || 0,
       riskScore: 10,
-      mevRisk: 'low',
+      mevRisk: "low",
       instructions: [],
       estimatedComputeUnits: 200000,
     },
@@ -129,10 +138,10 @@ describe('SwapExecutor', () => {
   beforeEach(() => {
     // Clear all mocks and reset state
     vi.clearAllMocks();
-    
+
     // Reset circuit breaker to CLOSED state
     mockCircuitBreaker.isTripped.mockReturnValue(false);
-    mockCircuitBreaker.getState.mockReturnValue('CLOSED');
+    mockCircuitBreaker.getState.mockReturnValue("CLOSED");
     mockCircuitBreaker.getNextRetryTime.mockReturnValue(null);
 
     // Create test keypair
@@ -153,15 +162,15 @@ describe('SwapExecutor', () => {
   // TEST 1: SUCCESSFUL SWAP EXECUTION
   // ============================================================================
 
-  describe('Successful Swap Execution', () => {
-    it('should execute swap successfully with valid parameters', async () => {
+  describe("Successful Swap Execution", () => {
+    it("should execute swap successfully with valid parameters", async () => {
       // Setup mocks
       const mockSource = createMockLiquiditySource(100.5);
       const mockLiquidity = createMockAggregatedLiquidity([mockSource]);
 
       const mockRoutes: RouteCandidate[] = [
         {
-          id: 'route-1',
+          id: "route-1",
           venues: [VenueName.ORCA],
           path: [SOL_MINT, USDC_MINT],
           hops: 1,
@@ -178,7 +187,7 @@ describe('SwapExecutor', () => {
           totalCost: 0.05,
           effectiveRate: 100.5,
           riskScore: 10,
-          mevRisk: 'low',
+          mevRisk: "low",
           instructions: [],
           estimatedComputeUnits: 200000,
         },
@@ -186,7 +195,7 @@ describe('SwapExecutor', () => {
 
       // Mock oracle price data
       const mockOraclePriceSOL: OraclePriceData = {
-        provider: 'pyth',
+        provider: "pyth",
         price: 100.0,
         confidence: 0.5,
         timestamp: Date.now(),
@@ -194,7 +203,7 @@ describe('SwapExecutor', () => {
       };
 
       const mockOraclePriceUSDC: OraclePriceData = {
-        provider: 'pyth',
+        provider: "pyth",
         price: 1.0,
         confidence: 0.001,
         timestamp: Date.now(),
@@ -202,15 +211,17 @@ describe('SwapExecutor', () => {
       };
 
       // Setup service mocks
-      mockLiquidityCollector.fetchAggregatedLiquidity.mockResolvedValue(mockLiquidity);
+      mockLiquidityCollector.fetchAggregatedLiquidity.mockResolvedValue(
+        mockLiquidity
+      );
       mockOptimizer.findOptimalRoutes.mockResolvedValue(mockRoutes);
       mockOracleService.getTokenPrice
         .mockResolvedValueOnce(mockOraclePriceSOL)
         .mockResolvedValueOnce(mockOraclePriceUSDC);
-      
+
       mockJitoService.submitBundle.mockResolvedValue({
-        bundleId: 'test-bundle-123',
-        status: 'pending',
+        bundleId: "test-bundle-123",
+        status: "pending",
         transactions: [],
       });
 
@@ -220,7 +231,7 @@ describe('SwapExecutor', () => {
           slot: 12345,
           confirmations: 10,
           err: null,
-          confirmationStatus: 'confirmed',
+          confirmationStatus: "confirmed",
         },
       });
 
@@ -240,7 +251,7 @@ describe('SwapExecutor', () => {
       // Assertions
       expect(result.success).toBe(true);
       expect(result.signature).toBeDefined();
-      expect(result.signature).toBe('test-bundle-123');
+      expect(result.signature).toBe("test-bundle-123");
       expect(result.routes).toHaveLength(1);
       expect(result.metrics).toBeDefined();
       expect(result.metrics.executionTimeMs).toBeGreaterThan(0);
@@ -268,15 +279,15 @@ describe('SwapExecutor', () => {
   // TEST 2: ORACLE VERIFICATION FAILURE
   // ============================================================================
 
-  describe('Oracle Verification Failure', () => {
-    it('should reject swap when route price deviates > 5% from oracle', async () => {
+  describe("Oracle Verification Failure", () => {
+    it("should reject swap when route price deviates > 5% from oracle", async () => {
       // Mock liquidity with manipulated price
       const mockSource: LiquiditySource = {
         venue: VenueName.ORCA,
         venueType: VenueType.AMM,
         tokenPair: [
-          'So11111111111111111111111111111111111111112',
-          'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+          "So11111111111111111111111111111111111111112",
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
         ],
         depth: 500000,
         reserves: { input: 1000000, output: 110000000 },
@@ -284,26 +295,26 @@ describe('SwapExecutor', () => {
         feeAmount: 0.05,
         slippagePercent: 0.001,
         route: [
-          'So11111111111111111111111111111111111111112',
-          'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+          "So11111111111111111111111111111111111111112",
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
         ],
         timestamp: Date.now(),
       };
 
       const mockLiquidity: AggregatedLiquidity = {
         tokenPair: [
-          'So11111111111111111111111111111111111111112',
-          'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+          "So11111111111111111111111111111111111111112",
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
         ],
         totalDepth: 500000,
         sources: [mockSource],
         bestSingleVenue: VenueName.ORCA,
         bestCombinedRoute: {
-          id: 'route-best',
+          id: "route-best",
           venues: [VenueName.ORCA],
           path: [
-            'So11111111111111111111111111111111111111112',
-            'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+            "So11111111111111111111111111111111111111112",
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
           ],
           hops: 1,
           splits: [],
@@ -311,7 +322,7 @@ describe('SwapExecutor', () => {
           totalCost: 0.05,
           effectiveRate: 110.0,
           riskScore: 50,
-          mevRisk: 'medium',
+          mevRisk: "medium",
           instructions: [],
           estimatedComputeUnits: 200000,
         },
@@ -321,11 +332,11 @@ describe('SwapExecutor', () => {
 
       const mockRoutes: RouteCandidate[] = [
         {
-          id: 'route-1',
+          id: "route-1",
           venues: [VenueName.ORCA],
           path: [
-            'So11111111111111111111111111111111111111112',
-            'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+            "So11111111111111111111111111111111111111112",
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
           ],
           hops: 1,
           splits: [
@@ -341,7 +352,7 @@ describe('SwapExecutor', () => {
           totalCost: 0.05,
           effectiveRate: 110.0,
           riskScore: 50,
-          mevRisk: 'medium',
+          mevRisk: "medium",
           instructions: [],
           estimatedComputeUnits: 200000,
         },
@@ -349,7 +360,7 @@ describe('SwapExecutor', () => {
 
       // Oracle shows normal price
       const mockOraclePriceSOL: OraclePriceData = {
-        provider: 'pyth',
+        provider: "pyth",
         price: 100.0, // Expected rate: 100
         confidence: 0.5,
         timestamp: Date.now(),
@@ -357,7 +368,7 @@ describe('SwapExecutor', () => {
       };
 
       const mockOraclePriceUSDC: OraclePriceData = {
-        provider: 'pyth',
+        provider: "pyth",
         price: 1.0,
         confidence: 0.001,
         timestamp: Date.now(),
@@ -365,7 +376,9 @@ describe('SwapExecutor', () => {
       };
 
       // Setup mocks
-      mockLiquidityCollector.fetchAggregatedLiquidity.mockResolvedValue(mockLiquidity);
+      mockLiquidityCollector.fetchAggregatedLiquidity.mockResolvedValue(
+        mockLiquidity
+      );
       mockOptimizer.findOptimalRoutes.mockResolvedValue(mockRoutes);
       mockOracleService.getTokenPrice
         .mockResolvedValueOnce(mockOraclePriceSOL)
@@ -386,9 +399,9 @@ describe('SwapExecutor', () => {
 
       // Assertions
       expect(result.success).toBe(false);
-      expect(result.error).toContain('deviates');
-      expect(result.error).toContain('oracle');
-      
+      expect(result.error).toContain("deviates");
+      expect(result.error).toContain("oracle");
+
       // Verify circuit breaker recorded failure
       expect(mockCircuitBreaker.recordFailure).toHaveBeenCalled();
     });
@@ -398,8 +411,8 @@ describe('SwapExecutor', () => {
   // TEST 3: CIRCUIT BREAKER BEHAVIOR
   // ============================================================================
 
-  describe('Circuit Breaker Behavior', () => {
-    it('should block swap when circuit breaker is tripped', async () => {
+  describe("Circuit Breaker Behavior", () => {
+    it("should block swap when circuit breaker is tripped", async () => {
       // Trip the circuit breaker
       mockCircuitBreaker.isTripped.mockReturnValue(true);
 
@@ -420,14 +433,16 @@ describe('SwapExecutor', () => {
       expect(result.error).toMatch(/circuit breaker.*active/i);
 
       // Verify no other services were called
-      expect(mockLiquidityCollector.fetchAggregatedLiquidity).not.toHaveBeenCalled();
+      expect(
+        mockLiquidityCollector.fetchAggregatedLiquidity
+      ).not.toHaveBeenCalled();
       expect(mockOptimizer.findOptimalRoutes).not.toHaveBeenCalled();
     });
 
-    it('should record consecutive failures and trip breaker', async () => {
+    it("should record consecutive failures and trip breaker", async () => {
       // Mock to simulate 3 failures in a row
       mockLiquidityCollector.fetchAggregatedLiquidity.mockRejectedValue(
-        new Error('RPC timeout')
+        new Error("RPC timeout")
       );
 
       const params: SwapParams = {
@@ -460,19 +475,19 @@ describe('SwapExecutor', () => {
   // TEST 4: INSUFFICIENT LIQUIDITY
   // ============================================================================
 
-  describe('Insufficient Liquidity', () => {
-    it('should fail when no liquidity sources are available', async () => {
+  describe("Insufficient Liquidity", () => {
+    it("should fail when no liquidity sources are available", async () => {
       // Mock empty liquidity
       const mockLiquidity: AggregatedLiquidity = {
         tokenPair: [
-          'So11111111111111111111111111111111111111112',
-          'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+          "So11111111111111111111111111111111111111112",
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
         ],
         totalDepth: 0,
         sources: [],
         bestSingleVenue: VenueName.ORCA, // Will have no actual routes
         bestCombinedRoute: {
-          id: 'route-empty',
+          id: "route-empty",
           venues: [],
           path: [],
           hops: 0,
@@ -481,7 +496,7 @@ describe('SwapExecutor', () => {
           totalCost: 0,
           effectiveRate: 0,
           riskScore: 100,
-          mevRisk: 'high',
+          mevRisk: "high",
           instructions: [],
           estimatedComputeUnits: 0,
         },
@@ -489,7 +504,9 @@ describe('SwapExecutor', () => {
         staleness: 0,
       };
 
-      mockLiquidityCollector.fetchAggregatedLiquidity.mockResolvedValue(mockLiquidity);
+      mockLiquidityCollector.fetchAggregatedLiquidity.mockResolvedValue(
+        mockLiquidity
+      );
       // Also need to mock optimizer to return empty routes
       mockOptimizer.findOptimalRoutes.mockResolvedValue([]);
 
@@ -518,15 +535,15 @@ describe('SwapExecutor', () => {
   // TEST 5: TRANSACTION TIMEOUT
   // ============================================================================
 
-  describe('Transaction Timeout', () => {
-    it('should timeout when transaction confirmation exceeds 30s', async () => {
+  describe("Transaction Timeout", () => {
+    it("should timeout when transaction confirmation exceeds 30s", async () => {
       // Mock services for successful route
       const mockSource: LiquiditySource = {
         venue: VenueName.ORCA,
         venueType: VenueType.AMM,
         tokenPair: [
-          'So11111111111111111111111111111111111111112',
-          'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+          "So11111111111111111111111111111111111111112",
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
         ],
         depth: 500000,
         reserves: { input: 1000000, output: 100500000 },
@@ -534,26 +551,26 @@ describe('SwapExecutor', () => {
         feeAmount: 0.05,
         slippagePercent: 0.001,
         route: [
-          'So11111111111111111111111111111111111111112',
-          'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+          "So11111111111111111111111111111111111111112",
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
         ],
         timestamp: Date.now(),
       };
 
       const mockLiquidity: AggregatedLiquidity = {
         tokenPair: [
-          'So11111111111111111111111111111111111111112',
-          'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+          "So11111111111111111111111111111111111111112",
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
         ],
         totalDepth: 500000,
         sources: [mockSource],
         bestSingleVenue: VenueName.ORCA,
         bestCombinedRoute: {
-          id: 'route-best',
+          id: "route-best",
           venues: [VenueName.ORCA],
           path: [
-            'So11111111111111111111111111111111111111112',
-            'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+            "So11111111111111111111111111111111111111112",
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
           ],
           hops: 1,
           splits: [],
@@ -561,7 +578,7 @@ describe('SwapExecutor', () => {
           totalCost: 0.05,
           effectiveRate: 100.5,
           riskScore: 10,
-          mevRisk: 'low',
+          mevRisk: "low",
           instructions: [],
           estimatedComputeUnits: 200000,
         },
@@ -571,11 +588,11 @@ describe('SwapExecutor', () => {
 
       const mockRoutes: RouteCandidate[] = [
         {
-          id: 'route-1',
+          id: "route-1",
           venues: [VenueName.ORCA],
           path: [
-            'So11111111111111111111111111111111111111112',
-            'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+            "So11111111111111111111111111111111111111112",
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
           ],
           hops: 1,
           splits: [
@@ -591,14 +608,14 @@ describe('SwapExecutor', () => {
           totalCost: 0.05,
           effectiveRate: 100.5,
           riskScore: 10,
-          mevRisk: 'low',
+          mevRisk: "low",
           instructions: [],
           estimatedComputeUnits: 200000,
         },
       ];
 
       const mockOraclePriceSOL: OraclePriceData = {
-        provider: 'pyth',
+        provider: "pyth",
         price: 100.0,
         confidence: 0.5,
         timestamp: Date.now(),
@@ -606,22 +623,24 @@ describe('SwapExecutor', () => {
       };
 
       const mockOraclePriceUSDC: OraclePriceData = {
-        provider: 'pyth',
+        provider: "pyth",
         price: 1.0,
         confidence: 0.001,
         timestamp: Date.now(),
         exponent: -8,
       };
 
-      mockLiquidityCollector.fetchAggregatedLiquidity.mockResolvedValue(mockLiquidity);
+      mockLiquidityCollector.fetchAggregatedLiquidity.mockResolvedValue(
+        mockLiquidity
+      );
       mockOptimizer.findOptimalRoutes.mockResolvedValue(mockRoutes);
       mockOracleService.getTokenPrice
         .mockResolvedValueOnce(mockOraclePriceSOL)
         .mockResolvedValueOnce(mockOraclePriceUSDC);
-      
+
       mockJitoService.submitBundle.mockResolvedValue({
-        bundleId: 'test-bundle-timeout',
-        status: 'pending',
+        bundleId: "test-bundle-timeout",
+        status: "pending",
         transactions: [],
       });
 

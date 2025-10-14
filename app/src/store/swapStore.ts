@@ -3,9 +3,9 @@
  * Manages swap state, routes, transaction status using Zustand
  */
 
-import { create } from 'zustand';
-import { devtools, persist } from 'zustand/middleware';
-import { RouteCandidate } from '@/../../sdk/src/types/smart-router';
+import { create } from "zustand";
+import { devtools, persist } from "zustand/middleware";
+import { RouteCandidate } from "@/../../sdk/src/types/smart-router";
 
 // ============================================================================
 // TYPES
@@ -27,7 +27,7 @@ export interface SwapState {
   outputAmount: string;
   slippageTolerance: number;
   useMEVProtection: boolean;
-  priorityLevel: 'low' | 'medium' | 'high';
+  priorityLevel: "low" | "medium" | "high";
 }
 
 export interface RouteState {
@@ -38,7 +38,14 @@ export interface RouteState {
 }
 
 export interface TransactionState {
-  status: 'idle' | 'preparing' | 'signing' | 'sending' | 'confirming' | 'confirmed' | 'failed';
+  status:
+    | "idle"
+    | "preparing"
+    | "signing"
+    | "sending"
+    | "confirming"
+    | "confirmed"
+    | "failed";
   signature: string | null;
   error: string | null;
   confirmations: number;
@@ -53,7 +60,7 @@ export interface SwapStore {
   setOutputAmount: (amount: string) => void;
   setSlippageTolerance: (tolerance: number) => void;
   setUseMEVProtection: (use: boolean) => void;
-  setPriorityLevel: (level: 'low' | 'medium' | 'high') => void;
+  setPriorityLevel: (level: "low" | "medium" | "high") => void;
   switchTokens: () => void;
 
   // Route State
@@ -64,7 +71,7 @@ export interface SwapStore {
 
   // Transaction State
   transaction: TransactionState;
-  setTransactionStatus: (status: TransactionState['status']) => void;
+  setTransactionStatus: (status: TransactionState["status"]) => void;
   setTransactionSignature: (signature: string) => void;
   setTransactionError: (error: string | null) => void;
   incrementConfirmations: () => void;
@@ -78,9 +85,9 @@ export interface SwapStore {
     outputToken: Token;
     inputAmount: string;
     outputAmount: string;
-    status: 'confirmed' | 'failed';
+    status: "confirmed" | "failed";
   }>;
-  addToHistory: (tx: SwapStore['transactionHistory'][0]) => void;
+  addToHistory: (tx: SwapStore["transactionHistory"][0]) => void;
 
   // Reset
   reset: () => void;
@@ -93,11 +100,11 @@ export interface SwapStore {
 const initialSwapState: SwapState = {
   inputToken: null,
   outputToken: null,
-  inputAmount: '',
-  outputAmount: '',
+  inputAmount: "",
+  outputAmount: "",
   slippageTolerance: 0.01, // 1%
   useMEVProtection: true,
-  priorityLevel: 'medium',
+  priorityLevel: "medium",
 };
 
 const initialRouteState: RouteState = {
@@ -108,7 +115,7 @@ const initialRouteState: RouteState = {
 };
 
 const initialTransactionState: TransactionState = {
-  status: 'idle',
+  status: "idle",
   signature: null,
   error: null,
   confirmations: 0,
@@ -185,9 +192,9 @@ export const useSwapStore = create<SwapStore>()(
           }));
 
           try {
-            const response = await fetch('/api/swap-simple', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+            const response = await fetch("/api/swap-simple", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 inputMint: swap.inputToken.mint,
                 outputMint: swap.outputToken.mint,
@@ -199,7 +206,7 @@ export const useSwapStore = create<SwapStore>()(
             });
 
             if (!response.ok) {
-              throw new Error('Failed to fetch routes');
+              throw new Error("Failed to fetch routes");
             }
 
             const data = await response.json();
@@ -217,7 +224,7 @@ export const useSwapStore = create<SwapStore>()(
               routes: {
                 ...state.routes,
                 isLoading: false,
-                error: error instanceof Error ? error.message : 'Unknown error',
+                error: error instanceof Error ? error.message : "Unknown error",
               },
             }));
           }
@@ -248,7 +255,7 @@ export const useSwapStore = create<SwapStore>()(
 
         setTransactionError: (error) =>
           set((state) => ({
-            transaction: { ...state.transaction, error, status: 'failed' },
+            transaction: { ...state.transaction, error, status: "failed" },
           })),
 
         incrementConfirmations: () =>
@@ -281,7 +288,7 @@ export const useSwapStore = create<SwapStore>()(
           })),
       }),
       {
-        name: 'swapback-storage',
+        name: "swapback-storage",
         partialize: (state) => ({
           transactionHistory: state.transactionHistory,
           swap: {

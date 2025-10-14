@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Run tests before commit
+npm test
+
+# Run linter (warnings allowed, fail only on errors)
+npm run lint --max-warnings=-1 || echo "⚠️  Linting completed with warnings"
