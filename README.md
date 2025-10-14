@@ -1,5 +1,10 @@
 # SwapBack - Routeur d'Exécution Optimisé pour Solana
 
+[![Tests & Coverage](https://github.com/BacBacta/SwapBack/actions/workflows/test.yml/badge.svg)](https://github.com/BacBacta/SwapBack/actions/workflows/test.yml)
+[![Build](https://github.com/BacBacta/SwapBack/actions/workflows/build.yml/badge.svg)](https://github.com/BacBacta/SwapBack/actions/workflows/build.yml)
+[![codecov](https://codecov.io/gh/BacBacta/SwapBack/branch/main/graph/badge.svg)](https://codecov.io/gh/BacBacta/SwapBack)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ![SwapBack Logo](https://via.placeholder.com/800x200?text=SwapBack+Best+Execution+Router)
 
 ## 📋 Table des matières
