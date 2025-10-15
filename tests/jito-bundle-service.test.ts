@@ -58,7 +58,7 @@ const createMockRouteCandidate = (
 ): RouteCandidate => {
   const splits: RouteSplit[] = venues.map((venue) => ({
     venue,
-    percentage: 100 / venues.length,
+     weight: 100 / venues.length,
     inputAmount: inputAmount / venues.length,
     expectedOutput: (inputAmount / venues.length) * 100,
     liquiditySource: createMockLiquiditySource(

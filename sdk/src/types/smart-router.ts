@@ -107,7 +107,7 @@ export interface RouteCandidate {
 
 export interface RouteSplit {
   venue: VenueName;
-  percentage: number;      // % of total input (0-100)
+  weight: number;          // Weight of total input (0-100, must sum to 100)
   inputAmount: number;     // Tokens to send to this venue
   expectedOutput: number;  // Expected output from this split
   liquiditySource: LiquiditySource;

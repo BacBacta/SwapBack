@@ -7,6 +7,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Connection } from "@solana/web3.js";
 import { RouteOptimizationEngine } from "../sdk/src/services/RouteOptimizationEngine";
 import { LiquidityDataCollector } from "../sdk/src/services/LiquidityDataCollector";
+import { OraclePriceService } from "../sdk/src/services/OraclePriceService";
 import {
   VenueName,
   VenueType,
@@ -28,6 +29,19 @@ vi.mock("../sdk/src/services/LiquidityDataCollector", () => ({
       enabled: true,
       minTradeSize: 1,
       maxSlippage: 0.01,
+    }),
+  })),
+}));
+
+vi.mock("../sdk/src/services/OraclePriceService", () => ({
+  OraclePriceService: vi.fn().mockImplementation(() => ({
+    getTokenPrice: vi.fn().mockResolvedValue({
+      provider: 'pyth',
+      price: 150,
+      confidence: 1,
+      timestamp: Date.now(),
+      exponent: 0,
+      publishTime: Date.now(),
     }),
   })),
 }));
@@ -91,6 +105,7 @@ const createMockAggregatedLiquidity = (
 describe("RouteOptimizationEngine", () => {
   let engine: RouteOptimizationEngine;
   let mockCollector: any;
+  let mockOracleService: any;
   let mockConnection: any;
 
   beforeEach(() => {
@@ -101,7 +116,8 @@ describe("RouteOptimizationEngine", () => {
     };
 
     mockCollector = new LiquidityDataCollector(mockConnection as Connection);
-    engine = new RouteOptimizationEngine(mockCollector);
+    mockOracleService = new OraclePriceService(mockConnection as Connection);
+    engine = new RouteOptimizationEngine(mockCollector, mockOracleService);
   });
 
   // ============================================================================
@@ -156,7 +172,7 @@ describe("RouteOptimizationEngine", () => {
       const bestRoute = routes[0];
       expect(bestRoute.hops).toBe(1);
       expect(bestRoute.splits.length).toBe(1);
-      expect(bestRoute.splits[0].percentage).toBe(100);
+      expect(bestRoute.splits[0].weight).toBe(100);
       expect(bestRoute.expectedOutput).toBeGreaterThan(0);
     });
 
@@ -287,13 +303,13 @@ describe("RouteOptimizationEngine", () => {
       // If split routes are created, validate them
       const splitRoutes = routes.filter((r) => r.splits.length > 1);
       if (splitRoutes.length > 0) {
-        // Validate split percentages sum to 100
+        // Validate split weights sum to 100
         splitRoutes.forEach((route) => {
-          const totalPercent = route.splits.reduce(
-            (sum, s) => sum + s.percentage,
+          const totalWeight = route.splits.reduce(
+            (sum, s) => sum + s.weight,
             0
           );
-          expect(totalPercent).toBeCloseTo(100, 1);
+          expect(totalWeight).toBeCloseTo(100, 1);
         });
       }
     });
@@ -333,7 +349,7 @@ describe("RouteOptimizationEngine", () => {
       // All routes should be single venue
       routes.forEach((route) => {
         expect(route.splits.length).toBe(1);
-        expect(route.splits[0].percentage).toBe(100);
+        expect(route.splits[0].weight).toBe(100);
       });
     });
 

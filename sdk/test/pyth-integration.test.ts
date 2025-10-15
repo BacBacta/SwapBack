@@ -1,19 +1,41 @@
-import { describe, it } from 'vitest';
-import { Connection, clusterApiUrl } from '@solana/web3.js';
+import { describe, it, vi, beforeEach } from 'vitest';
+import { Connection } from '@solana/web3.js';
 import { OraclePriceService } from '../src/services/OraclePriceService';
+import { VenueName, RouteCandidate } from '../src/types/smart-router';
 
-describe.skip('Pyth Oracle Integration', () => {
-  it('should test Pyth integration', async () => {
-    console.log('🧪 Testing Pyth Oracle Integration...\n');
+// Mock Solana connection
+vi.mock('@solana/web3.js', () => ({
+  Connection: vi.fn().mockImplementation(() => ({
+    getAccountInfo: vi.fn(),
+  })),
+  clusterApiUrl: vi.fn(),
+  PublicKey: vi.fn().mockImplementation((value) => ({
+    toString: vi.fn(() => value),
+    toBase58: vi.fn(() => value),
+    toBytes: vi.fn(() => new Uint8Array()),
+    toBuffer: vi.fn(() => Buffer.from([])),
+  })),
+}));
 
-    // Connect to Solana Mainnet
-    const connection = new Connection(
-      process.env.SOLANA_RPC_URL || clusterApiUrl('mainnet-beta'),
-      'confirmed'
-    );
+vi.mock('@pythnetwork/client', () => ({
+  parsePriceData: vi.fn(),
+}));
 
-    // Initialize Oracle Service
-    const oracleService = new OraclePriceService(connection, 5000);
+vi.mock('@switchboard-xyz/solana.js', () => ({
+  AggregatorAccount: vi.fn(),
+}));
+
+describe('Pyth Oracle Integration', () => {
+  let oracleService: OraclePriceService;
+  let mockConnection: any;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockConnection = new Connection('mock-url');
+    oracleService = new OraclePriceService(mockConnection, 5000);
+  });
+
+  it('should test Pyth integration with mocked data', async () => {
 
   // Test tokens (using mint addresses)
   const testCases = [
@@ -62,18 +84,20 @@ describe.skip('Pyth Oracle Integration', () => {
   console.log('\n🧪 Testing route price verification...\n');
 
   // Test route verification with mock route
-  const mockRoute = {
-    venues: ['Orca'],
-    splits: [{ venue: 'Orca', percentage: 100, amount: 1000 }],
-    expectedOutput: 10050, // Expecting 10,050 USDC for 100 SOL
-    totalCost: 50,
-    riskScore: 20,
-    mevRisk: 'low' as const,
-    slippagePercent: 0.5,
-    instructions: [],
-  };
-
-  try {
+      const mockRoute: RouteCandidate = {
+        id: 'test-route-1',
+        venues: [VenueName.RAYDIUM],
+        path: ['SOL', 'USDC'],
+        hops: 1,
+        splits: [],
+        expectedOutput: 1000000,
+        totalCost: 0.001,
+        effectiveRate: 0.0001,
+        riskScore: 10,
+        mevRisk: 'low',
+        instructions: [],
+        estimatedComputeUnits: 100000,
+      };  try {
     const verification = await oracleService.verifyRoutePrice(
       mockRoute,
       'So11111111111111111111111111111111111111112', // SOL

@@ -44,7 +44,7 @@ function createStubPlan(id: string, venue: VenueName, fallbackPlans: AtomicSwapP
     splits: [
       {
         venue,
-        percentage: 100,
+        weight: 100,
         inputAmount: 10,
         expectedOutput: 950,
         liquiditySource: {

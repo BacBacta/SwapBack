@@ -13,17 +13,23 @@ import {
   VenueType,
 } from '../types/smart-router';
 import { LiquidityDataCollector } from './LiquidityDataCollector';
+import { OraclePriceService } from './OraclePriceService';
 
 // ============================================================================
 // OPTIMIZATION ENGINE
 // ============================================================================
 
 export class RouteOptimizationEngine {
-  private liquidityCollector: LiquidityDataCollector;
-  private defaultConfig: OptimizationConfig;
+  private readonly liquidityCollector: LiquidityDataCollector;
+  private readonly oracleService: OraclePriceService;
+  private readonly defaultConfig: OptimizationConfig;
 
-  constructor(liquidityCollector: LiquidityDataCollector) {
+  constructor(
+    liquidityCollector: LiquidityDataCollector,
+    oracleService: OraclePriceService
+  ) {
     this.liquidityCollector = liquidityCollector;
+    this.oracleService = oracleService;
     
     this.defaultConfig = {
       slippageTolerance: 0.01,      // 1%
@@ -90,7 +96,7 @@ export class RouteOptimizationEngine {
 
     // 3b. Split routes (if enabled)
     if (config.enableSplitRoutes && sources.length > 1) {
-      const splitCandidates = this.createSplitRoutes(sources, inputAmount, config);
+      const splitCandidates = await this.createSplitRoutes(sources, inputAmount, inputMint, outputMint, config);
       candidates.push(...splitCandidates);
     }
 
@@ -128,7 +134,7 @@ export class RouteOptimizationEngine {
 
     const split: RouteSplit = {
       venue: source.venue,
-      percentage: 100,
+      weight: 100,
       inputAmount,
       expectedOutput,
       liquiditySource: source,
@@ -152,22 +158,43 @@ export class RouteOptimizationEngine {
 
   /**
    * Create split routes across multiple venues
-   * Uses greedy algorithm: allocate to cheapest sources first
+   * Uses dynamic weight calculation based on oracle data
    */
-  private createSplitRoutes(
+  private async createSplitRoutes(
     sources: LiquiditySource[],
     inputAmount: number,
+    inputMint: string,
+    outputMint: string,
     config: OptimizationConfig
-  ): RouteCandidate[] {
+  ): Promise<RouteCandidate[]> {
     const candidates: RouteCandidate[] = [];
     const maxSplits = Math.min(config.maxSplits, sources.length);
 
     // Try different split configurations (2-way, 3-way, etc.)
     for (let numSplits = 2; numSplits <= maxSplits; numSplits++) {
       const topSources = sources.slice(0, numSplits);
-      const splits = this.optimizeSplitAllocation(topSources, inputAmount);
+
+      // Calculate dynamic weights for these sources
+      const { weights } = await this.calculateDynamicWeights(
+        topSources,
+        inputMint,
+        outputMint,
+        inputAmount
+      );
+
+      const splits = this.optimizeSplitAllocationWithWeights(topSources, inputAmount, weights);
       
       if (splits.length === 0) continue;
+
+      // Validate weights sum to 100
+      const totalWeight = splits.reduce((sum, s) => sum + s.weight, 0);
+      if (Math.abs(totalWeight - 100) > 0.01) {
+        console.warn(`Warning: Split weights sum to ${totalWeight}, adjusting...`);
+        // Normalize weights to sum to 100
+        for (const split of splits) {
+          split.weight = (split.weight / totalWeight) * 100;
+        }
+      }
 
       const totalOutput = splits.reduce((sum, s) => sum + s.expectedOutput, 0);
       const venues = splits.map(s => s.venue);
@@ -192,43 +219,34 @@ export class RouteOptimizationEngine {
   }
 
   /**
-   * Optimize allocation across multiple sources using greedy algorithm
-   * Allocate to cheapest liquidity first until filled
+   * Optimize allocation across multiple sources using dynamic weights
+   * Weights are pre-calculated based on oracle data and venue characteristics
    */
-  private optimizeSplitAllocation(
+  private optimizeSplitAllocationWithWeights(
     sources: LiquiditySource[],
-    totalInput: number
+    totalInput: number,
+    weights: number[]
   ): RouteSplit[] {
     const splits: RouteSplit[] = [];
-    let remaining = totalInput;
 
-    // Sort by effective price (ascending = best first)
-    const sorted = [...sources].sort((a, b) => a.effectivePrice - b.effectivePrice);
+    for (let i = 0; i < sources.length; i++) {
+      const source = sources[i];
+      const weight = weights[i];
 
-    for (const source of sorted) {
-      if (remaining <= 0) break;
+      // Calculate allocation based on weight
+      const allocated = (totalInput * weight) / 100;
 
-      // Calculate how much we can allocate to this source
-      // Limited by either remaining amount or source depth
-      const maxAllocatable = Math.min(
-        remaining,
-        source.depth * 0.9 // Use max 90% of depth to avoid excessive slippage
-      );
+      if (allocated < 1) continue; // Skip if too small
 
-      if (maxAllocatable < 1) continue; // Skip if too small
-
-      const allocated = maxAllocatable;
       const expectedOutput = this.calculateExpectedOutput(source, allocated);
-      
+
       splits.push({
         venue: source.venue,
-        percentage: (allocated / totalInput) * 100,
+        weight,
         inputAmount: allocated,
         expectedOutput,
         liquiditySource: source,
       });
-
-      remaining -= allocated;
     }
 
     return splits;
@@ -333,21 +351,106 @@ export class RouteOptimizationEngine {
   }
 
   /**
-   * Generate fallback routes
-   * Returns alternative routes if primary fails
+   * Calculate dynamic weights for venues based on oracle prices and liquidity
+   * Weights are normalized to sum to 100
    */
-  async generateFallbackRoutes(
-    primaryRoute: RouteCandidate,
+  async calculateDynamicWeights(
+    sources: LiquiditySource[],
     inputMint: string,
     outputMint: string,
-    inputAmount: number,
-    config: OptimizationConfig
-  ): Promise<RouteCandidate[]> {
-    // Get all routes
-    const allRoutes = await this.findOptimalRoutes(inputMint, outputMint, inputAmount, config);
+    totalInput: number
+  ): Promise<{ weights: number[], venueOrder: VenueName[] }> {
+    if (sources.length === 0) {
+      return { weights: [], venueOrder: [] };
+    }
 
-    // Filter out primary route and return alternatives
-    return allRoutes.filter(r => r.id !== primaryRoute.id);
+    try {
+      // Get oracle price for comparison
+      const oraclePrice = await this.oracleService.getTokenPrice(outputMint);
+      const oracleRate = oraclePrice.price; // USD per output token
+
+      // Calculate scores for each venue
+      const venueScores: Array<{ venue: VenueName, score: number }> = [];
+
+      for (const source of sources) {
+        let score = 0;
+
+        // 1. Price efficiency vs oracle (40% weight)
+        const priceEfficiency = Math.min(source.effectivePrice / oracleRate, 1);
+        score += priceEfficiency * 40;
+
+        // 2. Liquidity depth (30% weight)
+        const depthScore = Math.min(source.depth / 1000000, 1); // Cap at $1M depth
+        score += depthScore * 30;
+
+        // 3. Fee efficiency (20% weight)
+        const feeEfficiency = Math.max(0, 1 - source.feeAmount / totalInput);
+        score += feeEfficiency * 20;
+
+        // 4. Venue reliability (10% weight) - CLOB > AMM > RFQ
+        let reliabilityScore: number;
+        if (source.venueType === VenueType.CLOB) {
+          reliabilityScore = 1;
+        } else if (source.venueType === VenueType.AMM) {
+          reliabilityScore = 0.7;
+        } else {
+          reliabilityScore = 0.5;
+        }
+        score += reliabilityScore * 10;
+
+        venueScores.push({ venue: source.venue, score });
+      }
+
+      // Sort by score (descending)
+      venueScores.sort((a, b) => b.score - a.score);
+
+      // Allocate weights using exponential decay
+      // Top venue gets most weight, others get progressively less
+      const totalScore = venueScores.reduce((sum, v) => sum + v.score, 0);
+      let weights: number[] = [];
+      let remainingWeight = 100;
+
+      for (let i = 0; i < venueScores.length; i++) {
+        if (i === venueScores.length - 1) {
+          // Last venue gets remaining weight
+          weights.push(remainingWeight);
+        } else {
+          // Exponential decay allocation
+          const scoreRatio = venueScores[i].score / totalScore;
+          const allocatedWeight = Math.max(5, Math.floor(scoreRatio * 100 * Math.pow(0.7, i)));
+          weights.push(Math.min(allocatedWeight, remainingWeight));
+          remainingWeight -= allocatedWeight;
+        }
+      }
+
+      // Ensure weights sum to exactly 100
+      const currentSum = weights.reduce((sum, w) => sum + w, 0);
+      if (currentSum !== 100) {
+        const adjustment = 100 - currentSum;
+        weights[weights.length - 1] += adjustment;
+      }
+
+      return {
+        weights,
+        venueOrder: venueScores.map(v => v.venue)
+      };
+
+    } catch (error) {
+      console.warn('Oracle-based weight calculation failed, using equal weights:', error);
+
+      // Fallback to equal weights
+      const equalWeight = Math.floor(100 / sources.length);
+      let weights = new Array(sources.length).fill(equalWeight);
+      const remainder = 100 - (equalWeight * sources.length);
+      if (remainder > 0 && weights.length > 0) {
+        weights[weights.length - 1] += remainder;
+      }
+
+      return {
+        weights,
+        venueOrder: sources.map(s => s.venue)
+      };
+    }
   }
 }
 

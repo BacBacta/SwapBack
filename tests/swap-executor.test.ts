@@ -239,7 +239,7 @@ const mockConnection = {
 // TEST SETUP
 // ============================================================================
 
-describe.skip("SwapExecutor", () => {
+describe("SwapExecutor", () => {
   let executor: SwapExecutor;
   let testKeypair: Keypair;
 
@@ -377,7 +377,7 @@ describe.skip("SwapExecutor", () => {
           splits: [
             {
               venue: VenueName.ORCA,
-              percentage: 100,
+              weight: 100,
               inputAmount: 1.5,
               expectedOutput: 150.75,
               liquiditySource: mockSource,
@@ -406,7 +406,7 @@ describe.skip("SwapExecutor", () => {
       const mockOraclePriceUSDC: OraclePriceData = {
         provider: "pyth",
         price: 1,
-        confidence: 1,
+        confidence: 0.001,
         timestamp: Date.now(),
         publishTime: Date.now(),
         exponent: -8,
@@ -598,7 +598,7 @@ describe.skip("SwapExecutor", () => {
           splits: [
             {
               venue: VenueName.ORCA,
-              percentage: 100,
+              weight: 100,
               inputAmount: 1.5,
               expectedOutput: 165, // 10% higher than oracle
               liquiditySource: mockSource,
@@ -627,7 +627,7 @@ describe.skip("SwapExecutor", () => {
       const mockOraclePriceUSDC: OraclePriceData = {
         provider: "pyth",
         price: 1,
-        confidence: 1,
+        confidence: 0.001,
         timestamp: Date.now(),
         publishTime: Date.now(),
         exponent: -8,
@@ -926,7 +926,7 @@ describe.skip("SwapExecutor", () => {
           splits: [
             {
               venue: VenueName.ORCA,
-              percentage: 100,
+              weight: 100,
               inputAmount: 1.5,
               expectedOutput: 150.75,
               liquiditySource: mockSource,
@@ -954,7 +954,7 @@ describe.skip("SwapExecutor", () => {
       const mockOraclePriceUSDC: OraclePriceData = {
         provider: "pyth",
         price: 1,
-        confidence: 1,
+        confidence: 0.001,
         timestamp: Date.now(),
         publishTime: Date.now(),
         exponent: -8,
