@@ -12,81 +12,113 @@
  * @module SwapExecutor
  */
 
+import { promises as fs } from "fs";
+import * as path from "path";
+import bs58 from "bs58";
 import {
   Connection,
   PublicKey,
   Transaction,
   TransactionInstruction,
-  VersionedTransaction,
   Signer,
+  ComputeBudgetProgram,
+  SystemProgram,
 } from "@solana/web3.js";
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddressSync,
+  getMint,
+} from "@solana/spl-token";
 import { LiquidityDataCollector } from "./LiquidityDataCollector";
 import { RouteOptimizationEngine } from "./RouteOptimizationEngine";
 import { OraclePriceService } from "./OraclePriceService";
-import { JitoBundleService } from "./JitoBundleService";
 import { CircuitBreaker } from "../utils/circuit-breaker";
 import {
+  BuildPlanParams,
+  IntelligentOrderRouter,
+  PlanAdjustmentResult,
+  PlanDiff,
+} from "./IntelligentOrderRouter";
+import {
+  AtomicSwapPlan,
+  AtomicSwapLeg,
   RouteCandidate,
   OptimizationConfig,
   VenueName,
+  VenueType,
+  OraclePriceData,
 } from "../types/smart-router";
+import { JitoBundleService, MEVProtectionAnalyzer } from "./JitoBundleService";
+
+const SWAPBACK_ROUTER_PROGRAM_ID = new PublicKey(
+  "FPK46poe53iX6Bcv3q8cgmc1jm7dJKQ9Qs9oESFxGN55"
+);
+
+const JUPITER_AGGREGATOR_PROGRAM_ID = new PublicKey(
+  "JUP4sxrRzkF3EFRQ3SExvxBH5yDcszb1VSEi8PvX8Br"
+);
+
+const SYSTEM_PROGRAM_ID = new PublicKey("11111111111111111111111111111111");
 
 // ============================================================================
 // TYPES & INTERFACES
 // ============================================================================
 
-/**
- * Swap execution parameters
- */
 export interface SwapParams {
-  /** Input token mint address */
   inputMint: string;
-  /** Output token mint address */
   outputMint: string;
-  /** Amount to swap (in token decimals) */
   inputAmount: number;
-  /** Maximum acceptable slippage (0.01 = 1%) */
   maxSlippageBps: number;
-  /** User's wallet public key */
+  slippageTolerance?: number;
   userPublicKey: PublicKey;
-  /** User's wallet signer for transaction signing */
   signer: Signer;
-  /** Minimum output amount (computed from slippage) */
   minOutputAmount?: number;
-  /** Optional route preferences */
   routePreferences?: RoutePreferences;
 }
 
-/**
- * Route preferences for advanced users
- */
 export interface RoutePreferences {
-  /** Preferred venues to prioritize */
   preferredVenues?: VenueName[];
-  /** Venues to exclude from routing */
   excludedVenues?: VenueName[];
-  /** Maximum number of hops allowed */
   maxHops?: number;
-  /** Enable/disable MEV protection */
   enableMevProtection?: boolean;
+  outputTokenAccount?: string;
+  enableFallbackRouting?: boolean;
+  enableTwapMode?: boolean;
+  twapThresholdRatio?: number;
+  twapMaxSlices?: number;
+  twapIntervalMs?: number;
 }
 
-/**
- * Swap execution result
- */
 export interface SwapResult {
-  /** Transaction signature */
   signature: string;
-  /** Routes used for the swap */
+  signatures?: string[];
   routes: RouteCandidate[];
-  /** Execution metrics */
   metrics: SwapMetrics;
-  /** Whether swap succeeded */
   success: boolean;
-  /** Error message if swap failed */
   error?: string;
 }
 
+export interface SwapMetrics {
+  executionTimeMs: number;
+  outputAmount: number;
+  actualSlippage: number;
+  priceImpact: number;
+  totalFees: number;
+  feeBreakdown: {
+    dexFees: number;
+    networkFees: number;
+    priorityFees: number;
+    jitoTip: number;
+  };
+  mevSavings: number;
+  venueBreakdown: Record<VenueName, number>;
+  routeCount: number;
+  oraclePrice: number;
+  oracleVerified: boolean;
+}
+/**
+ * Route preferences for advanced users
 /**
  * Swap execution metrics for analytics
  */
@@ -129,6 +161,51 @@ interface ExecutionContext {
   oraclePrice: number;
   transaction?: Transaction;
   signature?: string;
+  chunkSignatures?: string[];
+  plan?: AtomicSwapPlan;
+  legs?: AtomicSwapLeg[];
+  planDiffs?: PlanDiff[];
+  planRefreshReason?: string;
+  planRefreshIterations?: number;
+  lastPlanAdjustment?: PlanAdjustmentResult;
+  globalMinOutput?: number;
+  inputOracle?: OraclePriceData;
+  outputOracle?: OraclePriceData;
+  tradeValueUSD?: number;
+  bundleId?: string;
+  mevStrategy?: "jito" | "quicknode" | "direct";
+  mevTipLamports?: number;
+  priorityFeeMicroLamports?: number;
+  computeUnitLimit?: number;
+  outputAccount?: PublicKey;
+  preSwapOutputBalanceRaw?: bigint;
+  guardMinOutputRaw?: bigint;
+  outputDecimals?: number;
+  slippageTolerance?: number;
+  twapSlices?: number;
+}
+
+interface PlanRefreshSummary {
+  plan: AtomicSwapPlan;
+  diffs: PlanDiff[];
+  reason?: string;
+  iterations: number;
+  lastAdjustment?: PlanAdjustmentResult;
+}
+
+interface TwapConfig {
+  enabled: boolean;
+  slices: number;
+  intervalMs: number;
+  thresholdRatio: number;
+  liquidityDepth?: number;
+  footprintRatio?: number;
+  liquidityStalenessMs?: number;
+}
+
+interface TwapSliceDescriptor {
+  params: SwapParams;
+  isFirst: boolean;
 }
 
 // ============================================================================
@@ -139,14 +216,19 @@ export class SwapExecutor {
   private readonly connection: Connection;
   private readonly liquidityCollector: LiquidityDataCollector;
   private readonly optimizer: RouteOptimizationEngine;
+  private readonly router: IntelligentOrderRouter;
   private readonly oracleService: OraclePriceService;
   private readonly jitoService: JitoBundleService;
   private readonly circuitBreaker: CircuitBreaker;
+  private readonly analyticsLogPath: string;
+  private readonly mevAnalyzer: MEVProtectionAnalyzer;
+  private readonly mintDecimalsCache = new Map<string, number>();
 
   constructor(
     connection: Connection,
     liquidityCollector: LiquidityDataCollector,
     optimizer: RouteOptimizationEngine,
+    router: IntelligentOrderRouter,
     oracleService: OraclePriceService,
     jitoService: JitoBundleService,
     circuitBreaker: CircuitBreaker
@@ -154,9 +236,12 @@ export class SwapExecutor {
     this.connection = connection;
     this.liquidityCollector = liquidityCollector;
     this.optimizer = optimizer;
+    this.router = router;
     this.oracleService = oracleService;
     this.jitoService = jitoService;
     this.circuitBreaker = circuitBreaker;
+    this.analyticsLogPath = path.resolve(process.cwd(), "logs", "swap-metrics.log");
+    this.mevAnalyzer = new MEVProtectionAnalyzer();
   }
 
   /**
@@ -189,73 +274,49 @@ export class SwapExecutor {
     };
 
     try {
-      // Step 1: Check circuit breaker
+      const { tolerance: slippageTolerance, maxSlippageBps } =
+        this.resolveSlippage(params);
+      ctx.slippageTolerance = slippageTolerance;
+
       await this.checkCircuitBreaker();
 
-      // Step 2: Fetch aggregated liquidity from all venues (real data)
-      console.log("📊 Fetching aggregated liquidity...");
+      console.log("📊 Building intelligent routing plan...");
 
-      // Step 3: Optimize routes using greedy algorithm
-      const optimizationConfig: Partial<OptimizationConfig> = {
-        slippageTolerance: params.maxSlippageBps / 10000,
-        maxRoutes: 5,
-        prioritizeCLOB: true,
-        maxHops: 3,
-        enableSplitRoutes: true,
-        maxSplits: 3,
-        useBundling: params.routePreferences?.enableMevProtection ?? true,
-        maxPriorityFee: 10000,
-        enableTWAP: false,
-        enableFallback: true,
-        maxRetries: 3,
-        allowedVenues: params.routePreferences?.preferredVenues,
-        excludedVenues: params.routePreferences?.excludedVenues,
-      };
+      const { plan: finalPlan, summary: refreshSummary } =
+        await this.buildStablePlan(params, slippageTolerance, maxSlippageBps);
 
-      ctx.routes = await this.optimizer.findOptimalRoutes(
-        params.inputMint,
-        params.outputMint,
-        params.inputAmount,
-        optimizationConfig
+      ctx.planDiffs = refreshSummary.diffs;
+      ctx.planRefreshReason = refreshSummary.reason;
+      ctx.planRefreshIterations = refreshSummary.iterations;
+      ctx.lastPlanAdjustment = refreshSummary.lastAdjustment;
+      ctx.plan = finalPlan;
+      ctx.legs = finalPlan.legs;
+
+      const fallbackEnabled =
+        params.routePreferences?.enableFallbackRouting ?? true;
+      const candidatePlans = fallbackEnabled
+        ? this.prepareCandidatePlans(finalPlan)
+        : [finalPlan];
+
+      await this.runPlanWithFallback(
+        params,
+        candidatePlans,
+        ctx,
+        slippageTolerance
       );
 
-      if (ctx.routes.length === 0) {
-        throw new Error("No optimal routes found");
-      }
-
-      // Step 4: Verify price with oracle (Pyth + Switchboard)
-      ctx.oraclePrice = await this.verifyOraclePrice(
-        params.inputMint,
-        params.outputMint,
-        ctx.routes
-      );
-
-      // Step 5: Build transaction
-      ctx.transaction = await this.buildTransaction(params, ctx.routes);
-
-      // Step 6: Submit via Jito bundle for MEV protection
-      const bundleResult = await this.submitJitoBundle(
-        ctx.transaction,
-        params.signer,
-        params.routePreferences?.enableMevProtection ?? true
-      );
-
-      ctx.signature = bundleResult.signature;
-
-      // Step 7: Confirm transaction
-      await this.confirmTransaction(ctx.signature);
-
-      // Step 8: Calculate metrics
+      // Step 7: Calculate metrics
       const metrics = await this.calculateMetrics(params, ctx);
 
-      // Step 9: Log analytics
+      // Step 8: Log analytics
       await this.logSwapMetrics(params, ctx, metrics);
 
       // Record success in circuit breaker
       this.circuitBreaker.recordSuccess();
 
       return {
-        signature: ctx.signature,
+        signature: ctx.signature!,
+        signatures: ctx.chunkSignatures,
         routes: ctx.routes,
         metrics,
         success: true,
@@ -274,12 +335,562 @@ export class SwapExecutor {
 
       return {
         signature: ctx.signature || "",
+        signatures: ctx.chunkSignatures,
         routes: ctx.routes,
         metrics: this.getEmptyMetrics(),
         success: false,
         error: errorMessage,
       };
     }
+  }
+
+  private resolveSlippage(params: SwapParams): {
+    tolerance: number;
+    maxSlippageBps: number;
+  } {
+    const requestedTolerance =
+      params.slippageTolerance ?? params.maxSlippageBps / 10_000;
+    const tolerance = Math.min(Math.max(requestedTolerance, 0.0001), 0.99);
+
+    return {
+      tolerance,
+      maxSlippageBps: this.toEffectiveSlippageBps(tolerance),
+    };
+  }
+
+  private async buildStablePlan(
+    params: SwapParams,
+    slippageTolerance: number,
+    effectiveMaxSlippageBps: number
+  ): Promise<{ plan: AtomicSwapPlan; summary: PlanRefreshSummary }> {
+    const optimizationOverrides = this.buildOptimizationOverrides(
+      params,
+      slippageTolerance
+    );
+
+    const initialPlan = await this.router.buildAtomicPlan({
+      inputMint: params.inputMint,
+      outputMint: params.outputMint,
+      inputAmount: params.inputAmount,
+      maxSlippageBps: effectiveMaxSlippageBps,
+      optimization:
+        optimizationOverrides && Object.keys(optimizationOverrides).length
+          ? optimizationOverrides
+          : undefined,
+    });
+
+    const planOverrides = this.buildPlanOverrides(
+      params,
+      optimizationOverrides,
+      effectiveMaxSlippageBps
+    );
+
+    const summary = await this.refreshPlanUntilStable(
+      initialPlan,
+      planOverrides
+    );
+
+    if (!summary.plan.legs.length) {
+      throw new Error("No executable legs were generated for the swap plan");
+    }
+
+    if (Date.now() > summary.plan.expiresAt) {
+      throw new Error("Swap quote expired before execution could start");
+    }
+
+    return { plan: summary.plan, summary };
+  }
+
+  private async runPlanWithFallback(
+    params: SwapParams,
+    candidatePlans: AtomicSwapPlan[],
+    ctx: ExecutionContext,
+    slippageTolerance: number
+  ): Promise<void> {
+    let lastError: unknown;
+
+    for (const candidatePlan of candidatePlans) {
+      try {
+        await this.executePlanCandidate(
+          params,
+          candidatePlan,
+          ctx,
+          slippageTolerance
+        );
+
+        if (!ctx.signature) {
+          throw new Error("Candidate plan execution did not produce a signature");
+        }
+
+        return;
+      } catch (attemptError) {
+        lastError = attemptError;
+        const reason =
+          attemptError instanceof Error
+            ? attemptError.message
+            : String(attemptError);
+        console.warn(`Fallback plan ${candidatePlan.id} failed: ${reason}`);
+      }
+    }
+
+    const errorMessage =
+      lastError instanceof Error
+        ? lastError.message
+        : "All swap routes failed to execute";
+    throw new Error(errorMessage);
+  }
+
+  private prepareCandidatePlans(plan: AtomicSwapPlan): AtomicSwapPlan[] {
+    const candidates: AtomicSwapPlan[] = [];
+    const queue: AtomicSwapPlan[] = [plan];
+    const seen = new Set<string>();
+
+    while (queue.length && candidates.length < 5) {
+      const next = queue.shift();
+      if (!next || seen.has(next.id)) {
+        continue;
+      }
+
+      seen.add(next.id);
+      candidates.push(next);
+
+      if (next.fallbackPlans?.length) {
+        queue.push(...next.fallbackPlans);
+      }
+    }
+
+    return candidates.sort((a, b) => this.rankPlan(b) - this.rankPlan(a));
+  }
+
+  private rankPlan(plan: AtomicSwapPlan): number {
+    const route = plan.baseRoute;
+    if (!route) {
+      return 0;
+    }
+
+    let score = 0;
+
+    for (const split of route.splits) {
+      const venueType = split.liquiditySource?.venueType ?? VenueType.AMM;
+      switch (venueType) {
+        case VenueType.CLOB:
+          score += 80;
+          break;
+        case VenueType.RFQ:
+          score += 60;
+          break;
+        case VenueType.AMM:
+        default:
+          score += 30;
+          break;
+      }
+
+      const fee = split.liquiditySource?.feeAmount ?? 0;
+      if (fee <= 0.0005) {
+        score += 10;
+      }
+    }
+
+    score -= route.hops * 5;
+
+    return score;
+  }
+
+  private async executePlanCandidate(
+    params: SwapParams,
+    plan: AtomicSwapPlan,
+    ctx: ExecutionContext,
+    slippageTolerance: number
+  ): Promise<void> {
+    const twapConfig = this.evaluateTwapConfig(params, plan);
+
+    if (twapConfig.enabled) {
+      await this.executeTwapSlices(params, plan, ctx, slippageTolerance, twapConfig);
+      return;
+    }
+
+    const attemptCtx = await this.executeSinglePlanAttempt(
+      params,
+      plan,
+      ctx,
+      slippageTolerance
+    );
+
+    this.applyExecutionResult(ctx, attemptCtx, { appendRoutes: false });
+  }
+
+  private async executeSinglePlanAttempt(
+    params: SwapParams,
+    plan: AtomicSwapPlan,
+    baseCtx: ExecutionContext,
+    slippageTolerance: number
+  ): Promise<ExecutionContext> {
+    if (Date.now() > plan.expiresAt) {
+      throw new Error("Swap quote expired before execution could start");
+    }
+
+    const attemptCtx = this.cloneExecutionContext(baseCtx);
+    attemptCtx.plan = plan;
+    attemptCtx.legs = plan.legs;
+    attemptCtx.routes = plan.baseRoute ? [plan.baseRoute] : [];
+
+    const minOutputCandidate = Math.max(
+      params.minOutputAmount ?? 0,
+      plan.minOutput,
+      plan.expectedOutput * (1 - slippageTolerance)
+    );
+    const globalMinOutput = Math.min(plan.expectedOutput, minOutputCandidate);
+    attemptCtx.globalMinOutput = globalMinOutput;
+
+    const oracleCheck = await this.verifyOraclePrice(params, plan);
+    attemptCtx.oraclePrice = oracleCheck.rate;
+    attemptCtx.inputOracle = oracleCheck.inputPrice;
+    attemptCtx.outputOracle = oracleCheck.outputPrice;
+
+    await this.prepareOutputAccountContext(
+      params,
+      plan,
+      globalMinOutput,
+      slippageTolerance,
+      attemptCtx
+    );
+
+    attemptCtx.transaction = await this.buildTransaction(
+      params,
+      plan,
+      globalMinOutput,
+      attemptCtx
+    );
+    attemptCtx.tradeValueUSD = this.estimateTradeValueUSD(plan, attemptCtx);
+
+    const bundleResult = await this.submitProtectedBundle(
+      params,
+      plan,
+      attemptCtx,
+      attemptCtx.transaction,
+      params.signer,
+      params.routePreferences?.enableMevProtection ?? true
+    );
+
+    attemptCtx.signature = bundleResult.signature;
+    attemptCtx.bundleId = bundleResult.bundleId;
+    attemptCtx.mevTipLamports = bundleResult.tip;
+    attemptCtx.mevStrategy = bundleResult.strategy;
+
+    if (!attemptCtx.signature) {
+      throw new Error("Bundle submission did not return a transaction signature");
+    }
+
+    await this.confirmTransaction(attemptCtx.signature);
+
+    return attemptCtx;
+  }
+
+  private cloneExecutionContext(baseCtx: ExecutionContext): ExecutionContext {
+    return {
+      startTime: baseCtx.startTime,
+      routes: [],
+      oraclePrice: baseCtx.oraclePrice,
+      transaction: undefined,
+      signature: undefined,
+      chunkSignatures: baseCtx.chunkSignatures ? [...baseCtx.chunkSignatures] : undefined,
+      plan: undefined,
+      legs: undefined,
+      planDiffs: baseCtx.planDiffs,
+      planRefreshReason: baseCtx.planRefreshReason,
+      planRefreshIterations: baseCtx.planRefreshIterations,
+      lastPlanAdjustment: baseCtx.lastPlanAdjustment,
+      globalMinOutput: undefined,
+      inputOracle: baseCtx.inputOracle,
+      outputOracle: baseCtx.outputOracle,
+      tradeValueUSD: undefined,
+      bundleId: undefined,
+      mevStrategy: undefined,
+      mevTipLamports: undefined,
+      priorityFeeMicroLamports: baseCtx.priorityFeeMicroLamports,
+      computeUnitLimit: baseCtx.computeUnitLimit,
+      outputAccount: baseCtx.outputAccount,
+      preSwapOutputBalanceRaw: undefined,
+      guardMinOutputRaw: undefined,
+      outputDecimals: baseCtx.outputDecimals,
+      slippageTolerance: baseCtx.slippageTolerance,
+      twapSlices: baseCtx.twapSlices,
+    };
+  }
+
+  private applyExecutionResult(
+    target: ExecutionContext,
+    result: ExecutionContext,
+    options: { appendRoutes: boolean }
+  ): void {
+    if (options.appendRoutes) {
+      target.routes.push(...result.routes);
+    } else {
+      target.routes = result.routes;
+    }
+
+    target.plan = result.plan;
+    target.legs = result.legs;
+    target.transaction = result.transaction;
+    target.signature = result.signature;
+    target.bundleId = result.bundleId;
+    target.mevStrategy = result.mevStrategy;
+    target.mevTipLamports = result.mevTipLamports;
+    target.priorityFeeMicroLamports = result.priorityFeeMicroLamports;
+    target.computeUnitLimit = result.computeUnitLimit;
+    target.tradeValueUSD = result.tradeValueUSD;
+    target.globalMinOutput = result.globalMinOutput;
+    target.outputAccount = result.outputAccount;
+    target.preSwapOutputBalanceRaw = result.preSwapOutputBalanceRaw;
+    target.guardMinOutputRaw = result.guardMinOutputRaw;
+    target.outputDecimals = result.outputDecimals;
+    target.oraclePrice = result.oraclePrice;
+    target.inputOracle = result.inputOracle;
+    target.outputOracle = result.outputOracle;
+
+    if (result.chunkSignatures?.length) {
+      target.chunkSignatures = result.chunkSignatures;
+    }
+  }
+
+  private evaluateTwapConfig(params: SwapParams, plan: AtomicSwapPlan): TwapConfig {
+    const preferences = params.routePreferences;
+    const enabled = preferences?.enableTwapMode ?? false;
+    const threshold = Math.min(
+      0.9,
+      Math.max(preferences?.twapThresholdRatio ?? 0.2, 0.05)
+    );
+    const maxSlices = Math.min(Math.max(preferences?.twapMaxSlices ?? 3, 2), 10);
+    const intervalMs = Math.max(0, preferences?.twapIntervalMs ?? 2_000);
+
+    if (!enabled) {
+      return { enabled: false, slices: 1, intervalMs: 0, thresholdRatio: threshold };
+    }
+
+    const liquidityFootprint = this.computePlanLiquidityFootprint(plan);
+    if (liquidityFootprint <= 0) {
+      return { enabled: false, slices: 1, intervalMs: 0, thresholdRatio: threshold };
+    }
+
+    const footprintRatio = plan.totalInput / liquidityFootprint;
+    if (footprintRatio < threshold) {
+      return { enabled: false, slices: 1, intervalMs: 0, thresholdRatio: threshold };
+    }
+
+    const slices = Math.min(
+      maxSlices,
+      Math.max(2, Math.ceil(footprintRatio / threshold))
+    );
+
+    return {
+      enabled: true,
+      slices,
+      intervalMs,
+      thresholdRatio: threshold,
+    };
+  }
+
+  private async executeTwapSlices(
+    params: SwapParams,
+    initialPlan: AtomicSwapPlan,
+    ctx: ExecutionContext,
+    slippageTolerance: number,
+    config: TwapConfig
+  ): Promise<void> {
+    const sliceSignatures: string[] = [];
+    const aggregatedRoutes: RouteCandidate[] = [];
+    let aggregateTradeValue = 0;
+
+    const totalAmount = params.inputAmount;
+    const totalMinOutput = params.minOutputAmount ?? 0;
+    const baseSliceAmount = totalAmount / config.slices;
+
+    for (let index = 0; index < config.slices; index += 1) {
+      const sliceDescriptor = this.buildTwapSliceDescriptor(
+        index,
+        config,
+        totalAmount,
+        baseSliceAmount,
+        totalMinOutput,
+        params
+      );
+
+      const sliceCtx = await this.processTwapSlice(
+        index,
+        sliceDescriptor,
+        initialPlan,
+        ctx,
+        slippageTolerance
+      );
+
+      sliceSignatures.push(sliceCtx.signature!);
+      aggregatedRoutes.push(...sliceCtx.routes);
+      aggregateTradeValue += sliceCtx.tradeValueUSD ?? 0;
+
+      ctx.chunkSignatures = ctx.chunkSignatures
+        ? [...ctx.chunkSignatures, sliceCtx.signature!]
+        : [sliceCtx.signature!];
+
+      this.applyExecutionResult(ctx, sliceCtx, { appendRoutes: true });
+
+      await this.awaitTwapInterval(index, config);
+    }
+
+    ctx.routes = aggregatedRoutes;
+    ctx.signature = sliceSignatures[sliceSignatures.length - 1];
+    ctx.tradeValueUSD = aggregateTradeValue;
+    ctx.twapSlices = config.slices;
+  }
+
+  private buildSliceParams(
+    params: SwapParams,
+    sliceAmount: number,
+    sliceMinOutput?: number
+  ): SwapParams {
+    return {
+      ...params,
+      inputAmount: sliceAmount,
+      minOutputAmount: sliceMinOutput,
+    };
+  }
+
+  private buildTwapSliceDescriptor(
+    index: number,
+    config: TwapConfig,
+    totalAmount: number,
+    baseSliceAmount: number,
+    totalMinOutput: number,
+    params: SwapParams
+  ): TwapSliceDescriptor {
+    const isLast = index === config.slices - 1;
+    const sliceAmount = isLast
+      ? totalAmount - baseSliceAmount * index
+      : baseSliceAmount;
+    const ratio = totalAmount > 0 ? sliceAmount / totalAmount : 0;
+    const sliceMinOutput = totalMinOutput > 0 ? totalMinOutput * ratio : undefined;
+
+    return {
+      params: this.buildSliceParams(params, sliceAmount, sliceMinOutput),
+      isFirst: index === 0,
+    };
+  }
+
+  private async processTwapSlice(
+    index: number,
+    descriptor: TwapSliceDescriptor,
+    initialPlan: AtomicSwapPlan,
+    ctx: ExecutionContext,
+    slippageTolerance: number
+  ): Promise<ExecutionContext> {
+    const slicePlan = descriptor.isFirst
+      ? initialPlan
+      : await this.rebuildPlanForAmount(descriptor.params, slippageTolerance);
+
+    const sliceCtx = await this.executeTwapPlanWithFallback(
+      descriptor.params,
+      slicePlan,
+      ctx,
+      slippageTolerance
+    );
+
+    if (!sliceCtx?.signature) {
+      throw new Error(`TWAP slice ${index + 1} failed to produce a signature`);
+    }
+
+    return sliceCtx;
+  }
+
+  private async awaitTwapInterval(index: number, config: TwapConfig): Promise<void> {
+    if (index >= config.slices - 1) {
+      return;
+    }
+
+    if (config.intervalMs <= 0) {
+      return;
+    }
+
+    await this.delay(config.intervalMs);
+  }
+
+  private async executeTwapPlanWithFallback(
+    sliceParams: SwapParams,
+    slicePlan: AtomicSwapPlan,
+    ctx: ExecutionContext,
+    slippageTolerance: number
+  ): Promise<ExecutionContext> {
+    const candidatePlans = this.prepareCandidatePlans(slicePlan);
+    let lastError: unknown;
+
+    for (const candidate of candidatePlans) {
+      try {
+        return await this.executeSinglePlanAttempt(
+          sliceParams,
+          candidate,
+          ctx,
+          slippageTolerance
+        );
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError instanceof Error
+      ? lastError
+      : new Error("TWAP slice execution failed");
+  }
+
+  private async rebuildPlanForAmount(
+    params: SwapParams,
+    slippageTolerance: number
+  ): Promise<AtomicSwapPlan> {
+    const optimizationOverrides = this.buildOptimizationOverrides(
+      params,
+      slippageTolerance
+    );
+    const maxSlippageBps = this.toEffectiveSlippageBps(slippageTolerance);
+
+    const basePlan = await this.router.buildAtomicPlan({
+      inputMint: params.inputMint,
+      outputMint: params.outputMint,
+      inputAmount: params.inputAmount,
+      maxSlippageBps,
+      optimization:
+        optimizationOverrides && Object.keys(optimizationOverrides).length
+          ? optimizationOverrides
+          : undefined,
+    });
+
+    const planOverrides = this.buildPlanOverrides(
+      params,
+      optimizationOverrides,
+      maxSlippageBps
+    );
+
+    const summary = await this.refreshPlanUntilStable(basePlan, planOverrides);
+    return summary.plan;
+  }
+
+  private computePlanLiquidityFootprint(plan: AtomicSwapPlan): number {
+    if (!plan.legs?.length) {
+      return 0;
+    }
+
+    return plan.legs.reduce((acc, leg) => {
+      const depth = leg.liquiditySource?.depth ?? 0;
+      return acc + Math.max(depth, 0);
+    }, 0);
+  }
+
+  private toEffectiveSlippageBps(slippageTolerance: number): number {
+    return Math.max(1, Math.round(slippageTolerance * 10_000));
+  }
+
+  private async delay(ms: number): Promise<void> {
+    if (ms <= 0) {
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
@@ -297,43 +908,362 @@ export class SwapExecutor {
     }
   }
 
+  private buildOptimizationOverrides(
+    params: SwapParams,
+    slippageTolerance: number
+  ): Partial<OptimizationConfig> {
+    const overrides: Partial<OptimizationConfig> = {
+      slippageTolerance,
+    };
+
+    if (typeof params.minOutputAmount === "number") {
+      overrides.minOutputAmount = params.minOutputAmount;
+    }
+
+    const preferences = params.routePreferences;
+    if (preferences?.preferredVenues?.length) {
+      overrides.allowedVenues = preferences.preferredVenues;
+    }
+
+    if (preferences?.excludedVenues?.length) {
+      overrides.excludedVenues = preferences.excludedVenues;
+    }
+
+    if (typeof preferences?.maxHops === "number") {
+      overrides.maxHops = preferences.maxHops;
+    }
+
+    if (typeof preferences?.enableMevProtection === "boolean") {
+      overrides.useBundling = preferences.enableMevProtection;
+    }
+
+    return overrides;
+  }
+
+  private buildPlanOverrides(
+    params: SwapParams,
+    optimizationOverrides: Partial<OptimizationConfig>,
+    effectiveMaxSlippageBps: number
+  ): Partial<BuildPlanParams> {
+    const overrides: Partial<BuildPlanParams> = {
+      inputMint: params.inputMint,
+      outputMint: params.outputMint,
+      inputAmount: params.inputAmount,
+      maxSlippageBps: effectiveMaxSlippageBps,
+    };
+
+    if (Object.keys(optimizationOverrides).length > 0) {
+      overrides.optimization = optimizationOverrides;
+    }
+
+    return overrides;
+  }
+
+  private async refreshPlanUntilStable(
+    initialPlan: AtomicSwapPlan,
+    overrides: Partial<BuildPlanParams>,
+    maxIterations = 3
+  ): Promise<PlanRefreshSummary> {
+    let plan = initialPlan;
+    let iterations = 0;
+    let lastAdjustment: PlanAdjustmentResult | undefined;
+    const collectedDiffs: PlanDiff[] = [];
+
+    while (iterations < maxIterations) {
+      iterations += 1;
+      const adjustment = await this.router.adjustPlanIfNeeded(plan, overrides);
+      lastAdjustment = adjustment;
+      collectedDiffs.push(...adjustment.diffs);
+
+      if (!adjustment.updated) {
+        return {
+          plan,
+          diffs: this.consolidateDiffs(collectedDiffs),
+          reason: adjustment.reason ?? "plan_stable",
+          iterations,
+          lastAdjustment: adjustment,
+        };
+      }
+
+      plan = adjustment.plan;
+
+      if (!adjustment.reason) {
+        break;
+      }
+    }
+
+    return {
+      plan,
+      diffs: this.consolidateDiffs(collectedDiffs),
+      reason: lastAdjustment?.reason ?? "plan_rebalanced",
+      iterations,
+      lastAdjustment,
+    };
+  }
+
+  private consolidateDiffs(diffs: PlanDiff[]): PlanDiff[] {
+    if (!diffs.length) {
+      return [];
+    }
+
+    const byVenue = new Map<VenueName, PlanDiff>();
+    for (const diff of diffs) {
+      byVenue.set(diff.venue, diff);
+    }
+
+    return Array.from(byVenue.values());
+  }
+
+  private formatAgeMs(ageMs: number): string {
+    if (!Number.isFinite(ageMs) || ageMs < 0) {
+      return "unknown";
+    }
+
+    if (ageMs < 1000) {
+      return `${Math.round(ageMs)}ms`;
+    }
+
+    if (ageMs < 60_000) {
+      return `${(ageMs / 1000).toFixed(2)}s`;
+    }
+
+    return `${(ageMs / 60_000).toFixed(2)}m`;
+  }
+
+  private estimateTradeValueUSD(
+    plan: AtomicSwapPlan,
+    ctx: ExecutionContext
+  ): number {
+    if (ctx.inputOracle) {
+      return plan.totalInput * ctx.inputOracle.price;
+    }
+
+    if (ctx.outputOracle) {
+      return plan.expectedOutput * ctx.outputOracle.price;
+    }
+
+    return plan.totalInput;
+  }
+
+  private determineTipLamports(tradeValueUSD?: number): number {
+    if (!tradeValueUSD || tradeValueUSD <= 0) {
+      return 10_000;
+    }
+
+    const recommended = Math.floor(
+      this.mevAnalyzer.calculateRecommendedTip(tradeValueUSD)
+    );
+
+    return Math.max(5_000, Math.min(200_000, recommended));
+  }
+
+  private determinePriorityLevel(tradeValueUSD?: number): "low" | "medium" | "high" {
+    if (!tradeValueUSD || tradeValueUSD < 5_000) {
+      return "low";
+    }
+
+    if (tradeValueUSD > 50_000) {
+      return "high";
+    }
+
+    if (tradeValueUSD > 10_000) {
+      return "medium";
+    }
+
+    return "medium";
+  }
+
+  private determinePriorityFeeMicroLamports(
+    plan: AtomicSwapPlan,
+    tradeValueUSD?: number
+  ): number {
+    const base = this.estimatePriorityFeeMicroLamports(plan);
+
+    if (!tradeValueUSD || tradeValueUSD <= 0) {
+      return base;
+    }
+
+    if (tradeValueUSD > 50_000) {
+      return Math.min(base * 3, 1_000_000);
+    }
+
+    if (tradeValueUSD > 10_000) {
+      return Math.min(base * 2, 1_000_000);
+    }
+
+    if (tradeValueUSD < 2_000) {
+      return Math.max(1, Math.floor(base * 0.8));
+    }
+
+    return base;
+  }
+
+  private async prepareOutputAccountContext(
+    params: SwapParams,
+    plan: AtomicSwapPlan,
+    globalMinOutput: number,
+    slippageTolerance: number,
+    ctx: ExecutionContext
+  ): Promise<void> {
+    const outputMintKey = this.safePublicKey(plan.outputMint);
+    const outputDecimals = await this.getMintDecimals(plan.outputMint);
+    ctx.outputDecimals = outputDecimals;
+
+    const overrideAccount = params.routePreferences?.outputTokenAccount;
+    const outputAccount = overrideAccount
+      ? this.safePublicKey(overrideAccount)
+      : getAssociatedTokenAddressSync(outputMintKey, params.userPublicKey);
+
+    ctx.outputAccount = outputAccount;
+
+    try {
+      const balance = await this.connection.getTokenAccountBalance(outputAccount);
+      ctx.preSwapOutputBalanceRaw = BigInt(balance.value.amount);
+    } catch (error) {
+      console.warn("Unable to fetch output account balance", error);
+      ctx.preSwapOutputBalanceRaw = 0n;
+    }
+
+    const scale = BigInt(10) ** BigInt(outputDecimals);
+    const scaleAsNumber = Number(scale);
+    const guardRaw = Number.isFinite(globalMinOutput)
+      ? BigInt(Math.max(0, Math.floor(globalMinOutput * scaleAsNumber)))
+      : 0n;
+
+    ctx.guardMinOutputRaw = guardRaw;
+    ctx.slippageTolerance = slippageTolerance;
+  }
+
+  private appendMevTipInstruction(
+    transaction: Transaction,
+    payer: PublicKey,
+    tipLamports: number
+  ): void {
+    if (tipLamports <= 0) {
+      return;
+    }
+
+    const tipAccount = this.jitoService.pickTipAccount();
+    const alreadyAdded = transaction.instructions.some((ix) =>
+      ix.keys.some((key) => key.pubkey.equals(tipAccount))
+    );
+
+    if (alreadyAdded) {
+      return;
+    }
+
+    transaction.add(
+      SystemProgram.transfer({
+        fromPubkey: payer,
+        toPubkey: tipAccount,
+        lamports: tipLamports,
+      })
+    );
+  }
+
   /**
    * Verify route price against oracle
    */
   private async verifyOraclePrice(
-    inputMint: string,
-    outputMint: string,
-    routes: RouteCandidate[]
-  ): Promise<number> {
-    // Get oracle price (Pyth primary, Switchboard fallback)
-    const inputPriceData = await this.oracleService.getTokenPrice(inputMint);
-    const outputPriceData = await this.oracleService.getTokenPrice(outputMint);
+    params: SwapParams,
+    plan: AtomicSwapPlan
+  ): Promise<{
+    rate: number;
+    inputPrice: OraclePriceData;
+    outputPrice: OraclePriceData;
+  }> {
+    const slippageTolerance = Math.max(
+      params.maxSlippageBps / 10_000,
+      0.0001
+    );
+
+    const [inputPriceData, outputPriceData] = await Promise.all([
+      this.oracleService.getTokenPrice(params.inputMint),
+      this.oracleService.getTokenPrice(params.outputMint),
+    ]);
+
+    const maxOracleAgeMs = Math.min(plan.quoteValidityMs, 15_000);
+
+    if (!this.oracleService.isPriceFresh(inputPriceData, maxOracleAgeMs)) {
+      throw new Error(
+        `Input oracle price is stale (published ${this.formatAgeMs(
+          Date.now() - inputPriceData.publishTime
+        )} ago)`
+      );
+    }
+
+    if (!this.oracleService.isPriceFresh(outputPriceData, maxOracleAgeMs)) {
+      throw new Error(
+        `Output oracle price is stale (published ${this.formatAgeMs(
+          Date.now() - outputPriceData.publishTime
+        )} ago)`
+      );
+    }
+
+    const inputConfidenceRatio = Math.abs(
+      inputPriceData.confidence / inputPriceData.price
+    );
+    const outputConfidenceRatio = Math.abs(
+      outputPriceData.confidence / outputPriceData.price
+    );
+
+    if (inputConfidenceRatio > slippageTolerance) {
+      throw new Error(
+        `Input oracle confidence ${(
+          inputConfidenceRatio * 100
+        ).toFixed(3)}% exceeds user slippage tolerance ${(slippageTolerance * 100).toFixed(2)}%`
+      );
+    }
+
+    if (outputConfidenceRatio > slippageTolerance) {
+      throw new Error(
+        `Output oracle confidence ${(
+          outputConfidenceRatio * 100
+        ).toFixed(3)}% exceeds user slippage tolerance ${(slippageTolerance * 100).toFixed(2)}%`
+      );
+    }
 
     // Oracle rate: how much output per input
     // Example: SOL=$100, USDC=$1 => oracleRate = 100 / 1 = 100 USDC per SOL
     const oracleRate = inputPriceData.price / outputPriceData.price;
 
-    // Calculate weighted average route rate
-    const totalOutput = routes.reduce((sum, r) => sum + r.expectedOutput, 0);
-    const totalInput = routes.reduce((sum, r) => {
-      return sum + r.splits.reduce((s, split) => s + split.inputAmount, 0);
-    }, 0);
+    if (!Number.isFinite(oracleRate) || oracleRate <= 0) {
+      throw new Error("Oracle rate is invalid or non-positive");
+    }
 
-    // Route rate: how much output per input
+    // Calculate weighted average route rate
+    const totalOutput = plan.legs.reduce(
+      (sum, leg) => sum + leg.expectedOutput,
+      0
+    );
+    const totalInput = plan.legs.reduce(
+      (sum, leg) => sum + leg.inputAmount,
+      0
+    );
+
+    if (totalInput <= 0) {
+      throw new Error("Swap plan has no input allocation");
+    }
+
     const routeRate = totalOutput / totalInput;
 
-    // Check if route rate deviates too much from oracle
     const deviation = Math.abs(routeRate - oracleRate) / oracleRate;
-    const MAX_ORACLE_DEVIATION = 0.05; // 5% max deviation
 
-    if (deviation > MAX_ORACLE_DEVIATION) {
+    if (deviation > slippageTolerance) {
       throw new Error(
-        `Route price deviates ${(deviation * 100).toFixed(2)}% from oracle. ` +
-          `Oracle: ${oracleRate.toFixed(6)}, Route: ${routeRate.toFixed(6)}`
+        `Route price deviates ${(deviation * 100).toFixed(
+          2
+        )}% from oracle, exceeding slippage tolerance ${(slippageTolerance * 100).toFixed(
+          2
+        )}%. Oracle: ${oracleRate.toFixed(6)}, Route: ${routeRate.toFixed(6)}`
       );
     }
 
-    return oracleRate;
+    return {
+      rate: oracleRate,
+      inputPrice: inputPriceData,
+      outputPrice: outputPriceData,
+    };
   }
 
   /**
@@ -341,18 +1271,41 @@ export class SwapExecutor {
    */
   private async buildTransaction(
     params: SwapParams,
-    routes: RouteCandidate[]
+    plan: AtomicSwapPlan,
+    globalMinOutput: number,
+    ctx: ExecutionContext
   ): Promise<Transaction> {
     const transaction = new Transaction();
 
-    // Add compute budget instruction for priority fees
-    const computeBudgetIx = this.createComputeBudgetInstruction();
-    transaction.add(computeBudgetIx);
+    const computeBudgetInstructions = this.createComputeBudgetInstructions(
+      plan,
+      ctx
+    );
+    if (computeBudgetInstructions.length) {
+      transaction.add(...computeBudgetInstructions);
+    }
 
-    // Add swap instructions for each route
-    for (const route of routes) {
-      const swapIx = await this.createSwapInstruction(params, route);
-      transaction.add(swapIx);
+    for (const leg of plan.legs) {
+      const legInstructions = await this.createSwapInstructions(
+        params,
+        plan,
+        leg,
+        globalMinOutput
+      );
+
+      if (legInstructions.length) {
+        transaction.add(...legInstructions);
+      }
+    }
+
+    const guardInstruction = this.createGlobalMinOutputGuardInstruction(
+      params,
+      plan,
+      globalMinOutput,
+      ctx
+    );
+    if (guardInstruction) {
+      transaction.add(guardInstruction);
     }
 
     // Set recent blockhash
@@ -366,65 +1319,307 @@ export class SwapExecutor {
   /**
    * Create compute budget instruction for priority fees
    */
-  private createComputeBudgetInstruction(): TransactionInstruction {
-    // TODO: Implement actual ComputeBudgetProgram instruction
-    // For now, return placeholder
-    return new TransactionInstruction({
-      keys: [],
-      programId: new PublicKey("ComputeBudget111111111111111111111111111111"),
-      data: Buffer.from([]),
+  private createComputeBudgetInstructions(
+    plan: AtomicSwapPlan,
+    ctx?: ExecutionContext
+  ): TransactionInstruction[] {
+    if (!plan.legs.length) {
+      return [];
+    }
+
+    const boundedUnits = this.estimateComputeUnitLimit(plan);
+    if (ctx) {
+      ctx.computeUnitLimit = boundedUnits;
+    }
+
+    const priorityPriceMicroLamports = this.estimatePriorityFeeMicroLamports(plan);
+    if (ctx && typeof ctx.priorityFeeMicroLamports !== "number") {
+      ctx.priorityFeeMicroLamports = priorityPriceMicroLamports;
+    }
+
+    const unitLimitIx = ComputeBudgetProgram.setComputeUnitLimit({
+      units: boundedUnits,
     });
+
+    const unitPriceIx = ComputeBudgetProgram.setComputeUnitPrice({
+      microLamports: priorityPriceMicroLamports,
+    });
+
+    return [unitLimitIx, unitPriceIx];
   }
 
   /**
    * Create swap instruction for a specific route
    */
-  private async createSwapInstruction(
+  private async createSwapInstructions(
     params: SwapParams,
-    route: RouteCandidate
-  ): Promise<TransactionInstruction> {
-    // TODO: Implement venue-specific swap instructions
-    // This will vary by venue (Phoenix, Orca, Jupiter, etc.)
+    plan: AtomicSwapPlan,
+    leg: AtomicSwapLeg,
+    globalMinOutput: number
+  ): Promise<TransactionInstruction[]> {
+    const programId = this.resolveVenueProgramId(leg.venue);
+    const accounts = this.buildLegAccounts(params, plan, leg);
+    const payload = this.serializeLegPayload(plan, leg, globalMinOutput);
 
-    // Placeholder instruction
+    return [
+      new TransactionInstruction({
+        keys: accounts,
+        programId,
+        data: payload,
+      }),
+    ];
+  }
+
+  private estimateLegComputeUnits(leg: AtomicSwapLeg): number {
+    switch (leg.venueType) {
+      case VenueType.CLOB:
+        return 70_000;
+      case VenueType.RFQ:
+        return 110_000;
+      case VenueType.AMM:
+      default:
+        return 130_000;
+    }
+  }
+
+  private estimateComputeUnits(plan: AtomicSwapPlan): number {
+    return plan.legs
+      .map((leg) => this.estimateLegComputeUnits(leg))
+      .reduce((sum, units) => sum + units, 0);
+  }
+
+  private estimateComputeUnitLimit(plan: AtomicSwapPlan): number {
+    const estimatedUnits = this.estimateComputeUnits(plan);
+    return Math.min(1_400_000, Math.max(200_000, estimatedUnits));
+  }
+
+  private estimatePriorityFeeMicroLamports(plan: AtomicSwapPlan): number {
+    const boundedUnits = this.estimateComputeUnitLimit(plan);
+    return Math.max(
+      1,
+      Math.floor((plan.baseRoute?.estimatedComputeUnits ?? boundedUnits) / 10)
+    );
+  }
+
+  private resolveVenueProgramId(venue: VenueName): PublicKey {
+    if (venue === VenueName.JUPITER) {
+      return JUPITER_AGGREGATOR_PROGRAM_ID;
+    }
+
+    return SWAPBACK_ROUTER_PROGRAM_ID;
+  }
+
+  private buildLegAccounts(
+    params: SwapParams,
+    plan: AtomicSwapPlan,
+    leg: AtomicSwapLeg
+  ): { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[] {
+    const accounts: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[] = [
+      { pubkey: params.userPublicKey, isSigner: true, isWritable: true },
+    ];
+
+    const accountSet = new Set<string>();
+    accountSet.add(plan.inputMint);
+    accountSet.add(plan.outputMint);
+    for (const mint of leg.route) {
+      accountSet.add(mint);
+    }
+
+    for (const mint of accountSet) {
+      accounts.push({
+        pubkey: this.safePublicKey(mint),
+        isSigner: false,
+        isWritable: true,
+      });
+    }
+
+    return accounts;
+  }
+
+  private serializeLegPayload(
+    plan: AtomicSwapPlan,
+    leg: AtomicSwapLeg,
+    globalMinOutput: number
+  ): Buffer {
+    const payload = {
+      planId: plan.id,
+      legVenue: leg.venue,
+      venueType: leg.venueType,
+      inputAmount: leg.inputAmount,
+      expectedOutput: leg.expectedOutput,
+      minOutput: leg.minOutput,
+      globalMinOutput,
+      quoteExpiresAt: plan.expiresAt,
+    };
+
+    return Buffer.from(JSON.stringify(payload), "utf8");
+  }
+
+  private createGlobalMinOutputGuardInstruction(
+    params: SwapParams,
+    plan: AtomicSwapPlan,
+    globalMinOutput: number,
+    ctx: ExecutionContext
+  ): TransactionInstruction | null {
+    if (!Number.isFinite(globalMinOutput) || globalMinOutput <= 0) {
+      return null;
+    }
+
+    const outputAccount = ctx.outputAccount ?? this.safePublicKey(plan.outputMint);
+    const outputDecimals = ctx.outputDecimals ?? 0;
+    const minOutputRaw = ctx.guardMinOutputRaw ?? this.convertToRawAmount(
+      globalMinOutput,
+      outputDecimals
+    );
+
+    const payload = {
+      planId: plan.id,
+      minOutput: globalMinOutput,
+      minOutputRaw: minOutputRaw.toString(),
+      expectedOutput: plan.expectedOutput,
+      preSwapBalance: ctx.preSwapOutputBalanceRaw?.toString(),
+      slippageTolerance: ctx.slippageTolerance,
+      legCount: plan.legs.length,
+    };
+
+    const data = Buffer.from(JSON.stringify(payload, null, 0), "utf8");
+
+    const metas: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[] = [];
+    const pushMeta = (
+      meta?: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }
+    ) => {
+      if (!meta) {
+        return;
+      }
+      if (metas.some((existing) => existing.pubkey.equals(meta.pubkey))) {
+        return;
+      }
+      metas.push(meta);
+    };
+
+    pushMeta({ pubkey: params.userPublicKey, isSigner: true, isWritable: true });
+    pushMeta({ pubkey: outputAccount, isSigner: false, isWritable: true });
+    pushMeta({ pubkey: this.safePublicKey(plan.outputMint), isSigner: false, isWritable: false });
+    pushMeta({ pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false });
+    pushMeta({ pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false });
+    pushMeta({ pubkey: SystemProgram.programId, isSigner: false, isWritable: false });
+
     return new TransactionInstruction({
-      keys: [],
-      programId: new PublicKey("11111111111111111111111111111111"),
-      data: Buffer.from([]),
+      keys: metas,
+      programId: SWAPBACK_ROUTER_PROGRAM_ID,
+      data,
     });
+  }
+
+  private async getMintDecimals(mintAddress: string): Promise<number> {
+    const cached = this.mintDecimalsCache.get(mintAddress);
+    if (typeof cached === "number") {
+      return cached;
+    }
+
+    const mintKey = this.safePublicKey(mintAddress);
+    const mintInfo = await getMint(this.connection, mintKey);
+    this.mintDecimalsCache.set(mintAddress, mintInfo.decimals);
+    return mintInfo.decimals;
+  }
+
+  private convertToRawAmount(amount: number, decimals: number): bigint {
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return 0n;
+    }
+
+    const scale = BigInt(10) ** BigInt(Math.max(decimals, 0));
+    const scaleAsNumber = Number(scale);
+    return BigInt(Math.max(0, Math.floor(amount * scaleAsNumber)));
+  }
+
+  private safePublicKey(address: string): PublicKey {
+    if (!address) {
+      return SYSTEM_PROGRAM_ID;
+    }
+
+    try {
+      return new PublicKey(address);
+    } catch (error) {
+      console.warn(
+        `Encountered invalid public key ${address}. Using system program placeholder.`,
+        error
+      );
+      return SYSTEM_PROGRAM_ID;
+    }
   }
 
   /**
    * Submit transaction via Jito bundle
    */
-  private async submitJitoBundle(
+  private async submitProtectedBundle(
+    params: SwapParams,
+    plan: AtomicSwapPlan,
+    ctx: ExecutionContext,
     transaction: Transaction,
     signer: Signer,
-    enableMevProtection: boolean
-  ): Promise<{ signature: string; tip: number }> {
-    if (!enableMevProtection) {
-      // Direct submission without Jito
+    enableProtection: boolean
+  ): Promise<{
+    signature: string;
+    tip: number;
+    strategy: "jito" | "quicknode" | "direct";
+    bundleId?: string;
+  }> {
+    if (!enableProtection) {
       transaction.sign(signer);
+      ctx.priorityFeeMicroLamports = this.estimatePriorityFeeMicroLamports(plan);
       const signature = await this.connection.sendRawTransaction(
         transaction.serialize(),
         { skipPreflight: false }
       );
-      return { signature, tip: 0 };
+      ctx.mevStrategy = "direct";
+      ctx.mevTipLamports = 0;
+      return {
+        signature,
+        tip: 0,
+        strategy: "direct",
+      };
     }
 
-    // Sign transaction
+    const tradeValueUSD = ctx.tradeValueUSD ?? this.estimateTradeValueUSD(plan, ctx);
+    ctx.tradeValueUSD = tradeValueUSD;
+
+    const tipLamports = this.determineTipLamports(tradeValueUSD);
+    ctx.mevTipLamports = tipLamports;
+    this.appendMevTipInstruction(transaction, params.userPublicKey, tipLamports);
+
+    const priorityLevel = this.determinePriorityLevel(tradeValueUSD);
+    const priorityFeeMicroLamports = this.determinePriorityFeeMicroLamports(
+      plan,
+      tradeValueUSD
+    );
+    ctx.priorityFeeMicroLamports = priorityFeeMicroLamports;
+
     transaction.sign(signer);
 
-    // Submit via Jito bundle service
-    const bundle = await this.jitoService.submitBundle([transaction], {
-      enabled: true,
-      tipLamports: 10000, // 0.00001 SOL tip
-      maxRetries: 3,
-    });
+    const bundleResult = await this.jitoService.submitProtectedBundle(
+      [transaction],
+      {
+        tipLamports,
+        priorityLevel,
+        tradeValueUSD,
+        fallbackQuickNode: true,
+        priorityFeeMicroLamports,
+      }
+    );
+
+    const primarySignature = bundleResult.signatures.find(Boolean);
+    const derivedSignature =
+      primarySignature ||
+      (transaction.signature ? bs58.encode(transaction.signature) : undefined);
+
+    const signature = derivedSignature ?? bundleResult.bundleId;
 
     return {
-      signature: bundle.bundleId,
-      tip: 10000, // Tip amount in lamports
+      signature,
+      tip: tipLamports,
+      strategy: bundleResult.strategy,
+      bundleId: bundleResult.bundleId,
     };
   }
 
@@ -492,22 +1687,27 @@ export class SwapExecutor {
     // Calculate fees from total cost
     const dexFees = ctx.routes.reduce((sum, r) => sum + r.totalCost, 0);
     const networkFees = 0.000005 * ctx.routes.length; // 5000 lamports per instruction
-    const priorityFees = 0.0001; // Estimated
-    const jitoTip = 0.00001; // 10000 lamports
+
+    const computeUnitLimit =
+      ctx.computeUnitLimit ?? (ctx.plan ? this.estimateComputeUnitLimit(ctx.plan) : 0);
+
+    const priorityFees =
+      ctx.priorityFeeMicroLamports && computeUnitLimit
+        ? (ctx.priorityFeeMicroLamports * computeUnitLimit) / 1_000_000 / 1e9
+        : 0.0001;
+
+    const jitoTip = (ctx.mevTipLamports ?? 0) / 1e9;
 
     const totalFees = dexFees + networkFees + priorityFees + jitoTip;
 
-    // Estimate MEV savings (simplified)
-    const mevSavings = jitoTip * 10; // Rough estimate: 10x tip value saved
+    // Estimate MEV savings as multiple of tip (placeholder heuristic)
+    const mevSavings = jitoTip > 0 ? jitoTip * 8 : 0;
 
     // Venue breakdown
     const venueBreakdown: Record<string, number> = {};
-    for (const route of ctx.routes) {
-      for (const split of route.splits) {
-        const venue = split.venue;
-        venueBreakdown[venue] =
-          (venueBreakdown[venue] || 0) + split.inputAmount;
-      }
+    for (const leg of ctx.legs) {
+      const venue = leg.venue;
+      venueBreakdown[venue] = (venueBreakdown[venue] || 0) + leg.inputAmount;
     }
 
     return {
@@ -530,6 +1730,29 @@ export class SwapExecutor {
     };
   }
 
+  private async writeAnalyticsEvent(
+    event: string,
+    payload: Record<string, unknown>
+  ): Promise<void> {
+    try {
+      await fs.mkdir(path.dirname(this.analyticsLogPath), { recursive: true });
+      const entry = JSON.stringify(
+        {
+          event,
+          timestamp: new Date().toISOString(),
+          payload,
+        },
+        null,
+        0
+      );
+      await fs.appendFile(this.analyticsLogPath, `${entry}\n`, {
+        encoding: "utf8",
+      });
+    } catch (error) {
+      console.warn("Failed to persist analytics event", error);
+    }
+  }
+
   /**
    * Log successful swap metrics
    */
@@ -547,8 +1770,40 @@ export class SwapExecutor {
     console.log("🛡️  MEV savings:", metrics.mevSavings.toFixed(6));
     console.log("🔀 Routes used:", metrics.routeCount);
     console.log("🏦 Venue breakdown:", metrics.venueBreakdown);
+    console.log("🚦 MEV strategy:", ctx.mevStrategy ?? "direct");
+    if (ctx.mevTipLamports) {
+      console.log(
+        "🎁 Tip (lamports):",
+        ctx.mevTipLamports,
+        "(SOL",
+        (ctx.mevTipLamports / 1e9).toFixed(6),
+        ")"
+      );
+    }
+    if (ctx.priorityFeeMicroLamports) {
+      console.log("⚙️ Priority fee (μ-lamports):", ctx.priorityFeeMicroLamports);
+    }
+    if (ctx.bundleId) {
+      console.log("📦 Bundle ID:", ctx.bundleId);
+    }
 
-    // TODO: Send to analytics service (Mixpanel, Amplitude, etc.)
+    await this.writeAnalyticsEvent("swap_success", {
+      planId: ctx.plan?.id,
+      signature: ctx.signature,
+      executionTimeMs: metrics.executionTimeMs,
+      outputAmount: metrics.outputAmount,
+      totalFees: metrics.totalFees,
+      venues: metrics.venueBreakdown,
+      oraclePrice: metrics.oraclePrice,
+      diffs: ctx.planDiffs,
+      refreshReason: ctx.planRefreshReason,
+      refreshIterations: ctx.planRefreshIterations,
+      bundleStrategy: ctx.mevStrategy,
+      bundleId: ctx.bundleId,
+      mevTipLamports: ctx.mevTipLamports,
+      priorityFeeMicroLamports: ctx.priorityFeeMicroLamports,
+      tradeValueUSD: ctx.tradeValueUSD,
+    });
   }
 
   /**
@@ -563,8 +1818,27 @@ export class SwapExecutor {
     console.error("🔴 Error:", error);
     console.error("⏱️  Time to failure:", Date.now() - ctx.startTime, "ms");
     console.error("🔀 Routes attempted:", ctx.routes.length);
+    console.error("🚦 MEV strategy:", ctx.mevStrategy ?? "direct");
+    if (ctx.priorityFeeMicroLamports) {
+      console.error(
+        "⚙️ Priority fee (μ-lamports):",
+        ctx.priorityFeeMicroLamports
+      );
+    }
 
-    // TODO: Send to error tracking service (Sentry, etc.)
+    await this.writeAnalyticsEvent("swap_failure", {
+      planId: ctx.plan?.id,
+      error,
+      routesAttempted: ctx.routes.length,
+      elapsedMs: Date.now() - ctx.startTime,
+      diffs: ctx.planDiffs,
+      refreshReason: ctx.planRefreshReason,
+      bundleStrategy: ctx.mevStrategy,
+      bundleId: ctx.bundleId,
+      mevTipLamports: ctx.mevTipLamports,
+      priorityFeeMicroLamports: ctx.priorityFeeMicroLamports,
+      tradeValueUSD: ctx.tradeValueUSD,
+    });
   }
 
   /**

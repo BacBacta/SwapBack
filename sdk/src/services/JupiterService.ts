@@ -1,5 +1,5 @@
-import axios, { AxiosInstance } from 'axios';
-import { Connection, PublicKey, VersionedTransaction } from '@solana/web3.js';
+import axios, { AxiosInstance } from "axios";
+import { Connection, PublicKey, VersionedTransaction } from "@solana/web3.js";
 
 /**
  * Jupiter Quote Response from V6 API
@@ -70,21 +70,24 @@ export class JupiterService {
   private connection: Connection;
   private baseUrl: string;
 
-  constructor(connection: Connection, baseUrl: string = 'https://quote-api.jup.ag/v6') {
+  constructor(
+    connection: Connection,
+    baseUrl: string = "https://quote-api.jup.ag/v6"
+  ) {
     this.connection = connection;
     this.baseUrl = baseUrl;
     this.client = axios.create({
       baseURL: baseUrl,
       timeout: 30000, // 30s timeout
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
     });
   }
 
   /**
    * Get a quote for swapping tokens
-   * 
+   *
    * @param inputMint - Input token mint address
    * @param outputMint - Output token mint address
    * @param amount - Amount in smallest units (lamports)
@@ -100,7 +103,7 @@ export class JupiterService {
     onlyDirectRoutes: boolean = false
   ): Promise<JupiterQuote> {
     try {
-      const response = await this.client.get<JupiterQuote>('/quote', {
+      const response = await this.client.get<JupiterQuote>("/quote", {
         params: {
           inputMint,
           outputMint,
@@ -113,7 +116,7 @@ export class JupiterService {
         },
       });
 
-      console.log('✅ Jupiter quote received:', {
+      console.log("✅ Jupiter quote received:", {
         inputMint: response.data.inputMint,
         outputMint: response.data.outputMint,
         inAmount: response.data.inAmount,
@@ -125,7 +128,7 @@ export class JupiterService {
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        console.error('❌ Jupiter quote error:', {
+        console.error("❌ Jupiter quote error:", {
           status: error.response?.status,
           data: error.response?.data,
           message: error.message,
@@ -140,7 +143,7 @@ export class JupiterService {
 
   /**
    * Get swap transaction from Jupiter
-   * 
+   *
    * @param quote - Quote from getQuote()
    * @param userPublicKey - User's wallet public key
    * @param wrapUnwrapSOL - Auto wrap/unwrap SOL (recommended: true)
@@ -154,7 +157,7 @@ export class JupiterService {
     priorityFee?: number
   ): Promise<JupiterSwapResponse> {
     try {
-      const response = await this.client.post<JupiterSwapResponse>('/swap', {
+      const response = await this.client.post<JupiterSwapResponse>("/swap", {
         quoteResponse: quote,
         userPublicKey: userPublicKey.toBase58(),
         wrapAndUnwrapSol: wrapUnwrapSOL,
@@ -163,7 +166,7 @@ export class JupiterService {
         asLegacyTransaction: false,
       });
 
-      console.log('✅ Jupiter swap transaction created:', {
+      console.log("✅ Jupiter swap transaction created:", {
         user: userPublicKey.toBase58(),
         lastValidBlockHeight: response.data.lastValidBlockHeight,
         priorityFee: response.data.prioritizationFeeLamports,
@@ -172,7 +175,7 @@ export class JupiterService {
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        console.error('❌ Jupiter swap transaction error:', {
+        console.error("❌ Jupiter swap transaction error:", {
           status: error.response?.status,
           data: error.response?.data,
           message: error.message,
@@ -187,7 +190,7 @@ export class JupiterService {
 
   /**
    * Execute a complete swap (quote + transaction + send)
-   * 
+   *
    * @param inputMint - Input token mint
    * @param outputMint - Output token mint
    * @param amount - Amount in smallest units
@@ -202,11 +205,13 @@ export class JupiterService {
     outputMint: string,
     amount: number | string,
     userPublicKey: PublicKey,
-    signTransaction: (transaction: VersionedTransaction) => Promise<VersionedTransaction>,
+    signTransaction: (
+      transaction: VersionedTransaction
+    ) => Promise<VersionedTransaction>,
     slippageBps: number = 50,
     priorityFee?: number
   ): Promise<string> {
-    console.log('🔄 Starting Jupiter swap:', {
+    console.log("🔄 Starting Jupiter swap:", {
       inputMint,
       outputMint,
       amount: amount.toString(),
@@ -215,9 +220,14 @@ export class JupiterService {
     });
 
     // Step 1: Get quote
-    const quote = await this.getQuote(inputMint, outputMint, amount, slippageBps);
-    
-    console.log('📊 Quote received:', {
+    const quote = await this.getQuote(
+      inputMint,
+      outputMint,
+      amount,
+      slippageBps
+    );
+
+    console.log("📊 Quote received:", {
       expectedOutput: quote.outAmount,
       priceImpact: quote.priceImpactPct,
       routes: quote.routePlan.length,
@@ -232,10 +242,13 @@ export class JupiterService {
     );
 
     // Step 3: Deserialize transaction
-    const swapTransactionBuf = Buffer.from(swapResponse.swapTransaction, 'base64');
+    const swapTransactionBuf = Buffer.from(
+      swapResponse.swapTransaction,
+      "base64"
+    );
     const transaction = VersionedTransaction.deserialize(swapTransactionBuf);
-    
-    console.log('📝 Transaction deserialized, requesting signature...');
+
+    console.log("📝 Transaction deserialized, requesting signature...");
 
     // Step 4: Sign transaction
     const signedTransaction = await signTransaction(transaction);
@@ -247,20 +260,22 @@ export class JupiterService {
       maxRetries: 3,
     });
 
-    console.log('✅ Transaction sent:', txid);
-    console.log('⏳ Confirming...');
+    console.log("✅ Transaction sent:", txid);
+    console.log("⏳ Confirming...");
 
     // Step 6: Confirm transaction
     const confirmation = await this.connection.confirmTransaction(
       txid,
-      'confirmed'
+      "confirmed"
     );
 
     if (confirmation.value.err) {
-      throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      throw new Error(
+        `Transaction failed: ${JSON.stringify(confirmation.value.err)}`
+      );
     }
 
-    console.log('🎉 Swap completed successfully!', txid);
+    console.log("🎉 Swap completed successfully!", txid);
 
     return txid;
   }
@@ -288,28 +303,34 @@ export class JupiterService {
   /**
    * Get all supported tokens from Jupiter
    */
-  async getSupportedTokens(): Promise<Array<{
-    address: string;
-    chainId: number;
-    decimals: number;
-    name: string;
-    symbol: string;
-    logoURI?: string;
-    tags?: string[];
-  }>> {
+  async getSupportedTokens(): Promise<
+    Array<{
+      address: string;
+      chainId: number;
+      decimals: number;
+      name: string;
+      symbol: string;
+      logoURI?: string;
+      tags?: string[];
+    }>
+  > {
     try {
-      const response = await axios.get('https://token.jup.ag/all');
+      const response = await axios.get("https://token.jup.ag/all");
       return response.data;
     } catch (error) {
-      console.error('❌ Failed to fetch supported tokens:', error);
-      throw new Error('Failed to fetch Jupiter token list');
+      console.error("❌ Failed to fetch supported tokens:", error);
+      throw new Error("Failed to fetch Jupiter token list");
     }
   }
 
   /**
    * Calculate effective price (output per unit of input)
    */
-  calculateEffectivePrice(quote: JupiterQuote, inputDecimals: number, outputDecimals: number): number {
+  calculateEffectivePrice(
+    quote: JupiterQuote,
+    inputDecimals: number,
+    outputDecimals: number
+  ): number {
     const inAmount = parseInt(quote.inAmount) / Math.pow(10, inputDecimals);
     const outAmount = parseInt(quote.outAmount) / Math.pow(10, outputDecimals);
     return outAmount / inAmount;

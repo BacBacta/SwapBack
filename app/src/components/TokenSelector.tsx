@@ -16,7 +16,7 @@ interface TokenSelectorProps {
   onClose: () => void;
 }
 
-// Popular tokens on Solana
+// Popular tokens on Solana (Devnet pour tests)
 const POPULAR_TOKENS: Token[] = [
   {
     address: "So11111111111111111111111111111111111111112",
@@ -26,11 +26,25 @@ const POPULAR_TOKENS: Token[] = [
     logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png"
   },
   {
-    address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    address: "BH8thpWca6kpN2pKwWTaKv2F5s4MEkbML18LtJ8eFypU",
+    symbol: "BACK",
+    name: "SwapBack Token",
+    decimals: 9,
+    logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png" // TODO: Add custom logo
+  },
+  {
+    address: "3y4dCqwWuYx1B97YEDmgq9qjuNE1eyEwGx2eLgz6Rc6G",
     symbol: "USDC",
-    name: "USD Coin",
+    name: "USD Coin (Test)",
     decimals: 6,
     logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png"
+  },
+  {
+    address: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+    symbol: "BONK",
+    name: "Bonk",
+    decimals: 5,
+    logoURI: "https://arweave.net/hQiPZOsRZXGXBJd_82PhVdlM_hACsT_q6wqwf5cSY7I"
   },
   {
     address: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
@@ -38,13 +52,6 @@ const POPULAR_TOKENS: Token[] = [
     name: "Tether USD",
     decimals: 6,
     logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.png"
-  },
-  {
-    address: "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs",
-    symbol: "BONK",
-    name: "Bonk",
-    decimals: 5,
-    logoURI: "https://arweave.net/hQiPZOsRZXGXBJd_82PhVdlM_hACsT_q6wqwf5cSY7I"
   },
   {
     address: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",

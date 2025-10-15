@@ -7,6 +7,7 @@ import {
   getOrCreateAssociatedTokenAccount,
   transfer
 } from '@solana/spl-token';
+import fs from 'node:fs';
 
 /**
  * Configuration du token $BACK
@@ -152,8 +153,6 @@ export class BackTokenClient {
  * Fonction utilitaire pour charger la configuration depuis un fichier
  */
 export async function loadBackTokenConfig(configPath: string = './token_back_config.json'): Promise<BackTokenConfig> {
-  const fs = require('fs');
-
   if (!fs.existsSync(configPath)) {
     throw new Error(`Configuration file not found: ${configPath}`);
   }

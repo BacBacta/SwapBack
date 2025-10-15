@@ -3,9 +3,11 @@
 ## ✅ Composants Créés
 
 ### 1. Hook React: `useJupiter.ts`
+
 **Emplacement:** `app/src/hooks/useJupiter.ts`
 
 **Fonctionnalités:**
+
 - ✅ Intégration complète avec JupiterService du SDK
 - ✅ Gestion de l'état du wallet (connexion, adresse)
 - ✅ Méthodes exportées:
@@ -19,6 +21,7 @@
 - ✅ Vérification automatique de l'état du wallet (`isReady`)
 
 **Usage:**
+
 ```typescript
 const { getQuote, executeSwap, isReady, walletAddress } = useJupiter();
 
@@ -32,9 +35,11 @@ const signature = await executeSwap(SOL_MINT, USDC_MINT, amount, slippageBps);
 ---
 
 ### 2. Composant d'Affichage: `JupiterRouteDisplay.tsx`
+
 **Emplacement:** `app/src/components/JupiterRouteDisplay.tsx`
 
 **Fonctionnalités:**
+
 - ✅ Affichage détaillé du quote Jupiter
 - ✅ Visualisation des montants input/output
 - ✅ Indicateur de Price Impact avec code couleur:
@@ -49,6 +54,7 @@ const signature = await executeSwap(SOL_MINT, USDC_MINT, amount, slippageBps);
 - ✅ Affichage du Swap Mode et Slippage
 
 **Props:**
+
 ```typescript
 interface JupiterRouteDisplayProps {
   quote: JupiterQuote;
@@ -63,9 +69,11 @@ interface JupiterRouteDisplayProps {
 ---
 
 ### 3. Widget de Swap: `JupiterSwapWidget.tsx`
+
 **Emplacement:** `app/src/components/JupiterSwapWidget.tsx`
 
 **Fonctionnalités:**
+
 - ✅ Interface complète de swap avec Jupiter
 - ✅ Sélection de tokens (SOL, USDC, USDT, BONK)
 - ✅ Input de montant avec validation
@@ -80,6 +88,7 @@ interface JupiterRouteDisplayProps {
 - ✅ Affichage de l'adresse wallet connectée
 
 **États gérés:**
+
 - Tokens input/output
 - Montant d'input
 - Slippage
@@ -90,9 +99,11 @@ interface JupiterRouteDisplayProps {
 ---
 
 ### 4. Page Jupiter: `app/jupiter/page.tsx`
+
 **Emplacement:** `app/src/app/jupiter/page.tsx`
 
 **Fonctionnalités:**
+
 - ✅ Page dédiée à l'interface Jupiter
 - ✅ Hero section avec badge "Jupiter V6 Integration"
 - ✅ Intégration du JupiterSwapWidget
@@ -114,7 +125,9 @@ interface JupiterRouteDisplayProps {
 ---
 
 ### 5. Navigation: `Navigation.tsx` (Modifié)
+
 **Modifications:**
+
 - ✅ Ajout du lien "Jupiter" dans la navigation
 - ✅ Ordre des liens: Swap → **Jupiter** → Lock & Earn → Stats → Docs
 - ✅ Active state géré automatiquement
@@ -124,22 +137,41 @@ interface JupiterRouteDisplayProps {
 ## 🔧 Configuration Technique
 
 ### Tokens Pré-configurés
+
 ```typescript
 const POPULAR_TOKENS = [
-  { symbol: 'SOL', mint: 'So11111111111111111111111111111111111111112', decimals: 9 },
-  { symbol: 'USDC', mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', decimals: 6 },
-  { symbol: 'USDT', mint: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', decimals: 6 },
-  { symbol: 'BONK', mint: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', decimals: 5 },
+  {
+    symbol: "SOL",
+    mint: "So11111111111111111111111111111111111111112",
+    decimals: 9,
+  },
+  {
+    symbol: "USDC",
+    mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    decimals: 6,
+  },
+  {
+    symbol: "USDT",
+    mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+    decimals: 6,
+  },
+  {
+    symbol: "BONK",
+    mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+    decimals: 5,
+  },
 ];
 ```
 
 ### Slippage Options
+
 - 0.1% (10 bps)
 - 0.5% (50 bps) - **Par défaut**
 - 1% (100 bps)
 - 2% (200 bps)
 
 ### Auto-refresh
+
 - Intervalle: 30 secondes
 - Condition: Quote existant + montant valide
 - Nettoyage automatique à la destruction du composant
@@ -149,12 +181,14 @@ const POPULAR_TOKENS = [
 ## ✅ Validation TypeScript
 
 **SDK:**
+
 ```bash
 cd sdk && npx tsc --noEmit
 # ✅ 0 erreurs
 ```
 
 **App:**
+
 ```bash
 cd app && npx tsc --noEmit
 # ✅ 0 erreurs
@@ -165,6 +199,7 @@ cd app && npx tsc --noEmit
 ## 📊 Flux Utilisateur
 
 ### 1. Obtenir un Quote
+
 1. Utilisateur sélectionne tokens input/output
 2. Entre un montant
 3. Configure le slippage (optionnel)
@@ -174,6 +209,7 @@ cd app && npx tsc --noEmit
 7. Auto-refresh toutes les 30s
 
 ### 2. Exécuter un Swap
+
 1. Quote disponible et affiché
 2. Wallet connecté
 3. Utilisateur clique "Exécuter le Swap"
@@ -186,25 +222,27 @@ cd app && npx tsc --noEmit
 
 ## 🎯 État d'Avancement
 
-| Composant | Statut | Tests |
-|-----------|--------|-------|
-| useJupiter hook | ✅ Complet | ✅ TypeScript OK |
+| Composant           | Statut     | Tests            |
+| ------------------- | ---------- | ---------------- |
+| useJupiter hook     | ✅ Complet | ✅ TypeScript OK |
 | JupiterRouteDisplay | ✅ Complet | ✅ TypeScript OK |
-| JupiterSwapWidget | ✅ Complet | ✅ TypeScript OK |
-| Page /jupiter | ✅ Complet | ✅ TypeScript OK |
-| Navigation | ✅ Modifié | ✅ TypeScript OK |
-| SDK exports | ✅ Vérifié | ✅ Build OK |
+| JupiterSwapWidget   | ✅ Complet | ✅ TypeScript OK |
+| Page /jupiter       | ✅ Complet | ✅ TypeScript OK |
+| Navigation          | ✅ Modifié | ✅ TypeScript OK |
+| SDK exports         | ✅ Vérifié | ✅ Build OK      |
 
 ---
 
 ## 🚀 Prochaines Étapes
 
 ### Immédiat
+
 1. ✅ **Compilation Anchor:** Recompilation en cours avec spl-token-2022 v8.0.1
 2. ⏳ **Test Réseau:** Tester l'interface Jupiter hors devcontainer
 3. ⏳ **Premier Swap:** Exécuter un vrai swap sur devnet
 
 ### Court terme
+
 1. Ajouter plus de tokens à la sélection
 2. Implémenter le cache des tokens supportés
 3. Ajouter des animations de transition
@@ -212,6 +250,7 @@ cd app && npx tsc --noEmit
 5. Intégrer les métriques de performance
 
 ### Moyen terme
+
 1. Intégrer Jupiter dans SwapInterface principal
 2. Comparer prix Jupiter vs SwapBack router
 3. Permettre le choix entre Jupiter et router custom
@@ -222,17 +261,20 @@ cd app && npx tsc --noEmit
 ## 📝 Notes Techniques
 
 ### Limitations Actuelles
+
 - ⚠️ Réseau bloqué dans devcontainer → Nécessite test hors container
 - ⚠️ Liste de tokens limitée (4 tokens) → Peut être étendue
 - ⚠️ Pas de cache des quotes → Toujours fetch fresh data
 
 ### Optimisations Possibles
+
 - Implémenter un cache Redis pour les quotes
 - Ajouter un système de retry avec exponential backoff
 - Précharger les tokens supportés au démarrage
 - Websocket pour les mises à jour de prix en temps réel
 
 ### Dépendances
+
 - `@swapback/sdk` - Export de JupiterService
 - `@solana/wallet-adapter-react` - Hooks wallet
 - `@solana/wallet-adapter-react-ui` - UI components
@@ -243,6 +285,7 @@ cd app && npx tsc --noEmit
 ## 🎨 Design System
 
 ### Couleurs Utilisées
+
 - **Blue:** Boutons principaux (Get Quote)
 - **Green:** Bouton de swap et succès
 - **Red:** Erreurs
@@ -250,6 +293,7 @@ cd app && npx tsc --noEmit
 - **Gray:** États désactivés
 
 ### Composants UI
+
 - Inputs avec validation
 - Selects stylisés
 - Boutons avec états loading

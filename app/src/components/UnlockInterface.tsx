@@ -54,7 +54,7 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
     const hours = Math.floor((secondsRemaining % 86400) / 3600);
     const minutes = Math.floor((secondsRemaining % 3600) / 60);
 
-    let displayParts = [];
+    const displayParts = [];
     if (days > 0) displayParts.push(`${days}j`);
     if (hours > 0) displayParts.push(`${hours}h`);
     if (minutes > 0) displayParts.push(`${minutes}m`);

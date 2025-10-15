@@ -114,6 +114,67 @@ export interface RouteSplit {
 }
 
 // ============================================================================
+// ADVANCED QUOTING & ATOMIC PLAN TYPES
+// ============================================================================
+
+export interface VenueQuoteSample {
+  inputAmount: number;
+  outputAmount: number;
+  effectivePrice: number;
+  marginalPrice: number;
+  slippagePercent: number;
+  feeAmount: number;
+  postTradeLiquidity?: number;
+}
+
+export interface VenueSimulationResult {
+  venue: VenueName;
+  venueType: VenueType;
+  route: string[];
+  samples: VenueQuoteSample[];
+  bestSample: VenueQuoteSample;
+  fetchedAt: number;
+}
+
+export interface AtomicSwapLeg {
+  venue: VenueName;
+  venueType: VenueType;
+  route: string[];
+  inputAmount: number;
+  expectedOutput: number;
+  minOutput: number;
+  feeAmount: number;
+  slippagePercent: number;
+  quote: VenueQuoteSample;
+  liquiditySource: LiquiditySource;
+}
+
+export interface AtomicSwapPlan {
+  id: string;
+  inputMint: string;
+  outputMint: string;
+  totalInput: number;
+  expectedOutput: number;
+  minOutput: number;
+  createdAt: number;
+  expiresAt: number;
+  quoteValidityMs: number;
+  legs: AtomicSwapLeg[];
+  simulations: VenueSimulationResult[];
+  baseRoute: RouteCandidate;
+  fallbackPlans?: AtomicSwapPlan[];
+  maxSlippageBps: number;
+  driftRebalanceBps: number;
+  minLiquidityRatio: number;
+  maxStalenessMs: number;
+  liquiditySnapshot: Record<VenueName, {
+    effectivePrice: number;
+    depth: number;
+    timestamp: number;
+  }>;
+}
+
+// ============================================================================
 // OPTIMIZATION ENGINE CONFIG
 // ============================================================================
 
@@ -155,7 +216,8 @@ export interface OraclePriceData {
   provider: 'pyth' | 'switchboard';
   price: number;              // Current market price
   confidence: number;         // Price confidence interval
-  timestamp: number;          // When price was updated
+  timestamp: number;          // Backwards-compatible timestamp (ms)
+  publishTime: number;        // Precise publish time from oracle (ms)
   exponent: number;           // Price exponent
 }
 
@@ -257,6 +319,9 @@ export interface JitoBundleResult {
   status: 'pending' | 'landed' | 'failed';
   landedSlot?: number;
   signatures: string[];
+  strategy: 'jito' | 'quicknode';
+  tipLamports?: number;
+  priorityFeeMicroLamports?: number;
 }
 
 // ============================================================================

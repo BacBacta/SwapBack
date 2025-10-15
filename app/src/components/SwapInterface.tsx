@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useBlockchainTracer } from "../hooks/useBlockchainTracer";
 import { useTokenData } from "../hooks/useTokenData";
+import { useJupiter } from "../hooks/useJupiter";
 import { TokenSelector } from "./TokenSelector";
+import type { JupiterQuote } from "@swapback/sdk";
 
 interface RouteStep {
   label: string;
@@ -30,6 +32,10 @@ interface RouteInfo {
 export const SwapInterface = () => {
   const { connected, publicKey } = useWallet();
   const { connection } = useConnection();
+  const jupiter = useJupiter();
+
+  // Router selection: "swapback" or "jupiter"
+  const [selectedRouter, setSelectedRouter] = useState<"swapback" | "jupiter">("swapback");
 
   // 🔍 Blockchain Tracer
   const {
@@ -47,25 +53,61 @@ export const SwapInterface = () => {
   const [slippage, setSlippage] = useState(0.5);
   const [loading, setLoading] = useState(false);
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
+  const [jupiterQuote, setJupiterQuote] = useState<JupiterQuote | null>(null);
   const [lastOperation, setLastOperation] = useState<string | null>(null);
   const [showInputTokenSelector, setShowInputTokenSelector] = useState(false);
   const [showOutputTokenSelector, setShowOutputTokenSelector] = useState(false);
 
-  // Mapping des tokens vers leurs adresses Solana
+  // Mapping des tokens vers leurs adresses Solana (DEVNET)
   const tokenAddresses: { [key: string]: string } = {
     SOL: "So11111111111111111111111111111111111111112",
-    USDC: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    BACK: "BH8thpWca6kpN2pKwWTaKv2F5s4MEkbML18LtJ8eFypU", // 🆕 SwapBack Token (Devnet)
+    USDC: "3y4dCqwWuYx1B97YEDmgq9qjuNE1eyEwGx2eLgz6Rc6G", // 🔄 USDC Test (Devnet)
+    BONK: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", // Bonk (Devnet)
     USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-    BONK: "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs",
     PYTH: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
     mSOL: "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
     JUP: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
     JTO: "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr",
   };
 
+  const tokenDecimals: { [key: string]: number } = {
+    SOL: 9,
+    BACK: 9, // 🆕 SwapBack Token
+    USDC: 6,
+    USDT: 6,
+    BONK: 5,
+    PYTH: 6,
+    mSOL: 9,
+    JUP: 6,
+    JTO: 9,
+  };
+
   // Récupérer balance + prix USD pour chaque token
   const inputTokenData = useTokenData(tokenAddresses[inputToken]);
   const outputTokenData = useTokenData(tokenAddresses[outputToken]);
+
+  // 🔄 Calcul automatique du prix avec debounce
+  useEffect(() => {
+    // Reset output si input est vide
+    if (!inputAmount || inputAmount === "" || parseFloat(inputAmount) <= 0) {
+      setOutputAmount("");
+      setRouteInfo(null);
+      setJupiterQuote(null);
+      return;
+    }
+
+    // Debounce: attendre 800ms après la dernière frappe
+    const debounceTimer = setTimeout(() => {
+      if (connected && inputAmount && parseFloat(inputAmount) > 0) {
+        console.log("🔄 Calcul automatique du prix...");
+        handleSimulateRoute();
+      }
+    }, 800);
+
+    return () => clearTimeout(debounceTimer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputAmount, inputToken, outputToken, selectedRouter, connected]);
 
   const handleSimulateRoute = async () => {
     if (!inputAmount || !connected) return;
@@ -79,54 +121,87 @@ export const SwapInterface = () => {
         throw new Error("Token non supporté");
       }
 
-      // Appeler l'API SwapBack pour simuler la route
-      const response = await fetch('http://localhost:3003/simulate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      if (selectedRouter === "jupiter") {
+        // 🪐 Jupiter V6 API
+        const inputDecimals = tokenDecimals[inputToken] || 6;
+        const amountInSmallestUnit = Math.floor(
+          parseFloat(inputAmount) * Math.pow(10, inputDecimals)
+        );
+        const slippageBps = Math.floor(slippage * 100);
+
+        console.log(`🪐 Jupiter quote request: ${inputAmount} ${inputToken} → ${outputToken}`);
+        console.log(`   Amount: ${amountInSmallestUnit} (decimals: ${inputDecimals})`);
+
+        const quote = await jupiter.getQuote(
           inputMint,
           outputMint,
-          inputAmount: (parseFloat(inputAmount) * 1000000).toString(), // Convertir en lamports pour USDC
-          slippage: slippage / 100,
-          userPubkey: publicKey?.toString(),
-        }),
-      });
+          amountInSmallestUnit,
+          slippageBps,
+          false
+        );
 
-      if (!response.ok) {
-        throw new Error('Erreur lors de la simulation de route');
+        if (quote) {
+          setJupiterQuote(quote);
+          setRouteInfo(null);
+          const outputDecimals = tokenDecimals[outputToken] || 6;
+          const output = Number(quote.outAmount) / Math.pow(10, outputDecimals);
+          setOutputAmount(output.toFixed(6));
+          console.log(`✅ Jupiter quote: ${output.toFixed(6)} ${outputToken}`);
+          console.log(`   Price impact: ${quote.priceImpactPct}%`);
+          console.log(`   Route markets:`, quote.routePlan?.length || 0);
+        } else {
+          throw new Error("Impossible d'obtenir un quote Jupiter");
+        }
+      } else {
+        // ⚡ SwapBack API
+        const response = await fetch('http://localhost:3003/simulate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            inputMint,
+            outputMint,
+            inputAmount: (parseFloat(inputAmount) * 1000000).toString(),
+            slippage: slippage / 100,
+            userPubkey: publicKey?.toString(),
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Erreur lors de la simulation de route');
+        }
+
+        const data = await response.json();
+        
+        console.log('📥 Données reçues de l\'API:', data);
+
+        const route: RouteInfo = {
+          type: data.type || "Aggregator",
+          estimatedOutput: data.estimatedOutput / 1000000 || 0,
+          nonOptimizedOutput: data.nonOptimizedOutput / 1000000 || 0,
+          npi: data.npi / 1000000 || 0,
+          rebate: data.rebateAmount / 1000000 || 0,
+          burn: data.burnAmount / 1000000 || 0,
+          fees: data.fees / 1000000 || 0,
+          route: data.route || [],
+          priceImpact: data.priceImpact || 0,
+        };
+        
+        console.log('✅ RouteInfo transformé:', route);
+        console.log('🛣️ Nombre d\'étapes de route:', route.route?.length);
+
+        setRouteInfo(route);
+        setJupiterQuote(null);
+        setOutputAmount(route.estimatedOutput.toFixed(6));
       }
-
-      const data = await response.json();
-      
-      console.log('📥 Données reçues de l\'API:', data);
-
-      // Transformer les données de l'API en format RouteInfo
-      const route: RouteInfo = {
-        type: data.type || "Aggregator",
-        estimatedOutput: data.estimatedOutput / 1000000 || 0, // Convertir depuis lamports
-        nonOptimizedOutput: data.nonOptimizedOutput / 1000000 || 0, // ✨ Prix sans SwapBack
-        npi: data.npi / 1000000 || 0,
-        rebate: data.rebateAmount / 1000000 || 0,
-        burn: data.burnAmount / 1000000 || 0,
-        fees: data.fees / 1000000 || 0,
-        route: data.route || [],
-        priceImpact: data.priceImpact || 0,
-      };
-      
-      console.log('✅ RouteInfo transformé:', route);
-      console.log('🛣️ Nombre d\'étapes de route:', route.route?.length);
-
-      setRouteInfo(route);
-      setOutputAmount(route.estimatedOutput.toFixed(6));
     } catch (error) {
       console.error("Erreur lors de la simulation:", error);
       // Fallback vers les données mockées en cas d'erreur
       const mockRoute: RouteInfo = {
         type: "Aggregator",
         estimatedOutput: parseFloat(inputAmount) * 0.005,
-        nonOptimizedOutput: parseFloat(inputAmount) * 0.0045, // Prix non optimisé (moins bon)
+        nonOptimizedOutput: parseFloat(inputAmount) * 0.0045,
         npi: parseFloat(inputAmount) * 0.002,
         rebate: parseFloat(inputAmount) * 0.0015,
         burn: parseFloat(inputAmount) * 0.0005,
@@ -134,6 +209,7 @@ export const SwapInterface = () => {
       };
 
       setRouteInfo(mockRoute);
+      setJupiterQuote(null);
       setOutputAmount(mockRoute.estimatedOutput.toFixed(6));
     } finally {
       setLoading(false);
@@ -141,58 +217,98 @@ export const SwapInterface = () => {
   };
 
   const handleExecuteSwap = async () => {
-    if (!connected || !publicKey || !routeInfo) return;
+    if (!connected || !publicKey) return;
 
     setLoading(true);
     try {
-      console.log("🔄 Exécution du swap...");
-      
-      // Simulation de l'exécution du swap
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      if (selectedRouter === "jupiter" && jupiterQuote) {
+        // 🪐 Jupiter Swap
+        console.log("🔄 Exécution du swap Jupiter...");
+        
+        const inputMint = tokenAddresses[inputToken];
+        const outputMint = tokenAddresses[outputToken];
+        const inputDecimals = tokenDecimals[inputToken] || 6;
+        const amountInSmallestUnit = Math.floor(
+          parseFloat(inputAmount) * Math.pow(10, inputDecimals)
+        );
+        const slippageBps = Math.floor(slippage * 100);
 
-      // 🔍 TRAÇAGE BLOCKCHAIN - Enregistrer l'opération sur la blockchain
-      console.log("📝 Traçage de l'opération sur la blockchain...");
-      const operation = await traceSwap(
-        {
-          inputToken: inputToken,
-          outputToken: outputToken,
-          inputAmount: parseFloat(inputAmount),
-          outputAmount: routeInfo.estimatedOutput / 1000000, // Convertir en format décimal
-          route: routeInfo.route ? routeInfo.route.map(step => step.label) : [routeInfo.type],
-          priceImpact: routeInfo.priceImpact || 0.01,
-          slippage: slippage
-        },
-        {
-          npi: routeInfo.npi,
-          rebate: routeInfo.rebate,
-          burn: routeInfo.burn,
-          fees: routeInfo.fees
+        const signature = await jupiter.executeSwap(
+          inputMint,
+          outputMint,
+          amountInSmallestUnit,
+          slippageBps
+        );
+
+        if (signature) {
+          setLastOperation(signature);
+          console.log("✅ Swap Jupiter exécuté:", signature);
+          alert(
+            `✅ Swap Jupiter exécuté avec succès!\n\n` +
+            `📋 Signature: ${signature.substring(0, 20)}...\n` +
+            `🔗 Voir sur Solscan (devnet)`
+          );
+
+          // Reset
+          setInputAmount("");
+          setOutputAmount("");
+          setJupiterQuote(null);
+        } else {
+          throw new Error("Le swap Jupiter a échoué");
         }
-      );
+      } else if (selectedRouter === "swapback" && routeInfo) {
+        // ⚡ SwapBack Swap
+        console.log("🔄 Exécution du swap SwapBack...");
+        
+        // Simulation de l'exécution du swap
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      if (operation) {
-        console.log("✅ Swap tracé avec succès!");
-        console.log("📋 Signature:", operation.signature);
-        console.log("🔗 Voir sur Solana Explorer:", 
-          `https://explorer.solana.com/tx/${operation.signature}?cluster=devnet`
+        // 🔍 TRAÇAGE BLOCKCHAIN
+        console.log("📝 Traçage de l'opération sur la blockchain...");
+        const operation = await traceSwap(
+          {
+            inputToken: inputToken,
+            outputToken: outputToken,
+            inputAmount: parseFloat(inputAmount),
+            outputAmount: routeInfo.estimatedOutput / 1000000,
+            route: routeInfo.route ? routeInfo.route.map(step => step.label) : [routeInfo.type],
+            priceImpact: routeInfo.priceImpact || 0.01,
+            slippage: slippage
+          },
+          {
+            npi: routeInfo.npi,
+            rebate: routeInfo.rebate,
+            burn: routeInfo.burn,
+            fees: routeInfo.fees
+          }
         );
-        
-        setLastOperation(operation.signature);
-        
-        alert(
-          `✅ Swap exécuté avec succès!\n\n` +
-          `📋 Signature: ${operation.signature.substring(0, 20)}...\n` +
-          `💰 Économies: ${((routeInfo.estimatedOutput - routeInfo.nonOptimizedOutput) / 1000000).toFixed(4)} ${outputToken}\n` +
-          `🔗 Opération tracée sur la blockchain`
-        );
-      } else {
-        alert("⚠️ Swap exécuté mais le traçage a échoué");
+
+        if (operation) {
+          console.log("✅ Swap tracé avec succès!");
+          console.log("📋 Signature:", operation.signature);
+          console.log("🔗 Voir sur Solana Explorer:", 
+            `https://explorer.solana.com/tx/${operation.signature}?cluster=devnet`
+          );
+          
+          setLastOperation(operation.signature);
+          
+          alert(
+            `✅ Swap SwapBack exécuté avec succès!\n\n` +
+            `📋 Signature: ${operation.signature.substring(0, 20)}...\n` +
+            `💰 Économies: ${((routeInfo.estimatedOutput - routeInfo.nonOptimizedOutput) / 1000000).toFixed(4)} ${outputToken}\n` +
+            `🎁 Rebate: ${routeInfo.rebate.toFixed(4)} ${outputToken}\n` +
+            `� Burn: ${routeInfo.burn.toFixed(4)} $BACK\n` +
+            `�🔗 Opération tracée sur la blockchain`
+          );
+        } else {
+          alert("⚠️ Swap exécuté mais le traçage a échoué");
+        }
+
+        // Reset
+        setInputAmount("");
+        setOutputAmount("");
+        setRouteInfo(null);
       }
-
-      // Reset
-      setInputAmount("");
-      setOutputAmount("");
-      setRouteInfo(null);
     } catch (error) {
       console.error("❌ Erreur lors du swap:", error);
       alert(`❌ Erreur lors du swap: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
@@ -239,6 +355,54 @@ export const SwapInterface = () => {
         </div>
         <h2 className="section-title mb-3">Swap Tokens</h2>
         <p className="body-regular text-gray-400">Get the best price across all Solana DEXs</p>
+      </div>
+
+      {/* Router Selection Toggle */}
+      <div className="mb-6">
+        <div className="flex gap-2 p-1 bg-black/30 rounded-xl border border-white/10">
+          <button
+            onClick={() => {
+              setSelectedRouter("swapback");
+              setRouteInfo(null);
+              setJupiterQuote(null);
+              setOutputAmount("");
+            }}
+            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
+              selectedRouter === "swapback"
+                ? "bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] text-white shadow-lg"
+                : "text-gray-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <div className="flex items-center justify-center gap-2">
+              <span>⚡</span>
+              <span>SwapBack</span>
+            </div>
+            {selectedRouter === "swapback" && (
+              <div className="text-xs mt-1 opacity-90">+Rebates +Burn</div>
+            )}
+          </button>
+          <button
+            onClick={() => {
+              setSelectedRouter("jupiter");
+              setRouteInfo(null);
+              setJupiterQuote(null);
+              setOutputAmount("");
+            }}
+            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
+              selectedRouter === "jupiter"
+                ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg"
+                : "text-gray-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <div className="flex items-center justify-center gap-2">
+              <span>🪐</span>
+              <span>Jupiter V6</span>
+            </div>
+            {selectedRouter === "jupiter" && (
+              <div className="text-xs mt-1 opacity-90">Best Market Price</div>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Input Token */}
@@ -614,7 +778,7 @@ export const SwapInterface = () => {
             <p className="text-gray-400 mb-4">Connect your wallet to start trading</p>
             <p className="text-xs text-gray-500">Powered by Solana Wallet Adapter</p>
           </div>
-        ) : !routeInfo ? (
+        ) : !(routeInfo || jupiterQuote) ? (
           <button
             onClick={handleSimulateRoute}
             disabled={!inputAmount || loading}

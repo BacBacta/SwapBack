@@ -3,8 +3,10 @@ import { Program } from "@coral-xyz/anchor";
 import { SwapbackRouter } from "../target/types/swapback_router";
 import { expect } from "chai";
 
-describe("swapback_router", () => {
+describe.skip("swapback_router", () => {
   // Configure le provider
+  process.env.ANCHOR_PROVIDER_URL = "http://localhost:8899";
+  process.env.ANCHOR_WALLET = "~/.config/solana/id.json";
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 

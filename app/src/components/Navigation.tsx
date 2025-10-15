@@ -3,15 +3,19 @@
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export const Navigation = () => {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const navLinks = [
     { href: "/", label: "Swap" },
-    { href: "/jupiter", label: "Jupiter" },
     { href: "/lock", label: "Lock & Earn" },
     { href: "/stats", label: "Stats" },
     { href: "/docs", label: "Docs" },
@@ -39,16 +43,34 @@ export const Navigation = () => {
                 >
                   {/* Lightning bolt with gradient */}
                   <defs>
-                    <linearGradient id="swapback-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" style={{ stopColor: "var(--primary)", stopOpacity: 1 }} />
-                      <stop offset="50%" style={{ stopColor: "var(--accent)", stopOpacity: 1 }} />
-                      <stop offset="100%" style={{ stopColor: "var(--secondary)", stopOpacity: 1 }} />
+                    <linearGradient
+                      id="swapback-gradient"
+                      x1="0%"
+                      y1="0%"
+                      x2="100%"
+                      y2="100%"
+                    >
+                      <stop
+                        offset="0%"
+                        style={{ stopColor: "var(--primary)", stopOpacity: 1 }}
+                      />
+                      <stop
+                        offset="50%"
+                        style={{ stopColor: "var(--accent)", stopOpacity: 1 }}
+                      />
+                      <stop
+                        offset="100%"
+                        style={{
+                          stopColor: "var(--secondary)",
+                          stopOpacity: 1,
+                        }}
+                      />
                     </linearGradient>
                     <filter id="glow">
-                      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                      <feGaussianBlur stdDeviation="2" result="coloredBlur" />
                       <feMerge>
-                        <feMergeNode in="coloredBlur"/>
-                        <feMergeNode in="SourceGraphic"/>
+                        <feMergeNode in="coloredBlur" />
+                        <feMergeNode in="SourceGraphic" />
                       </feMerge>
                     </filter>
                   </defs>
@@ -62,7 +84,7 @@ export const Navigation = () => {
                   SwapBack
                 </span>
               </Link>
-              
+
               {/* Desktop Navigation */}
               <div className="hidden md:flex space-x-1">
                 {navLinks.map((link) => (
@@ -83,19 +105,21 @@ export const Navigation = () => {
                 ))}
               </div>
             </div>
-            
+
             <div className="flex items-center gap-4">
               {/* Network indicator */}
               <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-[var(--secondary)]/10 rounded-lg border border-[var(--secondary)]/20">
                 <span className="w-2 h-2 bg-[var(--secondary)] rounded-full animate-pulse"></span>
-                <span className="text-xs font-semibold text-[var(--secondary)]">Solana</span>
+                <span className="text-xs font-semibold text-[var(--secondary)]">
+                  Solana
+                </span>
               </div>
-              
+
               {/* Wallet button - hidden on mobile to save space */}
               <div className="hidden sm:block">
-                <WalletMultiButton />
+                {isMounted ? <WalletMultiButton /> : null}
               </div>
-              
+
               {/* Mobile menu button */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -103,12 +127,32 @@ export const Navigation = () => {
                 aria-label="Toggle menu"
               >
                 {mobileMenuOpen ? (
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    className="w-6 h-6 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 ) : (
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  <svg
+                    className="w-6 h-6 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 6h16M4 12h16M4 18h16"
+                    />
                   </svg>
                 )}
               </button>
@@ -126,7 +170,7 @@ export const Navigation = () => {
             onClick={() => setMobileMenuOpen(false)}
             aria-label="Close menu"
           />
-          
+
           {/* Menu Panel */}
           <div className="fixed top-[73px] right-0 bottom-0 w-72 bg-[var(--glass-bg)] backdrop-blur-xl border-l border-white/10 z-50 md:hidden animate-slide-in-right shadow-2xl">
             <div className="flex flex-col h-full p-6">
@@ -147,16 +191,18 @@ export const Navigation = () => {
                   </Link>
                 ))}
               </div>
-              
+
               {/* Network indicator */}
               <div className="flex items-center gap-2 px-4 py-3 bg-[var(--secondary)]/10 rounded-lg border border-[var(--secondary)]/20 mb-6">
                 <span className="w-2 h-2 bg-[var(--secondary)] rounded-full animate-pulse"></span>
-                <span className="text-xs font-semibold text-[var(--secondary)]">Solana Network</span>
+                <span className="text-xs font-semibold text-[var(--secondary)]">
+                  Solana Network
+                </span>
               </div>
-              
+
               {/* Wallet button for mobile */}
               <div className="mt-auto">
-                <WalletMultiButton className="!w-full" />
+                {isMounted ? <WalletMultiButton className="!w-full" /> : null}
               </div>
             </div>
           </div>

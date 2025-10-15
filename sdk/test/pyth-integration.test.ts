@@ -1,22 +1,19 @@
-/**
- * Pyth Oracle Integration Test
- * Tests real Pyth price feed integration on Solana Mainnet
- */
-
+import { describe, it } from 'vitest';
 import { Connection, clusterApiUrl } from '@solana/web3.js';
 import { OraclePriceService } from '../src/services/OraclePriceService';
 
-async function testPythIntegration() {
-  console.log('🧪 Testing Pyth Oracle Integration...\n');
+describe.skip('Pyth Oracle Integration', () => {
+  it('should test Pyth integration', async () => {
+    console.log('🧪 Testing Pyth Oracle Integration...\n');
 
-  // Connect to Solana Mainnet
-  const connection = new Connection(
-    process.env.SOLANA_RPC_URL || clusterApiUrl('mainnet-beta'),
-    'confirmed'
-  );
+    // Connect to Solana Mainnet
+    const connection = new Connection(
+      process.env.SOLANA_RPC_URL || clusterApiUrl('mainnet-beta'),
+      'confirmed'
+    );
 
-  // Initialize Oracle Service
-  const oracleService = new OraclePriceService(connection, 5000);
+    // Initialize Oracle Service
+    const oracleService = new OraclePriceService(connection, 5000);
 
   // Test tokens (using mint addresses)
   const testCases = [
@@ -98,7 +95,5 @@ async function testPythIntegration() {
   }
 
   console.log('\n✅ Pyth Integration Test Complete!');
-}
-
-// Run tests
-testPythIntegration().catch(console.error);
+  });
+});

@@ -5,12 +5,6 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
-    exclude: [
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/tests/swapback_router.test.ts", // Requires Anchor setup
-      "**/sdk/test/pyth-integration.test.ts", // Empty file
-    ],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],

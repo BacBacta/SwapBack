@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, Burn, Mint, Token, TokenAccount, Transfer};
 
-declare_id!("75nEwGH4cpRq13PG2eEioQE1wBqSvxvK9bhWfvpvZvP7");
+declare_id!("71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW");
 
 #[program]
 pub mod swapback_buyback {

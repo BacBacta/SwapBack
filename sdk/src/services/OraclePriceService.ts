@@ -112,8 +112,11 @@ export class OraclePriceService {
   public async getTokenPrice(mint: string): Promise<OraclePriceData> {
     // Check cache first
     const cached = this.priceCache.get(mint);
-    if (cached && Date.now() - cached.timestamp < this.cacheExpiryMs) {
+    if (cached) {
+      const cachedAge = Date.now() - (cached.publishTime ?? cached.timestamp);
+      if (cachedAge < this.cacheExpiryMs) {
       return cached;
+    }
     }
 
     // Try Pyth first
@@ -180,13 +183,22 @@ export class OraclePriceService {
       }
 
       // Validate price freshness
-      const currentTime = Math.floor(Date.now() / 1000);
-      const publishTime = Number(priceData.lastSlot || 0);
-      const priceAge = currentTime - publishTime;
+      const publishTimeSeconds = Number(
+        (priceData as any).publishTime ?? priceData.timestamp ?? 0
+      );
 
-      if (priceAge > MAX_PRICE_AGE_SECONDS * 100) {
-        // Slots are faster than seconds
-        console.warn(`Pyth price stale: ${priceAge} slots old`);
+      if (!publishTimeSeconds || !Number.isFinite(publishTimeSeconds)) {
+        console.warn("Pyth publish time missing or invalid");
+        return null;
+      }
+
+      const publishTimeMs = publishTimeSeconds * 1000;
+      const priceAgeMs = Date.now() - publishTimeMs;
+
+      if (priceAgeMs > MAX_PRICE_AGE_SECONDS * 1000) {
+        console.warn(
+          `Pyth price stale: ${(priceAgeMs / 1000).toFixed(2)} seconds old`
+        );
         return null;
       }
 
@@ -195,8 +207,8 @@ export class OraclePriceService {
       const rawPrice = Number(priceData.price);
       const rawConfidence = Number(priceData.confidence || 0);
 
-      const price = rawPrice * Math.pow(10, exponent);
-      const confidence = rawConfidence * Math.pow(10, exponent);
+  const price = rawPrice * Math.pow(10, exponent);
+  const confidence = rawConfidence * Math.pow(10, exponent);
 
       // Validate confidence interval
       const confidencePercent =
@@ -215,7 +227,8 @@ export class OraclePriceService {
         provider: "pyth",
         price,
         confidence,
-        timestamp: Date.now(), // Use current time since Pyth uses slots
+        timestamp: publishTimeMs,
+        publishTime: publishTimeMs,
         exponent,
       };
     } catch (error) {
@@ -287,20 +300,20 @@ export class OraclePriceService {
 
       let price = 0;
       let stdDeviation = 0;
-      let timestamp = Math.floor(Date.now() / 1000);
+      let publishTimeSeconds = 0;
 
       try {
         // Read latest result (f64 at offset 240)
-        const resultBuffer = data.slice(240, 248);
+        const resultBuffer = data.subarray(240, 248);
         price = resultBuffer.readDoubleLE(0);
 
         // Read std deviation (f64 at offset 256)
-        const stdDevBuffer = data.slice(256, 264);
+        const stdDevBuffer = data.subarray(256, 264);
         stdDeviation = stdDevBuffer.readDoubleLE(0);
 
         // Read timestamp (i64 at offset 272)
-        const timestampBuffer = data.slice(272, 280);
-        timestamp = Number(timestampBuffer.readBigInt64LE(0));
+        const timestampBuffer = data.subarray(272, 280);
+        publishTimeSeconds = Number(timestampBuffer.readBigInt64LE(0));
       } catch (parseError) {
         console.warn("Switchboard data parsing failed:", parseError);
         // If parsing fails, return null to fallback to Pyth
@@ -314,7 +327,7 @@ export class OraclePriceService {
 
       // Validate staleness
       const currentTime = Math.floor(Date.now() / 1000);
-      const staleness = currentTime - timestamp;
+      const staleness = currentTime - publishTimeSeconds;
 
       if (staleness > SWITCHBOARD_MAX_STALENESS_SECONDS) {
         console.warn(
@@ -336,11 +349,13 @@ export class OraclePriceService {
       }
 
       // Return validated Switchboard price
+      const publishTimeMs = publishTimeSeconds * 1000;
       return {
         provider: "switchboard",
         price,
         confidence: stdDeviation,
-        timestamp: timestamp * 1000, // Convert to ms
+        timestamp: publishTimeMs,
+        publishTime: publishTimeMs,
         exponent: 0, // Switchboard returns normalized values
       };
     } catch (error) {
@@ -397,7 +412,8 @@ export class OraclePriceService {
    * Check if oracle price is fresh
    */
   isPriceFresh(price: OraclePriceData, maxAgeMs = 60000): boolean {
-    return Date.now() - price.timestamp < maxAgeMs;
+    const referenceTime = price.publishTime ?? price.timestamp;
+    return Date.now() - referenceTime < maxAgeMs;
   }
 
   /**
@@ -421,8 +437,8 @@ export class OraclePriceService {
  * Protects against flash crashes, oracle failures, or manipulated pools
  */
 export class PriceCircuitBreaker {
-  private oracleService: OraclePriceService;
-  private maxDeviationPercent: number;
+  private readonly oracleService: OraclePriceService;
+  private readonly maxDeviationPercent: number;
   private consecutiveFailures: number;
   private readonly maxConsecutiveFailures = 3;
 

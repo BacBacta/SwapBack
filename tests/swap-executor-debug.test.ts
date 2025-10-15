@@ -12,6 +12,7 @@ describe("SwapExecutor - Debug", () => {
     const mockConnection = { getLatestBlockhash: vi.fn() };
     const mockLiquidity = { fetchAggregatedLiquidity: vi.fn() };
     const mockOptimizer = { findOptimalRoutes: vi.fn() };
+    const mockRouter = { buildPlan: vi.fn(), adjustPlan: vi.fn() };
     const mockOracle = { getTokenPrice: vi.fn() };
     const mockJito = { submitBundle: vi.fn() };
     const mockCircuit = {
@@ -25,6 +26,7 @@ describe("SwapExecutor - Debug", () => {
       mockConnection as any,
       mockLiquidity as any,
       mockOptimizer as any,
+      mockRouter as any,
       mockOracle as any,
       mockJito as any,
       mockCircuit as any
@@ -41,6 +43,7 @@ describe("SwapExecutor - Debug", () => {
         .mockRejectedValue(new Error("Expected")),
     };
     const mockOptimizer = { findOptimalRoutes: vi.fn() };
+    const mockRouter = { buildPlan: vi.fn(), adjustPlan: vi.fn() };
     const mockOracle = { getTokenPrice: vi.fn() };
     const mockJito = { submitBundle: vi.fn() };
     const mockCircuit = {
@@ -55,6 +58,7 @@ describe("SwapExecutor - Debug", () => {
       mockConnection as any,
       mockLiquidity as any,
       mockOptimizer as any,
+      mockRouter as any,
       mockOracle as any,
       mockJito as any,
       mockCircuit as any
@@ -66,7 +70,7 @@ describe("SwapExecutor - Debug", () => {
       await executor.executeSwap({
         inputMint: "So11111111111111111111111111111111111111112",
         outputMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-        inputAmount: 1.0,
+        inputAmount: 1,
         maxSlippageBps: 50,
         userPublicKey: testKeypair.publicKey,
         signer: testKeypair,

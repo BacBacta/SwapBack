@@ -72,28 +72,43 @@ export const useTokenData = (tokenMint: string) => {
   useEffect(() => {
     const fetchPrice = async () => {
       try {
-        // Utiliser l'API Jupiter pour les prix
-        const response = await fetch(`https://price.jup.ag/v4/price?ids=${tokenMint}`);
-        const data = await response.json();
+        // 🔧 Sur devnet, on utilise des prix simulés réalistes
+        // Sur mainnet, utiliser: https://price.jup.ag/v4/price?ids=${tokenMint}
         
-        if (data.data && data.data[tokenMint]) {
-          setUsdPrice(data.data[tokenMint].price);
+        // Prix simulés pour devnet (basés sur les prix mainnet approximatifs)
+        const devnetPrices: { [key: string]: number } = {
+          // Native tokens
+          "So11111111111111111111111111111111111111112": 145.50, // SOL ~$145
+          
+          // Devnet test tokens
+          "BH8thpWca6kpN2pKwWTaKv2F5s4MEkbML18LtJ8eFypU": 0.001, // $BACK (simulé)
+          "3y4dCqwWuYx1B97YEDmgq9qjuNE1eyEwGx2eLgz6Rc6G": 1.00, // USDC Test
+          "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263": 0.00002, // BONK
+          
+          // Mainnet tokens (pour référence)
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": 1.00, // USDC
+          "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB": 1.00, // USDT
+          "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So": 160.00, // mSOL
+          "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN": 0.85, // JUP
+          "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr": 2.50, // JTO
+        };
+
+        // Utiliser le prix simulé ou 0
+        const price = devnetPrices[tokenMint] || 0;
+        setUsdPrice(price);
+        
+        if (price > 0) {
+          console.log(`💰 Prix pour ${tokenMint.substring(0, 8)}... = $${price}`);
         }
       } catch (error) {
         console.error("Error fetching price:", error);
-        // Fallback vers des prix mockés
-        const mockPrices: { [key: string]: number } = {
-          "So11111111111111111111111111111111111111112": 100, // SOL
-          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": 1, // USDC
-          "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB": 1, // USDT
-        };
-        setUsdPrice(mockPrices[tokenMint] || 0);
+        setUsdPrice(0);
       }
     };
 
     fetchPrice();
 
-    // Rafraîchir toutes les 60 secondes
+    // Rafraîchir toutes les 60 secondes (pour future intégration Pyth)
     const interval = setInterval(fetchPrice, 60000);
     return () => clearInterval(interval);
   }, [tokenMint]);

@@ -6,10 +6,11 @@
 import {
   Connection,
   Transaction,
-  TransactionInstruction,
   PublicKey,
-  VersionedTransaction,
+  TransactionInstruction,
+  SystemProgram,
 } from '@solana/web3.js';
+import bs58 from 'bs58';
 import {
   JitoBundleConfig,
   JitoBundleResult,
@@ -20,10 +21,23 @@ import {
 // JITO BUNDLE SERVICE
 // ============================================================================
 
+type PriorityLevel = 'low' | 'medium' | 'high';
+
+export interface BundleProtectionOptions {
+  tipLamports?: number;
+  priorityLevel?: PriorityLevel;
+  tradeValueUSD?: number;
+  fallbackQuickNode?: boolean;
+  quickNodeEndpoint?: string;
+  priorityFeeMicroLamports?: number;
+  maxRetries?: number;
+}
+
 export class JitoBundleService {
-  private connection: Connection;
-  private jitoBlockEngineUrl: string;
-  private defaultTipLamports: number;
+  private readonly connection: Connection;
+  private readonly jitoBlockEngineUrl: string;
+  private readonly defaultTipLamports: number;
+  private readonly tipAccounts: PublicKey[];
 
   constructor(
     connection: Connection,
@@ -33,6 +47,59 @@ export class JitoBundleService {
     this.connection = connection;
     this.jitoBlockEngineUrl = jitoBlockEngineUrl;
     this.defaultTipLamports = defaultTipLamports;
+    this.tipAccounts = [
+      '96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5',
+      'HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe',
+      'Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY',
+      'ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49',
+      'DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh',
+      'ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt',
+      'DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL',
+      '3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT',
+    ].map((address) => new PublicKey(address));
+  }
+
+  pickTipAccount(): PublicKey {
+    const index = Math.floor(Math.random() * this.tipAccounts.length);
+    return this.tipAccounts[index];
+  }
+
+  async submitProtectedBundle(
+    transactions: Transaction[],
+    options: BundleProtectionOptions = {}
+  ): Promise<JitoBundleResult> {
+    const priorityLevel = options.priorityLevel ?? 'medium';
+    const computedTip =
+      options.tipLamports ??
+      (await this.calculateOptimalTip(priorityLevel, options.tradeValueUSD));
+
+    const submissionConfig: JitoBundleConfig = {
+      enabled: true,
+      tipLamports: computedTip,
+      maxRetries: options.maxRetries ?? 3,
+    };
+
+    try {
+      const result = await this.submitBundle(transactions, submissionConfig);
+      return {
+        ...result,
+        strategy: 'jito',
+        tipLamports: computedTip,
+        priorityFeeMicroLamports: options.priorityFeeMicroLamports,
+      };
+    } catch (error) {
+      if (!options.fallbackQuickNode) {
+        throw error;
+      }
+
+      const fallback = await this.submitViaQuickNode(
+        transactions,
+        options.quickNodeEndpoint,
+        options.priorityFeeMicroLamports ?? 0,
+        computedTip
+      );
+      return fallback;
+    }
   }
 
   /**
@@ -55,9 +122,16 @@ export class JitoBundleService {
     }
 
     try {
-      // Add Jito tip instruction to the first transaction
-      const tipInstruction = await this.createJitoTipInstruction(bundleConfig.tipLamports);
-      transactions[0].add(tipInstruction);
+      // Add tip instruction to first transaction if tipLamports > 0
+      if (bundleConfig.tipLamports > 0 && transactions.length > 0) {
+        const tipAccount = this.pickTipAccount();
+        const tipInstruction = SystemProgram.transfer({
+          fromPubkey: transactions[0].feePayer || new PublicKey('11111111111111111111111111111112'), // fallback
+          toPubkey: tipAccount,
+          lamports: bundleConfig.tipLamports,
+        });
+        transactions[0].add(tipInstruction);
+      }
 
       // Serialize transactions
       const serializedTxs = transactions.map(tx => {
@@ -87,7 +161,11 @@ export class JitoBundleService {
       return {
         bundleId: result.result,
         status: 'pending',
-        signatures: transactions.map(tx => tx.signature?.toString() || ''),
+        signatures: transactions.map((tx) =>
+          tx.signature ? bs58.encode(tx.signature) : ''
+        ),
+        strategy: 'jito',
+        tipLamports: bundleConfig.tipLamports,
       };
     } catch (error) {
       console.error('Jito bundle submission error:', error);
@@ -95,36 +173,71 @@ export class JitoBundleService {
     }
   }
 
-  /**
-   * Create Jito tip instruction
-   * Tips are sent to Jito's tip account to prioritize bundle
-   */
-  private async createJitoTipInstruction(tipLamports: number): Promise<TransactionInstruction> {
-    // Jito tip accounts (rotate for distribution)
-    const JITO_TIP_ACCOUNTS = [
-      '96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5',
-      'HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe',
-      'Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY',
-      'ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49',
-      'DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh',
-      'ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt',
-      'DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL',
-      '3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT',
-    ];
+  private async submitViaQuickNode(
+    transactions: Transaction[],
+    endpoint?: string,
+    priorityFeeMicroLamports = 0,
+    tipLamports?: number
+  ): Promise<JitoBundleResult> {
+    const quickNodeEndpoint = endpoint ?? process.env.QUICKNODE_LILJIT_URL;
 
-    // Select random tip account
-    const tipAccount = JITO_TIP_ACCOUNTS[Math.floor(Math.random() * JITO_TIP_ACCOUNTS.length)];
+    if (!quickNodeEndpoint) {
+      throw new Error('QuickNode Lil JIT endpoint not configured');
+    }
+
+    const serializedTxs = transactions.map((tx) =>
+      tx.serialize({ requireAllSignatures: false }).toString('base64')
+    );
+
+    const body = {
+      transactions: serializedTxs,
+      options: {
+        priorityFeeMicroLamports,
+        tipLamports,
+      },
+    };
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (process.env.QUICKNODE_API_KEY) {
+      headers.Authorization = `Bearer ${process.env.QUICKNODE_API_KEY}`;
+    }
+
+    const response = await fetch(quickNodeEndpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `QuickNode Lil JIT submission failed: ${response.status} ${response.statusText}`
+      );
+    }
+
+    let parsed: any = {};
+    try {
+      parsed = await response.json();
+    } catch (error) {
+      console.warn('QuickNode response parse failed', error);
+    }
+
+    const bundleId =
+      parsed?.bundleId ??
+      parsed?.result ??
+      parsed?.id ??
+      `quicknode-${Date.now()}`;
 
     return {
-      keys: [
-        {
-          pubkey: new PublicKey(tipAccount),
-          isSigner: false,
-          isWritable: true,
-        },
-      ],
-      programId: new PublicKey('11111111111111111111111111111111'),
-      data: Buffer.from([]),
+      bundleId,
+      status: 'pending',
+      signatures: transactions.map((tx) =>
+        tx.signature ? bs58.encode(tx.signature) : ''
+      ),
+      strategy: 'quicknode',
+      tipLamports,
+      priorityFeeMicroLamports,
     };
   }
 
@@ -182,6 +295,7 @@ export class JitoBundleService {
           bundleId,
           status: 'landed',
           signatures: [],
+          strategy: 'jito',
         };
       }
 
@@ -200,7 +314,8 @@ export class JitoBundleService {
    * Calculate optimal tip based on network conditions
    */
   async calculateOptimalTip(
-    priorityLevel: 'low' | 'medium' | 'high' = 'medium'
+    priorityLevel: PriorityLevel = 'medium',
+    tradeValueUSD?: number
   ): Promise<number> {
     // Base tips by priority
     const baseTips = {
@@ -209,12 +324,14 @@ export class JitoBundleService {
       high: 50000,    // 0.00005 SOL
     };
 
-    // TODO: Implement dynamic tip calculation based on:
-    // - Recent bundle acceptance rates
-    // - Network congestion
-    // - Time of day
-    
-    return baseTips[priorityLevel];
+    const base = baseTips[priorityLevel];
+
+    if (!tradeValueUSD || tradeValueUSD <= 0) {
+      return base;
+    }
+
+    const scaled = Math.min(4, Math.max(1, tradeValueUSD / 10000));
+    return Math.floor(base * scaled);
   }
 }
 
@@ -330,8 +447,8 @@ export class MEVProtectionAnalyzer {
  * Detects potential sandwich attacks in mempool
  */
 export class SandwichDetector {
-  private connection: Connection;
-  private recentTransactions: Map<string, number>;
+  private readonly connection: Connection;
+  private readonly recentTransactions: Map<string, number>;
 
   constructor(connection: Connection) {
     this.connection = connection;
@@ -350,7 +467,7 @@ export class SandwichDetector {
     reason?: string;
     confidence: number;
   }> {
-    // TODO: Implement mempool monitoring
+  // NOTE: A full mempool monitor is not yet integrated.
     // Look for:
     // - Repeated large swaps in same direction
     // - Front-running patterns
@@ -371,7 +488,7 @@ export class SandwichDetector {
     frontRunner?: string;
     backRunner?: string;
   }> {
-    // TODO: Implement post-execution sandwich detection
+  // NOTE: Post-trade sandwich detection can be plugged in with block data analytics.
     // Compare with transactions in same block
     
     return {

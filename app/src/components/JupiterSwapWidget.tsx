@@ -1,16 +1,36 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { useJupiter } from '../hooks/useJupiter';
-import { JupiterRouteDisplay } from './JupiterRouteDisplay';
-import type { JupiterQuote, RouteInfo } from '@swapback/sdk';
+import React, { useState, useEffect } from "react";
+import { useJupiter } from "../hooks/useJupiter";
+import { JupiterRouteDisplay } from "./JupiterRouteDisplay";
+import type { JupiterQuote, RouteInfo } from "@swapback/sdk";
 
 // Tokens populaires pour les tests
 const POPULAR_TOKENS = [
-  { symbol: 'SOL', mint: 'So11111111111111111111111111111111111111112', decimals: 9, logo: '◎' },
-  { symbol: 'USDC', mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', decimals: 6, logo: '$' },
-  { symbol: 'USDT', mint: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', decimals: 6, logo: '₮' },
-  { symbol: 'BONK', mint: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', decimals: 5, logo: '🐕' },
+  {
+    symbol: "SOL",
+    mint: "So11111111111111111111111111111111111111112",
+    decimals: 9,
+    logo: "◎",
+  },
+  {
+    symbol: "USDC",
+    mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    decimals: 6,
+    logo: "$",
+  },
+  {
+    symbol: "USDT",
+    mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+    decimals: 6,
+    logo: "₮",
+  },
+  {
+    symbol: "BONK",
+    mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+    decimals: 5,
+    logo: "🐕",
+  },
 ];
 
 export const JupiterSwapWidget: React.FC = () => {
@@ -19,7 +39,7 @@ export const JupiterSwapWidget: React.FC = () => {
   // État du swap
   const [inputToken, setInputToken] = useState(POPULAR_TOKENS[0]);
   const [outputToken, setOutputToken] = useState(POPULAR_TOKENS[1]);
-  const [inputAmount, setInputAmount] = useState('');
+  const [inputAmount, setInputAmount] = useState("");
   const [slippage, setSlippage] = useState(0.5); // 0.5%
 
   // État du quote
@@ -45,7 +65,7 @@ export const JupiterSwapWidget: React.FC = () => {
   // Obtenir un quote
   const fetchQuote = async () => {
     if (!inputAmount || parseFloat(inputAmount) <= 0) {
-      setQuoteError('Veuillez entrer un montant valide');
+      setQuoteError("Veuillez entrer un montant valide");
       return;
     }
 
@@ -75,11 +95,13 @@ export const JupiterSwapWidget: React.FC = () => {
         const route = jupiter.parseRouteInfo(jupiterQuote);
         setRouteInfo(route);
       } else {
-        setQuoteError('Impossible d\'obtenir un quote. Vérifiez votre connexion.');
+        setQuoteError(
+          "Impossible d'obtenir un quote. Vérifiez votre connexion."
+        );
       }
     } catch (error) {
-      console.error('Erreur lors de la récupération du quote:', error);
-      setQuoteError(error instanceof Error ? error.message : 'Erreur inconnue');
+      console.error("Erreur lors de la récupération du quote:", error);
+      setQuoteError(error instanceof Error ? error.message : "Erreur inconnue");
     } finally {
       setIsLoadingQuote(false);
     }
@@ -111,15 +133,15 @@ export const JupiterSwapWidget: React.FC = () => {
 
       if (signature) {
         setSwapSuccess(signature);
-        setInputAmount('');
+        setInputAmount("");
         setQuote(null);
         setRouteInfo(null);
       } else {
-        setSwapError('Le swap a échoué. Veuillez réessayer.');
+        setSwapError("Le swap a échoué. Veuillez réessayer.");
       }
     } catch (error) {
-      console.error('Erreur lors du swap:', error);
-      setSwapError(error instanceof Error ? error.message : 'Erreur inconnue');
+      console.error("Erreur lors du swap:", error);
+      setSwapError(error instanceof Error ? error.message : "Erreur inconnue");
     } finally {
       setIsSwapping(false);
     }
@@ -172,16 +194,20 @@ export const JupiterSwapWidget: React.FC = () => {
           <select
             value={inputToken.symbol}
             onChange={(e) => {
-              const token = POPULAR_TOKENS.find(t => t.symbol === e.target.value);
+              const token = POPULAR_TOKENS.find(
+                (t) => t.symbol === e.target.value
+              );
               if (token) setInputToken(token);
             }}
             className="text-sm font-medium border border-gray-300 rounded px-2 py-1"
           >
-            {POPULAR_TOKENS.filter(t => t.symbol !== outputToken.symbol).map(token => (
-              <option key={token.symbol} value={token.symbol}>
-                {token.logo} {token.symbol}
-              </option>
-            ))}
+            {POPULAR_TOKENS.filter((t) => t.symbol !== outputToken.symbol).map(
+              (token) => (
+                <option key={token.symbol} value={token.symbol}>
+                  {token.logo} {token.symbol}
+                </option>
+              )
+            )}
           </select>
         </div>
         <input
@@ -201,8 +227,18 @@ export const JupiterSwapWidget: React.FC = () => {
           onClick={handleSwapTokens}
           className="bg-gray-100 hover:bg-gray-200 rounded-full p-2 transition-colors"
         >
-          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+          <svg
+            className="w-5 h-5 text-gray-600"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
+            />
           </svg>
         </button>
       </div>
@@ -214,34 +250,40 @@ export const JupiterSwapWidget: React.FC = () => {
           <select
             value={outputToken.symbol}
             onChange={(e) => {
-              const token = POPULAR_TOKENS.find(t => t.symbol === e.target.value);
+              const token = POPULAR_TOKENS.find(
+                (t) => t.symbol === e.target.value
+              );
               if (token) setOutputToken(token);
             }}
             className="text-sm font-medium border border-gray-300 rounded px-2 py-1"
           >
-            {POPULAR_TOKENS.filter(t => t.symbol !== inputToken.symbol).map(token => (
-              <option key={token.symbol} value={token.symbol}>
-                {token.logo} {token.symbol}
-              </option>
-            ))}
+            {POPULAR_TOKENS.filter((t) => t.symbol !== inputToken.symbol).map(
+              (token) => (
+                <option key={token.symbol} value={token.symbol}>
+                  {token.logo} {token.symbol}
+                </option>
+              )
+            )}
           </select>
         </div>
         <div className="text-2xl font-bold text-gray-800">
-          {quote ? (
-            (Number(quote.outAmount) / Math.pow(10, outputToken.decimals)).toFixed(6)
-          ) : (
-            '0.00'
-          )}
+          {quote
+            ? (
+                Number(quote.outAmount) / Math.pow(10, outputToken.decimals)
+              ).toFixed(6)
+            : "0.00"}
         </div>
       </div>
 
       {/* Bouton Get Quote */}
       <button
         onClick={fetchQuote}
-        disabled={!inputAmount || parseFloat(inputAmount) <= 0 || isLoadingQuote}
+        disabled={
+          !inputAmount || parseFloat(inputAmount) <= 0 || isLoadingQuote
+        }
         className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-semibold py-3 rounded-lg transition-colors"
       >
-        {isLoadingQuote ? 'Chargement...' : 'Obtenir un Quote'}
+        {isLoadingQuote ? "Chargement..." : "Obtenir un Quote"}
       </button>
 
       {/* Affichage du quote */}
@@ -270,7 +312,7 @@ export const JupiterSwapWidget: React.FC = () => {
           disabled={isSwapping}
           className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-semibold py-3 rounded-lg transition-colors"
         >
-          {isSwapping ? 'Swap en cours...' : 'Exécuter le Swap'}
+          {isSwapping ? "Swap en cours..." : "Exécuter le Swap"}
         </button>
       )}
 
@@ -299,7 +341,8 @@ export const JupiterSwapWidget: React.FC = () => {
       {/* Wallet info */}
       {jupiter.isReady && jupiter.walletAddress && (
         <div className="text-xs text-gray-500 text-center pt-2 border-t border-gray-200">
-          Connecté: {jupiter.walletAddress.slice(0, 4)}...{jupiter.walletAddress.slice(-4)}
+          Connecté: {jupiter.walletAddress.slice(0, 4)}...
+          {jupiter.walletAddress.slice(-4)}
         </div>
       )}
     </div>

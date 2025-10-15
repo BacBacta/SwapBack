@@ -459,12 +459,13 @@ export class BlockchainTracer {
     for (const op of operations) {
       // Compter par type
       switch (op.type) {
-        case OperationType.SWAP:
+        case OperationType.SWAP: {
           stats.totalSwaps++;
           const swapDetails = op.details as SwapDetails;
           stats.totalVolume += swapDetails.inputAmount;
           if (op.npi) stats.totalSavings += op.npi;
           break;
+        }
         case OperationType.LOCK:
           stats.totalLocks++;
           break;
@@ -631,18 +632,21 @@ export class OperationFormatter {
     
     let detailsStr = '';
     switch (operation.type) {
-      case OperationType.SWAP:
+      case OperationType.SWAP: {
         const swap = operation.details as SwapDetails;
         detailsStr = `${swap.inputAmount} ${swap.inputToken} → ${swap.outputAmount} ${swap.outputToken}`;
         break;
-      case OperationType.LOCK:
+      }
+      case OperationType.LOCK: {
         const lock = operation.details as LockDetails;
         detailsStr = `${lock.amount} ${lock.token} (${lock.duration}s)`;
         break;
-      case OperationType.UNLOCK:
+      }
+      case OperationType.UNLOCK: {
         const unlock = operation.details as UnlockDetails;
         detailsStr = `${unlock.amount} ${unlock.token}`;
         break;
+      }
     }
 
     return `${status} ${operation.type} | ${date} | ${detailsStr} | Sig: ${operation.signature.substring(0, 8)}...`;

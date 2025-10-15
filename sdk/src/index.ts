@@ -33,6 +33,7 @@ export { LiquidityDataCollector } from "./services/LiquidityDataCollector";
 export { RouteOptimizationEngine } from "./services/RouteOptimizationEngine";
 export { OraclePriceService } from "./services/OraclePriceService";
 export { JitoBundleService } from "./services/JitoBundleService";
+export { IntelligentOrderRouter } from "./services/IntelligentOrderRouter";
 export * from "./types/smart-router";
 
 /**
