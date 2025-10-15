@@ -24,22 +24,40 @@ interface StubContext {
 
 const DUMMY_PUBLIC_KEY = new PublicKey("11111111111111111111111111111111");
 
-function buildSnapshot(venue: VenueName): Record<VenueName, { effectivePrice: number; depth: number; timestamp: number }> {
-  return Object.values(VenueName).reduce((acc, name) => {
-    acc[name] = {
-      effectivePrice: name === venue ? 95 : 100,
-      depth: name === venue ? 1_000_000 : 500_000,
-      timestamp: Date.now(),
-    };
-    return acc;
-  }, {} as Record<VenueName, { effectivePrice: number; depth: number; timestamp: number }>);
+function buildSnapshot(
+  venue: VenueName
+): Record<
+  VenueName,
+  { effectivePrice: number; depth: number; timestamp: number }
+> {
+  return Object.values(VenueName).reduce(
+    (acc, name) => {
+      acc[name] = {
+        effectivePrice: name === venue ? 95 : 100,
+        depth: name === venue ? 1_000_000 : 500_000,
+        timestamp: Date.now(),
+      };
+      return acc;
+    },
+    {} as Record<
+      VenueName,
+      { effectivePrice: number; depth: number; timestamp: number }
+    >
+  );
 }
 
-function createStubPlan(id: string, venue: VenueName, fallbackPlans: AtomicSwapPlan[] = []): AtomicSwapPlan {
+function createStubPlan(
+  id: string,
+  venue: VenueName,
+  fallbackPlans: AtomicSwapPlan[] = []
+): AtomicSwapPlan {
   const route: RouteCandidate = {
     id: `${id}-route`,
     venues: [venue],
-    path: ["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
+    path: [
+      "So11111111111111111111111111111111111111112",
+      "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    ],
     hops: 1,
     splits: [
       {
@@ -50,12 +68,18 @@ function createStubPlan(id: string, venue: VenueName, fallbackPlans: AtomicSwapP
         liquiditySource: {
           venue,
           venueType: VenueType.AMM,
-          tokenPair: ["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
+          tokenPair: [
+            "So11111111111111111111111111111111111111112",
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          ],
           depth: 1_000_000,
           effectivePrice: 95,
           feeAmount: 0.1,
           slippagePercent: 0.2,
-          route: ["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
+          route: [
+            "So11111111111111111111111111111111111111112",
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          ],
           timestamp: Date.now(),
         },
       },
@@ -112,7 +136,10 @@ function createStubPlan(id: string, venue: VenueName, fallbackPlans: AtomicSwapP
 }
 
 function createStubExecutor(): SwapExecutor {
-  const connection = new Connection("https://api.devnet.solana.com", "confirmed");
+  const connection = new Connection(
+    "https://api.devnet.solana.com",
+    "confirmed"
+  );
   const liquidityCollector = {} as unknown as LiquidityDataCollector;
   const optimizer = {} as unknown as RouteOptimizationEngine;
   const router = {} as unknown as IntelligentOrderRouter;
@@ -151,7 +178,9 @@ async function simulateFallback(): Promise<void> {
   const executorAny = executor as any;
 
   const fallbackPlan = createStubPlan("amm_fallback", VenueName.METEORA);
-  const primaryPlan = createStubPlan("clob_primary", VenueName.PHOENIX, [fallbackPlan]);
+  const primaryPlan = createStubPlan("clob_primary", VenueName.PHOENIX, [
+    fallbackPlan,
+  ]);
 
   const params: SwapParams = {
     inputMint: primaryPlan.inputMint,
@@ -196,7 +225,10 @@ async function simulateFallback(): Promise<void> {
   console.log("Fallback simulation ✅");
   console.log("- Attempts:", attempts);
   console.log("- Final signature:", ctx.signature);
-  console.log("- Routes used:", ctx.routes.map((route) => route.id));
+  console.log(
+    "- Routes used:",
+    ctx.routes.map((route) => route.id)
+  );
 }
 
 async function simulateTwap(): Promise<void> {
@@ -258,17 +290,17 @@ async function simulateTwap(): Promise<void> {
     return;
   }
 
-  await executorAny.executeTwapSlices(
-    params,
-    twapPlan,
-    ctx,
-    0.01,
-    { ...config, slices: sliceResults.length + 1 }
-  );
+  await executorAny.executeTwapSlices(params, twapPlan, ctx, 0.01, {
+    ...config,
+    slices: sliceResults.length + 1,
+  });
 
   console.log("TWAP simulation ✅");
   console.log("- Chunk signatures:", ctx.chunkSignatures);
-  console.log("- Routes aggregated:", ctx.routes.map((route) => route.id));
+  console.log(
+    "- Routes aggregated:",
+    ctx.routes.map((route) => route.id)
+  );
   console.log("- Final signature:", ctx.signature);
 }
 

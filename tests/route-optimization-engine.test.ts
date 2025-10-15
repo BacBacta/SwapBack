@@ -36,7 +36,7 @@ vi.mock("../sdk/src/services/LiquidityDataCollector", () => ({
 vi.mock("../sdk/src/services/OraclePriceService", () => ({
   OraclePriceService: vi.fn().mockImplementation(() => ({
     getTokenPrice: vi.fn().mockResolvedValue({
-      provider: 'pyth',
+      provider: "pyth",
       price: 150,
       confidence: 1,
       timestamp: Date.now(),

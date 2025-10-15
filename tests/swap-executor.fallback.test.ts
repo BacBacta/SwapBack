@@ -1,7 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { SwapExecutor, SwapParams } from "../sdk/src/services/SwapExecutor";
-import { AtomicSwapLeg, AtomicSwapPlan, RouteCandidate, VenueName, VenueType } from "../sdk/src/types/smart-router";
+import {
+  AtomicSwapLeg,
+  AtomicSwapPlan,
+  RouteCandidate,
+  VenueName,
+  VenueType,
+} from "../sdk/src/types/smart-router";
 import type { LiquidityDataCollector } from "../sdk/src/services/LiquidityDataCollector";
 import type { RouteOptimizationEngine } from "../sdk/src/services/RouteOptimizationEngine";
 import type { IntelligentOrderRouter } from "../sdk/src/services/IntelligentOrderRouter";
@@ -22,7 +28,10 @@ function buildLiquiditySnapshot(venue: VenueName) {
       };
       return acc;
     },
-    {} as Record<VenueName, { effectivePrice: number; depth: number; timestamp: number }>
+    {} as Record<
+      VenueName,
+      { effectivePrice: number; depth: number; timestamp: number }
+    >
   );
 }
 
@@ -30,7 +39,10 @@ function createStubPlan(id: string, venue: VenueName): AtomicSwapPlan {
   const route: RouteCandidate = {
     id: `${id}-route`,
     venues: [venue],
-    path: ["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
+    path: [
+      "So11111111111111111111111111111111111111112",
+      "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    ],
     hops: 1,
     splits: [
       {
@@ -41,12 +53,18 @@ function createStubPlan(id: string, venue: VenueName): AtomicSwapPlan {
         liquiditySource: {
           venue,
           venueType: VenueType.AMM,
-          tokenPair: ["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
+          tokenPair: [
+            "So11111111111111111111111111111111111111112",
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          ],
           depth: 1_000_000,
           effectivePrice: 95,
           feeAmount: 0.1,
           slippagePercent: 0.2,
-          route: ["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
+          route: [
+            "So11111111111111111111111111111111111111112",
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          ],
           timestamp: Date.now(),
         },
       },
@@ -185,8 +203,8 @@ describe("SwapExecutor fallback routing", () => {
     );
 
     expect(executeSpy).toHaveBeenCalledTimes(2);
-  expect(context.signature).toBe("sig-fallback");
-  expect(context.routes[0]?.id).toBe("fallback-route");
+    expect(context.signature).toBe("sig-fallback");
+    expect(context.routes[0]?.id).toBe("fallback-route");
   });
 
   it("throws when all candidate plans fail", async () => {
@@ -206,10 +224,15 @@ describe("SwapExecutor fallback routing", () => {
     });
 
     await expect(
-      (executor as any).runPlanWithFallback(params, [primary, fallback], context, 0.01)
+      (executor as any).runPlanWithFallback(
+        params,
+        [primary, fallback],
+        context,
+        0.01
+      )
     ).rejects.toThrow("execution reverted");
 
-  expect(context.signature).toBeUndefined();
+    expect(context.signature).toBeUndefined();
   });
 });
 
@@ -247,9 +270,9 @@ describe("SwapExecutor TWAP execution", () => {
     plan.baseRoute!.splits[0].liquiditySource.depth = 50_000;
 
     vi.spyOn(executor as any, "delay").mockResolvedValue(undefined);
-    vi
-      .spyOn(executor as any, "rebuildPlanForAmount")
-      .mockImplementation(async () => ({ ...plan } as AtomicSwapPlan));
+    vi.spyOn(executor as any, "rebuildPlanForAmount").mockImplementation(
+      async () => ({ ...plan }) as AtomicSwapPlan
+    );
 
     let attempt = 0;
     const attemptSpy = vi

@@ -65,43 +65,63 @@ const mockRouter = {
     createdAt: Date.now(),
     expiresAt: Date.now() + 60000,
     quoteValidityMs: 60000,
-    legs: [{
-      venue: VenueName.ORCA,
-      venueType: VenueType.AMM,
-      route: ["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
-      inputAmount: 1.5,
-      expectedOutput: 165,
-      minOutput: 142.71,
-      feeAmount: 5,
-      slippagePercent: 5,
-      quote: {
+    legs: [
+      {
         venue: VenueName.ORCA,
         venueType: VenueType.AMM,
-        tokenPair: ["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
-        depth: 100000,
-        effectivePrice: 100.5,
+        route: [
+          "So11111111111111111111111111111111111111112",
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        ],
+        inputAmount: 1.5,
+        expectedOutput: 165,
+        minOutput: 142.71,
         feeAmount: 5,
         slippagePercent: 5,
-        route: ["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
-        timestamp: Date.now(),
+        quote: {
+          venue: VenueName.ORCA,
+          venueType: VenueType.AMM,
+          tokenPair: [
+            "So11111111111111111111111111111111111111112",
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          ],
+          depth: 100000,
+          effectivePrice: 100.5,
+          feeAmount: 5,
+          slippagePercent: 5,
+          route: [
+            "So11111111111111111111111111111111111111112",
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          ],
+          timestamp: Date.now(),
+        },
+        liquiditySource: {
+          venue: VenueName.ORCA,
+          venueType: VenueType.AMM,
+          tokenPair: [
+            "So11111111111111111111111111111111111111112",
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          ],
+          depth: 100000,
+          effectivePrice: 100.5,
+          feeAmount: 5,
+          slippagePercent: 5,
+          route: [
+            "So11111111111111111111111111111111111111112",
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          ],
+          timestamp: Date.now(),
+        },
       },
-      liquiditySource: {
-        venue: VenueName.ORCA,
-        venueType: VenueType.AMM,
-        tokenPair: ["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
-        depth: 100000,
-        effectivePrice: 100.5,
-        feeAmount: 5,
-        slippagePercent: 5,
-        route: ["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
-        timestamp: Date.now(),
-      },
-    }],
+    ],
     simulations: [],
     baseRoute: {
       id: "route-1",
       venues: [VenueName.ORCA],
-      path: ["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
+      path: [
+        "So11111111111111111111111111111111111111112",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      ],
       hops: 1,
       splits: [],
       expectedOutput: 165,
@@ -130,43 +150,63 @@ const mockRouter = {
       createdAt: Date.now(),
       expiresAt: Date.now() + 60000,
       quoteValidityMs: 60000,
-      legs: [{
-        venue: VenueName.ORCA,
-        venueType: VenueType.AMM,
-        route: ["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
-        inputAmount: 1.5,
-        expectedOutput: 150.75,
-        minOutput: 142.71,
-        feeAmount: 5,
-        slippagePercent: 5,
-        quote: {
+      legs: [
+        {
           venue: VenueName.ORCA,
           venueType: VenueType.AMM,
-          tokenPair: ["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
-          depth: 100000,
-          effectivePrice: 100.5,
+          route: [
+            "So11111111111111111111111111111111111111112",
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          ],
+          inputAmount: 1.5,
+          expectedOutput: 150.75,
+          minOutput: 142.71,
           feeAmount: 5,
           slippagePercent: 5,
-          route: ["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
-          timestamp: Date.now(),
+          quote: {
+            venue: VenueName.ORCA,
+            venueType: VenueType.AMM,
+            tokenPair: [
+              "So11111111111111111111111111111111111111112",
+              "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            ],
+            depth: 100000,
+            effectivePrice: 100.5,
+            feeAmount: 5,
+            slippagePercent: 5,
+            route: [
+              "So11111111111111111111111111111111111111112",
+              "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            ],
+            timestamp: Date.now(),
+          },
+          liquiditySource: {
+            venue: VenueName.ORCA,
+            venueType: VenueType.AMM,
+            tokenPair: [
+              "So11111111111111111111111111111111111111112",
+              "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            ],
+            depth: 100000,
+            effectivePrice: 100.5,
+            feeAmount: 5,
+            slippagePercent: 5,
+            route: [
+              "So11111111111111111111111111111111111111112",
+              "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            ],
+            timestamp: Date.now(),
+          },
         },
-        liquiditySource: {
-          venue: VenueName.ORCA,
-          venueType: VenueType.AMM,
-          tokenPair: ["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
-          depth: 100000,
-          effectivePrice: 100.5,
-          feeAmount: 5,
-          slippagePercent: 5,
-          route: ["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
-          timestamp: Date.now(),
-        },
-      }],
+      ],
       simulations: [],
       baseRoute: {
         id: "route-1",
         venues: [VenueName.ORCA],
-        path: ["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
+        path: [
+          "So11111111111111111111111111111111111111112",
+          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        ],
         hops: 1,
         splits: [],
         expectedOutput: 150.75,
@@ -210,7 +250,11 @@ const mockJitoService = {
     strategy: "jito",
     tipLamports: 10000,
   }),
-  pickTipAccount: vi.fn().mockReturnValue(new PublicKey("Jito4APyf642JPZPx3hGcRVrLseQmNMsyUkEbJ9KBEM")),
+  pickTipAccount: vi
+    .fn()
+    .mockReturnValue(
+      new PublicKey("Jito4APyf642JPZPx3hGcRVrLseQmNMsyUkEbJ9KBEM")
+    ),
 };
 
 // Mock CircuitBreaker
@@ -353,9 +397,12 @@ describe("SwapExecutor", () => {
     );
 
     // Mock private methods to avoid TransactionInstruction creation issues
-    vi.spyOn(executor as any, 'createSwapInstructions').mockResolvedValue([]);
-    vi.spyOn(executor as any, 'createGlobalMinOutputGuardInstruction').mockReturnValue(null);
-    vi.spyOn(executor as any, 'getMintDecimals').mockResolvedValue(6);
+    vi.spyOn(executor as any, "createSwapInstructions").mockResolvedValue([]);
+    vi.spyOn(
+      executor as any,
+      "createGlobalMinOutputGuardInstruction"
+    ).mockReturnValue(null);
+    vi.spyOn(executor as any, "getMintDecimals").mockResolvedValue(6);
   });
 
   // ============================================================================
@@ -427,38 +474,40 @@ describe("SwapExecutor", () => {
         createdAt: Date.now(),
         expiresAt: Date.now() + 60000,
         quoteValidityMs: 60000,
-        legs: [{
-          venue: VenueName.ORCA,
-          venueType: VenueType.AMM,
-          route: [SOL_MINT, USDC_MINT],
-          inputAmount: 1.5,
-          expectedOutput: 150.75,
-          minOutput: 142.71,
-          feeAmount: 5,
-          slippagePercent: 5,
-          quote: {
+        legs: [
+          {
             venue: VenueName.ORCA,
             venueType: VenueType.AMM,
-            tokenPair: [SOL_MINT, USDC_MINT],
-            depth: 100000,
-            effectivePrice: 100.5,
+            route: [SOL_MINT, USDC_MINT],
+            inputAmount: 1.5,
+            expectedOutput: 150.75,
+            minOutput: 142.71,
             feeAmount: 5,
             slippagePercent: 5,
-            route: [SOL_MINT, USDC_MINT],
-            timestamp: Date.now(),
+            quote: {
+              venue: VenueName.ORCA,
+              venueType: VenueType.AMM,
+              tokenPair: [SOL_MINT, USDC_MINT],
+              depth: 100000,
+              effectivePrice: 100.5,
+              feeAmount: 5,
+              slippagePercent: 5,
+              route: [SOL_MINT, USDC_MINT],
+              timestamp: Date.now(),
+            },
+            liquiditySource: {
+              venue: VenueName.ORCA,
+              venueType: VenueType.AMM,
+              tokenPair: [SOL_MINT, USDC_MINT],
+              depth: 100000,
+              effectivePrice: 100.5,
+              feeAmount: 5,
+              slippagePercent: 5,
+              route: [SOL_MINT, USDC_MINT],
+              timestamp: Date.now(),
+            },
           },
-          liquiditySource: {
-            venue: VenueName.ORCA,
-            venueType: VenueType.AMM,
-            tokenPair: [SOL_MINT, USDC_MINT],
-            depth: 100000,
-            effectivePrice: 100.5,
-            feeAmount: 5,
-            slippagePercent: 5,
-            route: [SOL_MINT, USDC_MINT],
-            timestamp: Date.now(),
-          },
-        }],
+        ],
         simulations: [],
         baseRoute: {
           id: "route-1",
@@ -644,38 +693,40 @@ describe("SwapExecutor", () => {
         createdAt: Date.now(),
         expiresAt: Date.now() + 60000,
         quoteValidityMs: 60000,
-        legs: [{
-          venue: VenueName.ORCA,
-          venueType: VenueType.AMM,
-          route: [SOL_MINT, USDC_MINT],
-          inputAmount: 1.5,
-          expectedOutput: 165,
-          minOutput: 157.35,
-          feeAmount: 5,
-          slippagePercent: 5,
-          quote: {
+        legs: [
+          {
             venue: VenueName.ORCA,
             venueType: VenueType.AMM,
-            tokenPair: [SOL_MINT, USDC_MINT],
-            depth: 100000,
-            effectivePrice: 110,
+            route: [SOL_MINT, USDC_MINT],
+            inputAmount: 1.5,
+            expectedOutput: 165,
+            minOutput: 157.35,
             feeAmount: 5,
             slippagePercent: 5,
-            route: [SOL_MINT, USDC_MINT],
-            timestamp: Date.now(),
+            quote: {
+              venue: VenueName.ORCA,
+              venueType: VenueType.AMM,
+              tokenPair: [SOL_MINT, USDC_MINT],
+              depth: 100000,
+              effectivePrice: 110,
+              feeAmount: 5,
+              slippagePercent: 5,
+              route: [SOL_MINT, USDC_MINT],
+              timestamp: Date.now(),
+            },
+            liquiditySource: {
+              venue: VenueName.ORCA,
+              venueType: VenueType.AMM,
+              tokenPair: [SOL_MINT, USDC_MINT],
+              depth: 100000,
+              effectivePrice: 110,
+              feeAmount: 5,
+              slippagePercent: 5,
+              route: [SOL_MINT, USDC_MINT],
+              timestamp: Date.now(),
+            },
           },
-          liquiditySource: {
-            venue: VenueName.ORCA,
-            venueType: VenueType.AMM,
-            tokenPair: [SOL_MINT, USDC_MINT],
-            depth: 100000,
-            effectivePrice: 110,
-            feeAmount: 5,
-            slippagePercent: 5,
-            route: [SOL_MINT, USDC_MINT],
-            timestamp: Date.now(),
-          },
-        }],
+        ],
         simulations: [],
         baseRoute: {
           id: "route-1",
@@ -836,7 +887,9 @@ describe("SwapExecutor", () => {
       );
       // Also need to mock optimizer to return empty routes
       mockOptimizer.findOptimalRoutes.mockResolvedValue([]);
-      mockRouter.buildAtomicPlan.mockRejectedValue(new Error("No routes available"));
+      mockRouter.buildAtomicPlan.mockRejectedValue(
+        new Error("No routes available")
+      );
 
       const params: SwapParams = {
         inputMint: SOL_MINT,
@@ -974,38 +1027,40 @@ describe("SwapExecutor", () => {
         createdAt: Date.now(),
         expiresAt: Date.now() + 60000,
         quoteValidityMs: 60000,
-        legs: [{
-          venue: VenueName.ORCA,
-          venueType: VenueType.AMM,
-          route: [SOL_MINT, USDC_MINT],
-          inputAmount: 1.5,
-          expectedOutput: 150.75,
-          minOutput: 142.71,
-          feeAmount: 5,
-          slippagePercent: 5,
-          quote: {
+        legs: [
+          {
             venue: VenueName.ORCA,
             venueType: VenueType.AMM,
-            tokenPair: [SOL_MINT, USDC_MINT],
-            depth: 100000,
-            effectivePrice: 100.5,
+            route: [SOL_MINT, USDC_MINT],
+            inputAmount: 1.5,
+            expectedOutput: 150.75,
+            minOutput: 142.71,
             feeAmount: 5,
             slippagePercent: 5,
-            route: [SOL_MINT, USDC_MINT],
-            timestamp: Date.now(),
+            quote: {
+              venue: VenueName.ORCA,
+              venueType: VenueType.AMM,
+              tokenPair: [SOL_MINT, USDC_MINT],
+              depth: 100000,
+              effectivePrice: 100.5,
+              feeAmount: 5,
+              slippagePercent: 5,
+              route: [SOL_MINT, USDC_MINT],
+              timestamp: Date.now(),
+            },
+            liquiditySource: {
+              venue: VenueName.ORCA,
+              venueType: VenueType.AMM,
+              tokenPair: [SOL_MINT, USDC_MINT],
+              depth: 100000,
+              effectivePrice: 100.5,
+              feeAmount: 5,
+              slippagePercent: 5,
+              route: [SOL_MINT, USDC_MINT],
+              timestamp: Date.now(),
+            },
           },
-          liquiditySource: {
-            venue: VenueName.ORCA,
-            venueType: VenueType.AMM,
-            tokenPair: [SOL_MINT, USDC_MINT],
-            depth: 100000,
-            effectivePrice: 100.5,
-            feeAmount: 5,
-            slippagePercent: 5,
-            route: [SOL_MINT, USDC_MINT],
-            timestamp: Date.now(),
-          },
-        }],
+        ],
         simulations: [],
         baseRoute: {
           id: "route-1",

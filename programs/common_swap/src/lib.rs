@@ -40,10 +40,10 @@ pub mod common_swap {
         output_mint: Pubkey,
         total_input_amount: u64,
         min_output_amount: u64,
-        weights: Vec<u8>, // Weights for each venue (must sum to 100)
+        weights: Vec<u8>,             // Weights for each venue (must sum to 100)
         venue_addresses: Vec<Pubkey>, // DEX/venue program addresses
-        oracle_price: u64, // Oracle price for verification
-        oracle_confidence: u64, // Oracle confidence interval
+        oracle_price: u64,            // Oracle price for verification
+        oracle_confidence: u64,       // Oracle confidence interval
         use_jito_bundling: bool,
         max_slippage_bps: u16, // Max slippage in basis points
     ) -> Result<()> {
@@ -55,7 +55,10 @@ pub mod common_swap {
 
         // Validate weights
         require!(weights.len() <= MAX_VENUES, ErrorCode::TooManyVenues);
-        require!(weights.len() == venue_addresses.len(), ErrorCode::WeightVenueMismatch);
+        require!(
+            weights.len() == venue_addresses.len(),
+            ErrorCode::WeightVenueMismatch
+        );
 
         let total_weight: u64 = weights.iter().map(|&w| w as u64).sum();
         require!(total_weight == WEIGHT_PRECISION, ErrorCode::InvalidWeights);
@@ -67,7 +70,11 @@ pub mod common_swap {
         // Oracle price verification (basic check)
         require!(oracle_price > 0, ErrorCode::InvalidOraclePrice);
 
-        msg!("Executing weighted swap: {} venues, total weight: {}", weights.len(), total_weight);
+        msg!(
+            "Executing weighted swap: {} venues, total weight: {}",
+            weights.len(),
+            total_weight
+        );
 
         // TODO: Implement actual DEX integrations and weight-based execution
         // For MVP, simulate the swap with weight validation
@@ -77,18 +84,27 @@ pub mod common_swap {
 
         // Simulate execution across venues based on weights
         for (i, &weight) in weights.iter().enumerate() {
-            let venue_input = (total_input_amount as u128 * weight as u128 / WEIGHT_PRECISION as u128) as u64;
+            let venue_input =
+                (total_input_amount as u128 * weight as u128 / WEIGHT_PRECISION as u128) as u64;
             let venue_output = venue_input * 99 / 100; // Simulate 1% fee
 
             total_output += venue_output;
             executed_weights.push(weight);
 
-            msg!("Venue {}: weight={}, input={}, output={}",
-                 venue_addresses[i], weight, venue_input, venue_output);
+            msg!(
+                "Venue {}: weight={}, input={}, output={}",
+                venue_addresses[i],
+                weight,
+                venue_input,
+                venue_output
+            );
         }
 
         // Verify minimum output
-        require!(total_output >= min_output_amount, ErrorCode::SlippageExceeded);
+        require!(
+            total_output >= min_output_amount,
+            ErrorCode::SlippageExceeded
+        );
 
         // Update global statistics
         global_state.total_swaps += 1;
@@ -171,8 +187,10 @@ pub mod common_swap {
 
     /// Emergency pause/unpause the program
     pub fn set_emergency_mode(ctx: Context<SetEmergencyMode>, enabled: bool) -> Result<()> {
-        require!(ctx.accounts.authority.key() == ctx.accounts.global_state.authority,
-                ErrorCode::Unauthorized);
+        require!(
+            ctx.accounts.authority.key() == ctx.accounts.global_state.authority,
+            ErrorCode::Unauthorized
+        );
 
         ctx.accounts.global_state.emergency_mode = enabled;
 
@@ -182,14 +200,19 @@ pub mod common_swap {
             timestamp: Clock::get()?.unix_timestamp,
         });
 
-        msg!("Emergency mode {}", if enabled { "enabled" } else { "disabled" });
+        msg!(
+            "Emergency mode {}",
+            if enabled { "enabled" } else { "disabled" }
+        );
         Ok(())
     }
 
     /// Pause/unpause the program (admin only)
     pub fn pause_program(ctx: Context<PauseProgram>, paused: bool) -> Result<()> {
-        require!(ctx.accounts.authority.key() == ctx.accounts.global_state.authority,
-                ErrorCode::Unauthorized);
+        require!(
+            ctx.accounts.authority.key() == ctx.accounts.global_state.authority,
+            ErrorCode::Unauthorized
+        );
 
         ctx.accounts.global_state.is_paused = paused;
 

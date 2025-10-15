@@ -11,9 +11,9 @@ import {
   LiquiditySource,
   VenueName,
   VenueType,
-} from '../types/smart-router';
-import { LiquidityDataCollector } from './LiquidityDataCollector';
-import { OraclePriceService } from './OraclePriceService';
+} from "../types/smart-router";
+import { LiquidityDataCollector } from "./LiquidityDataCollector";
+import { OraclePriceService } from "./OraclePriceService";
 
 // ============================================================================
 // OPTIMIZATION ENGINE
@@ -30,16 +30,16 @@ export class RouteOptimizationEngine {
   ) {
     this.liquidityCollector = liquidityCollector;
     this.oracleService = oracleService;
-    
+
     this.defaultConfig = {
-      slippageTolerance: 0.01,      // 1%
+      slippageTolerance: 0.01, // 1%
       maxRoutes: 3,
       prioritizeCLOB: true,
       maxHops: 3,
       enableSplitRoutes: true,
       maxSplits: 3,
       useBundling: true,
-      maxPriorityFee: 100000,       // 0.0001 SOL
+      maxPriorityFee: 100000, // 0.0001 SOL
       enableTWAP: false,
       enableFallback: true,
       maxRetries: 2,
@@ -72,17 +72,23 @@ export class RouteOptimizationEngine {
 
     // Step 2: Filter sources
     let sources = liquidity.sources;
-    
+
     // Exclude venues if specified
     if (config.excludedVenues) {
-      sources = sources.filter(s => !config.excludedVenues!.includes(s.venue));
+      sources = sources.filter(
+        (s) => !config.excludedVenues!.includes(s.venue)
+      );
     }
 
     // Filter by slippage tolerance
-    sources = sources.filter(s => s.slippagePercent <= config.slippageTolerance);
+    sources = sources.filter(
+      (s) => s.slippagePercent <= config.slippageTolerance
+    );
 
     if (sources.length === 0) {
-      throw new Error('No viable liquidity sources found within slippage tolerance');
+      throw new Error(
+        "No viable liquidity sources found within slippage tolerance"
+      );
     }
 
     // Step 3: Generate route candidates
@@ -90,13 +96,23 @@ export class RouteOptimizationEngine {
 
     // 3a. Single venue routes (simplest, lowest gas)
     for (const source of sources) {
-      const candidate = this.createSingleVenueRoute(source, inputAmount, config);
+      const candidate = this.createSingleVenueRoute(
+        source,
+        inputAmount,
+        config
+      );
       if (candidate) candidates.push(candidate);
     }
 
     // 3b. Split routes (if enabled)
     if (config.enableSplitRoutes && sources.length > 1) {
-      const splitCandidates = await this.createSplitRoutes(sources, inputAmount, inputMint, outputMint, config);
+      const splitCandidates = await this.createSplitRoutes(
+        sources,
+        inputAmount,
+        inputMint,
+        outputMint,
+        config
+      );
       candidates.push(...splitCandidates);
     }
 
@@ -150,7 +166,7 @@ export class RouteOptimizationEngine {
       totalCost: 0, // Will be calculated
       effectiveRate: expectedOutput / inputAmount,
       riskScore: 0, // Will be assessed
-      mevRisk: 'low',
+      mevRisk: "low",
       instructions: [], // Will be built later
       estimatedComputeUnits: this.estimateComputeUnits(source.venueType, 1),
     };
@@ -182,14 +198,20 @@ export class RouteOptimizationEngine {
         inputAmount
       );
 
-      const splits = this.optimizeSplitAllocationWithWeights(topSources, inputAmount, weights);
-      
+      const splits = this.optimizeSplitAllocationWithWeights(
+        topSources,
+        inputAmount,
+        weights
+      );
+
       if (splits.length === 0) continue;
 
       // Validate weights sum to 100
       const totalWeight = splits.reduce((sum, s) => sum + s.weight, 0);
       if (Math.abs(totalWeight - 100) > 0.01) {
-        console.warn(`Warning: Split weights sum to ${totalWeight}, adjusting...`);
+        console.warn(
+          `Warning: Split weights sum to ${totalWeight}, adjusting...`
+        );
         // Normalize weights to sum to 100
         for (const split of splits) {
           split.weight = (split.weight / totalWeight) * 100;
@@ -197,7 +219,7 @@ export class RouteOptimizationEngine {
       }
 
       const totalOutput = splits.reduce((sum, s) => sum + s.expectedOutput, 0);
-      const venues = splits.map(s => s.venue);
+      const venues = splits.map((s) => s.venue);
 
       candidates.push({
         id: `split-${numSplits}-${Date.now()}`,
@@ -209,9 +231,12 @@ export class RouteOptimizationEngine {
         totalCost: 0,
         effectiveRate: totalOutput / inputAmount,
         riskScore: 0,
-        mevRisk: 'medium', // Splits have higher MEV risk
+        mevRisk: "medium", // Splits have higher MEV risk
         instructions: [],
-        estimatedComputeUnits: this.estimateComputeUnits(VenueType.AMM, numSplits),
+        estimatedComputeUnits: this.estimateComputeUnits(
+          VenueType.AMM,
+          numSplits
+        ),
       });
     }
 
@@ -255,7 +280,10 @@ export class RouteOptimizationEngine {
   /**
    * Calculate expected output from a liquidity source
    */
-  private calculateExpectedOutput(source: LiquiditySource, inputAmount: number): number {
+  private calculateExpectedOutput(
+    source: LiquiditySource,
+    inputAmount: number
+  ): number {
     if (source.venueType === VenueType.CLOB && source.topOfBook) {
       // For CLOB, use ask price directly
       const config = this.liquidityCollector.getVenueConfig(source.venue);
@@ -266,7 +294,10 @@ export class RouteOptimizationEngine {
       // For AMM, use constant product formula
       const config = this.liquidityCollector.getVenueConfig(source.venue);
       const inputWithFee = inputAmount * (1 - config.feeRate);
-      return (source.reserves.output * inputWithFee) / (source.reserves.input + inputWithFee);
+      return (
+        (source.reserves.output * inputWithFee) /
+        (source.reserves.input + inputWithFee)
+      );
     }
 
     // For RFQ, use effective price
@@ -276,7 +307,10 @@ export class RouteOptimizationEngine {
   /**
    * Calculate total cost including all fees
    */
-  private calculateTotalCost(candidate: RouteCandidate, config: OptimizationConfig): void {
+  private calculateTotalCost(
+    candidate: RouteCandidate,
+    config: OptimizationConfig
+  ): void {
     let totalCost = 0;
 
     // DEX fees
@@ -286,7 +320,8 @@ export class RouteOptimizationEngine {
 
     // Network fees (estimate)
     const baseFee = 5000; // lamports
-    const computeUnitPrice = config.maxPriorityFee / candidate.estimatedComputeUnits;
+    const computeUnitPrice =
+      config.maxPriorityFee / candidate.estimatedComputeUnits;
     const priorityFee = candidate.estimatedComputeUnits * computeUnitPrice;
     totalCost += (baseFee + priorityFee) / 1e9; // Convert to SOL
 
@@ -297,7 +332,8 @@ export class RouteOptimizationEngine {
 
     // Slippage cost
     for (const split of candidate.splits) {
-      const slippageCost = split.inputAmount * split.liquiditySource.slippagePercent;
+      const slippageCost =
+        split.inputAmount * split.liquiditySource.slippagePercent;
       totalCost += slippageCost;
     }
 
@@ -319,7 +355,9 @@ export class RouteOptimizationEngine {
     }
 
     // AMM has higher MEV risk than CLOB
-    const hasAMM = candidate.splits.some(s => s.liquiditySource.venueType === VenueType.AMM);
+    const hasAMM = candidate.splits.some(
+      (s) => s.liquiditySource.venueType === VenueType.AMM
+    );
     if (hasAMM) riskScore += 15;
 
     // Multi-hop = higher risk
@@ -329,22 +367,25 @@ export class RouteOptimizationEngine {
 
     // Assess MEV risk
     if (candidate.riskScore > 50) {
-      candidate.mevRisk = 'high';
+      candidate.mevRisk = "high";
     } else if (candidate.riskScore > 25) {
-      candidate.mevRisk = 'medium';
+      candidate.mevRisk = "medium";
     } else {
-      candidate.mevRisk = 'low';
+      candidate.mevRisk = "low";
     }
   }
 
   /**
    * Estimate compute units needed
    */
-  private estimateComputeUnits(venueType: VenueType, numOperations: number): number {
+  private estimateComputeUnits(
+    venueType: VenueType,
+    numOperations: number
+  ): number {
     const baseUnits = {
-      [VenueType.CLOB]: 50000,   // CLOBs are efficient
-      [VenueType.AMM]: 100000,   // AMMs need more CU
-      [VenueType.RFQ]: 150000,   // Aggregators may be complex
+      [VenueType.CLOB]: 50000, // CLOBs are efficient
+      [VenueType.AMM]: 100000, // AMMs need more CU
+      [VenueType.RFQ]: 150000, // Aggregators may be complex
     };
 
     return baseUnits[venueType] * numOperations;
@@ -359,7 +400,7 @@ export class RouteOptimizationEngine {
     inputMint: string,
     outputMint: string,
     totalInput: number
-  ): Promise<{ weights: number[], venueOrder: VenueName[] }> {
+  ): Promise<{ weights: number[]; venueOrder: VenueName[] }> {
     if (sources.length === 0) {
       return { weights: [], venueOrder: [] };
     }
@@ -370,7 +411,7 @@ export class RouteOptimizationEngine {
       const oracleRate = oraclePrice.price; // USD per output token
 
       // Calculate scores for each venue
-      const venueScores: Array<{ venue: VenueName, score: number }> = [];
+      const venueScores: Array<{ venue: VenueName; score: number }> = [];
 
       for (const source of sources) {
         let score = 0;
@@ -417,7 +458,10 @@ export class RouteOptimizationEngine {
         } else {
           // Exponential decay allocation
           const scoreRatio = venueScores[i].score / totalScore;
-          const allocatedWeight = Math.max(5, Math.floor(scoreRatio * 100 * Math.pow(0.7, i)));
+          const allocatedWeight = Math.max(
+            5,
+            Math.floor(scoreRatio * 100 * Math.pow(0.7, i))
+          );
           weights.push(Math.min(allocatedWeight, remainingWeight));
           remainingWeight -= allocatedWeight;
         }
@@ -432,23 +476,25 @@ export class RouteOptimizationEngine {
 
       return {
         weights,
-        venueOrder: venueScores.map(v => v.venue)
+        venueOrder: venueScores.map((v) => v.venue),
       };
-
     } catch (error) {
-      console.warn('Oracle-based weight calculation failed, using equal weights:', error);
+      console.warn(
+        "Oracle-based weight calculation failed, using equal weights:",
+        error
+      );
 
       // Fallback to equal weights
       const equalWeight = Math.floor(100 / sources.length);
       let weights = new Array(sources.length).fill(equalWeight);
-      const remainder = 100 - (equalWeight * sources.length);
+      const remainder = 100 - equalWeight * sources.length;
       if (remainder > 0 && weights.length > 0) {
         weights[weights.length - 1] += remainder;
       }
 
       return {
         weights,
-        venueOrder: sources.map(s => s.venue)
+        venueOrder: sources.map((s) => s.venue),
       };
     }
   }
@@ -466,22 +512,29 @@ export function validateRoute(
   config: OptimizationConfig
 ): { valid: boolean; reason?: string } {
   // Check min output
-  if (config.minOutputAmount && candidate.expectedOutput < config.minOutputAmount) {
-    return { valid: false, reason: 'Output below minimum threshold' };
+  if (
+    config.minOutputAmount &&
+    candidate.expectedOutput < config.minOutputAmount
+  ) {
+    return { valid: false, reason: "Output below minimum threshold" };
   }
 
   // Check slippage tolerance
   for (const split of candidate.splits) {
     if (split.liquiditySource.slippagePercent > config.slippageTolerance) {
-      return { valid: false, reason: `Slippage exceeds tolerance on ${split.venue}` };
+      return {
+        valid: false,
+        reason: `Slippage exceeds tolerance on ${split.venue}`,
+      };
     }
   }
 
   // Check route freshness
   for (const split of candidate.splits) {
     const staleness = Date.now() - split.liquiditySource.timestamp;
-    if (staleness > 30000) { // 30 seconds
-      return { valid: false, reason: 'Liquidity data is stale' };
+    if (staleness > 30000) {
+      // 30 seconds
+      return { valid: false, reason: "Liquidity data is stale" };
     }
   }
 

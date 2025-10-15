@@ -32,8 +32,12 @@ vi.mock("@coral-xyz/anchor", () => ({
 
 const mockAuthority = Keypair.generate();
 const mockUser = Keypair.generate();
-const mockInputMint = new PublicKey("So11111111111111111111111111111111111111112"); // SOL
-const mockOutputMint = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"); // USDC
+const mockInputMint = new PublicKey(
+  "So11111111111111111111111111111111111111112"
+); // SOL
+const mockOutputMint = new PublicKey(
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+); // USDC
 
 const createMockProgram = (): Program<CommonSwap> => {
   const mockProgram = {
@@ -143,7 +147,8 @@ describe("CommonSwap Program", () => {
       ];
 
       // Mock the rejection
-      const mockExecuteWeightedSwap = program.methods.executeWeightedSwap as any;
+      const mockExecuteWeightedSwap = program.methods
+        .executeWeightedSwap as any;
       mockExecuteWeightedSwap.mockReturnValueOnce({
         accounts: vi.fn().mockReturnValue({
           rpc: vi.fn().mockRejectedValue(new Error("InvalidWeights")),
@@ -185,7 +190,8 @@ describe("CommonSwap Program", () => {
       ];
 
       // Mock the rejection
-      const mockExecuteWeightedSwap = program.methods.executeWeightedSwap as any;
+      const mockExecuteWeightedSwap = program.methods
+        .executeWeightedSwap as any;
       mockExecuteWeightedSwap.mockReturnValueOnce({
         accounts: vi.fn().mockReturnValue({
           rpc: vi.fn().mockRejectedValue(new Error("WeightVenueMismatch")),
@@ -310,7 +316,9 @@ describe("CommonSwap Program", () => {
   describe("MEV Protection", () => {
     it("should support Jito bundling parameter", async () => {
       const weights = [100];
-      const venues = [new PublicKey("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8")];
+      const venues = [
+        new PublicKey("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"),
+      ];
 
       const tx = await program.methods
         .executeWeightedSwap(
