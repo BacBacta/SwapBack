@@ -7,7 +7,7 @@ use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 
-use swapback_client::{compute_optimal_weights, fetch_price, DexInfo, create_optimized_route};
+use swapback_client::{compute_optimal_weights, create_optimized_route, fetch_price, DexInfo};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -43,13 +43,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let amount_in = 10_000_000; // 10 SOL (6 decimals)
     let slippage_tolerance = 0.005; // 0.5%
 
-    println!("🔄 Optimizing swap route for {} SOL to USDC", amount_in as f64 / 1_000_000.0);
+    println!(
+        "🔄 Optimizing swap route for {} SOL to USDC",
+        amount_in as f64 / 1_000_000.0
+    );
 
     // Step 1: Fetch oracle price
     println!("📊 Fetching oracle price...");
     let price_data = fetch_price(&rpc_client, sol_mint, usdc_mint).await?;
-    println!("💰 Oracle price: ${:.2} (source: {})",
-             price_data.price as f64 / 1_000_000.0, price_data.source);
+    println!(
+        "💰 Oracle price: ${:.2} (source: {})",
+        price_data.price as f64 / 1_000_000.0,
+        price_data.source
+    );
 
     // Step 2: Create optimized route
     println!("🎯 Computing optimal weights...");
@@ -62,23 +68,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("📋 Optimized Route:");
     println!("   Weights: {:?}", route.weights);
-    println!("   Expected output: {} USDC", route.expected_output as f64 / 1_000_000.0);
-    println!("   Minimum output: {} USDC", route.min_output as f64 / 1_000_000.0);
+    println!(
+        "   Expected output: {} USDC",
+        route.expected_output as f64 / 1_000_000.0
+    );
+    println!(
+        "   Minimum output: {} USDC",
+        route.min_output as f64 / 1_000_000.0
+    );
 
     // Step 3: Display DEX allocation
     for (i, (dex, &weight)) in dexes.iter().zip(route.weights.iter()).enumerate() {
         if weight > 0 {
             let portion = weight as f64 / 100.0;
             let dex_amount = (amount_in as f64 * portion) as u64;
-            println!("   DEX {}: {}% ({} SOL) - Pool: {}",
-                    i + 1, weight, dex_amount as f64 / 1_000_000.0,
-                    dex.pool_id.to_string()[..8]);
+            println!(
+                "   DEX {}: {}% ({} SOL) - Pool: {}",
+                i + 1,
+                weight,
+                dex_amount as f64 / 1_000_000.0,
+                dex.pool_id.to_string()[..8]
+            );
         }
     }
 
     // Step 4: Prepare for on-chain execution
     println!("🚀 Ready for on-chain execution:");
-    println!("   Venue addresses: {:?}", dexes.iter().map(|d| d.program_id).collect::<Vec<_>>());
+    println!(
+        "   Venue addresses: {:?}",
+        dexes.iter().map(|d| d.program_id).collect::<Vec<_>>()
+    );
     println!("   Weights: {:?}", route.weights);
     println!("   Min output: {}", route.min_output);
 

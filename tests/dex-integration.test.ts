@@ -24,7 +24,10 @@ describe("DEX Integration Tests", () => {
 
   beforeEach(async () => {
     // Use mainnet-beta for real DEX data
-    connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
+    connection = new Connection(
+      "https://api.mainnet-beta.solana.com",
+      "confirmed"
+    );
     liquidityCollector = new LiquidityDataCollector(connection);
   });
 
@@ -40,7 +43,9 @@ describe("DEX Integration Tests", () => {
       expect(liquidity.sources.length).toBeGreaterThan(0);
 
       // Check if Phoenix is present
-      const phoenixSource = liquidity.sources.find((s: any) => s.venue === VenueName.PHOENIX);
+      const phoenixSource = liquidity.sources.find(
+        (s: any) => s.venue === VenueName.PHOENIX
+      );
       if (phoenixSource) {
         expect(phoenixSource.depth).toBeGreaterThan(0);
         expect(phoenixSource.effectivePrice).toBeGreaterThan(0);
@@ -59,7 +64,9 @@ describe("DEX Integration Tests", () => {
       expect(liquidity.sources.length).toBeGreaterThan(0);
 
       // Check if Raydium is present
-      const raydiumSource = liquidity.sources.find((s: any) => s.venue === VenueName.RAYDIUM);
+      const raydiumSource = liquidity.sources.find(
+        (s: any) => s.venue === VenueName.RAYDIUM
+      );
       if (raydiumSource) {
         expect(raydiumSource.depth).toBeGreaterThan(0);
         expect(raydiumSource.effectivePrice).toBeGreaterThan(0);
@@ -112,12 +119,18 @@ describe("DEX Integration Tests", () => {
         0.01 // 0.01 SOL in human units
       );
 
-      const orcaPrice = liquidity.sources.find((s: any) => s.venue === VenueName.ORCA)?.effectivePrice;
-      const raydiumPrice = liquidity.sources.find((s: any) => s.venue === VenueName.RAYDIUM)?.effectivePrice;
+      const orcaPrice = liquidity.sources.find(
+        (s: any) => s.venue === VenueName.ORCA
+      )?.effectivePrice;
+      const raydiumPrice = liquidity.sources.find(
+        (s: any) => s.venue === VenueName.RAYDIUM
+      )?.effectivePrice;
 
       if (orcaPrice && raydiumPrice) {
         // Prices should be reasonably close (within 5%)
-        const priceDiff = Math.abs(orcaPrice - raydiumPrice) / Math.min(orcaPrice, raydiumPrice);
+        const priceDiff =
+          Math.abs(orcaPrice - raydiumPrice) /
+          Math.min(orcaPrice, raydiumPrice);
         expect(priceDiff).toBeLessThan(0.05);
       }
     }, 30000);

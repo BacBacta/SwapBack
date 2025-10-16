@@ -3,24 +3,18 @@
  * Fetches current state from DEXs, CLOBs, and aggregators
  */
 
-import { Connection, PublicKey } from '@solana/web3.js';
-import { Client as PhoenixClient } from '@ellipsis-labs/phoenix-sdk';
+import { Connection, PublicKey } from "@solana/web3.js";
+import { Client as PhoenixClient } from "@ellipsis-labs/phoenix-sdk";
 import {
   VenueName,
   VenueType,
   LiquiditySource,
   AggregatedLiquidity,
   VenueConfig,
-} from '../types/smart-router';
-import {
-  getPhoenixMarket,
-} from '../config/phoenix-markets';
-import {
-  getOrcaWhirlpool,
-} from '../config/orca-pools';
-import {
-  getRaydiumPool,
-} from '../config/raydium-pools';
+} from "../types/smart-router";
+import { getPhoenixMarket } from "../config/phoenix-markets";
+import { getOrcaWhirlpool } from "../config/orca-pools";
+import { getRaydiumPool } from "../config/raydium-pools";
 
 // ============================================================================
 // CONFIGURATION
@@ -46,7 +40,7 @@ const VENUE_CONFIGS: Record<VenueName, VenueConfig> = {
     minTradeSize: 10,
     maxSlippage: 0.001,
   },
-  
+
   // AMMs - Medium priority
   [VenueName.ORCA]: {
     name: VenueName.ORCA,
@@ -84,7 +78,7 @@ const VENUE_CONFIGS: Record<VenueName, VenueConfig> = {
     minTradeSize: 1,
     maxSlippage: 0.02,
   },
-  
+
   // Aggregators - Lower priority (use as fallback)
   [VenueName.JUPITER]: {
     name: VenueName.JUPITER,
@@ -131,7 +125,7 @@ export class LiquidityDataCollector {
     enabledVenues?: VenueName[]
   ): Promise<AggregatedLiquidity> {
     const cacheKey = `${inputMint}-${outputMint}-${inputAmount}`;
-    
+
     // Check cache
     const cached = this.cache.get(cacheKey);
     if (cached && Date.now() - cached.fetchedAt < this.cacheExpiryMs) {
@@ -143,19 +137,22 @@ export class LiquidityDataCollector {
 
     // Fetch from all enabled venues in parallel
     const venuePromises = Object.values(VenueName)
-      .filter(venue => {
+      .filter((venue) => {
         const config = VENUE_CONFIGS[venue];
         if (!config.enabled) return false;
         if (enabledVenues && !enabledVenues.includes(venue)) return false;
         return true;
       })
-      .map(venue => this.fetchVenueLiquidity(venue, inputMint, outputMint, inputAmount));
+      .map((venue) =>
+        this.fetchVenueLiquidity(venue, inputMint, outputMint, inputAmount)
+      );
 
     const sources = (await Promise.allSettled(venuePromises))
-      .filter((result): result is PromiseFulfilledResult<LiquiditySource> => 
-        result.status === 'fulfilled' && result.value !== null
+      .filter(
+        (result): result is PromiseFulfilledResult<LiquiditySource> =>
+          result.status === "fulfilled" && result.value !== null
       )
-      .map(result => result.value)
+      .map((result) => result.value)
       .sort((a, b) => a.effectivePrice - b.effectivePrice); // Sort by best price
 
     // Calculate total depth
@@ -194,14 +191,29 @@ export class LiquidityDataCollector {
     try {
       switch (config.type) {
         case VenueType.CLOB:
-          return await this.fetchCLOBLiquidity(venue, inputMint, outputMint, inputAmount);
-        
+          return await this.fetchCLOBLiquidity(
+            venue,
+            inputMint,
+            outputMint,
+            inputAmount
+          );
+
         case VenueType.AMM:
-          return await this.fetchAMMLiquidity(venue, inputMint, outputMint, inputAmount);
-        
+          return await this.fetchAMMLiquidity(
+            venue,
+            inputMint,
+            outputMint,
+            inputAmount
+          );
+
         case VenueType.RFQ:
-          return await this.fetchRFQLiquidity(venue, inputMint, outputMint, inputAmount);
-        
+          return await this.fetchRFQLiquidity(
+            venue,
+            inputMint,
+            outputMint,
+            inputAmount
+          );
+
         default:
           return null;
       }
@@ -222,17 +234,21 @@ export class LiquidityDataCollector {
     inputAmount: number
   ): Promise<LiquiditySource | null> {
     const config = VENUE_CONFIGS[venue];
-    
+
     // Phoenix integration
     if (venue === VenueName.PHOENIX) {
       try {
-        return await this.fetchPhoenixOrderbook(inputMint, outputMint, inputAmount);
+        return await this.fetchPhoenixOrderbook(
+          inputMint,
+          outputMint,
+          inputAmount
+        );
       } catch (error) {
-        console.error('Phoenix orderbook fetch error:', error);
+        console.error("Phoenix orderbook fetch error:", error);
         return null;
       }
     }
-    
+
     // OpenBook and other CLOBs not yet implemented
     // TODO: Implement OpenBook integration
     console.warn(`CLOB venue ${venue} not yet implemented`);
@@ -250,7 +266,7 @@ export class LiquidityDataCollector {
     try {
       // Get Phoenix market for this pair
       const marketAddress = getPhoenixMarket(inputMint, outputMint);
-      
+
       if (!marketAddress) {
         console.warn(`No Phoenix market for ${inputMint}/${outputMint}`);
         return null;
@@ -258,29 +274,33 @@ export class LiquidityDataCollector {
 
       // Initialize Phoenix client
       const phoenixClient = await PhoenixClient.create(this.connection);
-      
+
       // Add market to client (uses string address)
       await phoenixClient.addMarket(marketAddress.toBase58());
-      
+
       // Get market state
-      const marketState = phoenixClient.marketStates.get(marketAddress.toBase58());
-      
+      const marketState = phoenixClient.marketStates.get(
+        marketAddress.toBase58()
+      );
+
       if (!marketState?.data) {
-        console.warn(`Phoenix market ${marketAddress.toBase58()} not found or no data`);
+        console.warn(
+          `Phoenix market ${marketAddress.toBase58()} not found or no data`
+        );
         return null;
       }
 
       // Phoenix market data structure
       // Note: Exact structure depends on SDK version
       // This is a simplified approach - real implementation should use proper SDK methods
-      
+
       // For now, use mock data with Phoenix structure
       // TODO: Use proper Phoenix SDK orderbook methods when available
       const topOfBook = {
-        bidPrice: 100.5,  // Best bid
-        askPrice: 100.7,  // Best ask
-        bidSize: 1000,    // Size at best bid
-        askSize: 800,     // Size at best ask
+        bidPrice: 100.5, // Best bid
+        askPrice: 100.7, // Best ask
+        bidSize: 1000, // Size at best bid
+        askSize: 800, // Size at best ask
       };
 
       // Calculate execution
@@ -288,7 +308,7 @@ export class LiquidityDataCollector {
       const effectivePrice = topOfBook.askPrice * (1 + config.feeRate);
       const expectedOutput = inputAmount * effectivePrice; // For CLOB, price is quote/base
       const feeAmount = expectedOutput * config.feeRate;
-      
+
       // Slippage is minimal on CLOB if within top-of-book size
       const slippagePercent = inputAmount > topOfBook.askSize ? 0.005 : 0.0001;
 
@@ -312,7 +332,7 @@ export class LiquidityDataCollector {
         },
       };
     } catch (error) {
-      console.error('Phoenix orderbook fetch error:', error);
+      console.error("Phoenix orderbook fetch error:", error);
       return null;
     }
   }
@@ -328,27 +348,31 @@ export class LiquidityDataCollector {
     inputAmount: number
   ): Promise<LiquiditySource | null> {
     const config = VENUE_CONFIGS[venue];
-    
+
     // Orca Whirlpools integration
     if (venue === VenueName.ORCA) {
       try {
-        return await this.fetchOrcaWhirlpool(inputMint, outputMint, inputAmount);
+        return await this.fetchOrcaWhirlpool(
+          inputMint,
+          outputMint,
+          inputAmount
+        );
       } catch (error) {
-        console.error('Orca whirlpool fetch error:', error);
+        console.error("Orca whirlpool fetch error:", error);
         return null;
       }
     }
-    
+
     // Raydium AMM integration
     if (venue === VenueName.RAYDIUM) {
       try {
         return await this.fetchRaydiumAmm(inputMint, outputMint, inputAmount);
       } catch (error) {
-        console.error('Raydium AMM fetch error:', error);
+        console.error("Raydium AMM fetch error:", error);
         return null;
       }
     }
-    
+
     // Fallback mock data for other AMMs
     const reserves = {
       input: 1000000,
@@ -356,8 +380,9 @@ export class LiquidityDataCollector {
     };
 
     const inputWithFee = inputAmount * (1 - config.feeRate);
-    const outputAmount = (reserves.output * inputWithFee) / (reserves.input + inputWithFee);
-    
+    const outputAmount =
+      (reserves.output * inputWithFee) / (reserves.input + inputWithFee);
+
     const spotPrice = reserves.output / reserves.input;
     const effectivePrice = inputAmount / outputAmount;
     const slippagePercent = (effectivePrice - spotPrice) / spotPrice;
@@ -394,17 +419,20 @@ export class LiquidityDataCollector {
         new PublicKey(inputMint),
         new PublicKey(outputMint)
       );
-      
+
       if (!whirlpoolAddress) {
         console.warn(`No Orca whirlpool for ${inputMint}/${outputMint}`);
         return null;
       }
 
       // Fetch whirlpool account data
-      const whirlpoolAccount = await this.connection.getAccountInfo(whirlpoolAddress);
-      
+      const whirlpoolAccount =
+        await this.connection.getAccountInfo(whirlpoolAddress);
+
       if (!whirlpoolAccount) {
-        console.warn(`Orca whirlpool account not found: ${whirlpoolAddress.toBase58()}`);
+        console.warn(
+          `Orca whirlpool account not found: ${whirlpoolAddress.toBase58()}`
+        );
         return null;
       }
 
@@ -412,48 +440,51 @@ export class LiquidityDataCollector {
       // Note: Orca Whirlpools use tick-based pricing, similar to Uniswap V3
       // Full SDK integration would require WhirlpoolContext and Wallet
       // For real-time quotes, we parse the account data directly
-      
+
       const data = whirlpoolAccount.data;
-      
+
       // Whirlpool account layout (simplified - actual layout is more complex):
       // - liquidity: u128 at offset 65 (16 bytes)
-      // - sqrtPrice: u128 at offset 81 (16 bytes)  
+      // - sqrtPrice: u128 at offset 81 (16 bytes)
       // - tickCurrentIndex: i32 at offset 97 (4 bytes)
       // - feeRate: u16 at offset 101 (2 bytes)
-      
+
       // Read current tick price (concentrated liquidity)
       const sqrtPriceBuf = data.slice(81, 97); // Read 16 bytes for u128
       const sqrtPriceX64 = sqrtPriceBuf.readBigUInt64LE(0); // Lower 64 bits
-      
+
       // Convert sqrt price to regular price
       // price = (sqrtPrice / 2^64)^2
       const sqrtPrice = Number(sqrtPriceX64) / Math.pow(2, 64);
       const currentPrice = Math.pow(sqrtPrice, 2);
-      
+
       // Read liquidity
       const liquidityBuf = data.slice(65, 81);
       const liquidity = Number(liquidityBuf.readBigUInt64LE(0));
-      
+
       // Read fee rate (basis points)
       const rawFeeRate = data.readUInt16LE(101);
       const feeRate = Math.min(rawFeeRate / 10000, 0.01); // Convert bps to decimal, cap at 1%
-      
-      console.log(`Orca Whirlpool: rawFeeRate=${rawFeeRate}, feeRate=${feeRate}`);
-      
+
+      console.log(
+        `Orca Whirlpool: rawFeeRate=${rawFeeRate}, feeRate=${feeRate}`
+      );
+
       // Calculate output amount with concentrated liquidity formula
       // For small trades, we can approximate with constant product
       const inputWithFee = inputAmount * (1 - feeRate);
       const outputAmount = inputWithFee * currentPrice;
-      
+
       // Calculate price impact
       const effectivePrice = outputAmount / inputAmount;
-      const slippagePercent = Math.abs(effectivePrice - currentPrice) / currentPrice;
-      
+      const slippagePercent =
+        Math.abs(effectivePrice - currentPrice) / currentPrice;
+
       // Estimate depth (TVL in the pool) - use a more reasonable estimate for concentrated liquidity
-      const depth = Math.min(liquidity * currentPrice * 2 / 1e12, 100000000); // Cap at 100M tokens, scale down
-      
+      const depth = Math.min((liquidity * currentPrice * 2) / 1e12, 100000000); // Cap at 100M tokens, scale down
+
       const feeAmount = inputAmount * feeRate;
-      
+
       return {
         venue: VenueName.ORCA,
         venueType: VenueType.AMM,
@@ -479,7 +510,7 @@ export class LiquidityDataCollector {
         },
       };
     } catch (error) {
-      console.error('Orca whirlpool fetch error:', error);
+      console.error("Orca whirlpool fetch error:", error);
       return null;
     }
   }
@@ -506,10 +537,14 @@ export class LiquidityDataCollector {
       }
 
       // Fetch AMM account data
-      const ammAccount = await this.connection.getAccountInfo(poolConfig.ammAddress);
+      const ammAccount = await this.connection.getAccountInfo(
+        poolConfig.ammAddress
+      );
 
       if (!ammAccount) {
-        console.warn(`Raydium AMM account not found: ${poolConfig.ammAddress.toBase58()}`);
+        console.warn(
+          `Raydium AMM account not found: ${poolConfig.ammAddress.toBase58()}`
+        );
         return null;
       }
 
@@ -561,11 +596,15 @@ export class LiquidityDataCollector {
       const data = ammAccount.data;
 
       // Read coin vault balance (token A)
-      const coinVaultAccount = await this.connection.getTokenAccountBalance(poolConfig.poolCoinTokenAccount);
-      const pcVaultAccount = await this.connection.getTokenAccountBalance(poolConfig.poolPcTokenAccount);
+      const coinVaultAccount = await this.connection.getTokenAccountBalance(
+        poolConfig.poolCoinTokenAccount
+      );
+      const pcVaultAccount = await this.connection.getTokenAccountBalance(
+        poolConfig.poolPcTokenAccount
+      );
 
       if (!coinVaultAccount.value || !pcVaultAccount.value) {
-        console.warn('Failed to fetch Raydium vault balances');
+        console.warn("Failed to fetch Raydium vault balances");
         return null;
       }
 
@@ -589,13 +628,16 @@ export class LiquidityDataCollector {
       // Calculate output amount using constant product formula
       const feeRate = poolConfig.feeBps / 10000; // Convert bps to decimal
       const inputWithFee = inputAmount * (1 - feeRate);
-      const outputAmount = (outputReserve * inputWithFee) / (inputReserve + inputWithFee);
+      const outputAmount =
+        (outputReserve * inputWithFee) / (inputReserve + inputWithFee);
 
       // Calculate effective price and slippage
       const effectivePrice = outputAmount / inputAmount; // Price in output units per input unit
       const slippagePercent = Math.abs(effectivePrice - spotPrice) / spotPrice;
 
-      console.log(`Raydium AMM: inputAmount=${inputAmount}, outputAmount=${outputAmount}, effectivePrice=${effectivePrice}, spotPrice=${spotPrice}`);
+      console.log(
+        `Raydium AMM: inputAmount=${inputAmount}, outputAmount=${outputAmount}, effectivePrice=${effectivePrice}, spotPrice=${spotPrice}`
+      );
 
       const feeAmount = inputAmount * feeRate;
       const depth = Math.min(coinAmount, pcAmount) * spotPrice * 2; // TVL estimate
@@ -625,7 +667,7 @@ export class LiquidityDataCollector {
         },
       };
     } catch (error) {
-      console.error('Raydium AMM fetch error:', error);
+      console.error("Raydium AMM fetch error:", error);
       return null;
     }
   }
@@ -641,17 +683,17 @@ export class LiquidityDataCollector {
     inputAmount: number
   ): Promise<LiquiditySource | null> {
     const config = VENUE_CONFIGS[venue];
-    
+
     // Jupiter v6 API integration
     if (venue === VenueName.JUPITER) {
       try {
         return await this.fetchJupiterQuote(inputMint, outputMint, inputAmount);
       } catch (error) {
-        console.error('Jupiter API error:', error);
+        console.error("Jupiter API error:", error);
         return null;
       }
     }
-    
+
     // For other RFQ venues (Metis, etc), return null for now
     // TODO: Implement Metis and other aggregator APIs
     console.warn(`RFQ venue ${venue} not yet implemented`);
@@ -671,26 +713,28 @@ export class LiquidityDataCollector {
       // Convert amount to lamports/smallest unit (assuming 9 decimals for SOL)
       // In production, look up actual token decimals
       const amountInSmallestUnit = Math.floor(inputAmount * 1e9);
-      
+
       // Jupiter v6 Quote API
-      const url = new URL('https://quote-api.jup.ag/v6/quote');
-      url.searchParams.append('inputMint', inputMint);
-      url.searchParams.append('outputMint', outputMint);
-      url.searchParams.append('amount', amountInSmallestUnit.toString());
-      url.searchParams.append('slippageBps', '50'); // 0.5% slippage
-      url.searchParams.append('onlyDirectRoutes', 'false'); // Allow multi-hop
-      
+      const url = new URL("https://quote-api.jup.ag/v6/quote");
+      url.searchParams.append("inputMint", inputMint);
+      url.searchParams.append("outputMint", outputMint);
+      url.searchParams.append("amount", amountInSmallestUnit.toString());
+      url.searchParams.append("slippageBps", "50"); // 0.5% slippage
+      url.searchParams.append("onlyDirectRoutes", "false"); // Allow multi-hop
+
       const response = await fetch(url.toString());
-      
+
       if (!response.ok) {
-        console.warn(`Jupiter API returned ${response.status}: ${response.statusText}`);
+        console.warn(
+          `Jupiter API returned ${response.status}: ${response.statusText}`
+        );
         return null;
       }
 
       const data = await response.json();
-      
+
       if (!data || !data.outAmount) {
-        console.warn('Invalid Jupiter quote response:', data);
+        console.warn("Invalid Jupiter quote response:", data);
         return null;
       }
 
@@ -698,7 +742,7 @@ export class LiquidityDataCollector {
       const outputAmount = Number(data.outAmount) / 1e9; // Convert back to UI units
       const priceImpactPct = Number(data.priceImpactPct || 0);
       const routePlan = data.routePlan || [];
-      
+
       // Extract route from Jupiter's route plan
       const route: string[] = [inputMint];
       for (const step of routePlan) {
@@ -712,10 +756,10 @@ export class LiquidityDataCollector {
 
       // Calculate effective price
       const effectivePrice = inputAmount / outputAmount;
-      
+
       // Jupiter fees are included in the quote
       const spotPrice = effectivePrice / (1 + priceImpactPct / 100);
-      const feeAmount = inputAmount - (inputAmount / effectivePrice);
+      const feeAmount = inputAmount - inputAmount / effectivePrice;
 
       return {
         venue: VenueName.JUPITER,
@@ -733,12 +777,14 @@ export class LiquidityDataCollector {
             inAmount: data.inAmount,
             outAmount: data.outAmount,
             priceImpactPct: data.priceImpactPct,
-            marketInfos: data.routePlan?.map((r: any) => r.swapInfo?.label).filter(Boolean),
+            marketInfos: data.routePlan
+              ?.map((r: any) => r.swapInfo?.label)
+              .filter(Boolean),
           },
         },
       };
     } catch (error) {
-      console.error('Jupiter quote fetch error:', error);
+      console.error("Jupiter quote fetch error:", error);
       return null;
     }
   }
@@ -762,7 +808,7 @@ export class LiquidityDataCollector {
    */
   getEnabledVenues(): VenueName[] {
     return Object.values(VenueName)
-      .filter(venue => VENUE_CONFIGS[venue].enabled)
+      .filter((venue) => VENUE_CONFIGS[venue].enabled)
       .sort((a, b) => VENUE_CONFIGS[b].priority - VENUE_CONFIGS[a].priority);
   }
 }
@@ -784,7 +830,7 @@ export function calculatePriceImpact(
   const inputWithFee = inputAmount * (1 - feeRate);
   const outputAmount = (reserveOut * inputWithFee) / (reserveIn + inputWithFee);
   const effectivePrice = inputAmount / outputAmount;
-  
+
   return (effectivePrice - spotPrice) / spotPrice;
 }
 
@@ -804,6 +850,9 @@ export function estimateAMMOutput(
 /**
  * Check if liquidity source is stale
  */
-export function isLiquidityStale(source: LiquiditySource, maxAgeMs = 10000): boolean {
+export function isLiquidityStale(
+  source: LiquiditySource,
+  maxAgeMs = 10000
+): boolean {
   return Date.now() - source.timestamp > maxAgeMs;
 }

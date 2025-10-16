@@ -7,7 +7,7 @@
  * @module raydium-pools
  */
 
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey } from "@solana/web3.js";
 
 /**
  * Raydium AMM pool configuration for a trading pair
@@ -55,20 +55,32 @@ export interface RaydiumPoolConfig {
  * - RAY/USDC
  */
 export const RAYDIUM_POOLS: Record<string, RaydiumPoolConfig> = {
-  'SOL/USDC': {
-    symbol: 'SOL/USDC',
-    ammAddress: new PublicKey('8HoQnePLqPj4M7PUDzfw8e3Ymdwgc7NLGnaTUapubyvu'),
-    ammAuthority: new PublicKey('5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1'),
-    ammOpenOrders: new PublicKey('HRk9CMrpq7Jn9sh7mzxE8CChHGvjHfbv56NXJbNCb9Z'),
-    ammTargetOrders: new PublicKey('CuieVDEDtLo7FypA9SbLM9saXFdb1dsshEkyErMqkRQq'),
-    poolCoinTokenAccount: new PublicKey('DQyrAcCrDXQ7NeoqGgDCZwBvWDcYmFCjSb9JtteuvPpz'),
-    poolPcTokenAccount: new PublicKey('HLmqeL62xR1QoZ1HKKbXRrdN1p3phKpxRMb2VVopvBB'),
-    poolWithdrawQueue: new PublicKey('G7xeGGLevkRwB5f44QNgQtrPKBdMfkT6ZZwpS9xcC97n'),
-    poolTempLpTokenAccount: new PublicKey('Awpt6N7ZYPBa4vG4BQNFhFxDj7FbH2PqAaro6rKEceMj'),
-    serumProgramId: new PublicKey('9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin'),
-    serumMarket: new PublicKey('9wFFyRfZBsuAha4YcuxcXLKwMxJR43S7fPfQLusDBzvT'),
-    tokenMintA: new PublicKey('So11111111111111111111111111111111111111112'), // Wrapped SOL
-    tokenMintB: new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'), // USDC
+  "SOL/USDC": {
+    symbol: "SOL/USDC",
+    ammAddress: new PublicKey("8HoQnePLqPj4M7PUDzfw8e3Ymdwgc7NLGnaTUapubyvu"),
+    ammAuthority: new PublicKey("5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1"),
+    ammOpenOrders: new PublicKey("HRk9CMrpq7Jn9sh7mzxE8CChHGvjHfbv56NXJbNCb9Z"),
+    ammTargetOrders: new PublicKey(
+      "CuieVDEDtLo7FypA9SbLM9saXFdb1dsshEkyErMqkRQq"
+    ),
+    poolCoinTokenAccount: new PublicKey(
+      "DQyrAcCrDXQ7NeoqGgDCZwBvWDcYmFCjSb9JtteuvPpz"
+    ),
+    poolPcTokenAccount: new PublicKey(
+      "HLmqeL62xR1QoZ1HKKbXRrdN1p3phKpxRMb2VVopvBB"
+    ),
+    poolWithdrawQueue: new PublicKey(
+      "G7xeGGLevkRwB5f44QNgQtrPKBdMfkT6ZZwpS9xcC97n"
+    ),
+    poolTempLpTokenAccount: new PublicKey(
+      "Awpt6N7ZYPBa4vG4BQNFhFxDj7FbH2PqAaro6rKEceMj"
+    ),
+    serumProgramId: new PublicKey(
+      "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin"
+    ),
+    serumMarket: new PublicKey("9wFFyRfZBsuAha4YcuxcXLKwMxJR43S7fPfQLusDBzvT"),
+    tokenMintA: new PublicKey("So11111111111111111111111111111111111111112"), // Wrapped SOL
+    tokenMintB: new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"), // USDC
     feeBps: 25, // 0.25%
     minLiquidityUsd: 500_000,
   },
@@ -88,7 +100,8 @@ export function getRaydiumPool(
   // Check both directions (tokenA/tokenB and tokenB/tokenA)
   for (const pool of Object.values(RAYDIUM_POOLS)) {
     if (
-      (pool.tokenMintA.equals(inputMint) && pool.tokenMintB.equals(outputMint)) ||
+      (pool.tokenMintA.equals(inputMint) &&
+        pool.tokenMintB.equals(outputMint)) ||
       (pool.tokenMintA.equals(outputMint) && pool.tokenMintB.equals(inputMint))
     ) {
       return pool;

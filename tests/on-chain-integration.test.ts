@@ -22,7 +22,9 @@ const shouldRunOnChainTests = process.env.RUN_ON_CHAIN_TESTS === "true";
 const describeOnChain = shouldRunOnChainTests ? describe : describe.skip;
 
 if (!shouldRunOnChainTests) {
-  console.warn("Skipping on-chain integration tests. Set RUN_ON_CHAIN_TESTS=true to enable.");
+  console.warn(
+    "Skipping on-chain integration tests. Set RUN_ON_CHAIN_TESTS=true to enable."
+  );
 }
 
 describeOnChain("On-Chain Integration Tests", () => {
@@ -31,7 +33,10 @@ describeOnChain("On-Chain Integration Tests", () => {
   const wallet = new anchor.Wallet(keypair);
 
   // Use localnet for testing (requires local validator)
-  const connection = new anchor.web3.Connection("http://localhost:8899", "confirmed");
+  const connection = new anchor.web3.Connection(
+    "http://localhost:8899",
+    "confirmed"
+  );
   const provider = new anchor.AnchorProvider(connection, wallet, {});
   anchor.setProvider(provider);
 
@@ -49,7 +54,10 @@ describeOnChain("On-Chain Integration Tests", () => {
 
   beforeAll(async () => {
     // Airdrop SOL to the test account for transaction fees
-    const airdropSignature = await connection.requestAirdrop(keypair.publicKey, 2 * anchor.web3.LAMPORTS_PER_SOL);
+    const airdropSignature = await connection.requestAirdrop(
+      keypair.publicKey,
+      2 * anchor.web3.LAMPORTS_PER_SOL
+    );
     await connection.confirmTransaction(airdropSignature);
 
     // Load the program
@@ -120,7 +128,10 @@ describeOnChain("On-Chain Integration Tests", () => {
         .rpc();
     } catch (error) {
       // Program might already be initialized
-      console.log("Program already initialized or initialization failed:", (error as Error).message);
+      console.log(
+        "Program already initialized or initialization failed:",
+        (error as Error).message
+      );
     }
   });
 
@@ -147,7 +158,7 @@ describeOnChain("On-Chain Integration Tests", () => {
           new BN(1_000_000), // oracle_price (1 USD in 6 decimals)
           new BN(10_000), // oracle_confidence
           false, // use_jito_bundling
-          500, // max_slippage_bps (5%)
+          500 // max_slippage_bps (5%)
         )
         .accounts({
           globalState,
@@ -163,7 +174,8 @@ describeOnChain("On-Chain Integration Tests", () => {
       expect(typeof tx).toBe("string");
 
       // Verify global state was updated
-  let globalStateAccount = await program.account.globalState.fetch(globalState);
+      let globalStateAccount =
+        await program.account.globalState.fetch(globalState);
       expect(globalStateAccount.totalSwaps.toNumber()).toBeGreaterThan(0);
 
       console.log("Weighted swap executed successfully with tx:", tx);
@@ -190,7 +202,7 @@ describeOnChain("On-Chain Integration Tests", () => {
             new BN(1_000_000),
             new BN(10_000),
             false,
-            500,
+            500
           )
           .accounts({
             globalState,
@@ -207,7 +219,9 @@ describeOnChain("On-Chain Integration Tests", () => {
       const inputAmount = 1_000_000_000;
       const minOutputAmount = 1_000_000_000; // Unrealistically high minimum
       const weights = [100]; // Single venue
-      const venueAddresses = [new PublicKey("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8")];
+      const venueAddresses = [
+        new PublicKey("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"),
+      ];
 
       await expect(
         program.methods
@@ -221,7 +235,7 @@ describeOnChain("On-Chain Integration Tests", () => {
             new BN(1_000_000),
             new BN(10_000),
             false,
-            500,
+            500
           )
           .accounts({
             globalState,
@@ -236,7 +250,8 @@ describeOnChain("On-Chain Integration Tests", () => {
 
     it("should handle emergency pause correctly", async () => {
       // Get current authority from global state
-      const globalStateAccount = await program.account.globalState.fetch(globalState);
+      const globalStateAccount =
+        await program.account.globalState.fetch(globalState);
       const currentAuthority = globalStateAccount.authority;
 
       // First pause the program using the correct authority
@@ -250,14 +265,17 @@ describeOnChain("On-Chain Integration Tests", () => {
         .rpc();
 
       // Verify program is paused
-      let updatedGlobalStateAccount = await program.account.globalState.fetch(globalState);
+      let updatedGlobalStateAccount =
+        await program.account.globalState.fetch(globalState);
       expect(updatedGlobalStateAccount.isPaused).toBe(true);
 
-            // Try to execute swap while paused - should fail
+      // Try to execute swap while paused - should fail
       const inputAmount = 1_000_000_000;
       const minOutputAmount = 900_000_000;
       const weights = [100];
-      const venueAddresses = [new PublicKey("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8")];
+      const venueAddresses = [
+        new PublicKey("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"),
+      ];
 
       await expect(
         program.methods
@@ -271,7 +289,7 @@ describeOnChain("On-Chain Integration Tests", () => {
             new BN(1_000_000),
             new BN(10_000),
             false,
-            500,
+            500
           )
           .accounts({
             globalState,
@@ -316,7 +334,7 @@ describeOnChain("On-Chain Integration Tests", () => {
           new BN(inputAmount),
           new BN(minOutputAmount),
           oracleData,
-          3, // max_venues
+          3 // max_venues
         )
         .accounts({
           globalState,
@@ -354,7 +372,7 @@ describeOnChain("On-Chain Integration Tests", () => {
           new BN(1_000_000),
           new BN(10_000),
           true, // use_jito_bundling enabled
-          300, // Lower slippage for large trades (3%)
+          300 // Lower slippage for large trades (3%)
         )
         .accounts({
           globalState,

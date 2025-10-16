@@ -68,7 +68,7 @@ pub struct SwapArgs {
     pub amount_in: u64,
     pub min_out: u64,
     pub slippage_tolerance: Option<u16>, // In basis points (e.g., 50 = 0.5%)
-    pub twap_slices: Option<u8>, // Number of slices for TWAP
+    pub twap_slices: Option<u8>,         // Number of slices for TWAP
 }
 
 #[account]
@@ -140,8 +140,12 @@ pub mod swap_toc_processor {
         Ok(expected_out)
     }
 
-    fn calculate_min_output_with_slippage(expected_out: u64, slippage_tolerance: u16) -> Result<u64> {
-        let slippage_factor = 10_000u64.checked_sub(slippage_tolerance as u64)
+    fn calculate_min_output_with_slippage(
+        expected_out: u64,
+        slippage_tolerance: u16,
+    ) -> Result<u64> {
+        let slippage_factor = 10_000u64
+            .checked_sub(slippage_tolerance as u64)
             .ok_or(ErrorCode::SlippageExceeded)?;
 
         let min_out = (expected_out as u128)

@@ -129,7 +129,7 @@ fn simulate_amm_output(amount_in: u64, dex: &DexInfo) -> f64 {
 struct DexCost {
     index: usize,
     dex: DexInfo,
-    unit_cost: f64,      // qin/qouti (higher = worse)
+    unit_cost: f64, // qin/qouti (higher = worse)
     simulated_output: f64,
 }
 

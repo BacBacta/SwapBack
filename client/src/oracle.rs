@@ -73,7 +73,11 @@ pub async fn fetch_price(
         Ok(price_data) => return Ok(price_data),
         Err(e) => {
             log::error!("Switchboard price fetch failed: {}", e);
-            return Err(format!("All oracle fetches failed: Pyth({}), Switchboard({})", "pyth_error", e).into());
+            return Err(format!(
+                "All oracle fetches failed: Pyth({}), Switchboard({})",
+                "pyth_error", e
+            )
+            .into());
         }
     }
 }
@@ -117,7 +121,9 @@ pub fn validate_route_price(
 
     // Calculate deviation from oracle (simplified check)
     // In production, you'd want more sophisticated price impact analysis
-    let deviation_bps = ((min_required_output as f64 - simulated_output as f64) / simulated_output as f64 * 10000.0) as u16;
+    let deviation_bps = ((min_required_output as f64 - simulated_output as f64)
+        / simulated_output as f64
+        * 10000.0) as u16;
 
     if deviation_bps > max_deviation_bps {
         return Err(format!(
@@ -167,12 +173,8 @@ mod tests {
         let oracle_price = 150_000_000;
         let max_deviation = 200; // 2%
 
-        let result = validate_route_price(
-            simulated_output,
-            min_required,
-            oracle_price,
-            max_deviation,
-        );
+        let result =
+            validate_route_price(simulated_output, min_required, oracle_price, max_deviation);
 
         assert!(result.is_ok());
     }
@@ -184,12 +186,8 @@ mod tests {
         let oracle_price = 150_000_000;
         let max_deviation = 200;
 
-        let result = validate_route_price(
-            simulated_output,
-            min_required,
-            oracle_price,
-            max_deviation,
-        );
+        let result =
+            validate_route_price(simulated_output, min_required, oracle_price, max_deviation);
 
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("below minimum"));
