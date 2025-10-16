@@ -447,7 +447,7 @@ export class RouteOptimizationEngine {
         // AMM formula: qout = reserveOut - (reserveIn * reserveOut) / (reserveIn + effectiveInput)
         const numerator = reserveIn * reserveOut;
         const denominator = reserveIn + effectiveInput;
-        const simulatedOutput = reserveOut - (numerator / denominator);
+        const simulatedOutput = reserveOut - numerator / denominator;
 
         // Unit cost: higher means worse price (qin/qouti)
         const unitCost = amountIn / Math.max(simulatedOutput, 0.000001);
@@ -463,7 +463,10 @@ export class RouteOptimizationEngine {
       dexCosts.sort((a, b) => a.unitCost - b.unitCost);
 
       // Step 3: Allocate in tranches using greedy algorithm
-      const allocations: Array<{ dex: LiquiditySource; allocatedInput: number }> = [];
+      const allocations: Array<{
+        dex: LiquiditySource;
+        allocatedInput: number;
+      }> = [];
       let remainingAmount = amountIn;
 
       for (const dexCost of dexCosts) {
@@ -507,16 +510,21 @@ export class RouteOptimizationEngine {
       }
 
       // Ensure no weight is 0 and all are u8 (0-255)
-      const validWeights = weights.filter(w => w > 0);
+      const validWeights = weights.filter((w) => w > 0);
       if (validWeights.length !== weights.length) {
         // Redistribute if some weights were 0
-        return this.computeWeightsTrancheBased(amountIn, dexList.slice(0, validWeights.length));
+        return this.computeWeightsTrancheBased(
+          amountIn,
+          dexList.slice(0, validWeights.length)
+        );
       }
 
       return { weights, venueOrder };
-
     } catch (error) {
-      console.warn("Tranche-based weight calculation failed, using equal weights:", error);
+      console.warn(
+        "Tranche-based weight calculation failed, using equal weights:",
+        error
+      );
 
       // Fallback to equal weights
       const equalWeight = Math.floor(100 / dexList.length);
@@ -528,7 +536,7 @@ export class RouteOptimizationEngine {
 
       return {
         weights,
-        venueOrder: dexList.map(d => d.venue),
+        venueOrder: dexList.map((d) => d.venue),
       };
     }
   }

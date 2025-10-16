@@ -12,15 +12,16 @@ function simulateAMMOutput(amountIn, source) {
 
   const numerator = reserveIn * reserveOut;
   const denominator = reserveIn + effectiveInput;
-  return reserveOut - (numerator / denominator);
+  return reserveOut - numerator / denominator;
 }
 
 function computeWeightsTrancheBased(amountIn, dexList) {
   if (dexList.length === 0) return { weights: [], venueOrder: [] };
-  if (dexList.length === 1) return { weights: [100], venueOrder: [dexList[0].venue] };
+  if (dexList.length === 1)
+    return { weights: [100], venueOrder: [dexList[0].venue] };
 
   // Step 1: Simulate output and calculate unit costs
-  const dexCosts = dexList.map(dex => {
+  const dexCosts = dexList.map((dex) => {
     const simulatedOutput = simulateAMMOutput(amountIn, dex);
     const unitCost = amountIn / Math.max(simulatedOutput, 0.000001);
     return { dex, unitCost, simulatedOutput };
@@ -36,7 +37,10 @@ function computeWeightsTrancheBased(amountIn, dexList) {
   for (const dexCost of dexCosts) {
     if (remainingAmount <= 0) break;
 
-    const trancheSize = Math.min(remainingAmount * 0.4, dexCost.dex.depth * 0.1);
+    const trancheSize = Math.min(
+      remainingAmount * 0.4,
+      dexCost.dex.depth * 0.1
+    );
     const allocatedInput = Math.min(trancheSize, remainingAmount);
 
     if (allocatedInput > 0) {
@@ -66,9 +70,27 @@ function computeWeightsTrancheBased(amountIn, dexList) {
 
 // Demo with sample data
 const dexes = [
-  { venue: "Raydium", depth: 1000000, feeAmount: 30, effectivePrice: 0.00001, slippagePercent: 0.005 },
-  { venue: "Orca", depth: 500000, feeAmount: 15, effectivePrice: 0.0000105, slippagePercent: 0.003 },
-  { venue: "Jupiter", depth: 2000000, feeAmount: 20, effectivePrice: 0.0000098, slippagePercent: 0.002 },
+  {
+    venue: "Raydium",
+    depth: 1000000,
+    feeAmount: 30,
+    effectivePrice: 0.00001,
+    slippagePercent: 0.005,
+  },
+  {
+    venue: "Orca",
+    depth: 500000,
+    feeAmount: 15,
+    effectivePrice: 0.0000105,
+    slippagePercent: 0.003,
+  },
+  {
+    venue: "Jupiter",
+    depth: 2000000,
+    feeAmount: 20,
+    effectivePrice: 0.0000098,
+    slippagePercent: 0.002,
+  },
 ];
 
 const inputAmount = 100000;
@@ -77,11 +99,17 @@ const result = computeWeightsTrancheBased(inputAmount, dexes);
 console.log("Tranche-based Weight Allocation Demo");
 console.log("====================================");
 console.log(`Input Amount: $${inputAmount}`);
-console.log("DEXes:", dexes.map(d => `${d.venue} ($${d.depth} liquidity)`));
+console.log(
+  "DEXes:",
+  dexes.map((d) => `${d.venue} ($${d.depth} liquidity)`)
+);
 console.log("\nResults:");
 console.log("Weights:", result.weights);
 console.log("Venue Order:", result.venueOrder);
-console.log("Total Weight:", result.weights.reduce((sum, w) => sum + w, 0));
+console.log(
+  "Total Weight:",
+  result.weights.reduce((sum, w) => sum + w, 0)
+);
 
 // Show individual allocations
 console.log("\nDetailed Allocation:");

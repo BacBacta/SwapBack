@@ -727,7 +727,6 @@ describe("RouteOptimizationEngine", () => {
         inputAmount,
         { maxRoutes }
       );
-
     });
   });
 
@@ -783,7 +782,10 @@ describe("RouteOptimizationEngine", () => {
       expect(result.venueOrder.length).toBe(sources.length);
 
       // Weights should sum to 100
-      const totalWeight = result.weights.reduce((sum: number, w: number) => sum + w, 0);
+      const totalWeight = result.weights.reduce(
+        (sum: number, w: number) => sum + w,
+        0
+      );
       expect(Math.abs(totalWeight - 100)).toBeLessThan(1); // Allow small rounding error
 
       // All weights should be positive and <= 255 (u8)
@@ -813,7 +815,10 @@ describe("RouteOptimizationEngine", () => {
         },
       ];
 
-      const result = await (engine as any).computeWeightsTrancheBased(1000, sources);
+      const result = await (engine as any).computeWeightsTrancheBased(
+        1000,
+        sources
+      );
 
       expect(result.weights).toEqual([100]);
       expect(result.venueOrder).toEqual(["raydium"]);
