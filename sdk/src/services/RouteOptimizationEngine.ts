@@ -401,116 +401,150 @@ export class RouteOptimizationEngine {
     outputMint: string,
     totalInput: number
   ): Promise<{ weights: number[]; venueOrder: VenueName[] }> {
-    if (sources.length === 0) {
+    // Use tranche-based allocation algorithm as requested
+    return this.computeWeightsTrancheBased(totalInput, sources);
+  }
+
+  /**
+   * Calculate weights using tranche-based allocation algorithm
+   * Implements the greedy allocation strategy requested:
+   * 1. Simulate output for each DEX using AMM formula
+   * 2. Calculate unit cost ci = qin/qouti
+   * 3. Sort DEXes by ascending cost
+   * 4. Allocate in tranches starting from lowest cost DEX
+   */
+  async computeWeightsTrancheBased(
+    amountIn: number,
+    dexList: LiquiditySource[]
+  ): Promise<{ weights: number[]; venueOrder: VenueName[] }> {
+    if (dexList.length === 0) {
       return { weights: [], venueOrder: [] };
     }
 
+    if (dexList.length === 1) {
+      return { weights: [100], venueOrder: [dexList[0].venue] };
+    }
+
     try {
-      // Get oracle price for comparison
-      const oraclePrice = await this.oracleService.getTokenPrice(outputMint);
-      const oracleRate = oraclePrice.price; // USD per output token
+      // Step 1: Simulate output for each DEX and calculate unit costs
+      const dexCosts: Array<{
+        dex: LiquiditySource;
+        unitCost: number; // qin/qouti (higher = worse)
+        simulatedOutput: number;
+      }> = [];
 
-      // Calculate scores for each venue
-      const venueScores: Array<{ venue: VenueName; score: number }> = [];
+      for (const dex of dexList) {
+        // Simulate AMM output using x*y = k formula with fees
+        // For AMM: qout = y - (x*y)/(x + qin)
+        // But we need to account for fees and use available reserves
+        const reserveIn = dex.depth * 0.5; // Assume 50% of depth is input token
+        const reserveOut = dex.depth * 0.5; // Assume 50% of depth is output token
 
-      for (const source of sources) {
-        let score = 0;
+        // Apply fee: effective input = amountIn * (1 - fee)
+        const feeRate = dex.feeAmount || 0.003; // Default 0.3% fee
+        const effectiveInput = amountIn * (1 - feeRate);
 
-        // 1. Price efficiency vs oracle (40% weight)
-        const priceEfficiency = Math.min(source.effectivePrice / oracleRate, 1);
-        score += priceEfficiency * 40;
+        // AMM formula: qout = reserveOut - (reserveIn * reserveOut) / (reserveIn + effectiveInput)
+        const numerator = reserveIn * reserveOut;
+        const denominator = reserveIn + effectiveInput;
+        const simulatedOutput = reserveOut - (numerator / denominator);
 
-        // 2. Liquidity depth (30% weight)
-        const depthScore = Math.min(source.depth / 1000000, 1); // Cap at $1M depth
-        score += depthScore * 30;
+        // Unit cost: higher means worse price (qin/qouti)
+        const unitCost = amountIn / Math.max(simulatedOutput, 0.000001);
 
-        // 3. Fee efficiency (20% weight)
-        const feeEfficiency = Math.max(0, 1 - source.feeAmount / totalInput);
-        score += feeEfficiency * 20;
-
-        // 4. Venue reliability (10% weight) - CLOB > AMM > RFQ
-        let reliabilityScore: number;
-        if (source.venueType === VenueType.CLOB) {
-          reliabilityScore = 1;
-        } else if (source.venueType === VenueType.AMM) {
-          reliabilityScore = 0.7;
-        } else {
-          reliabilityScore = 0.5;
-        }
-        score += reliabilityScore * 10;
-
-        venueScores.push({ venue: source.venue, score });
+        dexCosts.push({
+          dex,
+          unitCost,
+          simulatedOutput: Math.max(simulatedOutput, 0),
+        });
       }
 
-      // Sort by score (descending)
-      venueScores.sort((a, b) => b.score - a.score);
+      // Step 2: Sort DEXes by ascending unit cost (lowest cost first)
+      dexCosts.sort((a, b) => a.unitCost - b.unitCost);
 
-      // Allocate weights using exponential decay
-      // Top venue gets most weight, others get progressively less
-      const totalScore = venueScores.reduce((sum, v) => sum + v.score, 0);
-      let weights: number[] = [];
-      let remainingWeight = 100;
+      // Step 3: Allocate in tranches using greedy algorithm
+      const allocations: Array<{ dex: LiquiditySource; allocatedInput: number }> = [];
+      let remainingAmount = amountIn;
 
-      for (let i = 0; i < venueScores.length; i++) {
-        if (i === venueScores.length - 1) {
-          // Last venue gets remaining weight
-          weights.push(remainingWeight);
-        } else {
-          // Exponential decay allocation
-          const scoreRatio = venueScores[i].score / totalScore;
-          const allocatedWeight = Math.max(
-            5,
-            Math.floor(scoreRatio * 100 * Math.pow(0.7, i))
-          );
-          weights.push(Math.min(allocatedWeight, remainingWeight));
-          remainingWeight -= allocatedWeight;
+      for (const dexCost of dexCosts) {
+        if (remainingAmount <= 0) break;
+
+        // Calculate how much to allocate to this DEX
+        // Use a tranche size that considers price impact
+        const trancheSize = Math.min(
+          remainingAmount * 0.4, // Max 40% of remaining amount per tranche
+          dexCost.dex.depth * 0.1 // Max 10% of available liquidity
+        );
+
+        const allocatedInput = Math.min(trancheSize, remainingAmount);
+
+        if (allocatedInput > 0) {
+          allocations.push({
+            dex: dexCost.dex,
+            allocatedInput,
+          });
+          remainingAmount -= allocatedInput;
         }
+      }
+
+      // Step 4: Convert allocations to weights (u8 values summing to 100)
+      const weights: number[] = [];
+      const venueOrder: VenueName[] = [];
+
+      for (const allocation of allocations) {
+        const weight = Math.round((allocation.allocatedInput / amountIn) * 100);
+        weights.push(weight);
+        venueOrder.push(allocation.dex.venue);
       }
 
       // Ensure weights sum to exactly 100
-      const currentSum = weights.reduce((sum, w) => sum + w, 0);
-      if (currentSum !== 100) {
-        const adjustment = 100 - currentSum;
-        weights[weights.length - 1] += adjustment;
+      const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+      if (totalWeight !== 100) {
+        const adjustment = 100 - totalWeight;
+        if (weights.length > 0) {
+          weights[weights.length - 1] += adjustment;
+        }
       }
 
-      return {
-        weights,
-        venueOrder: venueScores.map((v) => v.venue),
-      };
+      // Ensure no weight is 0 and all are u8 (0-255)
+      const validWeights = weights.filter(w => w > 0);
+      if (validWeights.length !== weights.length) {
+        // Redistribute if some weights were 0
+        return this.computeWeightsTrancheBased(amountIn, dexList.slice(0, validWeights.length));
+      }
+
+      return { weights, venueOrder };
+
     } catch (error) {
-      console.warn(
-        "Oracle-based weight calculation failed, using equal weights:",
-        error
-      );
+      console.warn("Tranche-based weight calculation failed, using equal weights:", error);
 
       // Fallback to equal weights
-      const equalWeight = Math.floor(100 / sources.length);
-      let weights = new Array(sources.length).fill(equalWeight);
-      const remainder = 100 - equalWeight * sources.length;
+      const equalWeight = Math.floor(100 / dexList.length);
+      let weights = new Array(dexList.length).fill(equalWeight);
+      const remainder = 100 - equalWeight * dexList.length;
       if (remainder > 0 && weights.length > 0) {
         weights[weights.length - 1] += remainder;
       }
 
       return {
         weights,
-        venueOrder: sources.map((s) => s.venue),
+        venueOrder: dexList.map(d => d.venue),
       };
     }
   }
 }
 
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
 /**
  * Validate route candidate before execution
  */
-export function validateRoute(
+export async function validateRoute(
   candidate: RouteCandidate,
-  config: OptimizationConfig
-): { valid: boolean; reason?: string } {
+  config: OptimizationConfig,
+  oracleService?: OraclePriceService,
+  inputMint?: string,
+  outputMint?: string,
+  inputAmount?: number
+): Promise<{ valid: boolean; reason?: string }> {
   // Check min output
   if (
     config.minOutputAmount &&
@@ -535,6 +569,29 @@ export function validateRoute(
     if (staleness > 30000) {
       // 30 seconds
       return { valid: false, reason: "Liquidity data is stale" };
+    }
+  }
+
+  // Oracle price verification (if oracle service provided)
+  if (oracleService && inputMint && outputMint && inputAmount !== undefined) {
+    try {
+      const verification = await oracleService.verifyRoutePrice(
+        candidate,
+        inputMint,
+        outputMint,
+        inputAmount,
+        config.slippageTolerance // Use same tolerance as slippage
+      );
+
+      if (!verification.isAcceptable) {
+        return {
+          valid: false,
+          reason: `Route price deviates from oracle by ${verification.deviation.toFixed(2)}% (max allowed: ${(config.slippageTolerance * 100).toFixed(2)}%)`,
+        };
+      }
+    } catch (error) {
+      console.warn("Oracle price verification failed:", error);
+      // Don't fail validation if oracle check fails, just log warning
     }
   }
 

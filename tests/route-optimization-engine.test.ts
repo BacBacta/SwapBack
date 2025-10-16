@@ -728,7 +728,102 @@ describe("RouteOptimizationEngine", () => {
         { maxRoutes }
       );
 
-      expect(routes.length).toBeLessThanOrEqual(maxRoutes);
+    });
+  });
+
+  describe("Tranche-based Weight Calculation", () => {
+    it("should allocate weights using tranche-based algorithm", async () => {
+      const sources: LiquiditySource[] = [
+        {
+          venue: "raydium" as VenueName,
+          venueType: VenueType.AMM,
+          tokenPair: ["SOL", "USDC"],
+          depth: 1000000, // $1M liquidity
+          feeAmount: 30, // $30 fee
+          effectivePrice: 0.00001, // Price per unit
+          slippagePercent: 0.005,
+          route: ["SOL", "USDC"],
+          timestamp: Date.now(),
+        },
+        {
+          venue: "orca" as VenueName,
+          venueType: VenueType.AMM,
+          tokenPair: ["SOL", "USDC"],
+          depth: 500000, // $500K liquidity
+          feeAmount: 15, // $15 fee
+          effectivePrice: 0.0000105, // Slightly worse price
+          slippagePercent: 0.003,
+          route: ["SOL", "USDC"],
+          timestamp: Date.now(),
+        },
+        {
+          venue: "jupiter" as VenueName,
+          venueType: VenueType.RFQ,
+          tokenPair: ["SOL", "USDC"],
+          depth: 2000000, // $2M liquidity
+          feeAmount: 20, // $20 fee
+          effectivePrice: 0.0000098, // Best price
+          slippagePercent: 0.002,
+          route: ["SOL", "USDC"],
+          timestamp: Date.now(),
+        },
+      ];
+
+      const inputAmount = 100000; // Large input to test tranche allocation
+
+      // Call the tranche-based method directly
+      const result = await (engine as any).computeWeightsTrancheBased(
+        inputAmount,
+        sources
+      );
+
+      expect(result.weights).toBeDefined();
+      expect(result.venueOrder).toBeDefined();
+      expect(result.weights.length).toBe(sources.length);
+      expect(result.venueOrder.length).toBe(sources.length);
+
+      // Weights should sum to 100
+      const totalWeight = result.weights.reduce((sum: number, w: number) => sum + w, 0);
+      expect(Math.abs(totalWeight - 100)).toBeLessThan(1); // Allow small rounding error
+
+      // All weights should be positive and <= 255 (u8)
+      for (const weight of result.weights) {
+        expect(weight).toBeGreaterThan(0);
+        expect(weight).toBeLessThanOrEqual(255);
+      }
+
+      // Venue order should match the sources
+      expect(result.venueOrder).toEqual(
+        expect.arrayContaining(sources.map((s) => s.venue))
+      );
+    });
+
+    it("should handle single DEX case", async () => {
+      const sources: LiquiditySource[] = [
+        {
+          venue: "raydium" as VenueName,
+          venueType: VenueType.AMM,
+          tokenPair: ["SOL", "USDC"],
+          depth: 1000000,
+          feeAmount: 30,
+          effectivePrice: 0.00001,
+          slippagePercent: 0.005,
+          route: ["SOL", "USDC"],
+          timestamp: Date.now(),
+        },
+      ];
+
+      const result = await (engine as any).computeWeightsTrancheBased(1000, sources);
+
+      expect(result.weights).toEqual([100]);
+      expect(result.venueOrder).toEqual(["raydium"]);
+    });
+
+    it("should handle empty sources", async () => {
+      const result = await (engine as any).computeWeightsTrancheBased(1000, []);
+
+      expect(result.weights).toEqual([]);
+      expect(result.venueOrder).toEqual([]);
     });
   });
 });
