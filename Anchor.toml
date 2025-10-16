@@ -8,10 +8,14 @@ skip-lint = false
 [programs.localnet]
 swapback_buyback = "71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW"
 swapback_cnft = "HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf"
+swapback_router = "HCsNTpvkUGV7XMAw5VsBSR4Kxvt5x59iFDAeucvY4cre"
+common_swap = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 
 [programs.devnet]
 swapback_buyback = "71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW"
 swapback_cnft = "HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf"
+swapback_router = "HCsNTpvkUGV7XMAw5VsBSR4Kxvt5x59iFDAeucvY4cre"
+common_swap = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 
 [programs.mainnet]
 swapback_buyback = "71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW"

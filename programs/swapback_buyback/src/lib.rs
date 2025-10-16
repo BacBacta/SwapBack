@@ -2,7 +2,8 @@ use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, Burn, Mint, Token, TokenAccount, Transfer};
 
-declare_id!("71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW");
+// Program ID generated locally for deployment
+declare_id!("Fx6yfXhqq1i3CJjocwnLXMw3VMLFt5mfoLtWPJzSRQvn");
 
 #[program]
 pub mod swapback_buyback {

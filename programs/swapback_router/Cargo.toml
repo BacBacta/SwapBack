@@ -1,12 +1,12 @@
 [package]
-name = "common_swap"
+name = "swapback_router"
 version = "0.1.0"
-description = "Programme de swap commun avec routage pondéré et protection MEV"
+description = "Programme de routage de swap avancé avec oracle et TWAP"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "common_swap"
+name = "swapback_router"
 
 [features]
 no-entrypoint = []
@@ -19,3 +19,4 @@ default = []
 [dependencies]
 anchor-lang = { workspace = true, features = ["init-if-needed"] }
 anchor-spl = { workspace = true }
+pyth-sdk-solana = { workspace = true }

@@ -18,6 +18,9 @@ import {
 import {
   getOrcaWhirlpool,
 } from '../config/orca-pools';
+import {
+  getRaydiumPool,
+} from '../config/raydium-pools';
 
 // ============================================================================
 // CONFIGURATION
@@ -283,7 +286,7 @@ export class LiquidityDataCollector {
       // Calculate execution
       const config = VENUE_CONFIGS[VenueName.PHOENIX];
       const effectivePrice = topOfBook.askPrice * (1 + config.feeRate);
-      const expectedOutput = inputAmount / effectivePrice;
+      const expectedOutput = inputAmount * effectivePrice; // For CLOB, price is quote/base
       const feeAmount = expectedOutput * config.feeRate;
       
       // Slippage is minimal on CLOB if within top-of-book size
@@ -336,8 +339,15 @@ export class LiquidityDataCollector {
       }
     }
     
-    // Raydium and other AMMs not yet implemented
-    console.warn(`AMM venue ${venue} not yet implemented`);
+    // Raydium AMM integration
+    if (venue === VenueName.RAYDIUM) {
+      try {
+        return await this.fetchRaydiumAmm(inputMint, outputMint, inputAmount);
+      } catch (error) {
+        console.error('Raydium AMM fetch error:', error);
+        return null;
+      }
+    }
     
     // Fallback mock data for other AMMs
     const reserves = {
@@ -425,7 +435,10 @@ export class LiquidityDataCollector {
       const liquidity = Number(liquidityBuf.readBigUInt64LE(0));
       
       // Read fee rate (basis points)
-      const feeRate = data.readUInt16LE(101) / 10000; // Convert bps to decimal
+      const rawFeeRate = data.readUInt16LE(101);
+      const feeRate = Math.min(rawFeeRate / 10000, 0.01); // Convert bps to decimal, cap at 1%
+      
+      console.log(`Orca Whirlpool: rawFeeRate=${rawFeeRate}, feeRate=${feeRate}`);
       
       // Calculate output amount with concentrated liquidity formula
       // For small trades, we can approximate with constant product
@@ -433,11 +446,11 @@ export class LiquidityDataCollector {
       const outputAmount = inputWithFee * currentPrice;
       
       // Calculate price impact
-      const effectivePrice = inputAmount / outputAmount;
+      const effectivePrice = outputAmount / inputAmount;
       const slippagePercent = Math.abs(effectivePrice - currentPrice) / currentPrice;
       
-      // Estimate depth (TVL in the pool)
-      const depth = liquidity * currentPrice * 2; // Rough estimate
+      // Estimate depth (TVL in the pool) - use a more reasonable estimate for concentrated liquidity
+      const depth = Math.min(liquidity * currentPrice * 2 / 1e12, 100000000); // Cap at 100M tokens, scale down
       
       const feeAmount = inputAmount * feeRate;
       
@@ -467,6 +480,152 @@ export class LiquidityDataCollector {
       };
     } catch (error) {
       console.error('Orca whirlpool fetch error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch liquidity from Raydium AMM
+   * Uses constant product AMM (xy=k) similar to Uniswap V2
+   */
+  private async fetchRaydiumAmm(
+    inputMint: string,
+    outputMint: string,
+    inputAmount: number
+  ): Promise<LiquiditySource | null> {
+    try {
+      // Get Raydium pool for this pair
+      const poolConfig = getRaydiumPool(
+        new PublicKey(inputMint),
+        new PublicKey(outputMint)
+      );
+
+      if (!poolConfig) {
+        console.warn(`No Raydium pool for ${inputMint}/${outputMint}`);
+        return null;
+      }
+
+      // Fetch AMM account data
+      const ammAccount = await this.connection.getAccountInfo(poolConfig.ammAddress);
+
+      if (!ammAccount) {
+        console.warn(`Raydium AMM account not found: ${poolConfig.ammAddress.toBase58()}`);
+        return null;
+      }
+
+      // Parse Raydium AMM account data
+      // Raydium AMM account layout (simplified):
+      // - status: u64 at offset 0
+      // - nonce: u64 at offset 8
+      // - orderNum: u64 at offset 16
+      // - depth: u64 at offset 24
+      // - coinDecimals: u64 at offset 32
+      // - pcDecimals: u64 at offset 40
+      // - state: u64 at offset 48
+      // - resetFlag: u64 at offset 56
+      // - minSize: u64 at offset 64
+      // - volMaxCutRatio: u64 at offset 72
+      // - amountWaveRatio: u64 at offset 80
+      // - coinLotSize: u64 at offset 88
+      // - pcLotSize: u64 at offset 96
+      // - minPriceMultiplier: u64 at offset 104
+      // - maxPriceMultiplier: u64 at offset 112
+      // - systemDecimalValue: u64 at offset 120
+      // - minSeparateNumerator: u64 at offset 128
+      // - minSeparateDenominator: u64 at offset 136
+      // - tradeFeeNumerator: u64 at offset 144
+      // - tradeFeeDenominator: u64 at offset 152
+      // - pnlNumerator: u64 at offset 160
+      // - pnlDenominator: u64 at offset 168
+      // - swapFeeNumerator: u64 at offset 176
+      // - swapFeeDenominator: u64 at offset 184
+      // - needTakePnlCoin: u64 at offset 192
+      // - needTakePnlPc: u64 at offset 200
+      // - totalPnlPc: u64 at offset 208
+      // - totalPnlCoin: u64 at offset 216
+      // - poolCoinTokenAccount: Pubkey at offset 224 (32 bytes)
+      // - poolPcTokenAccount: Pubkey at offset 256 (32 bytes)
+      // - coinMintAddress: Pubkey at offset 288 (32 bytes)
+      // - pcMintAddress: Pubkey at offset 320 (32 bytes)
+      // - lpMintAddress: Pubkey at offset 352 (32 bytes)
+      // - ammOpenOrders: Pubkey at offset 384 (32 bytes)
+      // - serumMarket: Pubkey at offset 416 (32 bytes)
+      // - serumProgramId: Pubkey at offset 448 (32 bytes)
+      // - ammTargetOrders: Pubkey at offset 480 (32 bytes)
+      // - ammQuantities: Pubkey at offset 512 (32 bytes)
+      // - poolWithdrawQueue: Pubkey at offset 544 (32 bytes)
+      // - poolTempLpTokenAccount: Pubkey at offset 576 (32 bytes)
+      // - ammOwner: Pubkey at offset 608 (32 bytes)
+      // - poolLpTokenAccount: Pubkey at offset 640 (32 bytes)
+
+      const data = ammAccount.data;
+
+      // Read coin vault balance (token A)
+      const coinVaultAccount = await this.connection.getTokenAccountBalance(poolConfig.poolCoinTokenAccount);
+      const pcVaultAccount = await this.connection.getTokenAccountBalance(poolConfig.poolPcTokenAccount);
+
+      if (!coinVaultAccount.value || !pcVaultAccount.value) {
+        console.warn('Failed to fetch Raydium vault balances');
+        return null;
+      }
+
+      const coinBalance = Number(coinVaultAccount.value.amount);
+      const pcBalance = Number(pcVaultAccount.value.amount);
+      const coinDecimals = coinVaultAccount.value.decimals;
+      const pcDecimals = pcVaultAccount.value.decimals;
+
+      // Convert to common decimal representation
+      const coinAmount = coinBalance / Math.pow(10, coinDecimals);
+      const pcAmount = pcBalance / Math.pow(10, pcDecimals);
+
+      // Calculate spot price: pcAmount / coinAmount
+      const spotPrice = pcAmount / coinAmount;
+
+      // Determine if input is coin (tokenA) or pc (tokenB)
+      const isInputCoin = poolConfig.tokenMintA.toBase58() === inputMint;
+      const inputReserve = isInputCoin ? coinAmount : pcAmount;
+      const outputReserve = isInputCoin ? pcAmount : coinAmount;
+
+      // Calculate output amount using constant product formula
+      const feeRate = poolConfig.feeBps / 10000; // Convert bps to decimal
+      const inputWithFee = inputAmount * (1 - feeRate);
+      const outputAmount = (outputReserve * inputWithFee) / (inputReserve + inputWithFee);
+
+      // Calculate effective price and slippage
+      const effectivePrice = outputAmount / inputAmount; // Price in output units per input unit
+      const slippagePercent = Math.abs(effectivePrice - spotPrice) / spotPrice;
+
+      console.log(`Raydium AMM: inputAmount=${inputAmount}, outputAmount=${outputAmount}, effectivePrice=${effectivePrice}, spotPrice=${spotPrice}`);
+
+      const feeAmount = inputAmount * feeRate;
+      const depth = Math.min(coinAmount, pcAmount) * spotPrice * 2; // TVL estimate
+
+      return {
+        venue: VenueName.RAYDIUM,
+        venueType: VenueType.AMM,
+        tokenPair: [inputMint, outputMint],
+        depth,
+        reserves: {
+          input: inputReserve,
+          output: outputReserve,
+        },
+        effectivePrice,
+        feeAmount,
+        slippagePercent,
+        route: [inputMint, outputMint],
+        timestamp: Date.now(),
+        metadata: {
+          ammAddress: poolConfig.ammAddress.toBase58(),
+          spotPrice,
+          feeRate,
+          coinBalance,
+          pcBalance,
+          coinDecimals,
+          pcDecimals,
+        },
+      };
+    } catch (error) {
+      console.error('Raydium AMM fetch error:', error);
       return null;
     }
   }

@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
-declare_id!("HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf");
+// Program ID generated locally for deployment
+declare_id!("CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH");
 
 #[program]
 pub mod swapback_cnft {
