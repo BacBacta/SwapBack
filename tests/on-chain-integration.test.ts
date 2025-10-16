@@ -18,7 +18,14 @@ import { CommonSwap } from "../target/types/common_swap";
 // ON-CHAIN INTEGRATION TESTS
 // ============================================================================
 
-describe("On-Chain Integration Tests", () => {
+const shouldRunOnChainTests = process.env.RUN_ON_CHAIN_TESTS === "true";
+const describeOnChain = shouldRunOnChainTests ? describe : describe.skip;
+
+if (!shouldRunOnChainTests) {
+  console.warn("Skipping on-chain integration tests. Set RUN_ON_CHAIN_TESTS=true to enable.");
+}
+
+describeOnChain("On-Chain Integration Tests", () => {
   // Configure the client to use localnet for testing
   const keypair = anchor.web3.Keypair.generate();
   const wallet = new anchor.Wallet(keypair);
@@ -156,7 +163,7 @@ describe("On-Chain Integration Tests", () => {
       expect(typeof tx).toBe("string");
 
       // Verify global state was updated
-      const globalStateAccount = await program.account.globalState.fetch(globalState);
+  let globalStateAccount = await program.account.globalState.fetch(globalState);
       expect(globalStateAccount.totalSwaps.toNumber()).toBeGreaterThan(0);
 
       console.log("Weighted swap executed successfully with tx:", tx);

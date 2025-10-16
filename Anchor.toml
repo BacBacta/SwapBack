@@ -6,26 +6,26 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-swapback_buyback = "71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW"
-swapback_cnft = "HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf"
-swapback_router = "HCsNTpvkUGV7XMAw5VsBSR4Kxvt5x59iFDAeucvY4cre"
-common_swap = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+swapback_buyback = "Fx6yfXhqq1i3CJjocwnLXMw3VMLFt5mfoLtWPJzSRQvn"
+swapback_cnft = "CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH"
+swapback_router = "Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa"
+common_swap = "EtqKmwUHhaBJbmDzb3BrMf2iZ4RyGYPos9U78Xjpe3Ug"
 
 [programs.devnet]
-swapback_buyback = "71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW"
-swapback_cnft = "HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf"
-swapback_router = "HCsNTpvkUGV7XMAw5VsBSR4Kxvt5x59iFDAeucvY4cre"
-common_swap = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+swapback_buyback = "Fx6yfXhqq1i3CJjocwnLXMw3VMLFt5mfoLtWPJzSRQvn"
+swapback_cnft = "CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH"
+swapback_router = "Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa"
+common_swap = "EtqKmwUHhaBJbmDzb3BrMf2iZ4RyGYPos9U78Xjpe3Ug"
 
 [programs.mainnet]
-swapback_buyback = "71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW"
-swapback_cnft = "HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf"
-
-[registry]
+swapback_buyback = "Fx6yfXhqq1i3CJjocwnLXMw3VMLFt5mfoLtWPJzSRQvn"
+swapback_cnft = "CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH"
+swapback_router = "Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa"
+common_swap = "EtqKmwUHhaBJbmDzb3BrMf2iZ4RyGYPos9U78Xjpe3Ug"
 url = "https://api.apr.dev"
 
-[provider]
-cluster = "Localnet"
+swapback_buyback = "Fx6yfXhqq1i3CJjocwnLXMw3VMLFt5mfoLtWPJzSRQvn"
+swapback_cnft = "CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
