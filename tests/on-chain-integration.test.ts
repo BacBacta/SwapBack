@@ -32,9 +32,9 @@ describeOnChain("On-Chain Integration Tests", () => {
   const keypair = anchor.web3.Keypair.generate();
   const wallet = new anchor.Wallet(keypair);
 
-  // Use localnet for testing (requires local validator)
+  // Use devnet for testing
   const connection = new anchor.web3.Connection(
-    "http://localhost:8899",
+    "https://api.devnet.solana.com",
     "confirmed"
   );
   const provider = new anchor.AnchorProvider(connection, wallet, {});

@@ -1,3 +1,7 @@
+[provider]
+cluster = "devnet"
+wallet = "~/.config/solana/id.json"
+
 [toolchain]
 anchor_version = "0.32.1"
 
@@ -12,21 +16,16 @@ swapback_router = "Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa"
 common_swap = "EtqKmwUHhaBJbmDzb3BrMf2iZ4RyGYPos9U78Xjpe3Ug"
 
 [programs.devnet]
-swapback_buyback = "Fx6yfXhqq1i3CJjocwnLXMw3VMLFt5mfoLtWPJzSRQvn"
-swapback_cnft = "CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH"
-swapback_router = "Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa"
-common_swap = "EtqKmwUHhaBJbmDzb3BrMf2iZ4RyGYPos9U78Xjpe3Ug"
+swapback_buyback = "999xJTA329g26Zq3Q7YmMHr7mZBQ3nGtzY6JQW5KzhJe"
+swapback_cnft = "ENbA46Rq9yFdp63WwmVm4tykcjmaukWs6T2ScGr9x7zB"
+swapback_router = "2QeniXbo7kjiyDEsYauqum2DKy1u6YRobbW733WVvwj9"
+common_swap = "D4Hz5ZBPWrLvnjNheQa7FYLVpzuGmPGRqFGWNqg5jRg6"
 
 [programs.mainnet]
 swapback_buyback = "Fx6yfXhqq1i3CJjocwnLXMw3VMLFt5mfoLtWPJzSRQvn"
 swapback_cnft = "CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH"
 swapback_router = "Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa"
 common_swap = "EtqKmwUHhaBJbmDzb3BrMf2iZ4RyGYPos9U78Xjpe3Ug"
-url = "https://api.apr.dev"
-
-swapback_buyback = "Fx6yfXhqq1i3CJjocwnLXMw3VMLFt5mfoLtWPJzSRQvn"
-swapback_cnft = "CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH"
-wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
