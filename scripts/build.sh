@@ -23,14 +23,12 @@ anchor build
 echo -e "${BLUE}📏 Checking program sizes...${NC}"
 ROUTER_SIZE=$(stat -f%z target/deploy/swapback_router.so 2>/dev/null || stat -c%s target/deploy/swapback_router.so)
 BUYBACK_SIZE=$(stat -f%z target/deploy/swapback_buyback.so 2>/dev/null || stat -c%s target/deploy/swapback_buyback.so)
-CNFT_SIZE=$(stat -f%z target/deploy/swapback_cnft.so 2>/dev/null || stat -c%s target/deploy/swapback_cnft.so)
 
 echo "Router program size: $((ROUTER_SIZE / 1024)) KB"
 echo "Buyback program size: $((BUYBACK_SIZE / 1024)) KB"
-echo "cNFT program size: $((CNFT_SIZE / 1024)) KB"
 
 MAX_SIZE=$((10 * 1024 * 1024))  # 10 MB
-if [ $ROUTER_SIZE -gt $MAX_SIZE ] || [ $BUYBACK_SIZE -gt $MAX_SIZE ] || [ $CNFT_SIZE -gt $MAX_SIZE ]; then
+if [ $ROUTER_SIZE -gt $MAX_SIZE ] || [ $BUYBACK_SIZE -gt $MAX_SIZE ]; then
     echo -e "${RED}❌ Program size exceeds 10 MB limit!${NC}"
     exit 1
 fi
@@ -64,7 +62,6 @@ echo "Program IDs:"
 echo "------------"
 echo -e "Router:  ${GREEN}$(solana address -k target/deploy/swapback_router-keypair.json)${NC}"
 echo -e "Buyback: ${GREEN}$(solana address -k target/deploy/swapback_buyback-keypair.json)${NC}"
-echo -e "cNFT:    ${GREEN}$(solana address -k target/deploy/swapback_cnft-keypair.json)${NC}"
 
 echo ""
 echo -e "${BLUE}Next steps:${NC}"
