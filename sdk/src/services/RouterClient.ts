@@ -8,12 +8,7 @@
  * - Fallback route execution
  */
 
-import {
-  Connection,
-  PublicKey,
-  Transaction,
-  Signer,
-} from "@solana/web3.js";
+import { Connection, PublicKey, Transaction, Signer } from "@solana/web3.js";
 import { IntelligentOrderRouter } from "./IntelligentOrderRouter";
 import { JitoBundleService } from "./JitoBundleService";
 import { AtomicSwapPlan } from "../types/smart-router";

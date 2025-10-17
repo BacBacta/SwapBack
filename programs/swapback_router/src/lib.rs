@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token};
 
-
 // Program ID generated locally for deployment
 declare_id!("Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa");
 
@@ -16,7 +15,11 @@ pub mod swapback_router {
         Ok(())
     }
 
-    pub fn create_plan(ctx: Context<CreatePlan>, plan_id: [u8; 32], plan_data: CreatePlanArgs) -> Result<()> {
+    pub fn create_plan(
+        ctx: Context<CreatePlan>,
+        plan_id: [u8; 32],
+        plan_data: CreatePlanArgs,
+    ) -> Result<()> {
         create_plan_processor::process_create_plan(ctx, plan_id, plan_data)
     }
 
@@ -106,15 +109,15 @@ pub struct SwapArgs {
     pub min_out: u64,
     pub slippage_tolerance: Option<u16>, // In basis points (e.g., 50 = 0.5%)
     pub twap_slices: Option<u8>,         // Number of slices for TWAP
-    pub use_dynamic_plan: bool,         // Whether to use a dynamic plan from plan_account
-    pub plan_account: Option<Pubkey>,   // Account containing AtomicSwapPlan (if use_dynamic_plan)
-    pub use_bundle: bool,               // Whether to use MEV bundling
+    pub use_dynamic_plan: bool,          // Whether to use a dynamic plan from plan_account
+    pub plan_account: Option<Pubkey>,    // Account containing AtomicSwapPlan (if use_dynamic_plan)
+    pub use_bundle: bool,                // Whether to use MEV bundling
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct VenueWeight {
-    pub venue: Pubkey,    // DEX venue program ID
-    pub weight: u16,      // Weight in basis points (0-10000)
+    pub venue: Pubkey, // DEX venue program ID
+    pub weight: u16,   // Weight in basis points (0-10000)
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -125,17 +128,17 @@ pub struct FallbackPlan {
 
 #[account]
 pub struct SwapPlan {
-    pub plan_id: [u8; 32],              // Unique plan identifier
-    pub user: Pubkey,                   // User who created the plan
-    pub token_in: Pubkey,               // Input token mint
-    pub token_out: Pubkey,              // Output token mint
-    pub amount_in: u64,                 // Total input amount
-    pub min_out: u64,                   // Minimum output amount
-    pub venues: Vec<VenueWeight>,       // Primary venues with weights
+    pub plan_id: [u8; 32],                 // Unique plan identifier
+    pub user: Pubkey,                      // User who created the plan
+    pub token_in: Pubkey,                  // Input token mint
+    pub token_out: Pubkey,                 // Output token mint
+    pub amount_in: u64,                    // Total input amount
+    pub min_out: u64,                      // Minimum output amount
+    pub venues: Vec<VenueWeight>,          // Primary venues with weights
     pub fallback_plans: Vec<FallbackPlan>, // Fallback plans if primary fails
-    pub expires_at: i64,                // Plan expiration timestamp
-    pub created_at: i64,                // Plan creation timestamp
-    pub bump: u8,                       // PDA bump
+    pub expires_at: i64,                   // Plan expiration timestamp
+    pub created_at: i64,                   // Plan creation timestamp
+    pub bump: u8,                          // PDA bump
 }
 
 #[account]
@@ -165,7 +168,11 @@ pub enum ErrorCode {
 pub mod create_plan_processor {
     use super::*;
 
-    pub fn process_create_plan(ctx: Context<CreatePlan>, _plan_id: [u8; 32], plan_data: CreatePlanArgs) -> Result<()> {
+    pub fn process_create_plan(
+        ctx: Context<CreatePlan>,
+        _plan_id: [u8; 32],
+        plan_data: CreatePlanArgs,
+    ) -> Result<()> {
         let clock = Clock::get()?;
         let plan = &mut ctx.accounts.plan;
 
@@ -227,14 +234,22 @@ pub mod swap_toc_processor {
         process_single_swap(&ctx, args.amount_in, min_out)
     }
 
-    fn process_dynamic_plan_swap(ctx: Context<SwapToC>, args: SwapArgs, clock: Clock) -> Result<()> {
+    fn process_dynamic_plan_swap(
+        ctx: Context<SwapToC>,
+        args: SwapArgs,
+        clock: Clock,
+    ) -> Result<()> {
         // Handle MEV bundling if requested
         if args.use_bundle {
             return process_bundled_swap(ctx, args, clock);
         }
 
         // Validate that plan account is provided
-        let plan_account = ctx.accounts.plan.as_ref().ok_or(ErrorCode::InvalidOraclePrice)?;
+        let plan_account = ctx
+            .accounts
+            .plan
+            .as_ref()
+            .ok_or(ErrorCode::InvalidOraclePrice)?;
         let plan = &plan_account;
 
         // Validate plan ownership and expiration
@@ -258,7 +273,12 @@ pub mod swap_toc_processor {
             Err(_) => {
                 // Primary venues failed, try fallback plans
                 for fallback in &plan.fallback_plans {
-                    match execute_venues_swap(&ctx, &fallback.venues, args.amount_in, fallback.min_out) {
+                    match execute_venues_swap(
+                        &ctx,
+                        &fallback.venues,
+                        args.amount_in,
+                        fallback.min_out,
+                    ) {
                         Ok(amount_out) => {
                             if amount_out >= fallback.min_out {
                                 return Ok(());
@@ -303,7 +323,8 @@ pub mod swap_toc_processor {
                     .checked_mul(99)
                     .ok_or(ErrorCode::InvalidOraclePrice)?
                     .checked_div(100)
-                    .ok_or(ErrorCode::InvalidOraclePrice)? as u64;
+                    .ok_or(ErrorCode::InvalidOraclePrice)?
+                    as u64;
 
                 total_amount_out = total_amount_out
                     .checked_add(venue_amount_out)

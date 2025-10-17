@@ -33,7 +33,10 @@ mod tests {
         ];
 
         let invalid_total: u16 = invalid_weights.iter().map(|v| v.weight).sum();
-        assert_ne!(invalid_total, 10000, "Invalid weights should not sum to 10000");
+        assert_ne!(
+            invalid_total, 10000,
+            "Invalid weights should not sum to 10000"
+        );
     }
 
     #[test]
@@ -49,7 +52,10 @@ mod tests {
             .unwrap() as u64;
 
         let expected_min_out = 995000; // 1 * 0.995
-        assert_eq!(min_out, expected_min_out, "Slippage calculation should work correctly");
+        assert_eq!(
+            min_out, expected_min_out,
+            "Slippage calculation should work correctly"
+        );
     }
 
     #[test]
@@ -59,7 +65,10 @@ mod tests {
         let twap_slices = 10;
 
         let slice_amount = total_amount / twap_slices;
-        assert_eq!(slice_amount, 100000, "TWAP slice calculation should work correctly");
+        assert_eq!(
+            slice_amount, 100000,
+            "TWAP slice calculation should work correctly"
+        );
 
         // Test minimum slice check
         assert!(slice_amount > 0, "Slice amount should be greater than 0");
@@ -72,7 +81,13 @@ mod tests {
         let fresh_price_time = current_time - 30; // 30 seconds ago
         let stale_price_time = current_time - 120; // 2 minutes ago
 
-        assert!(fresh_price_time > current_time - 60, "Fresh price should be within 60 seconds");
-        assert!(stale_price_time <= current_time - 60, "Stale price should be older than 60 seconds");
+        assert!(
+            fresh_price_time > current_time - 60,
+            "Fresh price should be within 60 seconds"
+        );
+        assert!(
+            stale_price_time <= current_time - 60,
+            "Stale price should be older than 60 seconds"
+        );
     }
 }
