@@ -528,7 +528,7 @@ export class RouteOptimizationEngine {
 
       // Fallback to equal weights
       const equalWeight = Math.floor(100 / dexList.length);
-      let weights = new Array(dexList.length).fill(equalWeight);
+      const weights = new Array(dexList.length).fill(equalWeight);
       const remainder = 100 - equalWeight * dexList.length;
       if (remainder > 0 && weights.length > 0) {
         weights[weights.length - 1] += remainder;
