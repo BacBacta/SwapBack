@@ -4,6 +4,11 @@ use anchor_spl::token::{self, Token};
 // Program ID generated locally for deployment
 declare_id!("Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa");
 
+// DEX Program IDs (example - would need to be updated with actual deployed programs)
+pub const RAYDIUM_AMM_PROGRAM_ID: Pubkey = pubkey!("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8");
+pub const ORCA_WHIRLPOOL_PROGRAM_ID: Pubkey = pubkey!("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc");
+pub const JUPITER_PROGRAM_ID: Pubkey = pubkey!("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4");
+
 #[program]
 pub mod swapback_router {
     use super::*;
@@ -112,6 +117,7 @@ pub struct SwapArgs {
     pub use_dynamic_plan: bool,          // Whether to use a dynamic plan from plan_account
     pub plan_account: Option<Pubkey>,    // Account containing AtomicSwapPlan (if use_dynamic_plan)
     pub use_bundle: bool,                // Whether to use MEV bundling
+    pub oracle_account: Pubkey,          // Oracle account for price validation (Pyth/Switchboard)
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -163,6 +169,8 @@ pub enum ErrorCode {
     InvalidPlanWeights,
     #[msg("Plan amount mismatch")]
     PlanAmountMismatch,
+    #[msg("Unauthorized access to swap plan")]
+    UnauthorizedPlanAccess,
 }
 
 pub mod create_plan_processor {
@@ -204,6 +212,11 @@ pub mod swap_toc_processor {
 
     pub fn process_swap_toc(ctx: Context<SwapToC>, args: SwapArgs) -> Result<()> {
         let clock = Clock::get()?;
+
+        // Validate oracle account matches the provided oracle_account
+        if ctx.accounts.oracle.key() != args.oracle_account {
+            return err!(ErrorCode::InvalidOraclePrice);
+        }
 
         // Handle dynamic plan execution
         if args.use_dynamic_plan {
@@ -254,13 +267,27 @@ pub mod swap_toc_processor {
 
         // Validate plan ownership and expiration
         if plan.user != ctx.accounts.user.key() {
-            return err!(ErrorCode::InvalidOraclePrice); // TODO: Add specific error
+            return err!(ErrorCode::UnauthorizedPlanAccess);
         }
         if clock.unix_timestamp > plan.expires_at {
             return err!(ErrorCode::PlanExpired);
         }
         if plan.amount_in != args.amount_in {
             return err!(ErrorCode::PlanAmountMismatch);
+        }
+
+        // Validate that primary venue weights sum to 10000 (100%)
+        let total_weight: u16 = plan.venues.iter().map(|v| v.weight).sum();
+        if total_weight != 10000 {
+            return err!(ErrorCode::InvalidPlanWeights);
+        }
+
+        // Validate fallback plan weights as well
+        for fallback in &plan.fallback_plans {
+            let fallback_weight: u16 = fallback.venues.iter().map(|v| v.weight).sum();
+            if fallback_weight != 10000 {
+                return err!(ErrorCode::InvalidPlanWeights);
+            }
         }
 
         // Try primary venues first
@@ -302,7 +329,7 @@ pub mod swap_toc_processor {
     }
 
     fn execute_venues_swap(
-        _ctx: &Context<SwapToC>,
+        ctx: &Context<SwapToC>,
         venues: &[VenueWeight],
         total_amount_in: u64,
         min_out: u64,
@@ -317,14 +344,8 @@ pub mod swap_toc_processor {
                 .ok_or(ErrorCode::InvalidOraclePrice)? as u64;
 
             if amount_in > 0 {
-                // TODO: Implement actual DEX CPI calls based on venue.venue
-                // For now, simulate a successful swap with 99% efficiency
-                let venue_amount_out = (amount_in as u128)
-                    .checked_mul(99)
-                    .ok_or(ErrorCode::InvalidOraclePrice)?
-                    .checked_div(100)
-                    .ok_or(ErrorCode::InvalidOraclePrice)?
-                    as u64;
+                // Execute swap on the specified DEX
+                let venue_amount_out = execute_dex_swap(ctx, venue_weight.venue, amount_in, 0)?; // min_out handled at venue level
 
                 total_amount_out = total_amount_out
                     .checked_add(venue_amount_out)
@@ -339,9 +360,63 @@ pub mod swap_toc_processor {
         Ok(total_amount_out)
     }
 
-    fn get_oracle_price(_oracle_account: &AccountInfo, _current_time: i64) -> Result<u64> {
-        // TODO: Implement proper Pyth oracle integration
-        // For now, return a mock price (1.0 USD in 8 decimal places)
+    fn execute_dex_swap(
+        ctx: &Context<SwapToC>,
+        dex_program: Pubkey,
+        amount_in: u64,
+        min_out: u64,
+    ) -> Result<u64> {
+        match dex_program {
+            RAYDIUM_AMM_PROGRAM_ID => {
+                // TODO: Implement Raydium AMM swap CPI
+                // For now, simulate with 98% efficiency
+                Ok((amount_in as u128)
+                    .checked_mul(98)
+                    .ok_or(ErrorCode::InvalidOraclePrice)?
+                    .checked_div(100)
+                    .ok_or(ErrorCode::InvalidOraclePrice)? as u64)
+            }
+            ORCA_WHIRLPOOL_PROGRAM_ID => {
+                // TODO: Implement Orca Whirlpool swap CPI
+                // For now, simulate with 97% efficiency
+                Ok((amount_in as u128)
+                    .checked_mul(97)
+                    .ok_or(ErrorCode::InvalidOraclePrice)?
+                    .checked_div(100)
+                    .ok_or(ErrorCode::InvalidOraclePrice)? as u64)
+            }
+            JUPITER_PROGRAM_ID => {
+                // TODO: Implement Jupiter aggregator swap CPI
+                // For now, simulate with 99% efficiency (best rate)
+                Ok((amount_in as u128)
+                    .checked_mul(99)
+                    .ok_or(ErrorCode::InvalidOraclePrice)?
+                    .checked_div(100)
+                    .ok_or(ErrorCode::InvalidOraclePrice)? as u64)
+            }
+            _ => {
+                // Unknown DEX - simulate basic swap
+                Ok((amount_in as u128)
+                    .checked_mul(95)
+                    .ok_or(ErrorCode::InvalidOraclePrice)?
+                    .checked_div(100)
+                    .ok_or(ErrorCode::InvalidOraclePrice)? as u64)
+            }
+        }
+    }
+
+    fn get_oracle_price(oracle_account: &AccountInfo, _current_time: i64) -> Result<u64> {
+        // TODO: Implement proper Pyth/Switchboard oracle integration
+        // Basic validation - ensure oracle account is provided and return mock price
+        // In production, this would load and validate real oracle data
+
+        // Basic validation - ensure oracle account is not empty
+        if oracle_account.key() == Pubkey::default() {
+            return err!(ErrorCode::InvalidOraclePrice);
+        }
+
+        // Mock price for development (1.0 USD in 8 decimal places)
+        // Replace with actual Pyth/Switchboard integration
         Ok(100000000)
     }
 
