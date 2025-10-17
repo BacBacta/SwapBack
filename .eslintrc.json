@@ -4,7 +4,7 @@
   "parserOptions": {
     "ecmaVersion": 2022,
     "sourceType": "module",
-    "project": ["./sdk/tsconfig.json", "./app/tsconfig.json"]
+    "project": ["./tsconfig.json"]
   },
   "plugins": ["@typescript-eslint", "react-hooks"],
   "extends": [

@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { useBlockchainTracer } from "../hooks/useBlockchainTracer";
 import { useTokenData } from "../hooks/useTokenData";
 import { useJupiter } from "../hooks/useJupiter";
+import { ConnectionStatus } from "./ConnectionStatus";
 import { TokenSelector } from "./TokenSelector";
 import type { JupiterQuote } from "@swapback/sdk";
 
@@ -31,20 +32,15 @@ interface RouteInfo {
 
 export const SwapInterface = () => {
   const { connected, publicKey } = useWallet();
-  const { connection } = useConnection();
   const jupiter = useJupiter();
+
+  // 🔗 Gestion de la stabilité des connexions (gérée par ConnectionStatus)
 
   // Router selection: "swapback" or "jupiter"
   const [selectedRouter, setSelectedRouter] = useState<"swapback" | "jupiter">("swapback");
 
   // 🔍 Blockchain Tracer
-  const {
-    traceSwap,
-    operations,
-    loading: tracerLoading,
-    error: tracerError,
-    statistics
-  } = useBlockchainTracer();
+  const { traceSwap } = useBlockchainTracer();
 
   const [inputAmount, setInputAmount] = useState("");
   const [outputAmount, setOutputAmount] = useState("");
@@ -54,7 +50,6 @@ export const SwapInterface = () => {
   const [loading, setLoading] = useState(false);
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
   const [jupiterQuote, setJupiterQuote] = useState<JupiterQuote | null>(null);
-  const [lastOperation, setLastOperation] = useState<string | null>(null);
   const [showInputTokenSelector, setShowInputTokenSelector] = useState(false);
   const [showOutputTokenSelector, setShowOutputTokenSelector] = useState(false);
 
@@ -241,7 +236,6 @@ export const SwapInterface = () => {
         );
 
         if (signature) {
-          setLastOperation(signature);
           console.log("✅ Swap Jupiter exécuté:", signature);
           alert(
             `✅ Swap Jupiter exécuté avec succès!\n\n` +
@@ -290,15 +284,13 @@ export const SwapInterface = () => {
             `https://explorer.solana.com/tx/${operation.signature}?cluster=devnet`
           );
           
-          setLastOperation(operation.signature);
-          
           alert(
             `✅ Swap SwapBack exécuté avec succès!\n\n` +
             `📋 Signature: ${operation.signature.substring(0, 20)}...\n` +
             `💰 Économies: ${((routeInfo.estimatedOutput - routeInfo.nonOptimizedOutput) / 1000000).toFixed(4)} ${outputToken}\n` +
             `🎁 Rebate: ${routeInfo.rebate.toFixed(4)} ${outputToken}\n` +
-            `� Burn: ${routeInfo.burn.toFixed(4)} $BACK\n` +
-            `�🔗 Opération tracée sur la blockchain`
+            `🔥 Burn: ${routeInfo.burn.toFixed(4)} $BACK\n` +
+            `🔗 Opération tracée sur la blockchain`
           );
         } else {
           alert("⚠️ Swap exécuté mais le traçage a échoué");
@@ -355,6 +347,11 @@ export const SwapInterface = () => {
         </div>
         <h2 className="section-title mb-3">Swap Tokens</h2>
         <p className="body-regular text-gray-400">Get the best price across all Solana DEXs</p>
+        
+        {/* Connection Status */}
+        <div className="flex justify-center mb-4">
+          <ConnectionStatus />
+        </div>
       </div>
 
       {/* Router Selection Toggle */}

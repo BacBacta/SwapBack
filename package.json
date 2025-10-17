@@ -2,6 +2,7 @@
   "name": "@swapback/monorepo",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@10.0.0",
   "description": "SwapBack - Routeur d'exécution optimisé pour Solana avec mécanisme de cashback et burn",
   "workspaces": [
     "app",

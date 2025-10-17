@@ -7,7 +7,6 @@ import {
   getOrCreateAssociatedTokenAccount,
   transfer
 } from '@solana/spl-token';
-import fs from 'node:fs';
 
 /**
  * Configuration du token $BACK
@@ -150,32 +149,11 @@ export class BackTokenClient {
 }
 
 /**
- * Fonction utilitaire pour charger la configuration depuis un fichier
- */
-export async function loadBackTokenConfig(configPath: string = './token_back_config.json'): Promise<BackTokenConfig> {
-  if (!fs.existsSync(configPath)) {
-    throw new Error(`Configuration file not found: ${configPath}`);
-  }
-
-  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-
-  return {
-    mintAddress: new PublicKey(config.mintAddress),
-    treasuryAddress: new PublicKey(config.treasuryAddress),
-    transferHookProgramId: new PublicKey(config.transferHookProgramId),
-    decimals: config.decimals,
-    totalSupply: config.totalSupply,
-    burnPercentage: config.burnPercentage
-  };
-}
-
-/**
  * Fonction utilitaire pour créer un client $BACK
  */
 export async function createBackTokenClient(
   connection: Connection,
-  configPath?: string
+  config: BackTokenConfig
 ): Promise<BackTokenClient> {
-  const config = await loadBackTokenConfig(configPath);
   return new BackTokenClient(connection, config);
 }

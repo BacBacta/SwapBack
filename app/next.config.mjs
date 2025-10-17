@@ -6,6 +6,9 @@ const nextConfig = {
       fs: false,
       path: false,
       os: false,
+      'node:fs': false,
+      'node:path': false,
+      'node:os': false,
     };
     return config;
   },

@@ -1705,9 +1705,11 @@ export class SwapExecutor {
 
     // Venue breakdown
     const venueBreakdown: Record<string, number> = {};
-    for (const leg of ctx.legs) {
-      const venue = leg.venue;
-      venueBreakdown[venue] = (venueBreakdown[venue] || 0) + leg.inputAmount;
+    if (ctx.legs) {
+      for (const leg of ctx.legs) {
+        const venue = leg.venue;
+        venueBreakdown[venue] = (venueBreakdown[venue] || 0) + leg.inputAmount;
+      }
     }
 
     return {

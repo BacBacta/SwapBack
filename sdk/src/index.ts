@@ -384,7 +384,6 @@ export default SwapBackClient;
 export {
   BackTokenClient,
   createBackTokenClient,
-  loadBackTokenConfig,
 } from "./backToken";
 export type { BackTokenConfig } from "./backToken";
 
