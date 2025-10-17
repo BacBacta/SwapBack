@@ -381,10 +381,7 @@ export class SwapBackUtils {
 export default SwapBackClient;
 
 // Export du client $BACK token
-export {
-  BackTokenClient,
-  createBackTokenClient,
-} from "./backToken";
+export { BackTokenClient, createBackTokenClient } from "./backToken";
 export type { BackTokenConfig } from "./backToken";
 
 // Export du client cNFT

@@ -240,7 +240,11 @@ export class SwapExecutor {
     this.oracleService = oracleService;
     this.jitoService = jitoService;
     this.circuitBreaker = circuitBreaker;
-    this.analyticsLogPath = path.resolve(process.cwd(), "logs", "swap-metrics.log");
+    this.analyticsLogPath = path.resolve(
+      process.cwd(),
+      "logs",
+      "swap-metrics.log"
+    );
     this.mevAnalyzer = new MEVProtectionAnalyzer();
   }
 
@@ -419,7 +423,9 @@ export class SwapExecutor {
         );
 
         if (!ctx.signature) {
-          throw new Error("Candidate plan execution did not produce a signature");
+          throw new Error(
+            "Candidate plan execution did not produce a signature"
+          );
         }
 
         return;
@@ -505,7 +511,13 @@ export class SwapExecutor {
     const twapConfig = this.evaluateTwapConfig(params, plan);
 
     if (twapConfig.enabled) {
-      await this.executeTwapSlices(params, plan, ctx, slippageTolerance, twapConfig);
+      await this.executeTwapSlices(
+        params,
+        plan,
+        ctx,
+        slippageTolerance,
+        twapConfig
+      );
       return;
     }
 
@@ -578,7 +590,9 @@ export class SwapExecutor {
     attemptCtx.mevStrategy = bundleResult.strategy;
 
     if (!attemptCtx.signature) {
-      throw new Error("Bundle submission did not return a transaction signature");
+      throw new Error(
+        "Bundle submission did not return a transaction signature"
+      );
     }
 
     await this.confirmTransaction(attemptCtx.signature);
@@ -593,7 +607,9 @@ export class SwapExecutor {
       oraclePrice: baseCtx.oraclePrice,
       transaction: undefined,
       signature: undefined,
-      chunkSignatures: baseCtx.chunkSignatures ? [...baseCtx.chunkSignatures] : undefined,
+      chunkSignatures: baseCtx.chunkSignatures
+        ? [...baseCtx.chunkSignatures]
+        : undefined,
       plan: undefined,
       legs: undefined,
       planDiffs: baseCtx.planDiffs,
@@ -653,28 +669,49 @@ export class SwapExecutor {
     }
   }
 
-  private evaluateTwapConfig(params: SwapParams, plan: AtomicSwapPlan): TwapConfig {
+  private evaluateTwapConfig(
+    params: SwapParams,
+    plan: AtomicSwapPlan
+  ): TwapConfig {
     const preferences = params.routePreferences;
     const enabled = preferences?.enableTwapMode ?? false;
     const threshold = Math.min(
       0.9,
       Math.max(preferences?.twapThresholdRatio ?? 0.2, 0.05)
     );
-    const maxSlices = Math.min(Math.max(preferences?.twapMaxSlices ?? 3, 2), 10);
+    const maxSlices = Math.min(
+      Math.max(preferences?.twapMaxSlices ?? 3, 2),
+      10
+    );
     const intervalMs = Math.max(0, preferences?.twapIntervalMs ?? 2_000);
 
     if (!enabled) {
-      return { enabled: false, slices: 1, intervalMs: 0, thresholdRatio: threshold };
+      return {
+        enabled: false,
+        slices: 1,
+        intervalMs: 0,
+        thresholdRatio: threshold,
+      };
     }
 
     const liquidityFootprint = this.computePlanLiquidityFootprint(plan);
     if (liquidityFootprint <= 0) {
-      return { enabled: false, slices: 1, intervalMs: 0, thresholdRatio: threshold };
+      return {
+        enabled: false,
+        slices: 1,
+        intervalMs: 0,
+        thresholdRatio: threshold,
+      };
     }
 
     const footprintRatio = plan.totalInput / liquidityFootprint;
     if (footprintRatio < threshold) {
-      return { enabled: false, slices: 1, intervalMs: 0, thresholdRatio: threshold };
+      return {
+        enabled: false,
+        slices: 1,
+        intervalMs: 0,
+        thresholdRatio: threshold,
+      };
     }
 
     const slices = Math.min(
@@ -767,7 +804,8 @@ export class SwapExecutor {
       ? totalAmount - baseSliceAmount * index
       : baseSliceAmount;
     const ratio = totalAmount > 0 ? sliceAmount / totalAmount : 0;
-    const sliceMinOutput = totalMinOutput > 0 ? totalMinOutput * ratio : undefined;
+    const sliceMinOutput =
+      totalMinOutput > 0 ? totalMinOutput * ratio : undefined;
 
     return {
       params: this.buildSliceParams(params, sliceAmount, sliceMinOutput),
@@ -800,7 +838,10 @@ export class SwapExecutor {
     return sliceCtx;
   }
 
-  private async awaitTwapInterval(index: number, config: TwapConfig): Promise<void> {
+  private async awaitTwapInterval(
+    index: number,
+    config: TwapConfig
+  ): Promise<void> {
     if (index >= config.slices - 1) {
       return;
     }
@@ -1057,7 +1098,9 @@ export class SwapExecutor {
     return Math.max(5_000, Math.min(200_000, recommended));
   }
 
-  private determinePriorityLevel(tradeValueUSD?: number): "low" | "medium" | "high" {
+  private determinePriorityLevel(
+    tradeValueUSD?: number
+  ): "low" | "medium" | "high" {
     if (!tradeValueUSD || tradeValueUSD < 5_000) {
       return "low";
     }
@@ -1117,7 +1160,8 @@ export class SwapExecutor {
     ctx.outputAccount = outputAccount;
 
     try {
-      const balance = await this.connection.getTokenAccountBalance(outputAccount);
+      const balance =
+        await this.connection.getTokenAccountBalance(outputAccount);
       ctx.preSwapOutputBalanceRaw = BigInt(balance.value.amount);
     } catch (error) {
       console.warn("Unable to fetch output account balance", error);
@@ -1172,10 +1216,7 @@ export class SwapExecutor {
     inputPrice: OraclePriceData;
     outputPrice: OraclePriceData;
   }> {
-    const slippageTolerance = Math.max(
-      params.maxSlippageBps / 10_000,
-      0.0001
-    );
+    const slippageTolerance = Math.max(params.maxSlippageBps / 10_000, 0.0001);
 
     const [inputPriceData, outputPriceData] = await Promise.all([
       this.oracleService.getTokenPrice(params.inputMint),
@@ -1209,17 +1250,17 @@ export class SwapExecutor {
 
     if (inputConfidenceRatio > slippageTolerance) {
       throw new Error(
-        `Input oracle confidence ${(
-          inputConfidenceRatio * 100
-        ).toFixed(3)}% exceeds user slippage tolerance ${(slippageTolerance * 100).toFixed(2)}%`
+        `Input oracle confidence ${(inputConfidenceRatio * 100).toFixed(
+          3
+        )}% exceeds user slippage tolerance ${(slippageTolerance * 100).toFixed(2)}%`
       );
     }
 
     if (outputConfidenceRatio > slippageTolerance) {
       throw new Error(
-        `Output oracle confidence ${(
-          outputConfidenceRatio * 100
-        ).toFixed(3)}% exceeds user slippage tolerance ${(slippageTolerance * 100).toFixed(2)}%`
+        `Output oracle confidence ${(outputConfidenceRatio * 100).toFixed(
+          3
+        )}% exceeds user slippage tolerance ${(slippageTolerance * 100).toFixed(2)}%`
       );
     }
 
@@ -1236,10 +1277,7 @@ export class SwapExecutor {
       (sum, leg) => sum + leg.expectedOutput,
       0
     );
-    const totalInput = plan.legs.reduce(
-      (sum, leg) => sum + leg.inputAmount,
-      0
-    );
+    const totalInput = plan.legs.reduce((sum, leg) => sum + leg.inputAmount, 0);
 
     if (totalInput <= 0) {
       throw new Error("Swap plan has no input allocation");
@@ -1253,7 +1291,9 @@ export class SwapExecutor {
       throw new Error(
         `Route price deviates ${(deviation * 100).toFixed(
           2
-        )}% from oracle, exceeding slippage tolerance ${(slippageTolerance * 100).toFixed(
+        )}% from oracle, exceeding slippage tolerance ${(
+          slippageTolerance * 100
+        ).toFixed(
           2
         )}%. Oracle: ${oracleRate.toFixed(6)}, Route: ${routeRate.toFixed(6)}`
       );
@@ -1332,7 +1372,8 @@ export class SwapExecutor {
       ctx.computeUnitLimit = boundedUnits;
     }
 
-    const priorityPriceMicroLamports = this.estimatePriorityFeeMicroLamports(plan);
+    const priorityPriceMicroLamports =
+      this.estimatePriorityFeeMicroLamports(plan);
     if (ctx && typeof ctx.priorityFeeMicroLamports !== "number") {
       ctx.priorityFeeMicroLamports = priorityPriceMicroLamports;
     }
@@ -1414,9 +1455,11 @@ export class SwapExecutor {
     plan: AtomicSwapPlan,
     leg: AtomicSwapLeg
   ): { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[] {
-    const accounts: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[] = [
-      { pubkey: params.userPublicKey, isSigner: true, isWritable: true },
-    ];
+    const accounts: {
+      pubkey: PublicKey;
+      isSigner: boolean;
+      isWritable: boolean;
+    }[] = [{ pubkey: params.userPublicKey, isSigner: true, isWritable: true }];
 
     const accountSet = new Set<string>();
     accountSet.add(plan.inputMint);
@@ -1465,12 +1508,12 @@ export class SwapExecutor {
       return null;
     }
 
-    const outputAccount = ctx.outputAccount ?? this.safePublicKey(plan.outputMint);
+    const outputAccount =
+      ctx.outputAccount ?? this.safePublicKey(plan.outputMint);
     const outputDecimals = ctx.outputDecimals ?? 0;
-    const minOutputRaw = ctx.guardMinOutputRaw ?? this.convertToRawAmount(
-      globalMinOutput,
-      outputDecimals
-    );
+    const minOutputRaw =
+      ctx.guardMinOutputRaw ??
+      this.convertToRawAmount(globalMinOutput, outputDecimals);
 
     const payload = {
       planId: plan.id,
@@ -1484,10 +1527,16 @@ export class SwapExecutor {
 
     const data = Buffer.from(JSON.stringify(payload, null, 0), "utf8");
 
-    const metas: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[] = [];
-    const pushMeta = (
-      meta?: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }
-    ) => {
+    const metas: {
+      pubkey: PublicKey;
+      isSigner: boolean;
+      isWritable: boolean;
+    }[] = [];
+    const pushMeta = (meta?: {
+      pubkey: PublicKey;
+      isSigner: boolean;
+      isWritable: boolean;
+    }) => {
       if (!meta) {
         return;
       }
@@ -1497,12 +1546,28 @@ export class SwapExecutor {
       metas.push(meta);
     };
 
-    pushMeta({ pubkey: params.userPublicKey, isSigner: true, isWritable: true });
+    pushMeta({
+      pubkey: params.userPublicKey,
+      isSigner: true,
+      isWritable: true,
+    });
     pushMeta({ pubkey: outputAccount, isSigner: false, isWritable: true });
-    pushMeta({ pubkey: this.safePublicKey(plan.outputMint), isSigner: false, isWritable: false });
+    pushMeta({
+      pubkey: this.safePublicKey(plan.outputMint),
+      isSigner: false,
+      isWritable: false,
+    });
     pushMeta({ pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false });
-    pushMeta({ pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false });
-    pushMeta({ pubkey: SystemProgram.programId, isSigner: false, isWritable: false });
+    pushMeta({
+      pubkey: ASSOCIATED_TOKEN_PROGRAM_ID,
+      isSigner: false,
+      isWritable: false,
+    });
+    pushMeta({
+      pubkey: SystemProgram.programId,
+      isSigner: false,
+      isWritable: false,
+    });
 
     return new TransactionInstruction({
       keys: metas,
@@ -1567,7 +1632,8 @@ export class SwapExecutor {
   }> {
     if (!enableProtection) {
       transaction.sign(signer);
-      ctx.priorityFeeMicroLamports = this.estimatePriorityFeeMicroLamports(plan);
+      ctx.priorityFeeMicroLamports =
+        this.estimatePriorityFeeMicroLamports(plan);
       const signature = await this.connection.sendRawTransaction(
         transaction.serialize(),
         { skipPreflight: false }
@@ -1581,12 +1647,17 @@ export class SwapExecutor {
       };
     }
 
-    const tradeValueUSD = ctx.tradeValueUSD ?? this.estimateTradeValueUSD(plan, ctx);
+    const tradeValueUSD =
+      ctx.tradeValueUSD ?? this.estimateTradeValueUSD(plan, ctx);
     ctx.tradeValueUSD = tradeValueUSD;
 
     const tipLamports = this.determineTipLamports(tradeValueUSD);
     ctx.mevTipLamports = tipLamports;
-    this.appendMevTipInstruction(transaction, params.userPublicKey, tipLamports);
+    this.appendMevTipInstruction(
+      transaction,
+      params.userPublicKey,
+      tipLamports
+    );
 
     const priorityLevel = this.determinePriorityLevel(tradeValueUSD);
     const priorityFeeMicroLamports = this.determinePriorityFeeMicroLamports(
@@ -1689,7 +1760,8 @@ export class SwapExecutor {
     const networkFees = 0.000005 * ctx.routes.length; // 5000 lamports per instruction
 
     const computeUnitLimit =
-      ctx.computeUnitLimit ?? (ctx.plan ? this.estimateComputeUnitLimit(ctx.plan) : 0);
+      ctx.computeUnitLimit ??
+      (ctx.plan ? this.estimateComputeUnitLimit(ctx.plan) : 0);
 
     const priorityFees =
       ctx.priorityFeeMicroLamports && computeUnitLimit
@@ -1783,7 +1855,10 @@ export class SwapExecutor {
       );
     }
     if (ctx.priorityFeeMicroLamports) {
-      console.log("⚙️ Priority fee (μ-lamports):", ctx.priorityFeeMicroLamports);
+      console.log(
+        "⚙️ Priority fee (μ-lamports):",
+        ctx.priorityFeeMicroLamports
+      );
     }
     if (ctx.bundleId) {
       console.log("📦 Bundle ID:", ctx.bundleId);

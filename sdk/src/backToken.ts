@@ -1,12 +1,5 @@
-import {
-  Connection,
-  PublicKey,
-  Keypair
-} from '@solana/web3.js';
-import {
-  getOrCreateAssociatedTokenAccount,
-  transfer
-} from '@solana/spl-token';
+import { Connection, PublicKey, Keypair } from "@solana/web3.js";
+import { getOrCreateAssociatedTokenAccount, transfer } from "@solana/spl-token";
 
 /**
  * Configuration du token $BACK
@@ -58,7 +51,7 @@ export class BackTokenClient {
     const toAta = await this.createAssociatedTokenAccount(to);
 
     // Calculer le montant après burn (le burn est automatique via Transfer Hook)
-    const transferAmount = Math.floor(amount * (10 ** this.config.decimals));
+    const transferAmount = Math.floor(amount * 10 ** this.config.decimals);
 
     const signature = await transfer(
       this.connection,
@@ -70,9 +63,13 @@ export class BackTokenClient {
     );
 
     // Le burn automatique (0.1%) est effectué par le Transfer Hook
-    const burnAmount = Math.floor(transferAmount * (this.config.burnPercentage / 100));
+    const burnAmount = Math.floor(
+      transferAmount * (this.config.burnPercentage / 100)
+    );
 
-    console.log(`Transfer: ${amount} $BACK (burn: ${burnAmount / (10 ** this.config.decimals)} $BACK)`);
+    console.log(
+      `Transfer: ${amount} $BACK (burn: ${burnAmount / 10 ** this.config.decimals} $BACK)`
+    );
 
     return signature;
   }
@@ -85,10 +82,12 @@ export class BackTokenClient {
     recipient: PublicKey,
     amount: number
   ): Promise<string> {
-    const treasuryAta = await this.createAssociatedTokenAccount(this.config.treasuryAddress);
+    const treasuryAta = await this.createAssociatedTokenAccount(
+      this.config.treasuryAddress
+    );
     const recipientAta = await this.createAssociatedTokenAccount(recipient);
 
-    const transferAmount = Math.floor(amount * (10 ** this.config.decimals));
+    const transferAmount = Math.floor(amount * 10 ** this.config.decimals);
 
     const signature = await transfer(
       this.connection,
@@ -109,7 +108,7 @@ export class BackTokenClient {
     const ata = await this.createAssociatedTokenAccount(owner);
     const balance = await this.connection.getTokenAccountBalance(ata);
 
-    return parseFloat(balance.value.uiAmountString || '0');
+    return parseFloat(balance.value.uiAmountString || "0");
   }
 
   /**
@@ -128,7 +127,7 @@ export class BackTokenClient {
     return {
       supply: totalSupply,
       burned,
-      circulating
+      circulating,
     };
   }
 

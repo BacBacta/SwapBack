@@ -31,19 +31,19 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   // Configuration des wallets supportés avec reconnexion automatique
   const wallets = useMemo(
-    () => [
-      new PhantomWalletAdapter(),
-      new SolflareWalletAdapter()
-    ],
+    () => [new PhantomWalletAdapter(), new SolflareWalletAdapter()],
     []
   );
 
   // Configuration de connexion avec retry et timeout plus long
-  const connectionConfig = useMemo(() => ({
-    commitment: 'confirmed' as const,
-    confirmTransactionInitialTimeout: 60000, // 60 secondes
-    disableRetryOnRateLimit: false,
-  }), []);
+  const connectionConfig = useMemo(
+    () => ({
+      commitment: "confirmed" as const,
+      confirmTransactionInitialTimeout: 60000, // 60 secondes
+      disableRetryOnRateLimit: false,
+    }),
+    []
+  );
 
   return (
     <ConnectionProvider endpoint={endpoint} config={connectionConfig}>
@@ -53,9 +53,7 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
         localStorageKey="swapback-wallet"
       >
         <WalletModalProvider>
-          <WalletStabilityManager>
-            {children}
-          </WalletStabilityManager>
+          <WalletStabilityManager>{children}</WalletStabilityManager>
         </WalletModalProvider>
       </SolanaWalletProvider>
     </ConnectionProvider>
