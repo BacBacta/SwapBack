@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
-import { useConnectionStability } from '../hooks/useConnectionStability';
+import { useState } from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnectionStability } from "../hooks/useConnectionStability";
 
 export const ConnectionStatus = () => {
   const { connected, connecting } = useWallet();
@@ -14,7 +14,7 @@ export const ConnectionStatus = () => {
     try {
       await reconnect();
     } catch (error) {
-      console.error('Reconnection failed:', error);
+      console.error("Reconnection failed:", error);
     } finally {
       setIsReconnecting(false);
     }
@@ -48,7 +48,7 @@ export const ConnectionStatus = () => {
           className="px-2 py-1 bg-orange-500 hover:bg-orange-600 text-white text-xs rounded transition-colors"
           disabled={isReconnecting}
         >
-          {isReconnecting ? 'Reconnexion...' : 'Reconnecter'}
+          {isReconnecting ? "Reconnexion..." : "Reconnecter"}
         </button>
       </div>
     );
