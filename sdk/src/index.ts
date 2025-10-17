@@ -34,7 +34,7 @@ export { RouteOptimizationEngine } from "./services/RouteOptimizationEngine";
 export { OraclePriceService } from "./services/OraclePriceService";
 export { JitoBundleService } from "./services/JitoBundleService";
 export { IntelligentOrderRouter } from "./services/IntelligentOrderRouter";
-export * from "./types/smart-router";
+export { RouterClient } from "./services/RouterClient";
 
 /**
  * Types pour les routes de swap
