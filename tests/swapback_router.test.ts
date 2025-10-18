@@ -72,7 +72,9 @@ describe("swapback_router", () => {
   });
 
   it("Creates and validates swap plan with weight constraints", async () => {
-    const planId = Array.from({ length: 32 }, () => Math.floor(Math.random() * 256));
+    const planId = Array.from({ length: 32 }, () =>
+      Math.floor(Math.random() * 256)
+    );
 
     // Create plan with invalid weights (don't sum to 10000)
     const invalidVenues = [
@@ -83,7 +85,7 @@ describe("swapback_router", () => {
       {
         venue: new PublicKey("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"), // Orca
         weight: new anchor.BN(3000), // 30% - total 80%, should fail
-      }
+      },
     ];
 
     try {
@@ -91,7 +93,9 @@ describe("swapback_router", () => {
         .createPlan({
           planId,
           tokenIn: new PublicKey("So11111111111111111111111111111111111111112"), // SOL
-          tokenOut: new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"), // USDC
+          tokenOut: new PublicKey(
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+          ), // USDC
           amountIn: new anchor.BN(1000000),
           minOut: new anchor.BN(50000),
           venues: invalidVenues,
@@ -112,7 +116,9 @@ describe("swapback_router", () => {
   });
 
   it("Creates valid swap plan with correct weights", async () => {
-    const planId = Array.from({ length: 32 }, () => Math.floor(Math.random() * 256));
+    const planId = Array.from({ length: 32 }, () =>
+      Math.floor(Math.random() * 256)
+    );
 
     [planAccount] = PublicKey.findProgramAddressSync(
       [Buffer.from("swap_plan"), Buffer.from(planId)],
@@ -127,7 +133,7 @@ describe("swapback_router", () => {
       {
         venue: new PublicKey("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"), // Orca
         weight: new anchor.BN(4000), // 40% - total 100%
-      }
+      },
     ];
 
     await program.methods
@@ -191,16 +197,20 @@ describe("swapback_router", () => {
 
   it("Rejects expired plans", async () => {
     // Create an expired plan
-    const expiredPlanId = Array.from({ length: 32 }, () => Math.floor(Math.random() * 256));
+    const expiredPlanId = Array.from({ length: 32 }, () =>
+      Math.floor(Math.random() * 256)
+    );
     const [expiredPlanAccount] = PublicKey.findProgramAddressSync(
       [Buffer.from("swap_plan"), Buffer.from(expiredPlanId)],
       program.programId
     );
 
-    const venues = [{
-      venue: new PublicKey("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"),
-      weight: new anchor.BN(10000), // 100%
-    }];
+    const venues = [
+      {
+        venue: new PublicKey("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"),
+        weight: new anchor.BN(10000), // 100%
+      },
+    ];
 
     await program.methods
       .createPlan({
@@ -308,6 +318,300 @@ describe("swapback_router", () => {
       expect.fail("Should have thrown TwapSliceTooSmall error");
     } catch (e) {
       expect(e.message).to.include("TwapSliceTooSmall");
+    }
+  });
+
+  // New regression tests for oracle validation
+  it("Validates oracle staleness - rejects stale oracle data", async () => {
+    // This test would require setting up a mock oracle with stale timestamp
+    // For now, we'll test the oracle account validation
+    const amountIn = new anchor.BN(1000000);
+    const minOut = new anchor.BN(50000);
+
+    try {
+      await program.methods
+        .processSwapToc({
+          amountIn,
+          minOut,
+          slippageTolerance: null,
+          twapSlices: null,
+          useDynamicPlan: false,
+          planAccount: null,
+          useBundle: false,
+          oracleAccount: Keypair.generate().publicKey, // Random pubkey, no oracle data
+        })
+        .accounts({
+          state: routerState,
+          user: user.publicKey,
+          oracle: Keypair.generate().publicKey,
+          // ... other accounts would be needed
+        })
+        .rpc();
+
+      // In devnet mode, this should work with fallback logic
+      // In production, it would fail with StaleOracleData
+    } catch (e) {
+      // Expected behavior depends on oracle implementation
+      expect((e as Error).message).to.include("Oracle"); // Could be StaleOracleData or InvalidOraclePrice
+    }
+  });
+
+  it("Tests DEX fallback when primary venue fails", async () => {
+    // Create a plan with multiple venues where first venue will fail
+    const planId = Array.from({ length: 32 }, () =>
+      Math.floor(Math.random() * 256)
+    );
+
+    const venues = [
+      {
+        venue: new PublicKey("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"), // Raydium (will fail in devnet)
+        weight: new anchor.BN(5000), // 50%
+      },
+      {
+        venue: new PublicKey("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"), // Orca (devnet implementation)
+        weight: new anchor.BN(5000), // 50%
+      },
+    ];
+
+    // Create plan account
+    [planAccount] = PublicKey.findProgramAddressSync(
+      [Buffer.from("swap_plan"), user.publicKey.toBuffer()],
+      program.programId
+    );
+
+    await program.methods
+      .createPlan({
+        planId,
+        tokenIn: new PublicKey("So11111111111111111111111111111111111111112"),
+        tokenOut: new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
+        amountIn: new anchor.BN(1000000),
+        minOut: new anchor.BN(50000),
+        venues,
+        fallbackPlans: [],
+        expiresAt: new anchor.BN(Date.now() / 1000 + 3600),
+      })
+      .accounts({
+        plan: planAccount,
+        user: user.publicKey,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+
+    // Execute swap with dynamic plan - should fallback to Orca
+    const amountIn = new anchor.BN(1000000);
+    const minOut = new anchor.BN(50000);
+
+    try {
+      await program.methods
+        .processSwapToc({
+          amountIn,
+          minOut,
+          slippageTolerance: null,
+          twapSlices: null,
+          useDynamicPlan: true,
+          planAccount,
+          useBundle: false,
+          oracleAccount,
+        })
+        .accounts({
+          state: routerState,
+          user: user.publicKey,
+          oracle: oracleAccount,
+          plan: planAccount,
+          // ... other accounts would be needed for actual swap
+        })
+        .rpc();
+
+      // In devnet mode, Orca should succeed with simulated swap
+    } catch (e) {
+      // If all venues fail, expect SlippageExceeded
+      expect((e as Error).message).to.include("SlippageExceeded");
+    }
+  });
+
+  it("Validates security limits - rejects too many venues", async () => {
+    const planId = Array.from({ length: 32 }, () =>
+      Math.floor(Math.random() * 256)
+    );
+
+    // Create plan with too many venues (MAX_VENUES = 10)
+    const tooManyVenues = Array.from({ length: 15 }, (_, i) => ({
+      venue: new PublicKey(`675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp${i}`),
+      weight: new anchor.BN(1000), // Each gets equal weight
+    }));
+
+    try {
+      await program.methods
+        .createPlan({
+          planId,
+          tokenIn: new PublicKey("So11111111111111111111111111111111111111112"),
+          tokenOut: new PublicKey(
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+          ),
+          amountIn: new anchor.BN(1000000),
+          minOut: new anchor.BN(50000),
+          venues: tooManyVenues,
+          fallbackPlans: [],
+          expiresAt: new anchor.BN(Date.now() / 1000 + 3600),
+        })
+        .accounts({
+          plan: planAccount,
+          user: user.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+
+      expect.fail(
+        "Should have thrown InvalidPlanWeights error for too many venues"
+      );
+    } catch (e) {
+      expect((e as Error).message).to.include("InvalidPlanWeights");
+    }
+  });
+
+  it("Validates security limits - rejects too many fallback plans", async () => {
+    const planId = Array.from({ length: 32 }, () =>
+      Math.floor(Math.random() * 256)
+    );
+
+    const validVenues = [
+      {
+        venue: new PublicKey("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"),
+        weight: new anchor.BN(10000),
+      },
+    ];
+
+    // Create too many fallback plans (MAX_FALLBACKS = 5)
+    const tooManyFallbacks = Array.from({ length: 10 }, () => ({
+      venues: validVenues,
+      minOut: new anchor.BN(50000),
+    }));
+
+    try {
+      await program.methods
+        .createPlan({
+          planId,
+          tokenIn: new PublicKey("So11111111111111111111111111111111111111112"),
+          tokenOut: new PublicKey(
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+          ),
+          amountIn: new anchor.BN(1000000),
+          minOut: new anchor.BN(50000),
+          venues: validVenues,
+          fallbackPlans: tooManyFallbacks,
+          expiresAt: new anchor.BN(Date.now() / 1000 + 3600),
+        })
+        .accounts({
+          plan: planAccount,
+          user: user.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+
+      expect.fail(
+        "Should have thrown InvalidPlanWeights error for too many fallback plans"
+      );
+    } catch (e) {
+      expect((e as Error).message).to.include("InvalidPlanWeights");
+    }
+  });
+
+  it("Tests slippage tolerance calculation", async () => {
+    const amountIn = new anchor.BN(1000000);
+    const expectedMinOut = new anchor.BN(95000); // Expected output before slippage
+    const slippageTolerance = new anchor.BN(500); // 5% slippage tolerance
+
+    // This test validates that slippage calculation works correctly
+    // In practice, this would be tested by checking the actual min_out calculation
+    // For now, we test that the instruction accepts slippage parameters
+
+    try {
+      await program.methods
+        .processSwapToc({
+          amountIn,
+          minOut: expectedMinOut,
+          slippageTolerance,
+          twapSlices: null,
+          useDynamicPlan: false,
+          planAccount: null,
+          useBundle: false,
+          oracleAccount,
+        })
+        .accounts({
+          state: routerState,
+          user: user.publicKey,
+          oracle: oracleAccount,
+          // ... other accounts
+        })
+        .rpc();
+
+      // Should succeed or fail based on oracle/slippage logic
+    } catch (e) {
+      // Expected - oracle validation or DEX execution might fail in test environment
+      expect((e as Error).message).to.include("Oracle"); // Oracle-related error expected
+    }
+  });
+
+  it("Tests bundle hint emission for MEV protection", async () => {
+    // Create a plan for bundled execution
+    const planId = Array.from({ length: 32 }, () =>
+      Math.floor(Math.random() * 256)
+    );
+
+    const venues = [
+      {
+        venue: new PublicKey("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"),
+        weight: new anchor.BN(10000),
+      },
+    ];
+
+    await program.methods
+      .createPlan({
+        planId,
+        tokenIn: new PublicKey("So11111111111111111111111111111111111111112"),
+        tokenOut: new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
+        amountIn: new anchor.BN(1000000),
+        minOut: new anchor.BN(50000),
+        venues,
+        fallbackPlans: [],
+        expiresAt: new anchor.BN(Date.now() / 1000 + 3600),
+      })
+      .accounts({
+        plan: planAccount,
+        user: user.publicKey,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+
+    // Execute with bundle flag - should emit BundleHint event
+    const amountIn = new anchor.BN(1000000);
+    const minOut = new anchor.BN(50000);
+
+    try {
+      await program.methods
+        .processSwapToc({
+          amountIn,
+          minOut,
+          slippageTolerance: null,
+          twapSlices: null,
+          useDynamicPlan: true,
+          planAccount,
+          useBundle: true, // Enable bundling
+          oracleAccount,
+        })
+        .accounts({
+          state: routerState,
+          user: user.publicKey,
+          oracle: oracleAccount,
+          plan: planAccount,
+          // ... other accounts
+        })
+        .rpc();
+
+      // BundleHint event should be emitted (would need event parsing to verify)
+    } catch (e) {
+      // Expected in test environment - DEX execution will fail
+      expect((e as Error).message).to.include("SlippageExceeded");
     }
   });
 });

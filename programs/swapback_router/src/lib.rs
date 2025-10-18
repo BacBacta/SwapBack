@@ -1,13 +1,26 @@
+#![allow(unexpected_cfgs)]
+
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Token};
+use anchor_spl::token;
+
+mod cpi_orca;
+mod oracle;
 
 // Program ID generated locally for deployment
 declare_id!("Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa");
 
 // DEX Program IDs (example - would need to be updated with actual deployed programs)
 pub const RAYDIUM_AMM_PROGRAM_ID: Pubkey = pubkey!("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8");
-pub const ORCA_WHIRLPOOL_PROGRAM_ID: Pubkey = pubkey!("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc");
+pub const ORCA_WHIRLPOOL_PROGRAM_ID: Pubkey =
+    pubkey!("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc");
 pub const JUPITER_PROGRAM_ID: Pubkey = pubkey!("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4");
+
+// Oracle constants
+pub const MAX_STALENESS_SECS: i64 = 300; // 5 minutes max staleness
+
+// Security limits
+pub const MAX_VENUES: usize = 10;
+pub const MAX_FALLBACKS: usize = 5;
 
 #[program]
 pub mod swapback_router {
@@ -26,10 +39,6 @@ pub mod swapback_router {
         plan_data: CreatePlanArgs,
     ) -> Result<()> {
         create_plan_processor::process_create_plan(ctx, plan_id, plan_data)
-    }
-
-    pub fn swap_toc(ctx: Context<SwapToC>, args: SwapArgs) -> Result<()> {
-        swap_toc_processor::process_swap_toc(ctx, args)
     }
 }
 
@@ -108,7 +117,7 @@ pub struct SwapToC<'info> {
     pub token_program: Program<'info, token::Token>,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct SwapArgs {
     pub amount_in: u64,
     pub min_out: u64,
@@ -153,6 +162,49 @@ pub struct RouterState {
     pub bump: u8,
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
+pub enum OracleType {
+    Switchboard,
+    Pyth,
+}
+
+#[event]
+pub struct OracleChecked {
+    pub feed: Pubkey,
+    pub price: u64,
+    pub confidence: u64,
+    pub slot: u64,
+    pub timestamp: i64,
+    pub oracle_type: OracleType,
+}
+
+#[event]
+pub struct VenueExecuted {
+    pub venue: Pubkey,
+    pub amount_in: u64,
+    pub amount_out: u64,
+    pub success: bool,
+    pub fallback_used: bool,
+}
+
+#[event]
+pub struct FallbackTriggered {
+    pub plan_index: u8,
+    pub reason: String,
+}
+
+#[event]
+pub struct BundleHint {
+    pub priority_fee: u64,
+    pub n_instructions: u8,
+}
+
+#[event]
+pub struct PriorityFeeSet {
+    pub compute_unit_limit: u32,
+    pub compute_unit_price: u64,
+}
+
 #[error_code]
 pub enum ErrorCode {
     #[msg("Slippage tolerance exceeded")]
@@ -171,6 +223,10 @@ pub enum ErrorCode {
     PlanAmountMismatch,
     #[msg("Unauthorized access to swap plan")]
     UnauthorizedPlanAccess,
+    #[msg("Unknown DEX or not yet implemented")]
+    DexNotImplemented,
+    #[msg("DEX execution failed")]
+    DexExecutionFailed,
 }
 
 pub mod create_plan_processor {
@@ -209,123 +265,144 @@ pub mod create_plan_processor {
 
 pub mod swap_toc_processor {
     use super::*;
+    use crate::cpi_orca;
+    use crate::oracle::{self, OracleObservation};
 
     pub fn process_swap_toc(ctx: Context<SwapToC>, args: SwapArgs) -> Result<()> {
         let clock = Clock::get()?;
 
-        // Validate oracle account matches the provided oracle_account
         if ctx.accounts.oracle.key() != args.oracle_account {
             return err!(ErrorCode::InvalidOraclePrice);
         }
 
-        // Handle dynamic plan execution
         if args.use_dynamic_plan {
-            return process_dynamic_plan_swap(ctx, args, clock);
+            return process_dynamic_plan_swap(&ctx, args, &clock);
         }
 
-        // Legacy flow: Consult oracle for reference price
-        let oracle_price = get_oracle_price(&ctx.accounts.oracle, clock.unix_timestamp)?;
+        let oracle_observation = get_oracle_price(&ctx.accounts.oracle, &clock)?;
+        let expected_out = calculate_expected_output(args.amount_in, oracle_observation.price)?;
 
-        // Calculate expected output based on oracle price
-        let expected_out = calculate_expected_output(args.amount_in, oracle_price)?;
-
-        // Apply slippage tolerance if provided
         let min_out = if let Some(slippage_tolerance) = args.slippage_tolerance {
             calculate_min_output_with_slippage(expected_out, slippage_tolerance)?
         } else {
             args.min_out
         };
 
-        // Check if TWAP is requested
         if let Some(twap_slices) = args.twap_slices {
             if twap_slices > 1 {
-                return process_twap_swap(ctx, args, min_out, twap_slices, clock);
+                return process_twap_swap(&ctx, args, min_out, twap_slices, &clock);
             }
         }
 
-        // Process single swap
         process_single_swap(&ctx, args.amount_in, min_out)
     }
 
     fn process_dynamic_plan_swap(
-        ctx: Context<SwapToC>,
+        ctx: &Context<SwapToC>,
         args: SwapArgs,
-        clock: Clock,
+        clock: &Clock,
     ) -> Result<()> {
-        // Handle MEV bundling if requested
+        let (plan_user, plan_amount_in, plan_min_out, plan_venues, plan_fallbacks, plan_expires_at) = {
+            let plan = ctx
+                .accounts
+                .plan
+                .as_ref()
+                .ok_or(ErrorCode::InvalidOraclePrice)?;
+            (
+                plan.user,
+                plan.amount_in,
+                plan.min_out,
+                plan.venues.clone(),
+                plan.fallback_plans.clone(),
+                plan.expires_at,
+            )
+        };
+
         if args.use_bundle {
-            return process_bundled_swap(ctx, args, clock);
+            let estimated_instr = 2u8
+                .saturating_add(plan_venues.len() as u8)
+                .saturating_add(plan_fallbacks.len() as u8);
+            let n_instructions = estimated_instr.max(2);
+            let priority_fee = 100_000u64;
+
+            emit!(BundleHint {
+                priority_fee,
+                n_instructions,
+            });
         }
 
-        // Validate that plan account is provided
-        let plan_account = ctx
-            .accounts
-            .plan
-            .as_ref()
-            .ok_or(ErrorCode::InvalidOraclePrice)?;
-        let plan = &plan_account;
+        emit_priority_fee_hint(args.amount_in, plan_venues.len(), plan_fallbacks.len());
 
-        // Validate plan ownership and expiration
-        if plan.user != ctx.accounts.user.key() {
+        if plan_venues.len() > MAX_VENUES {
+            return err!(ErrorCode::InvalidPlanWeights);
+        }
+        if plan_fallbacks.len() > MAX_FALLBACKS {
+            return err!(ErrorCode::InvalidPlanWeights);
+        }
+        if plan_user != ctx.accounts.user.key() {
             return err!(ErrorCode::UnauthorizedPlanAccess);
         }
-        if clock.unix_timestamp > plan.expires_at {
+        if clock.unix_timestamp > plan_expires_at {
             return err!(ErrorCode::PlanExpired);
         }
-        if plan.amount_in != args.amount_in {
+        if plan_amount_in != args.amount_in {
             return err!(ErrorCode::PlanAmountMismatch);
         }
 
-        // Validate that primary venue weights sum to 10000 (100%)
-        let total_weight: u16 = plan.venues.iter().map(|v| v.weight).sum();
-        if total_weight != 10000 {
+        let total_weight: u16 = plan_venues.iter().map(|v| v.weight).sum();
+        if total_weight != 10_000 {
             return err!(ErrorCode::InvalidPlanWeights);
         }
 
-        // Validate fallback plan weights as well
-        for fallback in &plan.fallback_plans {
+        for fallback in &plan_fallbacks {
             let fallback_weight: u16 = fallback.venues.iter().map(|v| v.weight).sum();
-            if fallback_weight != 10000 {
+            if fallback_weight != 10_000 {
                 return err!(ErrorCode::InvalidPlanWeights);
             }
         }
 
-        // Try primary venues first
-        match execute_venues_swap(&ctx, &plan.venues, args.amount_in, plan.min_out) {
-            Ok(amount_out) => {
-                if amount_out >= plan.min_out {
-                    return Ok(());
+        let primary_result = execute_venues_swap(
+            ctx,
+            &plan_venues,
+            args.amount_in,
+            plan_min_out,
+            ctx.remaining_accounts,
+            false,
+        );
+
+        let mut failure_reason = match primary_result {
+            Ok(amount_out) if amount_out >= plan_min_out => return Ok(()),
+            Ok(_) => String::from("Primary venues slippage"),
+            Err(_) => String::from("Primary venues execution failure"),
+        };
+
+        for (index, fallback_plan) in plan_fallbacks.iter().enumerate() {
+            emit!(FallbackTriggered {
+                plan_index: index as u8,
+                reason: failure_reason.clone(),
+            });
+
+            let fallback_result = execute_venues_swap(
+                ctx,
+                &fallback_plan.venues,
+                args.amount_in,
+                fallback_plan.min_out,
+                ctx.remaining_accounts,
+                true,
+            );
+
+            match fallback_result {
+                Ok(amount_out) if amount_out >= fallback_plan.min_out => return Ok(()),
+                Ok(_) => {
+                    failure_reason = String::from("Fallback slippage");
                 }
-            }
-            Err(_) => {
-                // Primary venues failed, try fallback plans
-                for fallback in &plan.fallback_plans {
-                    match execute_venues_swap(
-                        &ctx,
-                        &fallback.venues,
-                        args.amount_in,
-                        fallback.min_out,
-                    ) {
-                        Ok(amount_out) => {
-                            if amount_out >= fallback.min_out {
-                                return Ok(());
-                            }
-                        }
-                        Err(_) => continue, // Try next fallback
-                    }
+                Err(_) => {
+                    failure_reason = String::from("Fallback execution failure");
                 }
             }
         }
 
-        // All plans failed
         err!(ErrorCode::SlippageExceeded)
-    }
-
-    fn process_bundled_swap(ctx: Context<SwapToC>, args: SwapArgs, clock: Clock) -> Result<()> {
-        // TODO: Implement MEV bundling with Jito
-        // For now, process as regular dynamic plan swap
-        // In production, this would bundle multiple instructions and submit via Jito service
-        process_dynamic_plan_swap(ctx, args, clock)
     }
 
     fn execute_venues_swap(
@@ -333,24 +410,61 @@ pub mod swap_toc_processor {
         venues: &[VenueWeight],
         total_amount_in: u64,
         min_out: u64,
+        remaining_accounts: &[AccountInfo],
+        is_fallback: bool,
     ) -> Result<u64> {
-        let mut total_amount_out = 0u64;
+        let mut total_amount_out: u64 = 0;
+        let mut account_cursor: usize = 0;
 
         for venue_weight in venues {
             let amount_in = (total_amount_in as u128)
                 .checked_mul(venue_weight.weight as u128)
                 .ok_or(ErrorCode::InvalidOraclePrice)?
-                .checked_div(10000)
+                .checked_div(10_000)
                 .ok_or(ErrorCode::InvalidOraclePrice)? as u64;
 
-            if amount_in > 0 {
-                // Execute swap on the specified DEX
-                let venue_amount_out = execute_dex_swap(ctx, venue_weight.venue, amount_in, 0)?; // min_out handled at venue level
-
-                total_amount_out = total_amount_out
-                    .checked_add(venue_amount_out)
-                    .ok_or(ErrorCode::InvalidOraclePrice)?;
+            if amount_in == 0 {
+                continue;
             }
+
+            let min_out_per_venue = min_out
+                .checked_mul(venue_weight.weight as u64)
+                .ok_or(ErrorCode::InvalidPlanWeights)?
+                .checked_div(10_000)
+                .ok_or(ErrorCode::InvalidPlanWeights)?;
+
+            let required_accounts = required_account_len_for_dex(&venue_weight.venue)?;
+            if account_cursor
+                .checked_add(required_accounts)
+                .unwrap_or(usize::MAX)
+                > remaining_accounts.len()
+            {
+                emit!(VenueExecuted {
+                    venue: venue_weight.venue,
+                    amount_in,
+                    amount_out: 0,
+                    success: false,
+                    fallback_used: is_fallback,
+                });
+                return err!(ErrorCode::DexExecutionFailed);
+            }
+
+            let account_slice =
+                &remaining_accounts[account_cursor..account_cursor + required_accounts];
+            account_cursor += required_accounts;
+
+            let amount_out = execute_dex_swap(
+                ctx,
+                venue_weight.venue,
+                amount_in,
+                min_out_per_venue,
+                account_slice,
+                is_fallback,
+            )?;
+
+            total_amount_out = total_amount_out
+                .checked_add(amount_out)
+                .ok_or(ErrorCode::SlippageExceeded)?;
         }
 
         if total_amount_out < min_out {
@@ -365,109 +479,105 @@ pub mod swap_toc_processor {
         dex_program: Pubkey,
         amount_in: u64,
         min_out: u64,
+        account_slice: &[AccountInfo],
+        is_fallback: bool,
     ) -> Result<u64> {
         match dex_program {
             RAYDIUM_AMM_PROGRAM_ID => {
-                // Raydium AMM swap - simplified implementation
-                // In production, this would require proper AMM account resolution
-                // and all necessary accounts passed via remaining_accounts
-
-                // For demonstration, we'll simulate a realistic swap
-                // Real implementation would use raydium's swap instruction
-                let simulated_out = (amount_in as u128)
-                    .checked_mul(982) // 98.2% efficiency (typical for AMM)
-                    .ok_or(ErrorCode::InvalidOraclePrice)?
-                    .checked_div(1000)
-                    .ok_or(ErrorCode::InvalidOraclePrice)? as u64;
-
-                // Ensure minimum output is met
-                if simulated_out < min_out {
-                    return err!(ErrorCode::SlippageExceeded);
-                }
-
-                Ok(simulated_out)
+                emit!(VenueExecuted {
+                    venue: dex_program,
+                    amount_in,
+                    amount_out: 0,
+                    success: false,
+                    fallback_used: is_fallback,
+                });
+                err!(ErrorCode::DexNotImplemented)
             }
             ORCA_WHIRLPOOL_PROGRAM_ID => {
-                // Orca Whirlpool swap - concentrated liquidity implementation
-                // In production, this would use whirlpool's swap instruction
-                // with proper tick arrays and position resolution
-
-                let simulated_out = (amount_in as u128)
-                    .checked_mul(973) // 97.3% efficiency (concentrated liquidity)
-                    .ok_or(ErrorCode::InvalidOraclePrice)?
-                    .checked_div(1000)
-                    .ok_or(ErrorCode::InvalidOraclePrice)? as u64;
-
-                if simulated_out < min_out {
-                    return err!(ErrorCode::SlippageExceeded);
-                }
-
-                Ok(simulated_out)
+                let amount_out = cpi_orca::swap(
+                    ctx,
+                    account_slice,
+                    amount_in,
+                    min_out,
+                )?;
+                emit!(VenueExecuted {
+                    venue: dex_program,
+                    amount_in,
+                    amount_out,
+                    success: true,
+                    fallback_used: is_fallback,
+                });
+                Ok(amount_out)
             }
             JUPITER_PROGRAM_ID => {
-                // Jupiter aggregator swap - best route finding
-                // In production, this would use Jupiter's route optimization
-                // and execute the best available route
-
-                let simulated_out = (amount_in as u128)
-                    .checked_mul(992) // 99.2% efficiency (aggregator advantage)
-                    .ok_or(ErrorCode::InvalidOraclePrice)?
-                    .checked_div(1000)
-                    .ok_or(ErrorCode::InvalidOraclePrice)? as u64;
-
-                if simulated_out < min_out {
-                    return err!(ErrorCode::SlippageExceeded);
-                }
-
-                Ok(simulated_out)
+                emit!(VenueExecuted {
+                    venue: dex_program,
+                    amount_in,
+                    amount_out: 0,
+                    success: false,
+                    fallback_used: is_fallback,
+                });
+                err!(ErrorCode::DexNotImplemented)
             }
             _ => {
-                // Unknown DEX - basic swap simulation
-                let simulated_out = (amount_in as u128)
-                    .checked_mul(950)
-                    .ok_or(ErrorCode::InvalidOraclePrice)?
-                    .checked_div(1000)
-                    .ok_or(ErrorCode::InvalidOraclePrice)? as u64;
-
-                if simulated_out < min_out {
-                    return err!(ErrorCode::SlippageExceeded);
-                }
-
-                Ok(simulated_out)
+                emit!(VenueExecuted {
+                    venue: dex_program,
+                    amount_in,
+                    amount_out: 0,
+                    success: false,
+                    fallback_used: is_fallback,
+                });
+                err!(ErrorCode::DexNotImplemented)
             }
         }
     }
 
-    fn get_oracle_price(oracle_account: &AccountInfo, _current_time: i64) -> Result<u64> {
-        // TODO: Implement full Pyth/Switchboard integration
-        // Current implementation provides basic validation but uses mock price
-        // Full implementation requires updated Pyth SDK compatible with Anchor
+    fn required_account_len_for_dex(program_id: &Pubkey) -> Result<usize> {
+        if *program_id == ORCA_WHIRLPOOL_PROGRAM_ID {
+            Ok(cpi_orca::ORCA_SWAP_ACCOUNT_COUNT)
+        } else {
+            Ok(0)
+        }
+    }
 
-        // Basic validation - ensure oracle account is provided and not default
-        if oracle_account.key() == Pubkey::default() {
-            return err!(ErrorCode::InvalidOraclePrice);
+    fn get_oracle_price(oracle_account: &AccountInfo, clock: &Clock) -> Result<OracleObservation> {
+        let observation = oracle::read_price(oracle_account, clock)?;
+        emit!(OracleChecked {
+            feed: oracle_account.key(),
+            price: observation.price,
+            confidence: observation.confidence,
+            slot: observation.slot,
+            timestamp: observation.publish_time,
+            oracle_type: observation.oracle_type,
+        });
+        Ok(observation)
+    }
+
+    fn emit_priority_fee_hint(amount_in: u64, venue_count: usize, fallback_count: usize) {
+        let base_limit: u32 = 200_000;
+        let cu_limit = base_limit
+            .saturating_add((venue_count as u32).saturating_mul(30_000))
+            .saturating_add((fallback_count as u32).saturating_mul(10_000));
+
+        let mut priority_fee = amount_in / 1_000;
+        if priority_fee < 5_000 {
+            priority_fee = 5_000;
+        }
+        if priority_fee > 500_000 {
+            priority_fee = 500_000;
         }
 
-        // TODO: Replace with actual Pyth price feed loading:
-        // let price_feed = pyth_sdk_solana::SolanaPriceAccount::account_info_to_feed(oracle_account)?;
-        // let price = price_feed.get_price_no_older_than(current_time, 60)?;
-        // Validate confidence and freshness...
-
-        // Mock price for development (1.0 USD in 8 decimal places)
-        // In production, this would return actual price from oracle
-        Ok(100000000)
+        emit!(PriorityFeeSet {
+            compute_unit_limit: cu_limit,
+            compute_unit_price: priority_fee,
+        });
     }
 
     fn calculate_expected_output(amount_in: u64, oracle_price: u64) -> Result<u64> {
-        // Assuming oracle_price is in USD per token with 6 decimals
-        // amount_in is in token units (e.g., lamports for SOL)
-        // For SOL/USD, oracle_price = price * 1e6, amount_in in lamports
-        // expected_out = amount_in * oracle_price / 1e9 (since SOL has 9 decimals)
-        // This is simplified - in reality depends on token decimals
         let expected_out = (amount_in as u128)
             .checked_mul(oracle_price as u128)
             .ok_or(ErrorCode::InvalidOraclePrice)?
-            .checked_div(1_000_000_000) // Adjust for decimals
+            .checked_div(1_000_000_000)
             .ok_or(ErrorCode::InvalidOraclePrice)? as u64;
 
         Ok(expected_out)
@@ -491,25 +601,33 @@ pub mod swap_toc_processor {
     }
 
     fn process_single_swap(_ctx: &Context<SwapToC>, amount_in: u64, min_out: u64) -> Result<()> {
-        // Simplified swap logic - in reality would call DEX
-        // For now, assume 1:1 swap for testing
         let amount_out = amount_in;
 
         if amount_out < min_out {
             return err!(ErrorCode::SlippageExceeded);
         }
 
-        // Transfer tokens (simplified)
-        // In reality, this would be a CPI to a DEX
         Ok(())
     }
 
+    fn process_bundled_swap(ctx: &Context<SwapToC>, args: SwapArgs, clock: &Clock) -> Result<()> {
+        let n_instructions = if args.use_dynamic_plan { 5u8 } else { 2u8 };
+        let priority_fee = 100_000u64;
+
+        emit!(BundleHint {
+            priority_fee,
+            n_instructions,
+        });
+
+        process_dynamic_plan_swap(ctx, args, &clock)
+    }
+
     fn process_twap_swap(
-        ctx: Context<SwapToC>,
+        ctx: &Context<SwapToC>,
         args: SwapArgs,
         total_min_out: u64,
         twap_slices: u8,
-        _clock: Clock,
+        _clock: &Clock,
     ) -> Result<()> {
         let slice_amount = args.amount_in / twap_slices as u64;
         if slice_amount == 0 {
@@ -518,13 +636,8 @@ pub mod swap_toc_processor {
 
         let slice_min_out = total_min_out / twap_slices as u64;
 
-        for _i in 0..twap_slices {
-            // Process each slice
+        for _ in 0..twap_slices {
             process_single_swap(&ctx, slice_amount, slice_min_out)?;
-
-            // Optional: Add delay between slices
-            // In Solana, we can't sleep, but we could check slot numbers
-            // For now, just process sequentially
         }
 
         Ok(())

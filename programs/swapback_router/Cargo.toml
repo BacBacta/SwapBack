@@ -15,8 +15,15 @@ no-log-ix-name = []
 cpi = ["no-entrypoint"]
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 default = []
+devnet = []
+switchboard = ["switchboard-solana"]
+pyth = []
 
 [dependencies]
 anchor-lang = { workspace = true, features = ["init-if-needed"] }
 anchor-spl = { workspace = true }
-pyth-sdk-solana = { workspace = true }
+pyth-sdk-solana = "=0.10.0"
+solana-program = { workspace = true }
+solana-sdk = { workspace = true }
+switchboard-solana = { version = "0.30.4", optional = true }
+solana-pubkey = { version = "2.4.0", default-features = false }
