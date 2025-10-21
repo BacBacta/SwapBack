@@ -1,0 +1,7 @@
+[target.'cfg(target_os = "solana")']
+# Force l'utilisation de getrandom avec la feature custom pour le target Solana BPF
+rustflags = ["--cfg", "getrandom_custom"]
+
+[build]
+# Configuration du resolver
+target-dir = "target"

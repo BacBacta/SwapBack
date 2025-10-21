@@ -1,7 +1,7 @@
 /**
  * API Route Tests - /api/execute
  * Tests for transaction execution endpoint
- * 
+ *
  * @vitest-environment node
  */
 
@@ -19,9 +19,11 @@ vi.mock("@solana/web3.js", async () => {
   return {
     ...actual,
     Connection: vi.fn().mockImplementation(() => ({
-      sendRawTransaction: vi.fn().mockResolvedValue(
-        "5j7s1QkJwKjZdP3xQqF8vXeC9kT2mN4pL6rV8sW9uY1xZ3cB2aD4eF6gH8iJ9kL"
-      ),
+      sendRawTransaction: vi
+        .fn()
+        .mockResolvedValue(
+          "5j7s1QkJwKjZdP3xQqF8vXeC9kT2mN4pL6rV8sW9uY1xZ3cB2aD4eF6gH8iJ9kL"
+        ),
       getLatestBlockhash: vi.fn().mockResolvedValue({
         blockhash: "GH7ome3EiwEr7tu9JuTh2dpYWBJK3z69Xm1ZE1c9k12345",
         lastValidBlockHeight: 150000000,
@@ -46,7 +48,7 @@ vi.mock("@solana/web3.js", async () => {
 
 function createMockRequest(body: any): NextRequest {
   const url = "http://localhost:3000/api/execute";
-  
+
   return {
     json: async () => body,
     method: "POST",
@@ -139,7 +141,9 @@ describe("API Route: /api/execute", () => {
       const data = await response.json();
 
       expect(data.blockhash).toBeDefined();
-      expect(data.blockhash).toBe("GH7ome3EiwEr7tu9JuTh2dpYWBJK3z69Xm1ZE1c9k12345");
+      expect(data.blockhash).toBe(
+        "GH7ome3EiwEr7tu9JuTh2dpYWBJK3z69Xm1ZE1c9k12345"
+      );
     });
 
     it("should include lastValidBlockHeight in response", async () => {

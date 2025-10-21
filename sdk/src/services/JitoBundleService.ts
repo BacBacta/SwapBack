@@ -9,19 +9,19 @@ import {
   PublicKey,
   TransactionInstruction,
   SystemProgram,
-} from '@solana/web3.js';
-import bs58 from 'bs58';
+} from "@solana/web3.js";
+import bs58 from "bs58";
 import {
   JitoBundleConfig,
   JitoBundleResult,
   RouteCandidate,
-} from '../types/smart-router';
+} from "../types/smart-router";
 
 // ============================================================================
 // JITO BUNDLE SERVICE
 // ============================================================================
 
-type PriorityLevel = 'low' | 'medium' | 'high';
+type PriorityLevel = "low" | "medium" | "high";
 
 export interface BundleProtectionOptions {
   tipLamports?: number;
@@ -41,21 +41,21 @@ export class JitoBundleService {
 
   constructor(
     connection: Connection,
-    jitoBlockEngineUrl = 'https://mainnet.block-engine.jito.wtf/api/v1/bundles',
+    jitoBlockEngineUrl = "https://mainnet.block-engine.jito.wtf/api/v1/bundles",
     defaultTipLamports = 10000 // 0.00001 SOL
   ) {
     this.connection = connection;
     this.jitoBlockEngineUrl = jitoBlockEngineUrl;
     this.defaultTipLamports = defaultTipLamports;
     this.tipAccounts = [
-      '96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5',
-      'HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe',
-      'Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY',
-      'ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49',
-      'DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh',
-      'ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt',
-      'DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL',
-      '3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT',
+      "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+      "HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe",
+      "Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY",
+      "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49",
+      "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+      "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt",
+      "DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL",
+      "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT",
     ].map((address) => new PublicKey(address));
   }
 
@@ -68,7 +68,7 @@ export class JitoBundleService {
     transactions: Transaction[],
     options: BundleProtectionOptions = {}
   ): Promise<JitoBundleResult> {
-    const priorityLevel = options.priorityLevel ?? 'medium';
+    const priorityLevel = options.priorityLevel ?? "medium";
     const computedTip =
       options.tipLamports ??
       (await this.calculateOptimalTip(priorityLevel, options.tradeValueUSD));
@@ -83,7 +83,7 @@ export class JitoBundleService {
       const result = await this.submitBundle(transactions, submissionConfig);
       return {
         ...result,
-        strategy: 'jito',
+        strategy: "jito",
         tipLamports: computedTip,
         priorityFeeMicroLamports: options.priorityFeeMicroLamports,
       };
@@ -118,7 +118,7 @@ export class JitoBundleService {
     };
 
     if (!bundleConfig.enabled) {
-      throw new Error('Jito bundling is disabled');
+      throw new Error("Jito bundling is disabled");
     }
 
     try {
@@ -126,7 +126,9 @@ export class JitoBundleService {
       if (bundleConfig.tipLamports > 0 && transactions.length > 0) {
         const tipAccount = this.pickTipAccount();
         const tipInstruction = SystemProgram.transfer({
-          fromPubkey: transactions[0].feePayer || new PublicKey('11111111111111111111111111111112'), // fallback
+          fromPubkey:
+            transactions[0].feePayer ||
+            new PublicKey("11111111111111111111111111111112"), // fallback
           toPubkey: tipAccount,
           lamports: bundleConfig.tipLamports,
         });
@@ -134,20 +136,20 @@ export class JitoBundleService {
       }
 
       // Serialize transactions
-      const serializedTxs = transactions.map(tx => {
-        return tx.serialize({ requireAllSignatures: false }).toString('base64');
+      const serializedTxs = transactions.map((tx) => {
+        return tx.serialize({ requireAllSignatures: false }).toString("base64");
       });
 
       // Submit to Jito block engine
       const response = await fetch(this.jitoBlockEngineUrl, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          jsonrpc: '2.0',
+          jsonrpc: "2.0",
           id: 1,
-          method: 'sendBundle',
+          method: "sendBundle",
           params: [serializedTxs],
         }),
       });
@@ -155,20 +157,22 @@ export class JitoBundleService {
       const result = await response.json();
 
       if (result.error) {
-        throw new Error(`Jito bundle submission failed: ${result.error.message}`);
+        throw new Error(
+          `Jito bundle submission failed: ${result.error.message}`
+        );
       }
 
       return {
         bundleId: result.result,
-        status: 'pending',
+        status: "pending",
         signatures: transactions.map((tx) =>
-          tx.signature ? bs58.encode(tx.signature) : ''
+          tx.signature ? bs58.encode(tx.signature) : ""
         ),
-        strategy: 'jito',
+        strategy: "jito",
         tipLamports: bundleConfig.tipLamports,
       };
     } catch (error) {
-      console.error('Jito bundle submission error:', error);
+      console.error("Jito bundle submission error:", error);
       throw error;
     }
   }
@@ -182,11 +186,11 @@ export class JitoBundleService {
     const quickNodeEndpoint = endpoint ?? process.env.QUICKNODE_LILJIT_URL;
 
     if (!quickNodeEndpoint) {
-      throw new Error('QuickNode Lil JIT endpoint not configured');
+      throw new Error("QuickNode Lil JIT endpoint not configured");
     }
 
     const serializedTxs = transactions.map((tx) =>
-      tx.serialize({ requireAllSignatures: false }).toString('base64')
+      tx.serialize({ requireAllSignatures: false }).toString("base64")
     );
 
     const body = {
@@ -198,14 +202,14 @@ export class JitoBundleService {
     };
 
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     };
     if (process.env.QUICKNODE_API_KEY) {
       headers.Authorization = `Bearer ${process.env.QUICKNODE_API_KEY}`;
     }
 
     const response = await fetch(quickNodeEndpoint, {
-      method: 'POST',
+      method: "POST",
       headers,
       body: JSON.stringify(body),
     });
@@ -220,7 +224,7 @@ export class JitoBundleService {
     try {
       parsed = await response.json();
     } catch (error) {
-      console.warn('QuickNode response parse failed', error);
+      console.warn("QuickNode response parse failed", error);
     }
 
     const bundleId =
@@ -231,11 +235,11 @@ export class JitoBundleService {
 
     return {
       bundleId,
-      status: 'pending',
+      status: "pending",
       signatures: transactions.map((tx) =>
-        tx.signature ? bs58.encode(tx.signature) : ''
+        tx.signature ? bs58.encode(tx.signature) : ""
       ),
-      strategy: 'quicknode',
+      strategy: "quicknode",
       tipLamports,
       priorityFeeMicroLamports,
     };
@@ -244,17 +248,17 @@ export class JitoBundleService {
   /**
    * Check bundle status
    */
-  async getBundleStatus(bundleId: string): Promise<JitoBundleResult['status']> {
+  async getBundleStatus(bundleId: string): Promise<JitoBundleResult["status"]> {
     try {
       const response = await fetch(this.jitoBlockEngineUrl, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          jsonrpc: '2.0',
+          jsonrpc: "2.0",
           id: 1,
-          method: 'getBundleStatuses',
+          method: "getBundleStatuses",
           params: [[bundleId]],
         }),
       });
@@ -262,19 +266,19 @@ export class JitoBundleService {
       const result = await response.json();
 
       if (result.error) {
-        return 'failed';
+        return "failed";
       }
 
       const status = result.result?.value?.[0]?.confirmation_status;
-      
-      if (status === 'confirmed' || status === 'finalized') {
-        return 'landed';
+
+      if (status === "confirmed" || status === "finalized") {
+        return "landed";
       }
 
-      return 'pending';
+      return "pending";
     } catch (error) {
-      console.error('Bundle status check failed:', error);
-      return 'failed';
+      console.error("Bundle status check failed:", error);
+      return "failed";
     }
   }
 
@@ -290,38 +294,38 @@ export class JitoBundleService {
     while (Date.now() - startTime < timeoutMs) {
       const status = await this.getBundleStatus(bundleId);
 
-      if (status === 'landed') {
+      if (status === "landed") {
         return {
           bundleId,
-          status: 'landed',
+          status: "landed",
           signatures: [],
-          strategy: 'jito',
+          strategy: "jito",
         };
       }
 
-      if (status === 'failed') {
-        throw new Error('Bundle failed to land');
+      if (status === "failed") {
+        throw new Error("Bundle failed to land");
       }
 
       // Wait 500ms before checking again
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
-    throw new Error('Bundle timeout');
+    throw new Error("Bundle timeout");
   }
 
   /**
    * Calculate optimal tip based on network conditions
    */
   async calculateOptimalTip(
-    priorityLevel: PriorityLevel = 'medium',
+    priorityLevel: PriorityLevel = "medium",
     tradeValueUSD?: number
   ): Promise<number> {
     // Base tips by priority
     const baseTips = {
-      low: 5000,      // 0.000005 SOL
-      medium: 10000,  // 0.00001 SOL
-      high: 50000,    // 0.00005 SOL
+      low: 5000, // 0.000005 SOL
+      medium: 10000, // 0.00001 SOL
+      high: 50000, // 0.00005 SOL
     };
 
     const base = baseTips[priorityLevel];
@@ -347,7 +351,7 @@ export class MEVProtectionAnalyzer {
    * Assess MEV risk for a route
    */
   assessMEVRisk(route: RouteCandidate): {
-    riskLevel: 'low' | 'medium' | 'high';
+    riskLevel: "low" | "medium" | "high";
     vulnerabilities: string[];
     recommendations: string[];
   } {
@@ -356,47 +360,55 @@ export class MEVProtectionAnalyzer {
     let riskScore = 0;
 
     // Large trades are more vulnerable
-    const isLargeTrade = route.splits.some(s => s.inputAmount > 10000);
+    const isLargeTrade = route.splits.some((s) => s.inputAmount > 10000);
     if (isLargeTrade) {
       riskScore += 30;
-      vulnerabilities.push('Large trade size makes it attractive to MEV bots');
-      recommendations.push('Consider splitting into smaller trades (TWAP)');
+      vulnerabilities.push("Large trade size makes it attractive to MEV bots");
+      recommendations.push("Consider splitting into smaller trades (TWAP)");
     }
 
     // AMM-only routes are more vulnerable than CLOB
-    const isAMMOnly = route.splits.every(s => s.liquiditySource.venueType === 'amm');
+    const isAMMOnly = route.splits.every(
+      (s) => s.liquiditySource.venueType === "amm"
+    );
     if (isAMMOnly) {
       riskScore += 25;
-      vulnerabilities.push('AMM swaps are predictable and sandwich-able');
-      recommendations.push('Use Jito bundling for atomic execution');
+      vulnerabilities.push("AMM swaps are predictable and sandwich-able");
+      recommendations.push("Use Jito bundling for atomic execution");
     }
 
     // High slippage indicates vulnerability
-    const hasHighSlippage = route.splits.some(s => s.liquiditySource.slippagePercent > 0.01);
+    const hasHighSlippage = route.splits.some(
+      (s) => s.liquiditySource.slippagePercent > 0.01
+    );
     if (hasHighSlippage) {
       riskScore += 20;
-      vulnerabilities.push('High slippage tolerance leaves room for sandwich attacks');
-      recommendations.push('Tighten slippage tolerance or use smaller trade size');
+      vulnerabilities.push(
+        "High slippage tolerance leaves room for sandwich attacks"
+      );
+      recommendations.push(
+        "Tighten slippage tolerance or use smaller trade size"
+      );
     }
 
     // Multi-venue splits are complex
     if (route.venues.length > 1) {
       riskScore += 15;
-      vulnerabilities.push('Multi-venue execution increases attack surface');
-      recommendations.push('Ensure all instructions are in same bundle');
+      vulnerabilities.push("Multi-venue execution increases attack surface");
+      recommendations.push("Ensure all instructions are in same bundle");
     }
 
     // Determine risk level
-    let riskLevel: 'low' | 'medium' | 'high';
+    let riskLevel: "low" | "medium" | "high";
     if (riskScore < 30) {
-      riskLevel = 'low';
-      recommendations.push('Standard transaction submission is acceptable');
+      riskLevel = "low";
+      recommendations.push("Standard transaction submission is acceptable");
     } else if (riskScore < 60) {
-      riskLevel = 'medium';
-      recommendations.push('Consider Jito bundling for MEV protection');
+      riskLevel = "medium";
+      recommendations.push("Consider Jito bundling for MEV protection");
     } else {
-      riskLevel = 'high';
-      recommendations.push('Strongly recommend Jito bundling + TWAP strategy');
+      riskLevel = "high";
+      recommendations.push("Strongly recommend Jito bundling + TWAP strategy");
     }
 
     return {
@@ -412,7 +424,7 @@ export class MEVProtectionAnalyzer {
   calculateRecommendedTip(tradeValueUSD: number): number {
     // Tip scales with trade value (0.01% of trade)
     const tipUSD = tradeValueUSD * 0.0001;
-    
+
     // Convert to lamports (assuming SOL = $100)
     const solPrice = 100;
     const tipSOL = tipUSD / solPrice;
@@ -427,13 +439,14 @@ export class MEVProtectionAnalyzer {
    */
   shouldUseBundling(route: RouteCandidate, tradeValueUSD: number): boolean {
     const analysis = this.assessMEVRisk(route);
-    
+
     // Always bundle for high-value trades
     if (tradeValueUSD > 10000) return true;
-    
+
     // Bundle for medium/high risk
-    if (analysis.riskLevel === 'high' || analysis.riskLevel === 'medium') return true;
-    
+    if (analysis.riskLevel === "high" || analysis.riskLevel === "medium")
+      return true;
+
     // Optional for low risk, small trades
     return false;
   }
@@ -467,12 +480,12 @@ export class SandwichDetector {
     reason?: string;
     confidence: number;
   }> {
-  // NOTE: A full mempool monitor is not yet integrated.
+    // NOTE: A full mempool monitor is not yet integrated.
     // Look for:
     // - Repeated large swaps in same direction
     // - Front-running patterns
     // - Known MEV bot addresses
-    
+
     // For now, return mock data
     return {
       suspicious: false,
@@ -483,14 +496,17 @@ export class SandwichDetector {
   /**
    * Monitor transaction after submission
    */
-  async monitorTransaction(signature: string, timeoutMs = 30000): Promise<{
+  async monitorTransaction(
+    signature: string,
+    timeoutMs = 30000
+  ): Promise<{
     sandwiched: boolean;
     frontRunner?: string;
     backRunner?: string;
   }> {
-  // NOTE: Post-trade sandwich detection can be plugged in with block data analytics.
+    // NOTE: Post-trade sandwich detection can be plugged in with block data analytics.
     // Compare with transactions in same block
-    
+
     return {
       sandwiched: false,
     };
@@ -514,7 +530,7 @@ export async function createAtomicSwapBundle(
 
   // Combine all instructions into single transaction if possible
   const allIxs = [...setupIxs, ...swapIxs, ...cleanupIxs];
-  
+
   // Split if too many instructions (max ~20 per tx)
   const maxIxPerTx = 20;
   for (let i = 0; i < allIxs.length; i += maxIxPerTx) {

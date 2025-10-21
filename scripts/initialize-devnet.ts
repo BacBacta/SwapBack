@@ -1,6 +1,6 @@
 /**
  * Script d'initialisation des programmes SwapBack sur Devnet
- * 
+ *
  * Ce script:
  * 1. Crée les tokens de test ($BACK et USDC)
  * 2. Initialise le programme swapback_buyback
@@ -17,29 +17,46 @@ import {
   mintTo,
   getAccount,
 } from "@solana/spl-token";
-import { Connection, Keypair, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY } from "@solana/web3.js";
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  SystemProgram,
+  SYSVAR_RENT_PUBKEY,
+} from "@solana/web3.js";
 import fs from "fs";
 import path from "path";
 
 // Configuration
 const DEVNET_RPC = "https://api.devnet.solana.com";
-const BUYBACK_PROGRAM_ID = new PublicKey("71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW");
-const CNFT_PROGRAM_ID = new PublicKey("HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf");
+const BUYBACK_PROGRAM_ID = new PublicKey(
+  "71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW"
+);
+const CNFT_PROGRAM_ID = new PublicKey(
+  "HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf"
+);
 
 async function main() {
   console.log("🚀 Initialisation des programmes SwapBack sur Devnet\n");
 
   // Setup connection et wallet
   const connection = new Connection(DEVNET_RPC, "confirmed");
-  
+
   // Charger le wallet depuis ~/.config/solana/id.json
-  const walletPath = path.join(process.env.HOME || "", ".config", "solana", "id.json");
+  const walletPath = path.join(
+    process.env.HOME || "",
+    ".config",
+    "solana",
+    "id.json"
+  );
   const walletKeypair = Keypair.fromSecretKey(
     Buffer.from(JSON.parse(fs.readFileSync(walletPath, "utf-8")))
   );
-  
+
   const wallet = new anchor.Wallet(walletKeypair);
-  const provider = new AnchorProvider(connection, wallet, { commitment: "confirmed" });
+  const provider = new AnchorProvider(connection, wallet, {
+    commitment: "confirmed",
+  });
   anchor.setProvider(provider);
 
   console.log("📍 Wallet:", wallet.publicKey.toBase58());
@@ -65,7 +82,7 @@ async function main() {
 
   // Vérifier si les mints existent déjà (fichier de cache)
   const cacheFile = path.join(__dirname, ".devnet-tokens.json");
-  
+
   if (fs.existsSync(cacheFile)) {
     const cache = JSON.parse(fs.readFileSync(cacheFile, "utf-8"));
     backMint = new PublicKey(cache.backMint);
@@ -75,7 +92,7 @@ async function main() {
     console.log("   USDC Mint:", usdcMint.toBase58());
   } else {
     console.log("🔨 Création de nouveaux tokens de test...");
-    
+
     // Créer le token $BACK (9 decimals)
     backMint = await createMint(
       connection,
@@ -99,10 +116,14 @@ async function main() {
     // Sauvegarder dans le cache
     fs.writeFileSync(
       cacheFile,
-      JSON.stringify({
-        backMint: backMint.toBase58(),
-        usdcMint: usdcMint.toBase58(),
-      }, null, 2)
+      JSON.stringify(
+        {
+          backMint: backMint.toBase58(),
+          usdcMint: usdcMint.toBase58(),
+        },
+        null,
+        2
+      )
     );
     console.log("💾 Tokens sauvegardés dans", cacheFile);
   }
@@ -111,14 +132,14 @@ async function main() {
 
   // Créer des token accounts pour le wallet et mint des tokens de test
   console.log("🪙 Création des token accounts et mint de tokens de test...");
-  
+
   const backTokenAccount = await getOrCreateAssociatedTokenAccount(
     connection,
     walletKeypair,
     backMint,
     walletKeypair.publicKey
   );
-  
+
   const usdcTokenAccount = await getOrCreateAssociatedTokenAccount(
     connection,
     walletKeypair,
@@ -127,8 +148,10 @@ async function main() {
   );
 
   // Vérifier les balances et mint si nécessaire
-  const backBalance = (await getAccount(connection, backTokenAccount.address)).amount;
-  const usdcBalance = (await getAccount(connection, usdcTokenAccount.address)).amount;
+  const backBalance = (await getAccount(connection, backTokenAccount.address))
+    .amount;
+  const usdcBalance = (await getAccount(connection, usdcTokenAccount.address))
+    .amount;
 
   if (backBalance === 0n) {
     // Mint 1 million $BACK
@@ -138,11 +161,11 @@ async function main() {
       backMint,
       backTokenAccount.address,
       walletKeypair.publicKey,
-      1_000_000 * 10**9 // 1M tokens avec 9 decimals
+      1_000_000 * 10 ** 9 // 1M tokens avec 9 decimals
     );
     console.log("✅ Minté 1,000,000 $BACK");
   } else {
-    console.log(`✅ Balance $BACK: ${Number(backBalance) / 10**9}`);
+    console.log(`✅ Balance $BACK: ${Number(backBalance) / 10 ** 9}`);
   }
 
   if (usdcBalance === 0n) {
@@ -153,11 +176,11 @@ async function main() {
       usdcMint,
       usdcTokenAccount.address,
       walletKeypair.publicKey,
-      10_000 * 10**6 // 10K tokens avec 6 decimals
+      10_000 * 10 ** 6 // 10K tokens avec 6 decimals
     );
     console.log("✅ Minté 10,000 USDC");
   } else {
-    console.log(`✅ Balance USDC: ${Number(usdcBalance) / 10**6}`);
+    console.log(`✅ Balance USDC: ${Number(usdcBalance) / 10 ** 6}`);
   }
 
   console.log();
@@ -167,9 +190,15 @@ async function main() {
 
   try {
     // Charger l'IDL
-    const idlPath = path.join(__dirname, "..", "target", "idl", "swapback_buyback.json");
+    const idlPath = path.join(
+      __dirname,
+      "..",
+      "target",
+      "idl",
+      "swapback_buyback.json"
+    );
     const idl = JSON.parse(fs.readFileSync(idlPath, "utf-8"));
-    
+
     const program = new Program(idl, BUYBACK_PROGRAM_ID, provider);
 
     // Dériver les PDAs
@@ -188,17 +217,24 @@ async function main() {
 
     // Vérifier si déjà initialisé
     try {
-      const stateAccount = await program.account.buybackState.fetch(buybackState);
+      const stateAccount =
+        await program.account.buybackState.fetch(buybackState);
       console.log("\n✅ Programme déjà initialisé!");
       console.log("   Authority:", stateAccount.authority.toBase58());
       console.log("   BACK Mint:", stateAccount.backMint.toBase58());
-      console.log("   Total USDC dépensé:", stateAccount.totalUsdcSpent.toString());
-      console.log("   Total BACK brûlé:", stateAccount.totalBackBurned.toString());
+      console.log(
+        "   Total USDC dépensé:",
+        stateAccount.totalUsdcSpent.toString()
+      );
+      console.log(
+        "   Total BACK brûlé:",
+        stateAccount.totalBackBurned.toString()
+      );
     } catch (e) {
       // Pas encore initialisé, on continue
       console.log("🔨 Initialisation du programme buyback...");
-      
-      const minBuybackAmount = new BN(100 * 10**6); // 100 USDC minimum
+
+      const minBuybackAmount = new BN(100 * 10 ** 6); // 100 USDC minimum
 
       const tx = await program.methods
         .initialize(minBuybackAmount)

@@ -9,6 +9,7 @@
 Le **Simple Browser de VS Code** ne supporte PAS les extensions de wallet (Phantom, Solflare, etc.)
 
 ### Pourquoi ça ne fonctionne pas :
+
 - ❌ Le Simple Browser n'a pas accès aux extensions du navigateur
 - ❌ L'API `window.solana` n'est pas injectée
 - ❌ Phantom/Solflare ne peuvent pas s'initialiser
@@ -27,12 +28,14 @@ https://musical-space-cod-jjw7vrjqvg5q3j7vx-3000.app.github.dev
 ### 📋 Étapes pour Résoudre
 
 #### 1️⃣ Copier l'URL Publique
+
 ```bash
 # L'URL Codespaces est:
 https://musical-space-cod-jjw7vrjqvg5q3j7vx-3000.app.github.dev
 ```
 
 #### 2️⃣ Ouvrir dans un Navigateur Externe
+
 - **Chrome** (recommandé)
 - **Firefox**
 - **Brave**
@@ -41,12 +44,14 @@ https://musical-space-cod-jjw7vrjqvg5q3j7vx-3000.app.github.dev
 ❌ **NE PAS utiliser** : Simple Browser de VS Code
 
 #### 3️⃣ Vérifier que Phantom est Installé
+
 1. Ouvre Chrome
 2. Va sur https://phantom.app
 3. Télécharge l'extension si pas déjà installé
 4. Configure avec la clé devnet (voir `PHANTOM_IMPORT_GUIDE.md`)
 
 #### 4️⃣ Accéder à l'Application
+
 1. Colle l'URL dans Chrome
 2. L'application se charge
 3. Clique sur **"Connect Wallet"**
@@ -59,16 +64,19 @@ https://musical-space-cod-jjw7vrjqvg5q3j7vx-3000.app.github.dev
 Si tu préfères utiliser l'interface VS Code :
 
 ### Étape 1: Ouvrir l'onglet PORTS
+
 1. Dans VS Code, cherche l'onglet **"PORTS"** (à côté de Terminal)
 2. Trouve la ligne avec **Port 3000**
 
 ### Étape 2: Ouvrir dans le Navigateur
+
 1. Sur la ligne du port 3000, tu verras une colonne **"Forwarded Address"**
 2. Clique sur l'icône **"globe" 🌐** à droite
 3. Sélectionne **"Open in Browser"**
 4. ✅ L'application s'ouvre dans ton navigateur système (Chrome)
 
 ### Étape 3: Connecter le Wallet
+
 1. Clique sur **"Connect Wallet"**
 2. Sélectionne **Phantom**
 3. Approuve la connexion
@@ -81,6 +89,7 @@ Si tu préfères utiliser l'interface VS Code :
 Une fois le wallet connecté, vérifie :
 
 ### ✅ Checklist
+
 - [ ] URL ouverte dans Chrome/Firefox (pas Simple Browser)
 - [ ] Extension Phantom installée et configurée
 - [ ] Wallet importé avec la clé devnet
@@ -96,36 +105,44 @@ Une fois le wallet connecté, vérifie :
 ## 🔍 Diagnostic des Problèmes
 
 ### Problème: "Aucun wallet détecté"
+
 **Cause**: Extension Phantom pas installée ou navigateur incorrect
 
 **Solution**:
+
 1. Vérifie que tu es dans Chrome/Firefox (pas Simple Browser)
 2. Installe Phantom : https://phantom.app
 3. Redémarre le navigateur
 4. Recharge la page
 
 ### Problème: "Connect Wallet" ne fait rien
+
 **Cause**: Tu es dans le Simple Browser de VS Code
 
 **Solution**:
+
 1. Ferme le Simple Browser
 2. Copie l'URL Codespaces
 3. Ouvre dans Chrome externe
 4. Réessaie
 
 ### Problème: "Wallet connecté mais balance = 0"
+
 **Cause**: Wallet non importé ou mauvais réseau
 
 **Solution**:
+
 1. Vérifie que tu as importé le wallet devnet
 2. Phantom → Settings → "Change Network" → **Devnet**
 3. Vérifie l'adresse : `578DGN45PsuxySc4T5VsZKeJu2Q83L5coCWR47ZJkwQf`
 4. Balance devrait être ~6 SOL
 
 ### Problème: "Page ne charge pas"
+
 **Cause**: Serveur Next.js arrêté
 
 **Solution**:
+
 ```bash
 # Vérifie que le serveur tourne
 ps aux | grep "next dev"
@@ -139,12 +156,14 @@ cd /workspaces/SwapBack/app && npm run dev
 ## 📱 Compatibilité des Navigateurs
 
 ### ✅ Supportés (avec extensions wallet)
+
 - **Chrome** ⭐ (Recommandé)
 - **Firefox** ⭐
 - **Brave** ⭐
 - **Edge**
 
 ### ❌ NON Supportés
+
 - Simple Browser de VS Code
 - Lynx / curl / wget
 - iframes sans permissions
@@ -154,6 +173,7 @@ cd /workspaces/SwapBack/app && npm run dev
 ## 🚀 Workflow Complet
 
 ### 1. Préparation (une seule fois)
+
 ```bash
 # Installer Phantom dans Chrome
 # → https://phantom.app
@@ -168,6 +188,7 @@ cd /workspaces/SwapBack/app && npm run dev
 ```
 
 ### 2. Accès à l'Application
+
 ```bash
 # Ouvrir Chrome
 
@@ -178,6 +199,7 @@ https://musical-space-cod-jjw7vrjqvg5q3j7vx-3000.app.github.dev
 ```
 
 ### 3. Connexion du Wallet
+
 ```
 1. Clique "Connect Wallet"
 2. Popup Phantom s'ouvre
@@ -187,6 +209,7 @@ https://musical-space-cod-jjw7vrjqvg5q3j7vx-3000.app.github.dev
 ```
 
 ### 4. Test du Swap
+
 ```
 1. Input: USDC
 2. Output: SOL
@@ -202,12 +225,14 @@ https://musical-space-cod-jjw7vrjqvg5q3j7vx-3000.app.github.dev
 ## 🔐 Sécurité
 
 ### ⚠️ IMPORTANT
+
 - L'URL Codespaces est **publique**
 - N'utilise que des wallets **devnet** (test)
 - Ne mets JAMAIS de vrais fonds dessus
 - L'URL change à chaque session Codespaces
 
 ### 🛡️ Bonnes Pratiques
+
 - ✅ Utilise un wallet dédié pour le devnet
 - ✅ Vérifie toujours le réseau (Devnet ≠ Mainnet)
 - ✅ Ne partage jamais ta clé privée
@@ -217,29 +242,32 @@ https://musical-space-cod-jjw7vrjqvg5q3j7vx-3000.app.github.dev
 
 ## 📊 Comparaison
 
-| Environnement | Extensions Wallet | window.solana | Connexion |
-|---------------|-------------------|---------------|-----------|
-| Chrome externe | ✅ Oui | ✅ Oui | ✅ Fonctionne |
-| Firefox externe | ✅ Oui | ✅ Oui | ✅ Fonctionne |
-| Brave externe | ✅ Oui | ✅ Oui | ✅ Fonctionne |
-| Simple Browser VS Code | ❌ Non | ❌ Non | ❌ Ne fonctionne pas |
-| Edge | ✅ Oui | ✅ Oui | ✅ Fonctionne |
+| Environnement          | Extensions Wallet | window.solana | Connexion            |
+| ---------------------- | ----------------- | ------------- | -------------------- |
+| Chrome externe         | ✅ Oui            | ✅ Oui        | ✅ Fonctionne        |
+| Firefox externe        | ✅ Oui            | ✅ Oui        | ✅ Fonctionne        |
+| Brave externe          | ✅ Oui            | ✅ Oui        | ✅ Fonctionne        |
+| Simple Browser VS Code | ❌ Non            | ❌ Non        | ❌ Ne fonctionne pas |
+| Edge                   | ✅ Oui            | ✅ Oui        | ✅ Fonctionne        |
 
 ---
 
 ## 🎯 Résumé Rapide
 
 ### Le Problème
+
 ```
 Simple Browser → Pas d'extensions → Pas de Phantom → Pas de connexion
 ```
 
 ### La Solution
+
 ```
 Chrome/Firefox → Extensions OK → Phantom détecté → Connexion OK ✅
 ```
 
 ### L'URL à Utiliser
+
 ```
 https://musical-space-cod-jjw7vrjqvg5q3j7vx-3000.app.github.dev
 ```
@@ -266,6 +294,7 @@ Avant de tester le swap, assure-toi que :
 ## 🎉 Une Fois Connecté
 
 Tu pourras enfin :
+
 - ✨ Voir ton adresse wallet dans l'app
 - 💰 Voir tes balances (SOL, USDC, BACK)
 - 🔄 Tester les swaps Jupiter

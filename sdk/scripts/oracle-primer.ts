@@ -11,7 +11,10 @@
  */
 
 import { Connection, clusterApiUrl } from "@solana/web3.js";
-import { OraclePriceService, formatOraclePrice } from "../src/services/OraclePriceService";
+import {
+  OraclePriceService,
+  formatOraclePrice,
+} from "../src/services/OraclePriceService";
 import type { OraclePriceData } from "../src/types/smart-router";
 
 const DEFAULT_MINTS = [
@@ -63,7 +66,10 @@ async function main(): Promise<void> {
       const formatted = formatOraclePrice(price);
       console.log("   Price:", formatted);
       console.log("   Provider:", price.provider);
-      console.log("   Publish Time:", new Date(price.publishTime).toISOString());
+      console.log(
+        "   Publish Time:",
+        new Date(price.publishTime).toISOString()
+      );
       console.log("   Age:", formatAge(price.publishTime));
       console.log("   Confidence:", formatConfidence(price));
     } catch (error) {

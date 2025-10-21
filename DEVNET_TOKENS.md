@@ -18,6 +18,7 @@
 - **Balance:** 1,000,000 $BACK
 
 **Explorer:**
+
 - [Solscan](https://solscan.io/token/BH8thpWca6kpN2pKwWTaKv2F5s4MEkbML18LtJ8eFypU?cluster=devnet)
 - [Solana Explorer](https://explorer.solana.com/address/BH8thpWca6kpN2pKwWTaKv2F5s4MEkbML18LtJ8eFypU?cluster=devnet)
 
@@ -33,6 +34,7 @@
 - **Balance:** 10,000 USDC
 
 **Explorer:**
+
 - [Solscan](https://solscan.io/token/3y4dCqwWuYx1B97YEDmgq9qjuNE1eyEwGx2eLgz6Rc6G?cluster=devnet)
 - [Solana Explorer](https://explorer.solana.com/address/3y4dCqwWuYx1B97YEDmgq9qjuNE1eyEwGx2eLgz6Rc6G?cluster=devnet)
 
@@ -41,12 +43,16 @@
 ## 📋 Programmes Déployés (Rappel)
 
 ### SwapBack Buyback Program
+
 **Program ID:** `71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW`
+
 - ✅ Déployé sur devnet
 - ⏳ À initialiser avec les tokens ci-dessus
 
 ### SwapBack cNFT Program
+
 **Program ID:** `HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf`
+
 - ✅ Déployé sur devnet
 - ⏳ À initialiser
 
@@ -57,11 +63,13 @@
 ### 1. Initialiser le Programme Buyback
 
 Le programme buyback nécessite :
+
 - `back_mint`: `BH8thpWca6kpN2pKwWTaKv2F5s4MEkbML18LtJ8eFypU`
 - `usdc_mint`: `3y4dCqwWuYx1B97YEDmgq9qjuNE1eyEwGx2eLgz6Rc6G`
 - `min_buyback_amount`: 100 USDC (100000000 en unités minimales)
 
 **Comptes créés automatiquement:**
+
 - `buyback_state` (PDA): État du programme
 - `usdc_vault` (PDA): Vault pour stocker les USDC
 
@@ -70,6 +78,7 @@ Le programme buyback nécessite :
 Modifier les fichiers suivants avec les nouvelles adresses :
 
 **SDK (`sdk/src/index.ts` ou config):**
+
 ```typescript
 export const DEVNET_CONFIG = {
   backMint: new PublicKey("BH8thpWca6kpN2pKwWTaKv2F5s4MEkbML18LtJ8eFypU"),
@@ -80,6 +89,7 @@ export const DEVNET_CONFIG = {
 ```
 
 **Frontend (`app/src/config.ts`):**
+
 ```typescript
 export const TOKENS = {
   BACK: {
@@ -98,6 +108,7 @@ export const TOKENS = {
 ### 3. Tester le Premier Swap
 
 Une fois le frontend mis à jour:
+
 1. Ouvrir http://localhost:3000
 2. Connecter le wallet `578DGN45PsuxySc4T5VsZKeJu2Q83L5coCWR47ZJkwQf`
 3. Essayer un swap USDC → $BACK avec:
@@ -109,6 +120,7 @@ Une fois le frontend mis à jour:
 ## 🔧 Commandes Utiles
 
 ### Vérifier les Balances
+
 ```bash
 # Balance $BACK
 spl-token balance BH8thpWca6kpN2pKwWTaKv2F5s4MEkbML18LtJ8eFypU --url devnet
@@ -121,6 +133,7 @@ solana balance --url devnet
 ```
 
 ### Mint Plus de Tokens (Si Nécessaire)
+
 ```bash
 # Mint 100,000 $BACK supplémentaires
 spl-token mint BH8thpWca6kpN2pKwWTaKv2F5s4MEkbML18LtJ8eFypU 100000 --url devnet
@@ -130,6 +143,7 @@ spl-token mint 3y4dCqwWuYx1B97YEDmgq9qjuNE1eyEwGx2eLgz6Rc6G 5000 --url devnet
 ```
 
 ### Vérifier les Programmes
+
 ```bash
 # Vérifier buyback program
 solana program show 71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW --url devnet
@@ -155,9 +169,11 @@ solana program show HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf --url devnet
 ## 💾 Fichiers de Configuration
 
 Les adresses des tokens sont sauvegardées dans:
+
 - `.devnet-tokens.json` (racine du projet)
 
 **Contenu actuel:**
+
 ```json
 {
   "backMint": "BH8thpWca6kpN2pKwWTaKv2F5s4MEkbML18LtJ8eFypU",

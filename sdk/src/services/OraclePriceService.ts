@@ -115,8 +115,8 @@ export class OraclePriceService {
     if (cached) {
       const cachedAge = Date.now() - (cached.publishTime ?? cached.timestamp);
       if (cachedAge < this.cacheExpiryMs) {
-      return cached;
-    }
+        return cached;
+      }
     }
 
     // Try Pyth first
@@ -207,8 +207,8 @@ export class OraclePriceService {
       const rawPrice = Number(priceData.price);
       const rawConfidence = Number(priceData.confidence || 0);
 
-  const price = rawPrice * Math.pow(10, exponent);
-  const confidence = rawConfidence * Math.pow(10, exponent);
+      const price = rawPrice * Math.pow(10, exponent);
+      const confidence = rawConfidence * Math.pow(10, exponent);
 
       // Validate confidence interval
       const confidencePercent =

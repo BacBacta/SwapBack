@@ -1,7 +1,7 @@
 /**
  * SwapStore Unit Tests
  * Tests Zustand state management for swap functionality
- * 
+ *
  * @vitest-environment jsdom
  */
 
@@ -83,12 +83,12 @@ describe("SwapStore", () => {
   beforeEach(() => {
     // Clear localStorage to avoid state leaking between tests
     window.localStorage.clear();
-    
+
     // Reset store to initial state
     useSwapStore.getState().reset();
     // Also manually clear history since reset() doesn't clear it
     useSwapStore.setState({ transactionHistory: [] });
-    
+
     // Clear all mocks
     vi.clearAllMocks();
   });
@@ -168,8 +168,13 @@ describe("SwapStore", () => {
     });
 
     it("should switch tokens", () => {
-      const { setInputToken, setOutputToken, setInputAmount, setOutputAmount, switchTokens } =
-        useSwapStore.getState();
+      const {
+        setInputToken,
+        setOutputToken,
+        setInputAmount,
+        setOutputAmount,
+        switchTokens,
+      } = useSwapStore.getState();
 
       // Setup initial state
       setInputToken(mockSOL);

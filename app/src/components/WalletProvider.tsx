@@ -27,11 +27,25 @@ const WalletStabilityManager: FC<{ children: ReactNode }> = ({ children }) => {
 export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
   // Configuration du réseau (devnet pour développement)
   const network = WalletAdapterNetwork.Devnet;
-  const endpoint = useMemo(() => clusterApiUrl(network), [network]);
+
+  // Utiliser RPC custom si disponible, sinon Helius, sinon clusterApiUrl
+  const endpoint = useMemo(() => {
+    if (process.env.NEXT_PUBLIC_RPC_URL) {
+      return process.env.NEXT_PUBLIC_RPC_URL;
+    }
+    if (process.env.NEXT_PUBLIC_HELIUS_API_KEY) {
+      return `https://devnet.helius-rpc.com/?api-key=${process.env.NEXT_PUBLIC_HELIUS_API_KEY}`;
+    }
+    return clusterApiUrl(network);
+  }, [network]);
 
   // Configuration des wallets supportés avec reconnexion automatique
   const wallets = useMemo(
-    () => [new PhantomWalletAdapter(), new SolflareWalletAdapter()],
+    () => [
+      new PhantomWalletAdapter(),
+      new SolflareWalletAdapter(),
+      // Backpack ajouté pour devnet testing
+    ],
     []
   );
 
@@ -41,8 +55,11 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
       commitment: "confirmed" as const,
       confirmTransactionInitialTimeout: 60000, // 60 secondes
       disableRetryOnRateLimit: false,
+      wsEndpoint: endpoint
+        .replace("https://", "wss://")
+        .replace("http://", "ws://"),
     }),
-    []
+    [endpoint]
   );
 
   return (

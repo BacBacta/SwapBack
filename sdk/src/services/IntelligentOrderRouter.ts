@@ -1,4 +1,8 @@
-import { LiquidityDataCollector, calculatePriceImpact, estimateAMMOutput } from "./LiquidityDataCollector";
+import {
+  LiquidityDataCollector,
+  calculatePriceImpact,
+  estimateAMMOutput,
+} from "./LiquidityDataCollector";
 import { RouteOptimizationEngine } from "./RouteOptimizationEngine";
 import {
   AtomicSwapLeg,
@@ -130,7 +134,8 @@ export class IntelligentOrderRouter {
       throw new Error("Input amount must be greater than zero");
     }
 
-    const quoteValidityMs = params.quoteValidityMs ?? this.options.quoteValidityMs;
+    const quoteValidityMs =
+      params.quoteValidityMs ?? this.options.quoteValidityMs;
     const maxSlippageBps = params.maxSlippageBps ?? this.options.maxSlippageBps;
     const samplePoints = params.samplePoints ?? this.options.samplePoints;
     const sampleStrategy = params.sampleStrategy ?? this.options.sampleStrategy;
@@ -142,7 +147,8 @@ export class IntelligentOrderRouter {
     const optimizationConfig: Partial<OptimizationConfig> = {
       ...this.options.optimizationDefaults,
       ...(params.optimization ?? {}),
-      slippageTolerance: (params.maxSlippageBps ?? this.options.maxSlippageBps) / 10_000,
+      slippageTolerance:
+        (params.maxSlippageBps ?? this.options.maxSlippageBps) / 10_000,
     };
 
     const aggregated = await this.liquidityCollector.fetchAggregatedLiquidity(
@@ -155,10 +161,16 @@ export class IntelligentOrderRouter {
       throw new Error("No liquidity sources available for the requested pair");
     }
 
-    const sampleSizes = this.buildSampleSizes(params.inputAmount, samplePoints, sampleStrategy);
+    const sampleSizes = this.buildSampleSizes(
+      params.inputAmount,
+      samplePoints,
+      sampleStrategy
+    );
 
     const simulations = await Promise.all(
-      aggregated.sources.map((source) => this.simulateVenue(source, sampleSizes))
+      aggregated.sources.map((source) =>
+        this.simulateVenue(source, sampleSizes)
+      )
     );
 
     const routes = await this.optimizer.findOptimalRoutes(
@@ -174,14 +186,19 @@ export class IntelligentOrderRouter {
 
     const now = Date.now();
 
-    const liquiditySnapshot = aggregated.sources.reduce<AtomicSwapPlan["liquiditySnapshot"]>((acc, source) => {
-      acc[source.venue] = {
-        effectivePrice: source.effectivePrice,
-        depth: source.depth,
-        timestamp: source.timestamp,
-      };
-      return acc;
-    }, {} as AtomicSwapPlan["liquiditySnapshot"]);
+    const liquiditySnapshot = aggregated.sources.reduce<
+      AtomicSwapPlan["liquiditySnapshot"]
+    >(
+      (acc, source) => {
+        acc[source.venue] = {
+          effectivePrice: source.effectivePrice,
+          depth: source.depth,
+          timestamp: source.timestamp,
+        };
+        return acc;
+      },
+      {} as AtomicSwapPlan["liquiditySnapshot"]
+    );
     const fallbackDepth = Math.min(routes.length, 3);
     const candidateRoutes = routes.slice(0, Math.max(fallbackDepth, 1));
 
@@ -224,11 +241,20 @@ export class IntelligentOrderRouter {
       liquiditySnapshot: AtomicSwapPlan["liquiditySnapshot"];
     }
   ): AtomicSwapPlan {
-    const { createdAt, quoteValidityMs, maxSlippageBps, rebalanceCfg, simulations, liquiditySnapshot } =
-      context;
+    const {
+      createdAt,
+      quoteValidityMs,
+      maxSlippageBps,
+      rebalanceCfg,
+      simulations,
+      liquiditySnapshot,
+    } = context;
 
     const legs = this.buildLegsFromRoute(route, simulations, maxSlippageBps);
-    const expectedOutput = legs.reduce((sum, leg) => sum + leg.expectedOutput, 0);
+    const expectedOutput = legs.reduce(
+      (sum, leg) => sum + leg.expectedOutput,
+      0
+    );
     const minOutput = legs.reduce((sum, leg) => sum + leg.minOutput, 0);
 
     return {
@@ -296,7 +322,8 @@ export class IntelligentOrderRouter {
     handler: PlanUpdateHandler = () => undefined
   ): PlanMonitor {
     const pollInterval =
-      overrides.rebalance?.pollIntervalMs ?? this.options.rebalance.pollIntervalMs;
+      overrides.rebalance?.pollIntervalMs ??
+      this.options.rebalance.pollIntervalMs;
 
     const mergedOverrides: Partial<BuildPlanParams> = {
       inputMint: overrides.inputMint ?? plan.inputMint,
@@ -360,8 +387,12 @@ export class IntelligentOrderRouter {
         continue;
       }
 
-      const priceDriftBps = this.computeDriftBps(baseline.effectivePrice, latestSource.effectivePrice);
-      const liquidityRatio = latestSource.depth === 0 ? 0 : latestSource.depth / baseline.depth;
+      const priceDriftBps = this.computeDriftBps(
+        baseline.effectivePrice,
+        latestSource.effectivePrice
+      );
+      const liquidityRatio =
+        latestSource.depth === 0 ? 0 : latestSource.depth / baseline.depth;
       const stalenessMs = now - latestSource.timestamp;
 
       diffs.push({
@@ -387,14 +418,17 @@ export class IntelligentOrderRouter {
       }
     }
 
-    const snapshot = latest.sources.reduce<AtomicSwapPlan["liquiditySnapshot"]>((acc, source) => {
-      acc[source.venue] = {
-        effectivePrice: source.effectivePrice,
-        depth: source.depth,
-        timestamp: source.timestamp,
-      };
-      return acc;
-    }, {} as AtomicSwapPlan["liquiditySnapshot"]);
+    const snapshot = latest.sources.reduce<AtomicSwapPlan["liquiditySnapshot"]>(
+      (acc, source) => {
+        acc[source.venue] = {
+          effectivePrice: source.effectivePrice,
+          depth: source.depth,
+          timestamp: source.timestamp,
+        };
+        return acc;
+      },
+      {} as AtomicSwapPlan["liquiditySnapshot"]
+    );
 
     return {
       shouldRebalance,
@@ -411,14 +445,17 @@ export class IntelligentOrderRouter {
     source: LiquiditySource,
     sampleSizes: number[]
   ): Promise<VenueSimulationResult> {
-    const samples: VenueQuoteSample[] = sampleSizes.map((size) => this.simulateSourceOutput(source, size));
+    const samples: VenueQuoteSample[] = sampleSizes.map((size) =>
+      this.simulateSourceOutput(source, size)
+    );
 
     if (!samples.length) {
       throw new Error(`No quote samples generated for venue ${source.venue}`);
     }
 
     const bestSample = samples.reduce(
-      (best, current) => (current.effectivePrice < best.effectivePrice ? current : best),
+      (best, current) =>
+        current.effectivePrice < best.effectivePrice ? current : best,
       samples[0]
     );
 
@@ -432,7 +469,10 @@ export class IntelligentOrderRouter {
     };
   }
 
-  private simulateSourceOutput(source: LiquiditySource, inputAmount: number): VenueQuoteSample {
+  private simulateSourceOutput(
+    source: LiquiditySource,
+    inputAmount: number
+  ): VenueQuoteSample {
     if (inputAmount <= 0) {
       return {
         inputAmount,
@@ -455,13 +495,27 @@ export class IntelligentOrderRouter {
       const askPrice = source.topOfBook.askPrice;
       outputAmount = inputAmount / (askPrice * (1 + config.feeRate));
       effectivePrice = inputAmount / outputAmount;
-      slippagePercent = inputAmount > source.topOfBook.askSize ? source.slippagePercent * (inputAmount / source.topOfBook.askSize) : source.slippagePercent;
+      slippagePercent =
+        inputAmount > source.topOfBook.askSize
+          ? source.slippagePercent * (inputAmount / source.topOfBook.askSize)
+          : source.slippagePercent;
       postTradeLiquidity = Math.max(source.depth - inputAmount, 0);
       feeAmount = outputAmount * config.feeRate;
     } else if (source.venueType === VenueType.AMM && source.reserves) {
-      outputAmount = estimateAMMOutput(inputAmount, source.reserves.input, source.reserves.output, config.feeRate);
-      effectivePrice = inputAmount / Math.max(outputAmount, this.options.epsilonAmount);
-      slippagePercent = calculatePriceImpact(inputAmount, source.reserves.input, source.reserves.output, config.feeRate);
+      outputAmount = estimateAMMOutput(
+        inputAmount,
+        source.reserves.input,
+        source.reserves.output,
+        config.feeRate
+      );
+      effectivePrice =
+        inputAmount / Math.max(outputAmount, this.options.epsilonAmount);
+      slippagePercent = calculatePriceImpact(
+        inputAmount,
+        source.reserves.input,
+        source.reserves.output,
+        config.feeRate
+      );
       postTradeLiquidity = Math.max(source.reserves.output - outputAmount, 0);
     } else {
       outputAmount = inputAmount / source.effectivePrice;
@@ -471,10 +525,20 @@ export class IntelligentOrderRouter {
     }
 
     const delta = Math.max(inputAmount * 0.01, this.options.epsilonAmount);
-    const bumpedOutput = source.venueType === VenueType.AMM && source.reserves
-      ? estimateAMMOutput(inputAmount + delta, source.reserves.input, source.reserves.output, config.feeRate)
-      : (inputAmount + delta) / Math.max(source.effectivePrice, this.options.epsilonAmount);
-    const marginalOutput = Math.max(bumpedOutput - outputAmount, this.options.epsilonAmount);
+    const bumpedOutput =
+      source.venueType === VenueType.AMM && source.reserves
+        ? estimateAMMOutput(
+            inputAmount + delta,
+            source.reserves.input,
+            source.reserves.output,
+            config.feeRate
+          )
+        : (inputAmount + delta) /
+          Math.max(source.effectivePrice, this.options.epsilonAmount);
+    const marginalOutput = Math.max(
+      bumpedOutput - outputAmount,
+      this.options.epsilonAmount
+    );
     const marginalPrice = delta / marginalOutput;
 
     return {
@@ -498,11 +562,14 @@ export class IntelligentOrderRouter {
 
     for (const split of route.splits) {
       const simulation = simulations.find((sim) => sim.venue === split.venue);
-      const sample = simulation ? this.selectSample(simulation.samples, split.inputAmount) : undefined;
+      const sample = simulation
+        ? this.selectSample(simulation.samples, split.inputAmount)
+        : undefined;
 
       const expectedOutput = sample?.outputAmount ?? split.expectedOutput;
       const feeAmount = sample?.feeAmount ?? split.liquiditySource.feeAmount;
-      const slippagePercent = sample?.slippagePercent ?? split.liquiditySource.slippagePercent;
+      const slippagePercent =
+        sample?.slippagePercent ?? split.liquiditySource.slippagePercent;
       const minOutput = expectedOutput * slippageMultiplier;
 
       legs.push({
@@ -552,7 +619,10 @@ export class IntelligentOrderRouter {
     return unique.sort((a, b) => a - b);
   }
 
-  private selectSample(samples: VenueQuoteSample[], inputAmount: number): VenueQuoteSample | undefined {
+  private selectSample(
+    samples: VenueQuoteSample[],
+    inputAmount: number
+  ): VenueQuoteSample | undefined {
     if (!samples.length) {
       return undefined;
     }

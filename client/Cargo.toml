@@ -10,12 +10,12 @@ path = "src/main.rs"
 
 [dependencies]
 # Solana dependencies
-solana-client = "1.18"
-solana-sdk = "1.18"
-solana-program = "1.18"
+solana-client = "=1.18.22"
+solana-sdk = { workspace = true }
+solana-program = { workspace = true }
 
-# Pyth oracle
-pyth-sdk-solana = "0.10"
+# Pyth oracle - DÉSACTIVÉ pour éviter conflit versions
+# pyth-sdk-solana = "0.10"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

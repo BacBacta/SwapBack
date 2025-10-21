@@ -39,11 +39,16 @@
     "husky": "^9.1.7",
     "jsdom": "^27.0.0",
     "prettier": "^3.0.0",
+    "solana-bankrun": "^0.4.0",
     "typescript": "^5.0.0",
     "vitest": "^3.2.4"
   },
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=9.0.0"
+  },
+  "dependencies": {
+    "@metaplex-foundation/mpl-bubblegum": "^5.0.2",
+    "next": "14.2.33"
   }
 }

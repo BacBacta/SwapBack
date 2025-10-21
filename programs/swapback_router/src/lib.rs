@@ -1,13 +1,15 @@
-#![allow(unexpected_cfgs)]
-
 use anchor_lang::prelude::*;
 use anchor_spl::token;
 
 mod cpi_orca;
 mod oracle;
 
-// Program ID generated locally for deployment
-declare_id!("Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa");
+// Custom getrandom stub for Solana BPF target
+#[cfg(target_os = "solana")]
+mod getrandom_stub;
+
+// Program ID déployé sur devnet - 19 Oct 2025
+declare_id!("3Z295H9QHByYn9sHm3tH7ASHitwd2Y4AEaXUddfhQKap");
 
 // DEX Program IDs (example - would need to be updated with actual deployed programs)
 pub const RAYDIUM_AMM_PROGRAM_ID: Pubkey = pubkey!("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8");
@@ -39,6 +41,10 @@ pub mod swapback_router {
         plan_data: CreatePlanArgs,
     ) -> Result<()> {
         create_plan_processor::process_create_plan(ctx, plan_id, plan_data)
+    }
+
+    pub fn swap_toc(ctx: Context<SwapToC>, args: SwapArgs) -> Result<()> {
+        swap_toc_processor::process_swap_toc(ctx, args)
     }
 }
 
@@ -224,6 +230,9 @@ pub enum ErrorCode {
     #[msg("Unauthorized access to swap plan")]
     UnauthorizedPlanAccess,
     #[msg("Unknown DEX or not yet implemented")]
+    UnknownDex,
+    #[msg("Invalid token account")]
+    InvalidTokenAccount,
     DexNotImplemented,
     #[msg("DEX execution failed")]
     DexExecutionFailed,
@@ -494,12 +503,7 @@ pub mod swap_toc_processor {
                 err!(ErrorCode::DexNotImplemented)
             }
             ORCA_WHIRLPOOL_PROGRAM_ID => {
-                let amount_out = cpi_orca::swap(
-                    ctx,
-                    account_slice,
-                    amount_in,
-                    min_out,
-                )?;
+                let amount_out = cpi_orca::swap(ctx, account_slice, amount_in, min_out)?;
                 emit!(VenueExecuted {
                     venue: dex_program,
                     amount_in,
@@ -608,18 +612,6 @@ pub mod swap_toc_processor {
         }
 
         Ok(())
-    }
-
-    fn process_bundled_swap(ctx: &Context<SwapToC>, args: SwapArgs, clock: &Clock) -> Result<()> {
-        let n_instructions = if args.use_dynamic_plan { 5u8 } else { 2u8 };
-        let priority_fee = 100_000u64;
-
-        emit!(BundleHint {
-            priority_fee,
-            n_instructions,
-        });
-
-        process_dynamic_plan_swap(ctx, args, &clock)
     }
 
     fn process_twap_swap(

@@ -7,11 +7,13 @@
 **Total Tests: 156 passing** ✅✅✅
 
 #### SDK Services Coverage
+
 ```
 SDK Services:  85.22% statements | 82.83% branches | 76.05% functions
 ```
 
 **Achievements:**
+
 - ✅ OraclePriceService: **88.99%** (target >85%) - **30 tests**
 - ✅ SwapExecutor: **96.28%** (target >85%) - **8 tests**
 - ✅ RouteOptimizationEngine: **83.26%** (target >80%) - **14 tests**
@@ -19,11 +21,13 @@ SDK Services:  85.22% statements | 82.83% branches | 76.05% functions
 - ⚠️ LiquidityDataCollector: **77.85%** (target >80%) - **9 tests** (close to target)
 
 #### Frontend Coverage
+
 ```
 Frontend Core:  ~94% average for tested modules
 ```
 
 **Achievements:**
+
 - ✅ swapStore: **100% statements, 96% branches, 100% functions** - **31 tests** 🎉
 - ✅ /api/swap route: **100%** coverage - **15 tests**
 - ✅ /api/execute route: **88.46%** coverage - **8 tests**
@@ -32,14 +36,17 @@ Frontend Core:  ~94% average for tested modules
 **Total Tests:** 156 (all passing)
 
 ### Global Coverage (All Files Including Untested)
+
 ```
 All files:  13.17% statements | 72.27% branches | 56.86% functions
 ```
+
 Note: Global coverage includes build artifacts, configs, and UI components not yet tested.
 
 ### SDK Services Coverage (Tested)
 
 #### ✅ Well Covered (>85%)
+
 1. **OraclePriceService** (`sdk/src/services/OraclePriceService.ts`) - ✅ **COMPLETED**
    - **Statements: 88.99%** (+30.50% from baseline 58.49%)
    - Branches: 83.12%
@@ -89,6 +96,7 @@ Note: Global coverage includes build artifacts, configs, and UI components not y
    - pyth-feeds.ts: 71.66% (missing: Lines 50-72)
 
 #### ⚠️ Needs Improvement (60-80%)
+
 1. **LiquidityDataCollector** (`sdk/src/services/LiquidityDataCollector.ts`)
    - Statements: 77.85%
    - Branches: 68%
@@ -100,6 +108,7 @@ Note: Global coverage includes build artifacts, configs, and UI components not y
 ### Frontend Coverage (New in Phase 9)
 
 #### ✅ Excellently Covered (>90%)
+
 1. **swapStore** (`app/src/store/swapStore.ts`) - ✅ **EXCEPTIONAL**
    - **Statements: 100%** 🎉
    - **Branches: 96%**
@@ -138,6 +147,7 @@ Note: Global coverage includes build artifacts, configs, and UI components not y
 ### Untested Areas (0% coverage)
 
 #### Frontend (Next.js App)
+
 - `/app/src/components/`: 0% (all React components)
   - EnhancedSwapInterface.tsx
   - TransactionTracker.tsx
@@ -164,6 +174,7 @@ Note: Global coverage includes build artifacts, configs, and UI components not y
   - /api/execute/route.ts: 0% (❌ needs API tests)
 
 #### Other
+
 - `oracle/src/`: 0% (price oracle server)
 - `browser-extension/`: 0% (Chrome extension)
 - `programs/`: 0% (Solana programs - requires Anchor tests)
@@ -173,9 +184,11 @@ Note: Global coverage includes build artifacts, configs, and UI components not y
 ## 🎯 Phase 9 Goals
 
 ### Goal 1: Bring SDK to >80% Coverage
+
 **Target**: All SDK services >80% statements
 
 **Action Items**:
+
 1. ✅ **CircuitBreaker**: Already at 95.38% ✓
 2. ✅ **SwapExecutor**: Already at 96.28% ✓
 3. ✅ **RouteOptimizationEngine**: Already at 83.26% ✓
@@ -187,7 +200,9 @@ Note: Global coverage includes build artifacts, configs, and UI components not y
    - Add tests for: getPriceWithConfidence(), batch price fetching
 
 ### Goal 2: Add Frontend Tests (Target >60%)
+
 **Priority Components**:
+
 1. **swapStore.ts** (Zustand)
    - Test actions: setInputToken, fetchRoutes, selectRoute, executeSwap
    - Test state updates and persistence
@@ -210,7 +225,9 @@ Note: Global coverage includes build artifacts, configs, and UI components not y
    - Use Vitest + React Testing Library
 
 ### Goal 3: CI/CD Pipeline
+
 **Deliverables**:
+
 1. `.github/workflows/test.yml`
    - Trigger: on push to main, on PR
    - Steps: checkout → setup Node 20 → npm install → npm test
@@ -241,43 +258,43 @@ Note: Global coverage includes build artifacts, configs, and UI components not y
 
 ```typescript
 // Switchboard Integration (missing ~150 lines)
-describe('Switchboard Fallback - Complete', () => {
-  test('should parse Switchboard aggregator data correctly', async () => {
+describe("Switchboard Fallback - Complete", () => {
+  test("should parse Switchboard aggregator data correctly", async () => {
     // Mock AccountInfo with real Switchboard data structure
     // Test decimal conversion, confidence calculation
   });
 
-  test('should handle Switchboard stale data (>60s)', async () => {
+  test("should handle Switchboard stale data (>60s)", async () => {
     // Mock old timestamp
     // Expect fallback to Pyth or error
   });
 
-  test('should validate Switchboard confidence interval', async () => {
+  test("should validate Switchboard confidence interval", async () => {
     // Mock high variance data
     // Expect rejection if >2%
   });
 });
 
 // Batch Price Fetching
-describe('Batch Operations', () => {
-  test('should fetch multiple token prices in parallel', async () => {
+describe("Batch Operations", () => {
+  test("should fetch multiple token prices in parallel", async () => {
     // Test getPrice() for 5 tokens simultaneously
     // Verify caching efficiency
   });
 
-  test('should handle partial failures in batch fetch', async () => {
+  test("should handle partial failures in batch fetch", async () => {
     // Mock 2 success, 1 failure
     // Expect graceful degradation
   });
 });
 
 // Price Confidence
-describe('getPriceWithConfidence()', () => {
-  test('should return price with confidence interval', async () => {
+describe("getPriceWithConfidence()", () => {
+  test("should return price with confidence interval", async () => {
     // Expect { price, confidence, source }
   });
 
-  test('should prioritize CLOB over AMM prices', async () => {
+  test("should prioritize CLOB over AMM prices", async () => {
     // Mock both sources
     // Verify CLOB chosen
   });
@@ -290,31 +307,31 @@ describe('getPriceWithConfidence()', () => {
 
 ```typescript
 // RFQ Timeout Scenarios
-describe('RFQ Aggregator Edge Cases', () => {
-  test('should timeout Jupiter API after 5s', async () => {
+describe("RFQ Aggregator Edge Cases", () => {
+  test("should timeout Jupiter API after 5s", async () => {
     // Mock slow response
     // Expect fallback to cached data
   });
 
-  test('should retry Jupiter API on network error', async () => {
+  test("should retry Jupiter API on network error", async () => {
     // Mock fetch failure, then success
     // Verify exponential backoff
   });
 
-  test('should parse Jupiter route splits correctly', async () => {
+  test("should parse Jupiter route splits correctly", async () => {
     // Mock complex split route
     // Verify percentage calculation
   });
 });
 
 // Liquidity Aggregation
-describe('Multi-Venue Aggregation', () => {
-  test('should merge liquidity from 5+ venues', async () => {
+describe("Multi-Venue Aggregation", () => {
+  test("should merge liquidity from 5+ venues", async () => {
     // Mock Orca, Raydium, Phoenix, Jupiter, Meteora
     // Verify correct sorting by liquidity
   });
 
-  test('should filter out venues below minTradeSize', async () => {
+  test("should filter out venues below minTradeSize", async () => {
     // Mock $1M trade, $100K min
     // Expect small venues excluded
   });
@@ -326,56 +343,58 @@ describe('Multi-Venue Aggregation', () => {
 **File**: `app/tests/swapStore.test.ts` (NEW)
 
 ```typescript
-import { describe, test, expect, beforeEach, vi } from 'vitest';
-import { useSwapStore } from '@/store/swapStore';
+import { describe, test, expect, beforeEach, vi } from "vitest";
+import { useSwapStore } from "@/store/swapStore";
 
-describe('SwapStore', () => {
+describe("SwapStore", () => {
   beforeEach(() => {
     useSwapStore.getState().reset();
     vi.clearAllMocks();
   });
 
-  describe('Token Selection', () => {
-    test('should set input token', () => {
+  describe("Token Selection", () => {
+    test("should set input token", () => {
       const { setInputToken } = useSwapStore.getState();
-      const token = { mint: 'SOL', symbol: 'SOL', decimals: 9 };
+      const token = { mint: "SOL", symbol: "SOL", decimals: 9 };
       setInputToken(token);
       expect(useSwapStore.getState().swap.inputToken).toEqual(token);
     });
 
-    test('should switch tokens', () => {
-      const { setInputToken, setOutputToken, switchTokens } = useSwapStore.getState();
-      setInputToken({ mint: 'SOL', symbol: 'SOL', decimals: 9 });
-      setOutputToken({ mint: 'USDC', symbol: 'USDC', decimals: 6 });
+    test("should switch tokens", () => {
+      const { setInputToken, setOutputToken, switchTokens } =
+        useSwapStore.getState();
+      setInputToken({ mint: "SOL", symbol: "SOL", decimals: 9 });
+      setOutputToken({ mint: "USDC", symbol: "USDC", decimals: 6 });
       switchTokens();
-      expect(useSwapStore.getState().swap.inputToken.symbol).toBe('USDC');
-      expect(useSwapStore.getState().swap.outputToken.symbol).toBe('SOL');
+      expect(useSwapStore.getState().swap.inputToken.symbol).toBe("USDC");
+      expect(useSwapStore.getState().swap.outputToken.symbol).toBe("SOL");
     });
   });
 
-  describe('Route Fetching', () => {
-    test('should fetch routes from API', async () => {
+  describe("Route Fetching", () => {
+    test("should fetch routes from API", async () => {
       global.fetch = vi.fn(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ routes: [{ id: '1', expectedOutput: 100 }] }),
+          json: () =>
+            Promise.resolve({ routes: [{ id: "1", expectedOutput: 100 }] }),
         })
       );
 
       const { setInputToken, setOutputToken, setInputAmount, fetchRoutes } =
         useSwapStore.getState();
-      setInputToken({ mint: 'SOL', symbol: 'SOL', decimals: 9 });
-      setOutputToken({ mint: 'USDC', symbol: 'USDC', decimals: 6 });
-      setInputAmount('10');
+      setInputToken({ mint: "SOL", symbol: "SOL", decimals: 9 });
+      setOutputToken({ mint: "USDC", symbol: "USDC", decimals: 6 });
+      setInputAmount("10");
 
       await fetchRoutes();
 
       expect(useSwapStore.getState().routes.routes).toHaveLength(1);
-      expect(useSwapStore.getState().routes.selectedRoute.id).toBe('1');
+      expect(useSwapStore.getState().routes.selectedRoute.id).toBe("1");
     });
 
-    test('should handle fetch error', async () => {
-      global.fetch = vi.fn(() => Promise.reject(new Error('Network error')));
+    test("should handle fetch error", async () => {
+      global.fetch = vi.fn(() => Promise.reject(new Error("Network error")));
 
       const { fetchRoutes } = useSwapStore.getState();
       await fetchRoutes();
@@ -389,16 +408,16 @@ describe('SwapStore', () => {
 **File**: `app/tests/api-swap.test.ts` (NEW)
 
 ```typescript
-import { describe, test, expect, vi } from 'vitest';
-import { POST, GET } from '@/app/api/swap/route';
+import { describe, test, expect, vi } from "vitest";
+import { POST, GET } from "@/app/api/swap/route";
 
-describe('API /api/swap', () => {
-  describe('POST', () => {
-    test('should return routes for valid input', async () => {
+describe("API /api/swap", () => {
+  describe("POST", () => {
+    test("should return routes for valid input", async () => {
       const request = {
         json: async () => ({
-          inputMint: 'SOL',
-          outputMint: 'USDC',
+          inputMint: "SOL",
+          outputMint: "USDC",
           inputAmount: 100,
         }),
       };
@@ -410,9 +429,9 @@ describe('API /api/swap', () => {
       expect(data.routes.length).toBeGreaterThan(0);
     });
 
-    test('should return 400 for missing fields', async () => {
+    test("should return 400 for missing fields", async () => {
       const request = {
-        json: async () => ({ inputMint: 'SOL' }), // Missing outputMint
+        json: async () => ({ inputMint: "SOL" }), // Missing outputMint
       };
 
       const response = await POST(request as any);
@@ -420,12 +439,12 @@ describe('API /api/swap', () => {
     });
   });
 
-  describe('GET', () => {
-    test('should return health check', async () => {
+  describe("GET", () => {
+    test("should return health check", async () => {
       const response = await GET();
       const data = await response.json();
 
-      expect(data.status).toBe('ok');
+      expect(data.status).toBe("ok");
       expect(data.currentSlot).toBeGreaterThan(0);
     });
   });
@@ -437,16 +456,19 @@ describe('API /api/swap', () => {
 ## 🚀 Implementation Order
 
 ### Week 1: SDK Coverage >80%
+
 - [ ] Day 1-2: OraclePriceService tests (target 85%)
 - [ ] Day 3: LiquidityDataCollector tests (target 82%)
 - [ ] Day 4: Run coverage report, verify >80% overall
 
 ### Week 2: Frontend Tests
+
 - [ ] Day 5: SwapStore tests (Zustand)
 - [ ] Day 6: API route tests (/api/swap, /api/execute)
 - [ ] Day 7: WebSocket service tests
 
 ### Week 3: CI/CD
+
 - [ ] Day 8: GitHub Actions workflows
 - [ ] Day 9: Pre-commit hooks (Husky)
 - [ ] Day 10: Coverage badges + documentation
@@ -456,6 +478,7 @@ describe('API /api/swap', () => {
 ## 📊 Success Metrics
 
 ### Phase 9 Complete When:
+
 1. ✅ SDK services all >80% coverage
 2. ✅ Frontend critical paths >60% coverage
 3. ✅ CI/CD pipeline running (GitHub Actions)
@@ -464,6 +487,7 @@ describe('API /api/swap', () => {
 6. ✅ All 85 tests still passing
 
 ### Stretch Goals:
+
 - Frontend >70% coverage
 - E2E tests with Playwright
 - Performance benchmarks in CI

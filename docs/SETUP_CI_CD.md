@@ -3,23 +3,27 @@
 ## 📋 Checklist Setup
 
 ### 1. GitHub Actions Workflows ✅ FAIT
+
 - [x] `.github/workflows/test.yml` créé
 - [x] `.github/workflows/build.yml` créé
 - [ ] Workflows testés en push
 - [ ] Secrets configurés
 
 ### 2. Codecov Integration
+
 - [ ] Créer compte sur https://codecov.io
 - [ ] Ajouter repository SwapBack
 - [ ] Copier upload token
 - [ ] Ajouter secret `CODECOV_TOKEN` dans GitHub
 
 ### 3. Pre-commit Hooks ✅ FAIT
+
 - [x] `.husky/pre-commit` créé
 - [ ] Husky installé (`npm install --save-dev husky`)
 - [ ] Testé avec commit local
 
 ### 4. README Badges
+
 - [ ] Codecov badge
 - [ ] GitHub Actions Test badge
 - [ ] GitHub Actions Build badge
@@ -41,6 +45,7 @@ git push origin main
 ```
 
 **Résultat attendu**:
+
 - `build.yml` devrait passer ✅
 - `test.yml` échouera sur Codecov (token manquant) ⚠️
 
@@ -49,22 +54,26 @@ git push origin main
 ### Étape 2: Setup Codecov
 
 #### 2.1 Créer Compte Codecov
+
 1. Aller sur https://codecov.io
 2. "Sign Up with GitHub"
 3. Autoriser Codecov
 
 #### 2.2 Ajouter Repository
+
 1. Dashboard Codecov → "Add Repository"
 2. Chercher "SwapBack"
 3. Activer integration
 
 #### 2.3 Obtenir Token
+
 ```
 Settings → Repository Settings → Upload Token
 Copier: ccov_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 #### 2.4 Ajouter Secret GitHub
+
 1. GitHub repo → `Settings` → `Secrets and variables` → `Actions`
 2. "New repository secret"
 3. Name: `CODECOV_TOKEN`
@@ -72,6 +81,7 @@ Copier: ccov_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 5. "Add secret"
 
 #### 2.5 Re-run Workflow
+
 ```bash
 # Option 1: Re-run failed job dans GitHub Actions UI
 # Option 2: Push dummy commit
@@ -103,6 +113,7 @@ npm pkg set scripts.prepare="husky install"
 ```
 
 #### Tester Pre-commit Hook
+
 ```bash
 # Créer changement de test
 echo "// test" >> sdk/src/index.ts
@@ -123,10 +134,12 @@ git commit -m "test: pre-commit hook"
 ### Étape 4: Ajouter Badges au README
 
 #### 4.1 Identifier Repository
+
 - Repository: `BacBacta/SwapBack` (remplacer par votre username/org)
 - Branch: `main`
 
 #### 4.2 Créer Badges
+
 Ajouter en haut du `README.md`:
 
 ```markdown
@@ -142,16 +155,19 @@ Ajouter en haut du `README.md`:
 #### 4.3 Options de Badge Codecov
 
 **Badge Simple**:
+
 ```markdown
 [![codecov](https://codecov.io/gh/BacBacta/SwapBack/branch/main/graph/badge.svg)](https://codecov.io/gh/BacBacta/SwapBack)
 ```
 
 **Badge avec Token (privé)**:
+
 ```markdown
 [![codecov](https://codecov.io/gh/BacBacta/SwapBack/branch/main/graph/badge.svg?token=YOUR_BADGE_TOKEN)](https://codecov.io/gh/BacBacta/SwapBack)
 ```
 
 **Badge Personnalisé**:
+
 ```markdown
 [![codecov](https://codecov.io/gh/BacBacta/SwapBack/branch/main/graphs/badge.svg?flag=sdk)](https://codecov.io/gh/BacBacta/SwapBack)
 ```
@@ -161,6 +177,7 @@ Ajouter en haut du `README.md`:
 ## 📊 Vérification Post-Setup
 
 ### Checklist Finale
+
 - [ ] Push déclenche workflows automatiquement
 - [ ] `test.yml` exécute 178 tests
 - [ ] `test.yml` upload coverage sur Codecov
@@ -190,6 +207,7 @@ npm test -- --coverage
 ```
 
 ### URLs à Vérifier
+
 - **GitHub Actions**: `https://github.com/BacBacta/SwapBack/actions`
 - **Codecov Dashboard**: `https://codecov.io/gh/BacBacta/SwapBack`
 - **README Badges**: `https://github.com/BacBacta/SwapBack#readme`
@@ -199,21 +217,27 @@ npm test -- --coverage
 ## 🔧 Troubleshooting
 
 ### Problème: test.yml échoue sur coverage threshold
+
 **Solution**: Vérifier que coverage >70% localement
+
 ```bash
 npm test -- --coverage | grep "All files"
 # Si <70% → ajouter tests
 ```
 
 ### Problème: build.yml échoue sur dependencies
+
 **Solution**: Vérifier package-lock.json est commit
+
 ```bash
 git add package-lock.json app/package-lock.json sdk/package-lock.json
 git commit -m "chore: Add package-lock.json"
 ```
 
 ### Problème: Pre-commit hook ne s'exécute pas
+
 **Solution**: Réinstaller Husky
+
 ```bash
 rm -rf .husky
 npx husky install
@@ -222,22 +246,27 @@ git commit --amend --no-edit  # Re-trigger hook
 ```
 
 ### Problème: Codecov badge ne s'affiche pas
+
 **Solution**: Vérifier repository visibility
+
 - Repository public → badge marche automatiquement
 - Repository privé → utiliser badge token
+
 ```markdown
 [![codecov](https://codecov.io/gh/BacBacta/SwapBack/branch/main/graph/badge.svg?token=BADGE_TOKEN)](...)
 ```
 
 ### Problème: Workflows ne se déclenchent pas
+
 **Solution**: Vérifier triggers et permissions
+
 ```yaml
 # .github/workflows/test.yml
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 permissions:
   contents: read
@@ -285,6 +314,7 @@ curl -s https://codecov.io/api/gh/BacBacta/SwapBack/commits \
 ## ✅ Conclusion
 
 Une fois setup complet:
+
 - ✅ CI/CD automatique sur push/PR
 - ✅ Coverage monitoring avec Codecov
 - ✅ Pre-commit hooks préviennent regressions

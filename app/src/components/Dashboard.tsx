@@ -6,24 +6,28 @@ import { CNFTCard } from "./CNFTCard";
 import { useCNFT } from "../hooks/useCNFT";
 import { useRealtimeStats } from "../hooks/useRealtimeStats";
 import { VolumeChart, ActivityChart } from "./Charts";
-import { SkeletonLoader, ChartSkeleton } from "./Skeletons";
+import { SkeletonLoader } from "./Skeletons";
 import { NoActivityState, NoConnectionState } from "./EmptyState";
 
 export const Dashboard = () => {
   const { connected, publicKey } = useWallet();
-  const [activeTab, setActiveTab] = useState<"overview" | "analytics">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "analytics">(
+    "overview"
+  );
 
   const { cnftData, levelName } = useCNFT();
-  const { userStats, globalStats, loading } = useRealtimeStats(publicKey?.toString());
+  const { userStats, globalStats, loading } = useRealtimeStats(
+    publicKey?.toString()
+  );
 
   // Mock chart data
   const volumeData = {
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     volumes: [1200, 1900, 1500, 2100, 1800, 2400, 2200],
   };
 
   const activityData = {
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     swaps: [5, 8, 6, 10, 7, 12, 9],
   };
 
@@ -52,31 +56,45 @@ export const Dashboard = () => {
         className="sr-only"
         role="status"
       >
-        {loading ? "Loading dashboard data..." : `Dashboard updated. Total volume: $${globalStats.totalVolume.toLocaleString()}`}
+        {loading
+          ? "Loading dashboard data..."
+          : `Dashboard updated. Total volume: $${globalStats.totalVolume.toLocaleString()}`}
       </div>
 
       {/* Global Stats avec animation */}
       <div className="swap-card">
         <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold" id="protocol-stats-heading">Protocol Statistics</h2>
+          <h2 className="text-2xl font-bold" id="protocol-stats-heading">
+            Protocol Statistics
+          </h2>
           <div className="flex items-center gap-2 px-3 py-1 bg-[var(--secondary)]/10 rounded-full border border-[var(--secondary)]/20">
-            <span className="w-2 h-2 bg-[var(--secondary)] rounded-full animate-pulse" aria-hidden="true"></span>
-            <span className="text-xs font-semibold text-[var(--secondary)]">Live</span>
+            <span
+              className="w-2 h-2 bg-[var(--secondary)] rounded-full animate-pulse"
+              aria-hidden="true"
+            ></span>
+            <span className="text-xs font-semibold text-[var(--secondary)]">
+              Live
+            </span>
           </div>
         </div>
-        <div 
+        <div
           className="grid grid-cols-1 md:grid-cols-3 gap-6"
           role="group"
           aria-labelledby="protocol-stats-heading"
         >
           <div className="stat-card text-center group hover:scale-105 transition-transform">
-            <div className="text-sm text-gray-400 mb-2" id="total-volume-label">Total Volume</div>
-            <div 
+            <div className="text-sm text-gray-400 mb-2" id="total-volume-label">
+              Total Volume
+            </div>
+            <div
               className="text-3xl font-bold text-[var(--primary)]"
               aria-labelledby="total-volume-label"
               aria-live="polite"
             >
-              ${globalStats.totalVolume.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+              $
+              {globalStats.totalVolume.toLocaleString("en-US", {
+                maximumFractionDigits: 0,
+              })}
             </div>
             <div className="text-xs text-gray-500 mt-2">
               +{globalStats.swapsLast24h} swaps (24h)
@@ -85,16 +103,19 @@ export const Dashboard = () => {
           <div className="stat-card text-center group hover:scale-105 transition-transform">
             <div className="text-sm text-gray-400 mb-2">$BACK Burned</div>
             <div className="text-3xl font-bold text-orange-400">
-              {globalStats.totalBurned.toLocaleString('en-US')}
+              {globalStats.totalBurned.toLocaleString("en-US")}
             </div>
-            <div className="text-xs text-gray-500 mt-2">
-              🔥 Deflationary
-            </div>
+            <div className="text-xs text-gray-500 mt-2">🔥 Deflationary</div>
           </div>
           <div className="stat-card text-center group hover:scale-105 transition-transform">
-            <div className="text-sm text-gray-400 mb-2">Rebates Distributed</div>
+            <div className="text-sm text-gray-400 mb-2">
+              Rebates Distributed
+            </div>
             <div className="text-3xl font-bold text-[var(--secondary)]">
-              ${globalStats.totalRebates.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+              $
+              {globalStats.totalRebates.toLocaleString("en-US", {
+                maximumFractionDigits: 0,
+              })}
             </div>
             <div className="text-xs text-gray-500 mt-2">
               {globalStats.activeUsers.toLocaleString()} active users
@@ -161,7 +182,9 @@ export const Dashboard = () => {
                 </div>
                 <span className="text-gray-400 text-sm">Volume</span>
               </div>
-              <div className="text-2xl font-bold">${userStats.totalVolume.toLocaleString()}</div>
+              <div className="text-2xl font-bold">
+                ${userStats.totalVolume.toLocaleString()}
+              </div>
             </div>
 
             <div className="glass-effect rounded-xl p-5 border border-gray-700/50 hover:border-[var(--secondary)]/30 transition-all group">
@@ -199,7 +222,9 @@ export const Dashboard = () => {
                     <span className="text-2xl">💎</span>
                   </div>
                   <div>
-                    <div className="font-bold text-lg mb-1">Pending Rebates</div>
+                    <div className="font-bold text-lg mb-1">
+                      Pending Rebates
+                    </div>
                     <div className="text-3xl font-bold bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] bg-clip-text text-transparent">
                       ${userStats.pendingRebates.toFixed(2)}
                     </div>
@@ -242,39 +267,62 @@ export const Dashboard = () => {
           {/* Stats Summary */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="swap-card">
-              <h4 className="font-bold mb-4 text-[var(--primary)]">Performance</h4>
+              <h4 className="font-bold mb-4 text-[var(--primary)]">
+                Performance
+              </h4>
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-400">Avg. Swap Size</span>
-                  <span className="font-semibold">${(userStats?.totalVolume || 0 / (userStats?.totalSwaps || 1)).toFixed(2)}</span>
+                  <span className="font-semibold">
+                    $
+                    {(
+                      userStats?.totalVolume || 0 / (userStats?.totalSwaps || 1)
+                    ).toFixed(2)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Avg. NPI per Swap</span>
                   <span className="font-semibold text-[var(--secondary)]">
-                    ${(userStats?.totalNPI || 0 / (userStats?.totalSwaps || 1)).toFixed(2)}
+                    $
+                    {(
+                      userStats?.totalNPI || 0 / (userStats?.totalSwaps || 1)
+                    ).toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Rebate Rate</span>
                   <span className="font-semibold text-[var(--secondary)]">
-                    {(((userStats?.totalRebates || 0) / (userStats?.totalVolume || 1)) * 100).toFixed(2)}%
+                    {(
+                      ((userStats?.totalRebates || 0) /
+                        (userStats?.totalVolume || 1)) *
+                      100
+                    ).toFixed(2)}
+                    %
                   </span>
                 </div>
               </div>
             </div>
 
             <div className="swap-card">
-              <h4 className="font-bold mb-4 text-[var(--secondary)]">Rewards</h4>
+              <h4 className="font-bold mb-4 text-[var(--secondary)]">
+                Rewards
+              </h4>
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-400">Total Earned</span>
                   <span className="font-semibold text-[var(--secondary)]">
-                    ${((userStats?.totalNPI || 0) + (userStats?.totalRebates || 0)).toFixed(2)}
+                    $
+                    {(
+                      (userStats?.totalNPI || 0) +
+                      (userStats?.totalRebates || 0)
+                    ).toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Rebate Boost</span>
-                  <span className="font-semibold">+{userStats?.rebateBoost || 0}%</span>
+                  <span className="font-semibold">
+                    +{userStats?.rebateBoost || 0}%
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Locked Amount</span>

@@ -1,7 +1,7 @@
 /**
  * API Route Tests - /api/swap
  * Tests for swap route endpoint
- * 
+ *
  * @vitest-environment node
  */
 
@@ -26,7 +26,7 @@ vi.mock("@solana/web3.js", () => ({
 
 function createMockRequest(body: any, method = "POST"): NextRequest {
   const url = "http://localhost:3000/api/swap";
-  
+
   return {
     json: async () => body,
     method,
@@ -190,7 +190,7 @@ describe("API Route: /api/swap", () => {
 
       const route1 = data.routes[0];
       const expectedOutput1 = parseFloat(route1.expectedOutput);
-      
+
       // Route 1 should output ~99% of input (0.99 rate)
       expect(expectedOutput1).toBeCloseTo(10 * 0.99, 1);
     });
@@ -207,7 +207,7 @@ describe("API Route: /api/swap", () => {
       const data = await response.json();
 
       expect(data.routes.length).toBeGreaterThanOrEqual(2);
-      
+
       // Verify routes have different venues
       const venues = data.routes.map((r: any) => r.venues[0]);
       const uniqueVenues = new Set(venues);

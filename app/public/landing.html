@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwapBack Beta - DCA Intelligent & Token Déflationnaire</title>
+    <meta name="description" content="SwapBack - Premier protocole Solana combinant DCA intelligent via Jupiter avec mécanisme déflationnaire automatique. Beta Devnet accessible maintenant.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white">
+    <!-- Hero Section -->
+    <div class="gradient-bg min-h-screen flex items-center justify-center px-4">
+        <div class="max-w-4xl mx-auto text-center">
+            <div class="mb-8">
+                <span class="bg-yellow-400 text-gray-900 px-4 py-2 rounded-full text-sm font-bold uppercase">
+                    🚀 Beta Devnet Live
+                </span>
+            </div>
+            
+            <h1 class="text-5xl md:text-7xl font-bold mb-6">
+                SwapBack
+            </h1>
+            
+            <p class="text-xl md:text-2xl mb-4 text-purple-100">
+                DCA Intelligent + Token Déflationnaire
+            </p>
+            
+            <p class="text-lg md:text-xl mb-12 text-purple-200 max-w-2xl mx-auto">
+                Le premier protocole Solana qui combine Dollar-Cost Averaging optimisé via Jupiter 
+                avec un mécanisme de buyback & burn automatique du token $BACK.
+            </p>
+            
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="/app" class="bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition">
+                    🎯 Lancer l'App
+                </a>
+                <a href="#features" class="border-2 border-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-white hover:text-purple-600 transition">
+                    📖 En savoir plus
+                </a>
+            </div>
+            
+            <div class="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                <div>
+                    <div class="text-4xl font-bold">56/56</div>
+                    <div class="text-purple-200">Tests Passent</div>
+                </div>
+                <div>
+                    <div class="text-4xl font-bold">2.5%</div>
+                    <div class="text-purple-200">Meilleure Exécution</div>
+                </div>
+                <div>
+                    <div class="text-4xl font-bold">80%</div>
+                    <div class="text-purple-200">Cashback Max</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Features Section -->
+    <div id="features" class="bg-gray-800 py-20 px-4">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-4xl font-bold text-center mb-16">Fonctionnalités Clés</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Feature 1 -->
+                <div class="bg-gray-900 p-8 rounded-xl card-hover transition-all">
+                    <div class="text-5xl mb-4">🚀</div>
+                    <h3 class="text-2xl font-bold mb-4">Best Execution</h3>
+                    <p class="text-gray-400">
+                        Routage intelligent via Metis, Juno et RFQ pour obtenir le meilleur prix sur chaque swap.
+                        Jusqu'à 2.5% de meilleure exécution.
+                    </p>
+                </div>
+                
+                <!-- Feature 2 -->
+                <div class="bg-gray-900 p-8 rounded-xl card-hover transition-all">
+                    <div class="text-5xl mb-4">💰</div>
+                    <h3 class="text-2xl font-bold mb-4">70-80% Cashback</h3>
+                    <p class="text-gray-400">
+                        Recevez jusqu'à 80% du surplus généré directement en tokens de destination.
+                        Récompenses instantanées à chaque swap.
+                    </p>
+                </div>
+                
+                <!-- Feature 3 -->
+                <div class="bg-gray-900 p-8 rounded-xl card-hover transition-all">
+                    <div class="text-5xl mb-4">🔥</div>
+                    <h3 class="text-2xl font-bold mb-4">Automatic Burn</h3>
+                    <p class="text-gray-400">
+                        20-30% du surplus utilisé pour acheter et brûler $BACK automatiquement.
+                        Supply décroissante mécaniquement.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- How It Works -->
+    <div class="bg-gray-900 py-20 px-4">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-4xl font-bold text-center mb-16">Comment ça marche ?</h2>
+            
+            <div class="space-y-12">
+                <div class="flex flex-col md:flex-row items-center gap-8">
+                    <div class="flex-1">
+                        <div class="bg-purple-600 w-12 h-12 rounded-full flex items-center justify-center font-bold text-2xl mb-4">1</div>
+                        <h3 class="text-2xl font-bold mb-4">Créez votre Plan DCA</h3>
+                        <p class="text-gray-400">
+                            Définissez le montant, la fréquence et le nombre de swaps. SwapBack gère tout automatiquement.
+                        </p>
+                    </div>
+                    <div class="flex-1 bg-gray-800 p-6 rounded-xl">
+                        <code class="text-sm text-green-400">
+                            Amount: 10 SOL<br>
+                            Interval: 1 hour<br>
+                            Swaps: 10 times<br>
+                            → 1 SOL per swap
+                        </code>
+                    </div>
+                </div>
+                
+                <div class="flex flex-col md:flex-row-reverse items-center gap-8">
+                    <div class="flex-1">
+                        <div class="bg-purple-600 w-12 h-12 rounded-full flex items-center justify-center font-bold text-2xl mb-4">2</div>
+                        <h3 class="text-2xl font-bold mb-4">Exécution Optimale</h3>
+                        <p class="text-gray-400">
+                            À chaque intervalle, SwapBack trouve le meilleur prix via Jupiter et exécute votre swap.
+                        </p>
+                    </div>
+                    <div class="flex-1 bg-gray-800 p-6 rounded-xl">
+                        <code class="text-sm text-blue-400">
+                            Jupiter Quote:<br>
+                            Expected: 145 USDC<br>
+                            Actual: 148.5 USDC<br>
+                            Surplus: +3.5 USDC ✨
+                        </code>
+                    </div>
+                </div>
+                
+                <div class="flex flex-col md:flex-row items-center gap-8">
+                    <div class="flex-1">
+                        <div class="bg-purple-600 w-12 h-12 rounded-full flex items-center justify-center font-bold text-2xl mb-4">3</div>
+                        <h3 class="text-2xl font-bold mb-4">Recevez vos Rewards</h3>
+                        <p class="text-gray-400">
+                            70-80% du surplus vous est redistribué instantanément. Le reste sert à buy & burn $BACK.
+                        </p>
+                    </div>
+                    <div class="flex-1 bg-gray-800 p-6 rounded-xl">
+                        <code class="text-sm text-yellow-400">
+                            Surplus: 3.5 USDC<br>
+                            Your rebate: 2.8 USDC (80%)<br>
+                            Buyback & Burn: 0.7 USDC (20%)<br>
+                            → $BACK supply ↓
+                        </code>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Beta Access CTA -->
+    <div class="gradient-bg py-20 px-4">
+        <div class="max-w-4xl mx-auto text-center">
+            <h2 class="text-4xl font-bold mb-6">Rejoignez la Beta Devnet</h2>
+            <p class="text-xl mb-8 text-purple-100">
+                Testez SwapBack en avant-première et aidez-nous à construire le meilleur protocole DCA sur Solana.
+            </p>
+            
+            <div class="bg-white/10 backdrop-blur-lg rounded-xl p-8 mb-8">
+                <h3 class="text-2xl font-bold mb-4">🎫 Programmes Déployés (Devnet)</h3>
+                <div class="space-y-2 text-left max-w-2xl mx-auto font-mono text-sm">
+                    <div>
+                        <span class="text-purple-300">Router:</span>
+                        <span class="text-white ml-2">3Z295H9...fhQKap</span>
+                    </div>
+                    <div>
+                        <span class="text-purple-300">Buyback:</span>
+                        <span class="text-white ml-2">46UWFYd...xtMgU</span>
+                    </div>
+                    <div>
+                        <span class="text-purple-300">$BACK Token:</span>
+                        <span class="text-white ml-2">862PQyz...Yn7Ux</span>
+                    </div>
+                </div>
+            </div>
+            
+            <a href="/app" class="inline-block bg-white text-purple-600 px-12 py-4 rounded-lg font-bold text-xl hover:bg-gray-100 transition">
+                🚀 Lancer l'Application
+            </a>
+            
+            <p class="mt-6 text-purple-200 text-sm">
+                Besoin de SOL devnet ? → <a href="https://faucet.solana.com/" class="underline">Solana Faucet</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="bg-gray-950 py-12 px-4">
+        <div class="max-w-6xl mx-auto text-center">
+            <div class="flex justify-center gap-6 mb-6">
+                <a href="https://twitter.com/SwapBackDeFi" class="text-gray-400 hover:text-white">Twitter</a>
+                <a href="https://discord.gg/swapback" class="text-gray-400 hover:text-white">Discord</a>
+                <a href="https://github.com/BacBacta/SwapBack" class="text-gray-400 hover:text-white">GitHub</a>
+                <a href="https://docs.swapback.io" class="text-gray-400 hover:text-white">Docs</a>
+            </div>
+            
+            <p class="text-gray-500 text-sm">
+                © 2025 SwapBack. Built with ❤️ on Solana.
+            </p>
+            
+            <p class="text-gray-600 text-xs mt-4">
+                ⚠️ Beta Software - Devnet Only - Use at your own risk
+            </p>
+        </div>
+    </div>
+</body>
+</html>

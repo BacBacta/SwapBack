@@ -3,6 +3,7 @@
 ## ✅ Ce qui a été fait
 
 ### Tests SDK (85.22% coverage)
+
 - [x] **OraclePriceService**: 88.99% (30 tests)
 - [x] **LiquidityDataCollector**: 84.47% (22 tests)
 - [x] **SwapExecutor**: 96.28% (8 tests)
@@ -10,11 +11,13 @@
 - [x] **RouteOptimizationEngine**: 83.26% (14 tests)
 
 ### Tests Frontend (~94% coverage)
+
 - [x] **swapStore**: 100% (31 tests)
 - [x] **/api/swap**: 100% (15 tests)
 - [x] **/api/execute**: 88.46% (8 tests)
 
 ### Infrastructure CI/CD
+
 - [x] GitHub Actions workflows créés
   - `.github/workflows/test.yml` - Tests + Coverage
   - `.github/workflows/build.yml` - Build verification
@@ -30,6 +33,7 @@
 ## ⏭️ Prochaines Actions IMMÉDIATES
 
 ### 1. Installer Husky (2 min)
+
 ```bash
 cd /workspaces/SwapBack
 npm install --save-dev husky
@@ -46,6 +50,7 @@ git checkout sdk/src/index.ts  # Restaurer fichier
 ```
 
 ### 2. Push Workflows sur GitHub (1 min)
+
 ```bash
 git add .github/workflows/ .husky/ docs/
 git commit -m "feat: Add CI/CD workflows and Phase 9 documentation"
@@ -56,10 +61,11 @@ git push origin main
 ```
 
 ### 3. Setup Codecov (5 min)
+
 1. **Créer compte**: https://codecov.io → "Sign Up with GitHub"
 2. **Ajouter repo**: Dashboard → "Add Repository" → chercher "SwapBack"
 3. **Obtenir token**: Settings → Upload Token → copier `ccov_...`
-4. **Ajouter secret GitHub**: 
+4. **Ajouter secret GitHub**:
    - Repo GitHub → Settings → Secrets and variables → Actions
    - "New repository secret"
    - Name: `CODECOV_TOKEN`
@@ -67,6 +73,7 @@ git push origin main
 5. **Re-run workflow**: Actions → "Tests & Coverage" → "Re-run failed jobs"
 
 ### 4. Ajouter Badges au README (2 min)
+
 Éditer `README.md`, ajouter en haut (remplacer `BacBacta` par votre username):
 
 ```markdown
@@ -83,15 +90,15 @@ git push origin main
 
 ## 📊 Résultats Phase 9
 
-| Métrique | Objectif | Atteint | Statut |
-|----------|----------|---------|--------|
-| **SDK Coverage** | >80% | **85.22%** | ✅ **+5.22%** |
-| **Frontend Coverage** | >60% | **~94%** | ✅ **+34%** |
-| **OraclePriceService** | >85% | **88.99%** | ✅ **+3.99%** |
-| **LiquidityDataCollector** | >80% | **84.47%** | ✅ **+4.47%** |
-| **swapStore** | >80% | **100%** | ✅ **+20%** 🚀 |
-| **Total Tests** | N/A | **178** | ✅ |
-| **CI/CD Pipeline** | Oui | **Oui** | ✅ |
+| Métrique                   | Objectif | Atteint    | Statut         |
+| -------------------------- | -------- | ---------- | -------------- |
+| **SDK Coverage**           | >80%     | **85.22%** | ✅ **+5.22%**  |
+| **Frontend Coverage**      | >60%     | **~94%**   | ✅ **+34%**    |
+| **OraclePriceService**     | >85%     | **88.99%** | ✅ **+3.99%**  |
+| **LiquidityDataCollector** | >80%     | **84.47%** | ✅ **+4.47%**  |
+| **swapStore**              | >80%     | **100%**   | ✅ **+20%** 🚀 |
+| **Total Tests**            | N/A      | **178**    | ✅             |
+| **CI/CD Pipeline**         | Oui      | **Oui**    | ✅             |
 
 **Modules avec 100% functions coverage**: swapStore, LiquidityDataCollector, SwapExecutor, CircuitBreaker
 
@@ -118,6 +125,7 @@ git push origin main
 ## 🎯 Vérification Finale
 
 ### Checklist Post-Setup
+
 ```bash
 # 1. Husky installé?
 ls -la .husky/pre-commit
@@ -140,6 +148,7 @@ npm run build              # Build SDK + App
 ```
 
 ### URLs Importantes
+
 - **GitHub Actions**: `https://github.com/BacBacta/SwapBack/actions`
 - **Codecov Dashboard**: `https://codecov.io/gh/BacBacta/SwapBack`
 - **Codecov Setup**: `https://docs.codecov.com/docs/quick-start`
@@ -151,18 +160,21 @@ npm run build              # Build SDK + App
 Une fois Phase 9 finalisée (badges + Codecov actif):
 
 ### Production Deployment
+
 - [ ] Déployer frontend Next.js (Vercel/Netlify)
 - [ ] Déployer SDK npm package
 - [ ] Configurer RPC nodes production
 - [ ] Setup monitoring (Sentry, LogRocket)
 
 ### Security Hardening
+
 - [ ] Audit smart contracts (Anchor programs)
 - [ ] Penetration testing API routes
 - [ ] Rate limiting & DDoS protection
 - [ ] Environment secrets rotation
 
 ### Performance Optimization
+
 - [ ] Bundle size optimization (<500kb)
 - [ ] Lighthouse score >90
 - [ ] API response time <500ms
@@ -173,6 +185,7 @@ Une fois Phase 9 finalisée (badges + Codecov actif):
 ## 💡 Tips
 
 ### Développement Local
+
 ```bash
 # Watcher mode pour tests
 npm test -- --watch
@@ -185,6 +198,7 @@ npm run lint -- --fix
 ```
 
 ### Débug CI/CD
+
 ```bash
 # Voir logs GitHub Actions localement
 gh run list --limit 5
@@ -196,6 +210,7 @@ act push  # Simule push trigger
 ```
 
 ### Coverage Tips
+
 - **Branches non couverts**: Ajouter tests pour `if/else` alternatifs
 - **Functions non couvertes**: Vérifier exports non utilisés
 - **Lines non couverts**: Souvent error handling ou edge cases

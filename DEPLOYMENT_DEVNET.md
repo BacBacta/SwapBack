@@ -19,17 +19,20 @@
 - **IDL Account:** `9YE83GyBdUyBFW7rqsiV6C4fqciQ9tRVyRhvx5A7uRMt`
 
 **Fonctionnalités:**
+
 - ✅ `initialize` - Initialisation du programme de buyback
 - ✅ `buy_back` - Achat de tokens $BACK avec les frais collectés
 - ✅ `burn_back` - Brûlage des tokens $BACK achetés
 - ✅ `update_config` - Mise à jour de la configuration
 
 **Vérification:**
+
 ```bash
 solana program show 71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW --url devnet
 ```
 
 **Explorer:**
+
 - Solscan: https://solscan.io/account/71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW?cluster=devnet
 - Solana Explorer: https://explorer.solana.com/address/71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW?cluster=devnet
 
@@ -45,17 +48,20 @@ solana program show 71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW --url devnet
 - **Slot de déploiement:** 414596533
 
 **Fonctionnalités:**
+
 - ✅ `initialize_collection` - Initialisation de la collection cNFT
 - ✅ `mint_level_nft` - Mint d'un cNFT de niveau pour utilisateur actif
 - ✅ `upgrade_level` - Upgrade du niveau d'un utilisateur
 - ✅ Compressed NFTs pour réduire les coûts de stockage
 
 **Vérification:**
+
 ```bash
 solana program show HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf --url devnet
 ```
 
 **Explorer:**
+
 - Solscan: https://solscan.io/account/HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf?cluster=devnet
 - Solana Explorer: https://explorer.solana.com/address/HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf?cluster=devnet
 
@@ -74,11 +80,13 @@ swapback_cnft = "HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf"
 ### Fichiers Source
 
 **swapback_buyback/src/lib.rs:**
+
 ```rust
 declare_id!("71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW");
 ```
 
 **swapback_cnft/src/lib.rs:**
+
 ```rust
 declare_id!("HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf");
 ```
@@ -87,14 +95,14 @@ declare_id!("HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf");
 
 ## 📊 Coûts de Déploiement
 
-| Item | Coût (SOL) |
-|------|------------|
-| Balance initiale | 2.867 SOL |
-| swapback_buyback (stockage) | ~2.083 SOL |
-| swapback_cnft (stockage) | ~1.689 SOL |
-| Frais de transaction | ~0.028 SOL |
-| **Balance finale** | **1.157 SOL** |
-| **Total dépensé** | **~1.71 SOL** |
+| Item                        | Coût (SOL)    |
+| --------------------------- | ------------- |
+| Balance initiale            | 2.867 SOL     |
+| swapback_buyback (stockage) | ~2.083 SOL    |
+| swapback_cnft (stockage)    | ~1.689 SOL    |
+| Frais de transaction        | ~0.028 SOL    |
+| **Balance finale**          | **1.157 SOL** |
+| **Total dépensé**           | **~1.71 SOL** |
 
 ---
 
@@ -103,6 +111,7 @@ declare_id!("HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf");
 ### Initialisation des Programmes
 
 1. **Initialiser swapback_buyback:**
+
    ```bash
    # Définir le token $BACK mint
    # Configurer l'autorité de buyback
@@ -120,7 +129,7 @@ declare_id!("HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf");
 
 - [ ] Tester `initialize` pour buyback
 - [ ] Tester `buy_back` avec des tokens de test
-- [ ] Tester `burn_back` 
+- [ ] Tester `burn_back`
 - [ ] Tester `initialize_collection` pour cNFT
 - [ ] Tester `mint_level_nft` pour un utilisateur test
 - [ ] Vérifier les cNFTs dans l'explorer
@@ -141,6 +150,7 @@ declare_id!("HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf");
 ⚠️ **IMPORTANT:** Cette clé a l'autorité de mettre à jour les programmes. Elle doit être sécurisée.
 
 Pour transférer l'autorité ou la rendre immuable:
+
 ```bash
 # Transférer l'autorité
 solana program set-upgrade-authority <PROGRAM_ID> --new-upgrade-authority <NEW_AUTHORITY> --url devnet
@@ -154,16 +164,20 @@ solana program set-upgrade-authority <PROGRAM_ID> --final --url devnet
 ## 📝 Résolution du Problème Initial
 
 ### Erreur Rencontrée
+
 ```
 Error Code: DeclaredProgramIdMismatch. Error Number: 4100.
 Error Message: The declared program id does not match the actual program id.
 ```
 
 ### Cause
+
 Les `declare_id!()` dans les fichiers source ne correspondaient pas aux Program IDs des keypairs de déploiement.
 
 ### Solution Appliquée
+
 1. Récupération des IDs réels des keypairs:
+
    ```bash
    solana-keygen pubkey target/deploy/swapback_buyback-keypair.json
    solana-keygen pubkey target/deploy/swapback_cnft-keypair.json
@@ -182,6 +196,7 @@ Les `declare_id!()` dans les fichiers source ne correspondaient pas aux Program 
 ## ✅ Statut Final
 
 **Phase 10 - Build & Integration:**
+
 - ✅ TypeScript: 0 erreurs
 - ✅ Jupiter API: Intégré avec toggle UI
 - ✅ Anchor Build: 2/4 programmes compilés

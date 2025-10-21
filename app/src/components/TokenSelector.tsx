@@ -23,67 +23,78 @@ const POPULAR_TOKENS: Token[] = [
     symbol: "SOL",
     name: "Solana",
     decimals: 9,
-    logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png"
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png",
   },
   {
     address: "BH8thpWca6kpN2pKwWTaKv2F5s4MEkbML18LtJ8eFypU",
     symbol: "BACK",
     name: "SwapBack Token",
     decimals: 9,
-    logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png" // TODO: Add custom logo
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png", // TODO: Add custom logo
   },
   {
     address: "3y4dCqwWuYx1B97YEDmgq9qjuNE1eyEwGx2eLgz6Rc6G",
     symbol: "USDC",
     name: "USD Coin (Test)",
     decimals: 6,
-    logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png"
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png",
   },
   {
     address: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
     symbol: "BONK",
     name: "Bonk",
     decimals: 5,
-    logoURI: "https://arweave.net/hQiPZOsRZXGXBJd_82PhVdlM_hACsT_q6wqwf5cSY7I"
+    logoURI: "https://arweave.net/hQiPZOsRZXGXBJd_82PhVdlM_hACsT_q6wqwf5cSY7I",
   },
   {
     address: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
     symbol: "USDT",
     name: "Tether USD",
     decimals: 6,
-    logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.png"
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.png",
   },
   {
     address: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
     symbol: "PYTH",
     name: "Pyth Network",
     decimals: 6,
-    logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263/logo.png"
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263/logo.png",
   },
   {
     address: "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
     symbol: "mSOL",
     name: "Marinade staked SOL",
     decimals: 9,
-    logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So/logo.png"
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So/logo.png",
   },
   {
     address: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
     symbol: "JUP",
     name: "Jupiter",
     decimals: 6,
-    logoURI: "https://static.jup.ag/jup/icon.png"
+    logoURI: "https://static.jup.ag/jup/icon.png",
   },
   {
     address: "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr",
     symbol: "JTO",
     name: "Jito",
     decimals: 9,
-    logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr/logo.png"
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr/logo.png",
   },
 ];
 
-export const TokenSelector = ({ selectedToken, onSelect, onClose }: TokenSelectorProps) => {
+export const TokenSelector = ({
+  selectedToken,
+  onSelect,
+  onClose,
+}: TokenSelectorProps) => {
   const [search, setSearch] = useState("");
   const [tokens, setTokens] = useState<Token[]>(POPULAR_TOKENS);
   const [loading, setLoading] = useState(false);
@@ -124,8 +135,18 @@ export const TokenSelector = ({ selectedToken, onSelect, onClose }: TokenSelecto
               className="p-2 rounded-lg hover:bg-white/10 transition-colors"
               aria-label="Close"
             >
-              <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="w-6 h-6 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -145,7 +166,9 @@ export const TokenSelector = ({ selectedToken, onSelect, onClose }: TokenSelecto
           {/* Popular Tokens */}
           {!search && (
             <div className="mb-4">
-              <p className="text-xs text-gray-400 mb-3 uppercase font-semibold">Popular Tokens</p>
+              <p className="text-xs text-gray-400 mb-3 uppercase font-semibold">
+                Popular Tokens
+              </p>
             </div>
           )}
 
@@ -169,29 +192,49 @@ export const TokenSelector = ({ selectedToken, onSelect, onClose }: TokenSelecto
                     onClose();
                   }}
                   className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all hover:bg-white/5 ${
-                    selectedToken === token.symbol ? "bg-white/10 border border-[var(--primary)]/20" : ""
+                    selectedToken === token.symbol
+                      ? "bg-white/10 border border-[var(--primary)]/20"
+                      : ""
                   }`}
                 >
                   {/* Token Logo */}
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)]/20 to-[var(--secondary)]/20 flex items-center justify-center overflow-hidden">
                     {token.logoURI ? (
-                      <img src={token.logoURI} alt={token.symbol} className="w-full h-full object-cover" />
+                      <img
+                        src={token.logoURI}
+                        alt={token.symbol}
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
-                      <span className="text-sm font-bold">{token.symbol.charAt(0)}</span>
+                      <span className="text-sm font-bold">
+                        {token.symbol.charAt(0)}
+                      </span>
                     )}
                   </div>
 
                   {/* Token Info */}
                   <div className="flex-1 text-left">
-                    <div className="font-semibold text-white">{token.symbol}</div>
+                    <div className="font-semibold text-white">
+                      {token.symbol}
+                    </div>
                     <div className="text-xs text-gray-400">{token.name}</div>
                   </div>
 
                   {/* Selected indicator */}
                   {selectedToken === token.symbol && (
                     <div className="w-6 h-6 rounded-full bg-[var(--primary)] flex items-center justify-center">
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      <svg
+                        className="w-4 h-4 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
                       </svg>
                     </div>
                   )}

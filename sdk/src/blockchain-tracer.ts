@@ -3,37 +3,37 @@
  * Enregistre toutes les opérations (swap, lock, unlock) sur la blockchain Solana
  */
 
-import { 
-  Connection, 
-  PublicKey, 
-  Transaction, 
+import {
+  Connection,
+  PublicKey,
+  Transaction,
   SystemProgram,
   TransactionInstruction,
   Keypair,
-  LAMPORTS_PER_SOL
-} from '@solana/web3.js';
+  LAMPORTS_PER_SOL,
+} from "@solana/web3.js";
 
 /**
  * Types d'opérations traçables
  */
 export enum OperationType {
-  SWAP = 'SWAP',
-  LOCK = 'LOCK',
-  UNLOCK = 'UNLOCK',
-  STAKE = 'STAKE',
-  UNSTAKE = 'UNSTAKE',
-  CLAIM_REWARD = 'CLAIM_REWARD',
-  BURN = 'BURN'
+  SWAP = "SWAP",
+  LOCK = "LOCK",
+  UNLOCK = "UNLOCK",
+  STAKE = "STAKE",
+  UNSTAKE = "UNSTAKE",
+  CLAIM_REWARD = "CLAIM_REWARD",
+  BURN = "BURN",
 }
 
 /**
  * Statut d'une opération
  */
 export enum OperationStatus {
-  PENDING = 'PENDING',
-  SUCCESS = 'SUCCESS',
-  FAILED = 'FAILED',
-  CANCELLED = 'CANCELLED'
+  PENDING = "PENDING",
+  SUCCESS = "SUCCESS",
+  FAILED = "FAILED",
+  CANCELLED = "CANCELLED",
 }
 
 /**
@@ -45,15 +45,20 @@ export interface TracedOperation {
   status: OperationStatus;
   timestamp: number;
   user: string; // PublicKey de l'utilisateur
-  
+
   // Détails selon le type d'opération
-  details: SwapDetails | LockDetails | UnlockDetails | StakeDetails | BurnDetails;
-  
+  details:
+    | SwapDetails
+    | LockDetails
+    | UnlockDetails
+    | StakeDetails
+    | BurnDetails;
+
   // Informations blockchain
   signature: string;
   slot: number;
   blockTime?: number;
-  
+
   // Métadonnées
   npi?: number; // Net Price Improvement
   rebate?: number; // Remise utilisateur
@@ -82,7 +87,7 @@ export interface LockDetails {
   amount: number;
   duration: number; // en secondes
   unlockDate: number; // timestamp
-  lockType: 'LIQUIDITY' | 'GOVERNANCE' | 'STAKING';
+  lockType: "LIQUIDITY" | "GOVERNANCE" | "STAKING";
 }
 
 /**
@@ -111,7 +116,7 @@ export interface StakeDetails {
 export interface BurnDetails {
   token: string;
   amount: number;
-  reason: 'OPTIMIZATION' | 'GOVERNANCE' | 'PENALTY';
+  reason: "OPTIMIZATION" | "GOVERNANCE" | "PENALTY";
 }
 
 /**
@@ -132,7 +137,7 @@ export class BlockchainTracer {
   private programId: PublicKey;
   private tracerAccountPubkey?: PublicKey;
   private maxHistorySize: number;
-  
+
   constructor(config: TracerConfig) {
     this.connection = config.connection;
     this.programId = config.programId;
@@ -153,8 +158,8 @@ export class BlockchainTracer {
       fees?: number;
     }
   ): Promise<TracedOperation> {
-    console.log('📝 Traçage du swap sur la blockchain...');
-    
+    console.log("📝 Traçage du swap sur la blockchain...");
+
     try {
       // Créer l'instruction de traçage
       const instruction = await this.createTraceInstruction(
@@ -167,16 +172,18 @@ export class BlockchainTracer {
       const transaction = new Transaction().add(instruction);
       const signature = await this.connection.sendTransaction(
         transaction,
-        [/* signers */],
+        [
+          /* signers */
+        ],
         { skipPreflight: false }
       );
 
       // Attendre la confirmation
-      await this.connection.confirmTransaction(signature, 'confirmed');
+      await this.connection.confirmTransaction(signature, "confirmed");
 
       // Récupérer les détails de la transaction
       const txDetails = await this.connection.getTransaction(signature, {
-        commitment: 'confirmed'
+        commitment: "confirmed",
       });
 
       const operation: TracedOperation = {
@@ -189,14 +196,13 @@ export class BlockchainTracer {
         signature,
         slot: txDetails?.slot || 0,
         blockTime: txDetails?.blockTime || undefined,
-        ...metadata
+        ...metadata,
       };
 
-      console.log('✅ Swap tracé avec succès:', signature);
+      console.log("✅ Swap tracé avec succès:", signature);
       return operation;
-      
     } catch (error) {
-      console.error('❌ Erreur lors du traçage du swap:', error);
+      console.error("❌ Erreur lors du traçage du swap:", error);
       throw error;
     }
   }
@@ -208,8 +214,8 @@ export class BlockchainTracer {
     userPubkey: PublicKey,
     lockDetails: LockDetails
   ): Promise<TracedOperation> {
-    console.log('📝 Traçage du lock sur la blockchain...');
-    
+    console.log("📝 Traçage du lock sur la blockchain...");
+
     try {
       const instruction = await this.createTraceInstruction(
         OperationType.LOCK,
@@ -218,15 +224,13 @@ export class BlockchainTracer {
       );
 
       const transaction = new Transaction().add(instruction);
-      const signature = await this.connection.sendTransaction(
-        transaction,
-        [],
-        { skipPreflight: false }
-      );
+      const signature = await this.connection.sendTransaction(transaction, [], {
+        skipPreflight: false,
+      });
 
-      await this.connection.confirmTransaction(signature, 'confirmed');
+      await this.connection.confirmTransaction(signature, "confirmed");
       const txDetails = await this.connection.getTransaction(signature, {
-        commitment: 'confirmed'
+        commitment: "confirmed",
       });
 
       const operation: TracedOperation = {
@@ -238,14 +242,13 @@ export class BlockchainTracer {
         details: lockDetails,
         signature,
         slot: txDetails?.slot || 0,
-        blockTime: txDetails?.blockTime || undefined
+        blockTime: txDetails?.blockTime || undefined,
       };
 
-      console.log('✅ Lock tracé avec succès:', signature);
+      console.log("✅ Lock tracé avec succès:", signature);
       return operation;
-      
     } catch (error) {
-      console.error('❌ Erreur lors du traçage du lock:', error);
+      console.error("❌ Erreur lors du traçage du lock:", error);
       throw error;
     }
   }
@@ -257,8 +260,8 @@ export class BlockchainTracer {
     userPubkey: PublicKey,
     unlockDetails: UnlockDetails
   ): Promise<TracedOperation> {
-    console.log('📝 Traçage du unlock sur la blockchain...');
-    
+    console.log("📝 Traçage du unlock sur la blockchain...");
+
     try {
       const instruction = await this.createTraceInstruction(
         OperationType.UNLOCK,
@@ -267,15 +270,13 @@ export class BlockchainTracer {
       );
 
       const transaction = new Transaction().add(instruction);
-      const signature = await this.connection.sendTransaction(
-        transaction,
-        [],
-        { skipPreflight: false }
-      );
+      const signature = await this.connection.sendTransaction(transaction, [], {
+        skipPreflight: false,
+      });
 
-      await this.connection.confirmTransaction(signature, 'confirmed');
+      await this.connection.confirmTransaction(signature, "confirmed");
       const txDetails = await this.connection.getTransaction(signature, {
-        commitment: 'confirmed'
+        commitment: "confirmed",
       });
 
       const operation: TracedOperation = {
@@ -287,14 +288,13 @@ export class BlockchainTracer {
         details: unlockDetails,
         signature,
         slot: txDetails?.slot || 0,
-        blockTime: txDetails?.blockTime || undefined
+        blockTime: txDetails?.blockTime || undefined,
       };
 
-      console.log('✅ Unlock tracé avec succès:', signature);
+      console.log("✅ Unlock tracé avec succès:", signature);
       return operation;
-      
     } catch (error) {
-      console.error('❌ Erreur lors du traçage du unlock:', error);
+      console.error("❌ Erreur lors du traçage du unlock:", error);
       throw error;
     }
   }
@@ -306,8 +306,8 @@ export class BlockchainTracer {
     userPubkey: PublicKey,
     burnDetails: BurnDetails
   ): Promise<TracedOperation> {
-    console.log('📝 Traçage du burn sur la blockchain...');
-    
+    console.log("📝 Traçage du burn sur la blockchain...");
+
     try {
       const instruction = await this.createTraceInstruction(
         OperationType.BURN,
@@ -316,15 +316,13 @@ export class BlockchainTracer {
       );
 
       const transaction = new Transaction().add(instruction);
-      const signature = await this.connection.sendTransaction(
-        transaction,
-        [],
-        { skipPreflight: false }
-      );
+      const signature = await this.connection.sendTransaction(transaction, [], {
+        skipPreflight: false,
+      });
 
-      await this.connection.confirmTransaction(signature, 'confirmed');
+      await this.connection.confirmTransaction(signature, "confirmed");
       const txDetails = await this.connection.getTransaction(signature, {
-        commitment: 'confirmed'
+        commitment: "confirmed",
       });
 
       const operation: TracedOperation = {
@@ -336,14 +334,13 @@ export class BlockchainTracer {
         details: burnDetails,
         signature,
         slot: txDetails?.slot || 0,
-        blockTime: txDetails?.blockTime || undefined
+        blockTime: txDetails?.blockTime || undefined,
       };
 
-      console.log('✅ Burn tracé avec succès:', signature);
+      console.log("✅ Burn tracé avec succès:", signature);
       return operation;
-      
     } catch (error) {
-      console.error('❌ Erreur lors du traçage du burn:', error);
+      console.error("❌ Erreur lors du traçage du burn:", error);
       throw error;
     }
   }
@@ -359,45 +356,57 @@ export class BlockchainTracer {
       beforeSignature?: string;
     }
   ): Promise<TracedOperation[]> {
-    console.log('📖 Récupération de l\'historique des opérations...');
-    
+    console.log("📖 Récupération de l'historique des opérations...");
+
     try {
       // Récupérer les signatures de transactions
       const signatures = await this.connection.getSignaturesForAddress(
         userPubkey,
         {
           limit: options?.limit || 100,
-          before: options?.beforeSignature
+          before: options?.beforeSignature,
         }
       );
 
       // Récupérer les détails de chaque transaction
       const operations: TracedOperation[] = [];
-      
+
       for (const sig of signatures) {
         try {
           const tx = await this.connection.getTransaction(sig.signature, {
-            commitment: 'confirmed'
+            commitment: "confirmed",
           });
 
           if (!tx) continue;
 
           // Parser les détails de la transaction
-          const operation = await this.parseTransactionToOperation(tx, sig.signature);
-          
-          if (operation && (!options?.type || operation.type === options.type)) {
+          const operation = await this.parseTransactionToOperation(
+            tx,
+            sig.signature
+          );
+
+          if (
+            operation &&
+            (!options?.type || operation.type === options.type)
+          ) {
             operations.push(operation);
           }
         } catch (error) {
-          console.warn('⚠️ Erreur lors du parsing de la tx:', sig.signature, error);
+          console.warn(
+            "⚠️ Erreur lors du parsing de la tx:",
+            sig.signature,
+            error
+          );
         }
       }
 
       console.log(`✅ ${operations.length} opérations récupérées`);
       return operations;
-      
     } catch (error) {
-      console.error('❌ Erreur lors de la récupération de l\'historique:', error);
+      console.error(
+        "❌ Erreur lors de la récupération de l'historique:",
+        error
+      );
       throw error;
     }
   }
@@ -406,24 +415,23 @@ export class BlockchainTracer {
    * Récupère une opération spécifique par sa signature
    */
   async getOperation(signature: string): Promise<TracedOperation | null> {
-    console.log('🔍 Recherche de l\'opération:', signature);
-    
+    console.log("🔍 Recherche de l'opération:", signature);
+
     try {
       const tx = await this.connection.getTransaction(signature, {
-        commitment: 'confirmed'
+        commitment: "confirmed",
       });
 
       if (!tx) {
-        console.log('❌ Transaction non trouvée');
+        console.log("❌ Transaction non trouvée");
         return null;
       }
 
       const operation = await this.parseTransactionToOperation(tx, signature);
-      console.log('✅ Opération trouvée:', operation?.type);
+      console.log("✅ Opération trouvée:", operation?.type);
       return operation;
-      
     } catch (error) {
-      console.error('❌ Erreur lors de la récupération de l\'opération:', error);
+      console.error("❌ Erreur lors de la récupération de l'opération:", error);
       return null;
     }
   }
@@ -441,10 +449,12 @@ export class BlockchainTracer {
     firstOperation?: number;
     lastOperation?: number;
   }> {
-    console.log('📊 Calcul des statistiques utilisateur...');
-    
-    const operations = await this.getOperationHistory(userPubkey, { limit: 1000 });
-    
+    console.log("📊 Calcul des statistiques utilisateur...");
+
+    const operations = await this.getOperationHistory(userPubkey, {
+      limit: 1000,
+    });
+
     const stats = {
       totalSwaps: 0,
       totalLocks: 0,
@@ -453,7 +463,7 @@ export class BlockchainTracer {
       totalVolume: 0,
       totalSavings: 0,
       firstOperation: undefined as number | undefined,
-      lastOperation: undefined as number | undefined
+      lastOperation: undefined as number | undefined,
     };
 
     for (const op of operations) {
@@ -486,7 +496,7 @@ export class BlockchainTracer {
       }
     }
 
-    console.log('✅ Statistiques calculées:', stats);
+    console.log("✅ Statistiques calculées:", stats);
     return stats;
   }
 
@@ -503,7 +513,7 @@ export class BlockchainTracer {
       JSON.stringify({
         type: operationType,
         details,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       })
     );
 
@@ -511,10 +521,10 @@ export class BlockchainTracer {
     return new TransactionInstruction({
       keys: [
         { pubkey: userPubkey, isSigner: true, isWritable: true },
-        { pubkey: this.programId, isSigner: false, isWritable: false }
+        { pubkey: this.programId, isSigner: false, isWritable: false },
       ],
       programId: this.programId,
-      data
+      data,
     });
   }
 
@@ -529,12 +539,12 @@ export class BlockchainTracer {
       // Parser les instructions de la transaction
       // Ceci est une version simplifiée - à adapter selon le format réel
       const instruction = tx.transaction.message.instructions[0];
-      
+
       if (!instruction) return null;
 
       // Décoder les données
       const decodedData = JSON.parse(instruction.data.toString());
-      
+
       return {
         id: signature,
         type: decodedData.type,
@@ -544,11 +554,10 @@ export class BlockchainTracer {
         details: decodedData.details,
         signature,
         slot: tx.slot,
-        blockTime: tx.blockTime || undefined
+        blockTime: tx.blockTime || undefined,
       };
-      
     } catch (error) {
-      console.error('Erreur lors du parsing:', error);
+      console.error("Erreur lors du parsing:", error);
       return null;
     }
   }
@@ -561,23 +570,23 @@ export class BlockchainTracer {
     filePath?: string
   ): Promise<string> {
     const operations = await this.getOperationHistory(userPubkey);
-    
-    const headers = [
-      'Signature',
-      'Type',
-      'Status',
-      'Date',
-      'Details',
-      'NPI',
-      'Rebate',
-      'Burn',
-      'Fees'
-    ].join(',');
 
-    const rows = operations.map(op => {
+    const headers = [
+      "Signature",
+      "Type",
+      "Status",
+      "Date",
+      "Details",
+      "NPI",
+      "Rebate",
+      "Burn",
+      "Fees",
+    ].join(",");
+
+    const rows = operations.map((op) => {
       const date = new Date(op.timestamp).toISOString();
-      const details = JSON.stringify(op.details).replace(/,/g, ';');
-      
+      const details = JSON.stringify(op.details).replace(/,/g, ";");
+
       return [
         op.signature,
         op.type,
@@ -587,15 +596,15 @@ export class BlockchainTracer {
         op.npi || 0,
         op.rebate || 0,
         op.burn || 0,
-        op.fees || 0
-      ].join(',');
+        op.fees || 0,
+      ].join(",");
     });
 
-    const csv = [headers, ...rows].join('\n');
-    
+    const csv = [headers, ...rows].join("\n");
+
     if (filePath) {
       // Écrire dans un fichier (nécessite fs)
-      console.log('💾 Export CSV vers:', filePath);
+      console.log("💾 Export CSV vers:", filePath);
     }
 
     return csv;
@@ -609,13 +618,12 @@ export function createBlockchainTracer(
   connection: Connection,
   programId: string | PublicKey
 ): BlockchainTracer {
-  const programPubkey = typeof programId === 'string' 
-    ? new PublicKey(programId) 
-    : programId;
+  const programPubkey =
+    typeof programId === "string" ? new PublicKey(programId) : programId;
 
   return new BlockchainTracer({
     connection,
-    programId: programPubkey
+    programId: programPubkey,
   });
 }
 
@@ -628,9 +636,9 @@ export class OperationFormatter {
    */
   static format(operation: TracedOperation): string {
     const date = new Date(operation.timestamp).toLocaleString();
-    const status = operation.status === OperationStatus.SUCCESS ? '✅' : '❌';
-    
-    let detailsStr = '';
+    const status = operation.status === OperationStatus.SUCCESS ? "✅" : "❌";
+
+    let detailsStr = "";
     switch (operation.type) {
       case OperationType.SWAP: {
         const swap = operation.details as SwapDetails;
@@ -657,20 +665,23 @@ export class OperationFormatter {
    */
   static generateReport(operations: TracedOperation[]): string {
     const report: string[] = [
-      '╔════════════════════════════════════════════╗',
-      '║     RAPPORT D\'OPÉRATIONS BLOCKCHAIN       ║',
-      '╚════════════════════════════════════════════╝',
-      ''
+      "╔════════════════════════════════════════════╗",
+      "║     RAPPORT D'OPÉRATIONS BLOCKCHAIN       ║",
+      "╚════════════════════════════════════════════╝",
+      "",
     ];
 
     // Statistiques globales
     const stats = {
       total: operations.length,
-      swaps: operations.filter(op => op.type === OperationType.SWAP).length,
-      locks: operations.filter(op => op.type === OperationType.LOCK).length,
-      unlocks: operations.filter(op => op.type === OperationType.UNLOCK).length,
-      success: operations.filter(op => op.status === OperationStatus.SUCCESS).length,
-      failed: operations.filter(op => op.status === OperationStatus.FAILED).length
+      swaps: operations.filter((op) => op.type === OperationType.SWAP).length,
+      locks: operations.filter((op) => op.type === OperationType.LOCK).length,
+      unlocks: operations.filter((op) => op.type === OperationType.UNLOCK)
+        .length,
+      success: operations.filter((op) => op.status === OperationStatus.SUCCESS)
+        .length,
+      failed: operations.filter((op) => op.status === OperationStatus.FAILED)
+        .length,
     };
 
     report.push(`Total d'opérations: ${stats.total}`);
@@ -679,15 +690,15 @@ export class OperationFormatter {
     report.push(`  - Unlocks: ${stats.unlocks}`);
     report.push(`  - Succès:  ${stats.success}`);
     report.push(`  - Échecs:  ${stats.failed}`);
-    report.push('');
-    report.push('─'.repeat(48));
-    report.push('');
+    report.push("");
+    report.push("─".repeat(48));
+    report.push("");
 
     // Liste des opérations
-    operations.forEach(op => {
+    operations.forEach((op) => {
       report.push(this.format(op));
     });
 
-    return report.join('\n');
+    return report.join("\n");
   }
 }
