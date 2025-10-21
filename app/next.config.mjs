@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     config.resolve.fallback = {
       fs: false,
       path: false,
@@ -10,6 +10,13 @@ const nextConfig = {
       "node:path": false,
       "node:os": false,
     };
+    
+    // Ignorer les modules optionnels manquants
+    config.ignoreWarnings = [
+      { module: /pino-pretty/ },
+      { module: /@walletconnect/ },
+    ];
+    
     return config;
   },
 };

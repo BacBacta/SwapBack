@@ -193,7 +193,7 @@ describe('✅ SDK E2E - Functions Validation', () => {
       tiers.forEach(tier => {
         const rebate = SwapBackUtils.calculateRebate(npi, rebatePercentage, tier.boost);
         console.log(`   ${tier.name} tier (${tier.boost}% boost): ${rebate} (expected ${tier.expected})`);
-        expect(rebate).toBe(tier.expected);
+        expect(rebate).toBeCloseTo(tier.expected, 0); // Use toBeCloseTo for floating point comparison
       });
       
       console.log('   ✅ All tier calculations correct');

@@ -1,19 +1,26 @@
 #!/usr/bin/env sh
 
 # Husky pre-commit hook
-# Run lint locally to catch obvious issues quickly.
-# Run the full test suite only in CI (CI=true) to avoid flaky network-dependent tests
+# Run lint and unit tests locally (fast, no network dependencies).
+# Run full integration tests only in CI to avoid flaky network-dependent tests
 # blocking local development.
 
 echo "Running linter (errors will abort commit)..."
 npm run lint --max-warnings=-1 || echo "⚠️  Linting completed with warnings"
 
 if [ "$CI" = "true" ]; then
-	echo "CI environment detected — running full test suite before commit"
-	npm test || {
-		echo "❌ Tests failed in CI pre-commit. Commit aborted.";
-		exit 1;
-	}
+  echo "CI environment detected — running full test suite (unit + integration)"
+  npm test || {
+    echo "❌ Tests failed in CI pre-commit. Commit aborted.";
+    exit 1;
+  }
 else
-	echo "Not in CI — skipping full test suite. To run tests locally: npm test"
+  echo "Running unit tests locally (integration tests skipped)..."
+  npm run test:unit || {
+    echo "❌ Unit tests failed. Commit aborted.";
+    echo "To run integration tests: npm run test:integration";
+    echo "To skip tests: git commit --no-verify";
+    exit 1;
+  }
+  echo "✅ Unit tests passed. Integration tests will run in CI."
 fi
