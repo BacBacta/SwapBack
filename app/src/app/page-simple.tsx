@@ -59,20 +59,26 @@ export default function Home() {
             <div className="space-y-8">
               {/* Swap Interface Card */}
               <div className="bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 p-8">
-                <h2 className="text-2xl font-bold text-white mb-6">Smart Router Swap</h2>
+                <h2 className="text-2xl font-bold text-white mb-6">
+                  Smart Router Swap
+                </h2>
                 <p className="text-gray-300 mb-4">
-                  ✨ Application is loading... The Smart Router interface will appear here.
+                  ✨ Application is loading... The Smart Router interface will
+                  appear here.
                 </p>
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
                   <p className="text-blue-300 text-sm">
-                    🔄 Initializing Enhanced Swap Interface and Route Comparison...
+                    🔄 Initializing Enhanced Swap Interface and Route
+                    Comparison...
                   </p>
                 </div>
               </div>
 
               {/* Route Comparison Card */}
               <div className="bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 p-8">
-                <h3 className="text-xl font-bold text-white mb-4">Route Comparison</h3>
+                <h3 className="text-xl font-bold text-white mb-4">
+                  Route Comparison
+                </h3>
                 <p className="text-gray-300">
                   📊 Best routes comparison will be displayed here
                 </p>
