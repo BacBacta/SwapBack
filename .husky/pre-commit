@@ -1,7 +1,20 @@
 #!/usr/bin/env sh
 
-# Run tests before commit
-npm test
+# Husky pre-commit hook
+# By default this runs tests and lint. If you are iterating locally and want to
+# skip the (potentially long) test run, set SKIP_TESTS=1 in your environment
+# or run `git commit --no-verify` to bypass hooks entirely.
+
+if [ "$SKIP_TESTS" = "1" ]; then
+	echo "SKIP_TESTS=1 detected — skipping test suite"
+else
+	echo "Running test suite (this may take a while)..."
+	npm test || {
+		echo "❌ Tests failed. Commit aborted. To bypass, run: git commit --no-verify or set SKIP_TESTS=1";
+		exit 1;
+	}
+fi
 
 # Run linter (warnings allowed, fail only on errors)
+echo "Running linter (errors will abort commit)..."
 npm run lint --max-warnings=-1 || echo "⚠️  Linting completed with warnings"
