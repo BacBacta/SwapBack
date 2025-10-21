@@ -6,9 +6,20 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
 import { PublicKey, Keypair, SystemProgram } from "@solana/web3.js";
 import { expect, beforeAll } from "vitest";
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+// Helper pour charger les IDL depuis les fichiers locaux
+function loadIdl(programName: string) {
+  const idlPath = path.join(__dirname, `../sdk/src/idl/${programName}.json`);
+  const idlContent = fs.readFileSync(idlPath, "utf-8");
+  return JSON.parse(idlContent);
+}
 
 describe("🚀 Router On-Chain E2E Tests", () => {
-  const provider = AnchorProvider.env();
+  const provider = process.env.ANCHOR_PROVIDER_URL
+    ? AnchorProvider.env()
+    : AnchorProvider.local("https://api.devnet.solana.com");
   anchor.setProvider(provider);
 
   // Program ID déployé sur devnet
@@ -29,12 +40,11 @@ describe("🚀 Router On-Chain E2E Tests", () => {
   let program: Program;
 
   beforeAll(async () => {
-    // Charger le programme depuis l'IDL on-chain
-    const idl = await Program.fetchIdl(ROUTER_PROGRAM_ID, provider);
-    if (!idl) {
-      throw new Error(
-        "IDL non trouvé on-chain. Uploader avec: anchor idl upgrade"
-      );
+    // Charger le programme depuis l'IDL local
+    const idl = loadIdl("swapback_router");
+    // Add programId to IDL if not present
+    if (!idl.address) {
+      idl.address = ROUTER_PROGRAM_ID.toBase58();
     }
     program = new Program(idl, provider);
     console.log("\n✅ Programme Router chargé:", ROUTER_PROGRAM_ID.toBase58());

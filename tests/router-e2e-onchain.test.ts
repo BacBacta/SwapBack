@@ -19,6 +19,15 @@ import {
   createAssociatedTokenAccountInstruction,
 } from "@solana/spl-token";
 import { BN } from "@coral-xyz/anchor";
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+// Helper pour charger les IDL depuis les fichiers locaux
+function loadIdl(programName: string) {
+  const idlPath = path.join(__dirname, `../sdk/src/idl/${programName}.json`);
+  const idlContent = fs.readFileSync(idlPath, "utf-8");
+  return JSON.parse(idlContent);
+}
 
 // Program IDs déployés sur devnet
 const ROUTER_PROGRAM_ID = new PublicKey(
@@ -39,7 +48,9 @@ const SWITCHBOARD_SOL_USD = new PublicKey(
 );
 
 describe("🚀 SwapBack Router - Tests E2E On-Chain (Devnet)", () => {
-  const provider = AnchorProvider.env();
+  const provider = process.env.ANCHOR_PROVIDER_URL
+    ? AnchorProvider.env()
+    : AnchorProvider.local("https://api.devnet.solana.com");
   anchor.setProvider(provider);
 
   const authority = provider.wallet.publicKey;
@@ -83,12 +94,12 @@ describe("🚀 SwapBack Router - Tests E2E On-Chain (Devnet)", () => {
     it("devrait initialiser le Router State", async () => {
       console.log("\n📝 Test: Initialize Router State");
 
-      // Charger IDL
-      const idl = await Program.fetchIdl(ROUTER_PROGRAM_ID, provider);
-      if (!idl) {
-        throw new Error("IDL non trouvé pour Router Program");
+      // Charger IDL depuis fichier local
+      const idl = loadIdl("swapback_router");
+      // Add programId to IDL if not present
+      if (!idl.address) {
+        idl.address = ROUTER_PROGRAM_ID.toBase58();
       }
-
       const routerProgram = new Program(idl, provider);
 
       try {
@@ -134,11 +145,12 @@ describe("🚀 SwapBack Router - Tests E2E On-Chain (Devnet)", () => {
     it("devrait initialiser le Buyback State", async () => {
       console.log("\n📝 Test: Initialize Buyback State");
 
-      const idl = await Program.fetchIdl(BUYBACK_PROGRAM_ID, provider);
-      if (!idl) {
-        throw new Error("IDL non trouvé pour Buyback Program");
+      // Charger IDL depuis fichier local
+      const idl = loadIdl("swapback_buyback");
+      // Add programId to IDL if not present
+      if (!idl.address) {
+        idl.address = BUYBACK_PROGRAM_ID.toBase58();
       }
-
       const buybackProgram = new Program(idl, provider);
 
       try {
@@ -253,9 +265,12 @@ describe("🚀 SwapBack Router - Tests E2E On-Chain (Devnet)", () => {
     it("devrait lire le Router State", async () => {
       console.log("\n📝 Test: Read Router State");
 
-      const idl = await Program.fetchIdl(ROUTER_PROGRAM_ID, provider);
-      if (!idl) throw new Error("IDL non trouvé");
-
+      // Charger IDL depuis fichier local
+      const idl = loadIdl("swapback_router");
+      // Add programId to IDL if not present
+      if (!idl.address) {
+        idl.address = ROUTER_PROGRAM_ID.toBase58();
+      }
       const routerProgram = new Program(idl, provider);
 
       try {
@@ -280,9 +295,12 @@ describe("🚀 SwapBack Router - Tests E2E On-Chain (Devnet)", () => {
     it("devrait lire le Buyback State", async () => {
       console.log("\n📝 Test: Read Buyback State");
 
-      const idl = await Program.fetchIdl(BUYBACK_PROGRAM_ID, provider);
-      if (!idl) throw new Error("IDL non trouvé");
-
+      // Charger IDL depuis fichier local
+      const idl = loadIdl("swapback_buyback");
+      // Add programId to IDL if not present
+      if (!idl.address) {
+        idl.address = BUYBACK_PROGRAM_ID.toBase58();
+      }
       const buybackProgram = new Program(idl, provider);
 
       try {

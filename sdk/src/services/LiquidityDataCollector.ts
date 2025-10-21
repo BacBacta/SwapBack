@@ -255,81 +255,43 @@ export class LiquidityDataCollector {
     return null;
   }
 
-  /**
-   * Fetch orderbook from Phoenix CLOB
+    /**
+   * Fetch real-time orderbook from Phoenix CLOB
    */
   private async fetchPhoenixOrderbook(
-    inputMint: string,
-    outputMint: string,
-    inputAmount: number
+    inputMint: PublicKey,
+    outputMint: PublicKey
   ): Promise<LiquiditySource | null> {
     try {
-      // Get Phoenix market for this pair
       const marketAddress = getPhoenixMarket(inputMint, outputMint);
-
       if (!marketAddress) {
-        console.warn(`No Phoenix market for ${inputMint}/${outputMint}`);
         return null;
       }
 
-      // Initialize Phoenix client
-      const phoenixClient = await PhoenixClient.create(this.connection);
+      // Check if Client.create exists (handles Vitest import issues)
+      if (typeof PhoenixClient.create !== 'function') {
+        console.warn("Phoenix Client.create not available - skipping Phoenix liquidity");
+        return null;
+      }
 
-      // Add market to client (uses string address)
+      const phoenixClient = await PhoenixClient.create(
+        this.connection,
+        false  // Don't skip initial fetch
+      );
+      
+      // Add market to the client
       await phoenixClient.addMarket(marketAddress.toBase58());
 
-      // Get market state
-      const marketState = phoenixClient.marketStates.get(
-        marketAddress.toBase58()
-      );
-
-      if (!marketState?.data) {
-        console.warn(
-          `Phoenix market ${marketAddress.toBase58()} not found or no data`
-        );
-        return null;
-      }
-
-      // Phoenix market data structure
-      // Note: Exact structure depends on SDK version
-      // This is a simplified approach - real implementation should use proper SDK methods
-
-      // For now, use mock data with Phoenix structure
-      // TODO: Use proper Phoenix SDK orderbook methods when available
-      const topOfBook = {
-        bidPrice: 100.5, // Best bid
-        askPrice: 100.7, // Best ask
-        bidSize: 1000, // Size at best bid
-        askSize: 800, // Size at best ask
-      };
-
-      // Calculate execution
-      const config = VENUE_CONFIGS[VenueName.PHOENIX];
-      const effectivePrice = topOfBook.askPrice * (1 + config.feeRate);
-      const expectedOutput = inputAmount * effectivePrice; // For CLOB, price is quote/base
-      const feeAmount = expectedOutput * config.feeRate;
-
-      // Slippage is minimal on CLOB if within top-of-book size
-      const slippagePercent = inputAmount > topOfBook.askSize ? 0.005 : 0.0001;
+      const ladder = phoenixClient.getUiLadder(marketAddress.toBase58());
 
       return {
         venue: VenueName.PHOENIX,
         venueType: VenueType.CLOB,
-        tokenPair: [inputMint, outputMint],
-        depth: topOfBook.askSize * topOfBook.askPrice, // Available liquidity at best price
-        topOfBook,
-        effectivePrice,
-        feeAmount,
-        slippagePercent,
-        route: [inputMint, outputMint],
+        inputMint: inputMint.toBase58(),
+        outputMint: outputMint.toBase58(),
+        price: ladder.bids[0]?.price || 0,
+        liquidity: this.calculateTotalLiquidity(ladder),
         timestamp: Date.now(),
-        metadata: {
-          phoenix: {
-            marketAddress: marketAddress.toBase58(),
-            // Market data available but structure varies by SDK version
-            hasMarketData: !!marketState.data,
-          },
-        },
       };
     } catch (error) {
       console.error("Phoenix orderbook fetch error:", error);

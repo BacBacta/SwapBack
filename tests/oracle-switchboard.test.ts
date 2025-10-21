@@ -5,8 +5,10 @@ import { SwapbackRouter } from "../target/types/swapback_router";
 import { expect } from "chai";
 
 describe("🔮 Oracle Switchboard Integration", () => {
-  // Configuration
-  const provider = AnchorProvider.env();
+  // Configuration - Fallback si ANCHOR_PROVIDER_URL absent
+  const provider = process.env.ANCHOR_PROVIDER_URL
+    ? AnchorProvider.env()
+    : AnchorProvider.local("https://api.devnet.solana.com");
   anchor.setProvider(provider);
 
   const program = anchor.workspace.SwapbackRouter as Program<SwapbackRouter>;

@@ -22,3 +22,4 @@ solana-program = { workspace = true }
 spl-token-2022 = "4.0.0"
 spl-transfer-hook-interface = "0.6.1"
 spl-tlv-account-resolution = "0.6.1"
+# TODO #10: Fix version conflicts with spl-pod (requires Solana 2.0 upgrade)
