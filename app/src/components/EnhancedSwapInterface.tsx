@@ -69,7 +69,9 @@ export function EnhancedSwapInterface() {
   const [showOutputTokenSelector, setShowOutputTokenSelector] = useState(false);
   const [showSlippageModal, setShowSlippageModal] = useState(false);
   const [customSlippage, setCustomSlippage] = useState("");
-  const [selectedRouter, setSelectedRouter] = useState<"swapback" | "jupiter">("swapback");
+  const [selectedRouter, setSelectedRouter] = useState<"swapback" | "jupiter">(
+    "swapback"
+  );
   const [hasSearchedRoute, setHasSearchedRoute] = useState(false);
 
   // Auto-fetch routes when input changes (debounced)
@@ -89,20 +91,25 @@ export function EnhancedSwapInterface() {
   }, [debouncedFetchRoutes]);
 
   // Calculate price impact
-  const outputValue = typeof routes.selectedRoute?.expectedOutput === "string"
-    ? Number.parseFloat(routes.selectedRoute.expectedOutput)
-    : routes.selectedRoute?.expectedOutput || 0;
-  
+  const outputValue =
+    typeof routes.selectedRoute?.expectedOutput === "string"
+      ? Number.parseFloat(routes.selectedRoute.expectedOutput)
+      : routes.selectedRoute?.expectedOutput || 0;
+
   const inputValue = Number.parseFloat(swap.inputAmount || "0");
-  
-  const priceImpact = routes.selectedRoute && inputValue > 0
-    ? Math.abs((outputValue / (inputValue * 100)) * 100 - 100)
-    : 0;
+
+  const priceImpact =
+    routes.selectedRoute && inputValue > 0
+      ? Math.abs((outputValue / (inputValue * 100)) * 100 - 100)
+      : 0;
 
   // Handle token selection
   const handleInputTokenSelect = (token: { symbol: string }) => {
     const fullToken: Token = {
-      mint: token.symbol === "SOL" ? "So11111111111111111111111111111111111111112" : "",
+      mint:
+        token.symbol === "SOL"
+          ? "So11111111111111111111111111111111111111112"
+          : "",
       symbol: token.symbol,
       name: token.symbol,
       decimals: 9,
@@ -113,7 +120,10 @@ export function EnhancedSwapInterface() {
 
   const handleOutputTokenSelect = (token: { symbol: string }) => {
     const fullToken: Token = {
-      mint: token.symbol === "SOL" ? "So11111111111111111111111111111111111111112" : "",
+      mint:
+        token.symbol === "SOL"
+          ? "So11111111111111111111111111111111111111112"
+          : "",
       symbol: token.symbol,
       name: token.symbol,
       decimals: 9,
@@ -159,24 +169,29 @@ export function EnhancedSwapInterface() {
   };
 
   // Mock route data for display (until real data is available)
-  const mockRouteInfo = routes.selectedRoute ? {
-    type: "Aggregator" as const,
-    estimatedOutput: outputValue,
-    nonOptimizedOutput: outputValue * 0.98,
-    npi: outputValue * 0.02,
-    rebate: outputValue * 0.012,
-    burn: outputValue * 0.004,
-    fees: outputValue * 0.004,
-    priceImpact: priceImpact,
-    route: routes.selectedRoute.venues.map((venue) => ({
-      label: venue,
-      inputMint: swap.inputToken?.mint || "",
-      outputMint: swap.outputToken?.mint || "",
-      inAmount: (inputValue * 1000000).toString(),
-      outAmount: (outputValue * 1000000 / routes.selectedRoute!.venues.length).toString(),
-      fee: "1000",
-    })) as RouteStep[],
-  } : null;
+  const mockRouteInfo = routes.selectedRoute
+    ? {
+        type: "Aggregator" as const,
+        estimatedOutput: outputValue,
+        nonOptimizedOutput: outputValue * 0.98,
+        npi: outputValue * 0.02,
+        rebate: outputValue * 0.012,
+        burn: outputValue * 0.004,
+        fees: outputValue * 0.004,
+        priceImpact: priceImpact,
+        route: routes.selectedRoute.venues.map((venue) => ({
+          label: venue,
+          inputMint: swap.inputToken?.mint || "",
+          outputMint: swap.outputToken?.mint || "",
+          inAmount: (inputValue * 1000000).toString(),
+          outAmount: (
+            (outputValue * 1000000) /
+            routes.selectedRoute!.venues.length
+          ).toString(),
+          fee: "1000",
+        })) as RouteStep[],
+      }
+    : null;
 
   return (
     <>
@@ -249,10 +264,13 @@ export function EnhancedSwapInterface() {
 
         {/* Inputs etc - reduced for space */}
         {/* Will add full implementation */}
-        
+
         <div className="text-center text-gray-500 py-8">
           <p>Interface mise à jour avec toutes les fonctionnalités</p>
-          <p className="text-sm mt-2">ConnectionStatus, Router Toggle, HALF/MAX, Financial Details, Your Savings</p>
+          <p className="text-sm mt-2">
+            ConnectionStatus, Router Toggle, HALF/MAX, Financial Details, Your
+            Savings
+          </p>
         </div>
       </div>
     </>

@@ -3,6 +3,7 @@
 ## 📊 Analyse Complète
 
 ### ✅ Fonctionnalités PRÉSENTES dans le nouveau design
+
 1. ✓ Slippage tolerance (modal + slider)
 2. ✓ MEV Protection toggle
 3. ✓ Priority Level (low/medium/high)
@@ -15,11 +16,13 @@
 ### ❌ Fonctionnalités MANQUANTES dans le nouveau design
 
 #### 1. **ConnectionStatus Component**
+
 - **Ancien**: `<ConnectionStatus />` affiché en haut
 - **Nouveau**: ❌ ABSENT
 - **Action**: Importer et ajouter `import { ConnectionStatus } from "./ConnectionStatus";`
 
 #### 2. **Router Selection Toggle (SwapBack vs Jupiter)**
+
 - **Ancien**: Toggle avec 2 boutons stylisés:
   - ⚡ SwapBack (+Rebates +Burn)
   - 🪐 Jupiter V6 (Best Market Price)
@@ -27,23 +30,33 @@
 - **Action**: Ajouter state `const [selectedRouter, setSelectedRouter] = useState<"swapback" | "jupiter">("swapback");`
 
 #### 3. **Balance USD Display**
+
 - **Ancien**: Affiche `≈ $XX.XX USD` sous chaque montant de token
 - **Nouveau**: ❌ ABSENT
 - **Action**: Ajouter calcul et affichage:
+
 ```tsx
-{swap.inputAmount && swap.inputToken?.usdPrice && (
-  <div className="mt-2 text-sm text-gray-400">
-    ≈ ${(Number.parseFloat(swap.inputAmount) * swap.inputToken.usdPrice).toFixed(2)} USD
-  </div>
-)}
+{
+  swap.inputAmount && swap.inputToken?.usdPrice && (
+    <div className="mt-2 text-sm text-gray-400">
+      ≈ $
+      {(Number.parseFloat(swap.inputAmount) * swap.inputToken.usdPrice).toFixed(
+        2
+      )}{" "}
+      USD
+    </div>
+  );
+}
 ```
 
 #### 4. **Boutons HALF / MAX**
+
 - **Ancien**: 2 boutons pour sélectionner rapidement:
   - `HALF` - Moitié du balance
   - `MAX` - Balance complet
 - **Nouveau**: ❌ ABSENT
 - **Action**: Ajouter fonctions et boutons:
+
 ```tsx
 const setMaxBalance = () => {
   if (swap.inputToken?.balance && swap.inputToken.balance > 0) {
@@ -59,6 +72,7 @@ const setHalfBalance = () => {
 ```
 
 #### 5. **Chemin de Route Visuel Détaillé**
+
 - **Ancien**: Section `🛣️ Chemin de Route` avec:
   - Chaque étape affichée individuellement
   - Montants entrée/sortie par étape
@@ -69,6 +83,7 @@ const setHalfBalance = () => {
 - **Action**: Ajouter section complète avec mapping des étapes
 
 #### 6. **Financial Details Section**
+
 - **Ancien**: Section détaillée avec:
   - **NPI** (Net Price Improvement) - +X.XXXX USDC
   - **Your rebate (30%)** - +X.XXXX USDC
@@ -80,6 +95,7 @@ const setHalfBalance = () => {
 - **Action**: Ajouter toute la section avec calculs mockés
 
 #### 7. **Your Savings Section (💰)**
+
 - **Ancien**: Grande section visuelle montrant:
   - ❌ **Sans SwapBack**: Prix standard (rouge)
   - ✅ **Avec SwapBack**: Prix optimisé (vert)
@@ -90,6 +106,7 @@ const setHalfBalance = () => {
 - **Action**: PRIORITÉ HAUTE - Ajouter toute la section
 
 #### 8. **Bouton "Find Best Route" Séparé**
+
 - **Ancien**: 2 boutons distincts:
   1. `🔍 Find Best Route` - Recherche de routes
   2. `⚡ Execute Swap` - Exécution (affiché après recherche)
@@ -97,6 +114,7 @@ const setHalfBalance = () => {
 - **Action**: Implémenter state `hasSearchedRoute` et séparation
 
 #### 9. **Résumé Route Optimisée (avant bouton)**
+
 - **Ancien**: Card compact montrant:
   - Type de route (Direct/Aggregator)
   - Étapes simplifiées en ligne
@@ -105,6 +123,7 @@ const setHalfBalance = () => {
 - **Action**: Ajouter card récapitulative
 
 #### 10. **Slider Slippage Visible**
+
 - **Ancien**: Slider range visible directement dans l'interface
 - **Nouveau**: Caché dans modal
 - **Impact**: Moins accessible
@@ -113,6 +132,7 @@ const setHalfBalance = () => {
 ## 🎯 Plan d'Action Prioritaire
 
 ### PHASE 1: Fonctionnalités Critiques (Impact UX élevé)
+
 1. ✅ **Your Savings Section** - 💰 Value proposition principale
 2. ✅ **Router Selection Toggle** - ⚡/🪐 Différenciation SwapBack/Jupiter
 3. ✅ **Financial Details** - NPI, Rebate, Burn (unique selling points)
@@ -120,11 +140,13 @@ const setHalfBalance = () => {
 5. ✅ **USD Price Display** - Compréhension immédiate
 
 ### PHASE 2: Fonctionnalités Importantes (Visual Clarity)
+
 6. ✅ **Chemin de Route Détaillé** - Transparence du routing
 7. ✅ **ConnectionStatus** - Feedback réseau
 8. ✅ **Bouton Find Route Séparé** - Workflow plus clair
 
 ### PHASE 3: Fonctionnalités Nice-to-Have
+
 9. ⚪ **Résumé Route Optimisée** - Redondant avec autres sections
 10. ⚪ **Slider Slippage Visible** - Modal suffit
 
@@ -138,7 +160,9 @@ import { TokenSelector } from "./TokenSelector";
 ## 🔧 States Additionnels Requis
 
 ```typescript
-const [selectedRouter, setSelectedRouter] = useState<"swapback" | "jupiter">("swapback");
+const [selectedRouter, setSelectedRouter] = useState<"swapback" | "jupiter">(
+  "swapback"
+);
 const [hasSearchedRoute, setHasSearchedRoute] = useState(false);
 ```
 
@@ -182,6 +206,7 @@ const [hasSearchedRoute, setHasSearchedRoute] = useState(false);
 ## ✨ Résultat Attendu
 
 Interface complète avec:
+
 - ✅ Toutes les fonctionnalités de l'ancien design
 - ✅ Nouveau design moderne du EnhancedSwapInterface
 - ✅ Zustand state management

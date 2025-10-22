@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { EnhancedSwapInterface } from "@/components/EnhancedSwapInterface";
+import { SwapInterface } from "@/components/SwapInterface";
 import { RouteComparison } from "@/components/RouteComparison";
 import { SwapBackDashboard } from "@/components/SwapBackDashboard";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
@@ -62,8 +62,8 @@ export default function Home() {
           {activeTab === "swap" && (
             <div className="space-y-8">
               {/* Smart Router Swap Interface */}
-              <EnhancedSwapInterface />
-              
+              <SwapInterface />
+
               {/* Route Comparison - Shows best routes */}
               <RouteComparison />
             </div>
