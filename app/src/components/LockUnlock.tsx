@@ -4,6 +4,10 @@ import { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useCNFT } from "../hooks/useCNFT";
 import { calculateLevel, calculateBoost } from "../lib/cnft";
+import {
+  addLockTransaction,
+  addUnlockTransaction,
+} from "./TransactionHistory";
 
 export const LockUnlock = () => {
   const { connected, publicKey } = useWallet();
@@ -52,6 +56,19 @@ export const LockUnlock = () => {
       // Pour l'instant, simulons le comportement
       console.log("⚠️ Programme non encore déployé - simulation activée");
       await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // Générer une signature simulée
+      const mockSignature = `sim${Date.now()}${Math.random().toString(36).substring(2, 15)}`;
+
+      // Ajouter à l'historique des transactions
+      addLockTransaction(publicKey.toString(), {
+        signature: mockSignature,
+        inputAmount: amount,
+        lockDuration: durationDays,
+        lockLevel: level,
+        lockBoost: boost,
+        status: "success",
+      });
 
       alert(
         `✅ $BACK Tokens Locked!\n\n` +
@@ -103,6 +120,17 @@ export const LockUnlock = () => {
 
       // Simulation de unlock (à remplacer par la vraie transaction)
       await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // Générer une signature simulée
+      const mockSignature = `sim${Date.now()}${Math.random().toString(36).substring(2, 15)}`;
+
+      // Ajouter à l'historique des transactions
+      addUnlockTransaction(publicKey.toString(), {
+        signature: mockSignature,
+        outputAmount: cnftData.lockedAmount,
+        lockLevel: levelName || "Unknown",
+        status: "success",
+      });
 
       alert(
         `✅ $BACK Tokens Unlocked!\n\n` +

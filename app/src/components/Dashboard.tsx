@@ -15,7 +15,7 @@ export const Dashboard = () => {
   const { connected, publicKey } = useWallet();
   const [activeTab, setActiveTab] = useState<
     "overview" | "analytics" | "strategies"
-  >("overview");
+  >("strategies");
   const [strategyTab, setStrategyTab] = useState<"dca" | "lockunlock">(
     "lockunlock"
   );

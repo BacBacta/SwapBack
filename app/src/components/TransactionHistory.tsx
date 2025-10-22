@@ -7,7 +7,7 @@ interface Transaction {
   id: string;
   signature: string;
   timestamp: number;
-  type: "swap" | "lock" | "unlock";
+  type: "swap" | "lock" | "unlock" | "dca";
   router: "swapback" | "jupiter";
   inputToken: string;
   outputToken: string;
@@ -18,6 +18,14 @@ interface Transaction {
   burn?: number;
   status: "success" | "pending" | "failed";
   explorerUrl: string;
+  // Champs spécifiques pour DCA
+  dcaInterval?: number; // En jours
+  dcaSwapsExecuted?: number;
+  dcaTotalSwaps?: number;
+  // Champs spécifiques pour Lock/Unlock
+  lockDuration?: number; // En jours
+  lockLevel?: string; // Bronze/Silver/Gold
+  lockBoost?: number; // Pourcentage
 }
 
 interface TransactionHistoryProps {
@@ -31,7 +39,7 @@ export const TransactionHistory = ({
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isOpen, setIsOpen] = useState(true);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
-  const [filter, setFilter] = useState<"all" | "swap" | "lock" | "unlock">(
+  const [filter, setFilter] = useState<"all" | "swap" | "lock" | "unlock" | "dca">(
     "all"
   );
 
@@ -126,7 +134,7 @@ export const TransactionHistory = ({
 
             {/* Filtres */}
             <div className="flex gap-2 mb-4">
-              {(["all", "swap", "lock", "unlock"] as const).map((f) => (
+              {(["all", "swap", "lock", "unlock", "dca"] as const).map((f) => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
@@ -188,6 +196,10 @@ export const TransactionHistory = ({
                             [{tx.status.toUpperCase()}]
                           </span>
                           <span className="px-2 py-1 text-xs font-bold border-2 border-[var(--primary)] text-[var(--primary)]">
+                            {tx.type === "swap" && "🔄 "}
+                            {tx.type === "lock" && "🔒 "}
+                            {tx.type === "unlock" && "🔓 "}
+                            {tx.type === "dca" && "📊 "}
                             [{tx.type.toUpperCase()}]
                           </span>
                           <span className="px-2 py-1 text-xs font-bold border-2 border-[var(--primary)] text-[var(--primary)]">
@@ -210,6 +222,37 @@ export const TransactionHistory = ({
                             )}
                             {tx.burn && (
                               <span>BURN: ${tx.burn.toFixed(4)}</span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Détails Lock/Unlock */}
+                        {(tx.type === "lock" || tx.type === "unlock") && (
+                          <div className="flex gap-4 text-xs terminal-text opacity-70 mt-2">
+                            {tx.lockLevel && (
+                              <span className="text-[var(--primary)]">
+                                LEVEL: {tx.lockLevel}
+                              </span>
+                            )}
+                            {tx.lockDuration && (
+                              <span>DURATION: {tx.lockDuration} days</span>
+                            )}
+                            {tx.lockBoost && (
+                              <span>BOOST: +{tx.lockBoost}%</span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Détails DCA */}
+                        {tx.type === "dca" && (
+                          <div className="flex gap-4 text-xs terminal-text opacity-70 mt-2">
+                            {tx.dcaInterval && (
+                              <span>INTERVAL: Every {tx.dcaInterval} days</span>
+                            )}
+                            {tx.dcaSwapsExecuted !== undefined && tx.dcaTotalSwaps && (
+                              <span className="text-[var(--primary)]">
+                                PROGRESS: {tx.dcaSwapsExecuted}/{tx.dcaTotalSwaps} swaps
+                              </span>
                             )}
                           </div>
                         )}
@@ -373,11 +416,104 @@ export const TransactionHistory = ({
   );
 };
 
-// Hook pour utiliser addTransaction dans d'autres composants
-export const useTransactionHistory = () => {
-  const [addTxCallback, setAddTxCallback] = useState<
-    ((tx: Omit<Transaction, "id" | "timestamp">) => void) | null
-  >(null);
+// Fonctions helper pour ajouter des transactions dans l'historique
+export const addTransactionToHistory = (
+  walletAddress: string,
+  tx: Omit<Transaction, "id" | "timestamp">
+) => {
+  const storageKey = `swapback_history_${walletAddress}`;
+  const stored = localStorage.getItem(storageKey);
+  const existing: Transaction[] = stored ? JSON.parse(stored) : [];
 
-  return { addTransaction: addTxCallback };
+  const newTx: Transaction = {
+    ...tx,
+    id: Date.now().toString(),
+    timestamp: Date.now(),
+  };
+
+  const updated = [newTx, ...existing].slice(0, 100); // Garder les 100 dernières
+  localStorage.setItem(storageKey, JSON.stringify(updated));
+};
+
+// Helper spécifique pour Lock
+export const addLockTransaction = (
+  walletAddress: string,
+  params: {
+    signature: string;
+    inputAmount: number;
+    lockDuration: number;
+    lockLevel: string;
+    lockBoost: number;
+    status?: "success" | "pending" | "failed";
+  }
+) => {
+  addTransactionToHistory(walletAddress, {
+    signature: params.signature,
+    type: "lock",
+    router: "swapback",
+    inputToken: "$BACK",
+    outputToken: "cNFT",
+    inputAmount: params.inputAmount,
+    outputAmount: 1, // 1 cNFT
+    lockDuration: params.lockDuration,
+    lockLevel: params.lockLevel,
+    lockBoost: params.lockBoost,
+    status: params.status || "success",
+    explorerUrl: `https://solscan.io/tx/${params.signature}?cluster=devnet`,
+  });
+};
+
+// Helper spécifique pour Unlock
+export const addUnlockTransaction = (
+  walletAddress: string,
+  params: {
+    signature: string;
+    outputAmount: number;
+    lockLevel: string;
+    status?: "success" | "pending" | "failed";
+  }
+) => {
+  addTransactionToHistory(walletAddress, {
+    signature: params.signature,
+    type: "unlock",
+    router: "swapback",
+    inputToken: "cNFT",
+    outputToken: "$BACK",
+    inputAmount: 1, // 1 cNFT
+    outputAmount: params.outputAmount,
+    lockLevel: params.lockLevel,
+    status: params.status || "success",
+    explorerUrl: `https://solscan.io/tx/${params.signature}?cluster=devnet`,
+  });
+};
+
+// Helper spécifique pour DCA
+export const addDCATransaction = (
+  walletAddress: string,
+  params: {
+    signature: string;
+    inputToken: string;
+    outputToken: string;
+    inputAmount: number;
+    outputAmount: number;
+    dcaInterval: number;
+    dcaSwapsExecuted: number;
+    dcaTotalSwaps: number;
+    status?: "success" | "pending" | "failed";
+  }
+) => {
+  addTransactionToHistory(walletAddress, {
+    signature: params.signature,
+    type: "dca",
+    router: "swapback",
+    inputToken: params.inputToken,
+    outputToken: params.outputToken,
+    inputAmount: params.inputAmount,
+    outputAmount: params.outputAmount,
+    dcaInterval: params.dcaInterval,
+    dcaSwapsExecuted: params.dcaSwapsExecuted,
+    dcaTotalSwaps: params.dcaTotalSwaps,
+    status: params.status || "success",
+    explorerUrl: `https://solscan.io/tx/${params.signature}?cluster=devnet`,
+  });
 };

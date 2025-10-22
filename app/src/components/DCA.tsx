@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useTokenData } from "../hooks/useTokenData";
 import { DCASimulator } from "./DCASimulator";
+import { addDCATransaction } from "./TransactionHistory";
 
 interface DCAOrder {
   id: string;
@@ -178,6 +179,32 @@ export const DCA = () => {
       // Save to localStorage
       const storageKey = `swapback_dca_${publicKey.toString()}`;
       localStorage.setItem(storageKey, JSON.stringify(updatedOrders));
+
+      // Générer une signature simulée pour la création du plan DCA
+      const mockSignature = `sim${Date.now()}${Math.random().toString(36).substring(2, 15)}`;
+
+      // Calculer l'intervalle en jours
+      const intervalInDays =
+        frequency === "hourly"
+          ? 1 / 24
+          : frequency === "daily"
+            ? 1
+            : frequency === "weekly"
+              ? 7
+              : 30;
+
+      // Enregistrer la création du plan DCA dans l'historique
+      addDCATransaction(publicKey.toString(), {
+        signature: mockSignature,
+        inputToken,
+        outputToken,
+        inputAmount: Number.parseFloat(amountPerOrder),
+        outputAmount: 0, // Pas encore exécuté
+        dcaInterval: intervalInDays,
+        dcaSwapsExecuted: 0,
+        dcaTotalSwaps: Number.parseInt(totalOrders),
+        status: "success",
+      });
 
       const executionTime = getNextExecutionTime(frequency).toLowerCase();
       alert(

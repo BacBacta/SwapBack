@@ -1,14 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SwapInterface } from "@/components/SwapInterface";
 import { RouteComparison } from "@/components/RouteComparison";
-import { SwapBackDashboard } from "@/components/SwapBackDashboard";
+import { Dashboard } from "@/components/Dashboard";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { KeyboardShortcutsHelper } from "@/components/KeyboardShortcutsHelper";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<"swap" | "dashboard">("swap");
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   return (
     <main className="min-h-screen bg-black">
@@ -55,7 +60,7 @@ export default function Home() {
             </div>
 
             {/* WALLET BUTTON */}
-            <WalletMultiButton />
+            {isMounted && <WalletMultiButton />}
           </div>
         </div>
       </nav>
@@ -72,7 +77,7 @@ export default function Home() {
               <RouteComparison />
             </div>
           )}
-          {activeTab === "dashboard" && <SwapBackDashboard />}
+          {activeTab === "dashboard" && <Dashboard />}
 
           {/* Features Section */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16">

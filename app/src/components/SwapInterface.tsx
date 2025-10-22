@@ -49,7 +49,7 @@ export const SwapInterface = () => {
   // �🔍 Blockchain Tracer
   const { traceSwap } = useBlockchainTracer();
 
-  // 📝 Fonction pour sauvegarder dans l'historique
+  // 📝 Function to save to history
   const saveToHistory = (tx: {
     signature: string;
     type: "swap" | "lock" | "unlock";
@@ -283,9 +283,9 @@ export const SwapInterface = () => {
         );
 
         if (signature) {
-          console.log("✅ Swap Jupiter exécuté:", signature);
+          console.log("✅ Jupiter Swap executed:", signature);
 
-          // 💾 Sauvegarder dans l'historique
+          // 💾 Save to history
           saveToHistory({
             signature,
             type: "swap",
@@ -300,9 +300,9 @@ export const SwapInterface = () => {
           });
 
           alert(
-            `✅ Swap Jupiter exécuté avec succès!\n\n` +
+            `✅ Jupiter Swap executed successfully!\n\n` +
               `📋 Signature: ${signature.substring(0, 20)}...\n` +
-              `🔗 Voir sur Solscan (devnet)`
+              `🔗 View on Solscan (devnet)`
           );
 
           // Reset
@@ -342,14 +342,14 @@ export const SwapInterface = () => {
         );
 
         if (operation) {
-          console.log("✅ Swap tracé avec succès!");
+          console.log("✅ Swap traced successfully!");
           console.log("📋 Signature:", operation.signature);
           console.log(
-            "🔗 Voir sur Solana Explorer:",
+            "🔗 View on Solana Explorer:",
             `https://explorer.solana.com/tx/${operation.signature}?cluster=devnet`
           );
 
-          // 💾 Sauvegarder dans l'historique
+          // 💾 Save to history
           saveToHistory({
             signature: operation.signature,
             type: "swap",
@@ -365,15 +365,15 @@ export const SwapInterface = () => {
           });
 
           alert(
-            `✅ Swap SwapBack exécuté avec succès!\n\n` +
+            `✅ SwapBack Swap executed successfully!\n\n` +
               `📋 Signature: ${operation.signature.substring(0, 20)}...\n` +
-              `💰 Économies: ${((routeInfo.estimatedOutput - routeInfo.nonOptimizedOutput) / 1000000).toFixed(4)} ${outputToken}\n` +
+              `💰 Savings: ${((routeInfo.estimatedOutput - routeInfo.nonOptimizedOutput) / 1000000).toFixed(4)} ${outputToken}\n` +
               `🎁 Rebate: ${routeInfo.rebate.toFixed(4)} ${outputToken}\n` +
               `🔥 Burn: ${routeInfo.burn.toFixed(4)} $BACK\n` +
-              `🔗 Opération tracée sur la blockchain`
+              `🔗 Operation traced on blockchain`
           );
         } else {
-          alert("⚠️ Swap exécuté mais le traçage a échoué");
+          alert("⚠️ Swap executed but tracing failed");
         }
 
         // Reset
@@ -942,14 +942,14 @@ export const SwapInterface = () => {
             </div>
 
             <div className="space-y-3">
-              {/* Prix Sans SwapBack */}
+              {/* Price Without SwapBack */}
               <div className="flex items-center justify-between p-3 bg-red-500/10 rounded-lg border border-red-500/20">
                 <div className="flex items-center gap-2">
                   <span className="text-red-400 text-xl">❌</span>
                   <div>
-                    <div className="text-xs text-gray-400">Sans SwapBack</div>
+                    <div className="text-xs text-gray-400">Without SwapBack</div>
                     <div className="text-sm font-semibold text-gray-300">
-                      Prix standard du marché
+                      Standard market price
                     </div>
                   </div>
                 </div>
@@ -961,14 +961,14 @@ export const SwapInterface = () => {
                 </div>
               </div>
 
-              {/* Prix Avec SwapBack */}
+              {/* Price With SwapBack */}
               <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-lg border border-green-500/30">
                 <div className="flex items-center gap-2">
                   <span className="text-green-400 text-xl">✅</span>
                   <div>
-                    <div className="text-xs text-gray-400">Avec SwapBack</div>
+                    <div className="text-xs text-gray-400">With SwapBack</div>
                     <div className="text-sm font-semibold text-gray-300">
-                      Route optimisée
+                      Optimized route
                     </div>
                   </div>
                 </div>
@@ -980,16 +980,16 @@ export const SwapInterface = () => {
                 </div>
               </div>
 
-              {/* Profit / Économie */}
+              {/* Profit / Savings */}
               <div className="flex items-center justify-between p-3 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-lg border-2 border-green-400/40">
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">🎉</span>
                   <div>
                     <div className="text-xs text-green-400 font-semibold">
-                      VOTRE PROFIT
+                      YOUR PROFIT
                     </div>
                     <div className="text-sm text-gray-300">
-                      Économie réalisée
+                      Savings realized
                     </div>
                   </div>
                 </div>
@@ -1015,9 +1015,9 @@ export const SwapInterface = () => {
             </div>
 
             <div className="mt-3 text-center text-xs text-gray-400">
-              💡 Vous recevez{" "}
-              <span className="text-green-400 font-bold">plus de tokens</span>{" "}
-              grâce à l'optimisation SwapBack
+              💡 You receive{" "}
+              <span className="text-green-400 font-bold">more tokens</span>{" "}
+              thanks to SwapBack optimization
             </div>
           </div>
         )}
