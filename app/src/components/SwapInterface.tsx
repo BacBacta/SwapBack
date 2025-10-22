@@ -278,7 +278,7 @@ export const SwapInterface = () => {
 
         if (signature) {
           console.log("✅ Swap Jupiter exécuté:", signature);
-          
+
           // 💾 Sauvegarder dans l'historique
           saveToHistory({
             signature,
@@ -287,8 +287,10 @@ export const SwapInterface = () => {
             inputToken,
             outputToken,
             inputAmount: Number.parseFloat(inputAmount),
-            outputAmount: jupiterQuote?.outAmount ? Number(jupiterQuote.outAmount) / 1000000 : 0,
-            status: "success"
+            outputAmount: jupiterQuote?.outAmount
+              ? Number(jupiterQuote.outAmount) / 1000000
+              : 0,
+            status: "success",
           });
 
           alert(
@@ -353,7 +355,7 @@ export const SwapInterface = () => {
             npi: routeInfo.npi,
             rebate: routeInfo.rebate,
             burn: routeInfo.burn,
-            status: "success"
+            status: "success",
           });
 
           alert(
@@ -440,17 +442,21 @@ export const SwapInterface = () => {
           <div className="flex justify-center mb-4">
             <button
               onClick={() => {
-                console.log("🔍 Opening transaction history, connected:", connected);
+                console.log(
+                  "🔍 Opening transaction history, connected:",
+                  connected
+                );
                 setShowHistory(true);
               }}
               disabled={!connected}
               className={`px-6 py-2 border-2 border-[var(--primary)] bg-transparent font-bold transition-all terminal-text ${
-                connected 
-                  ? "text-[var(--primary)] hover:bg-[var(--primary)]/20 cursor-pointer" 
+                connected
+                  ? "text-[var(--primary)] hover:bg-[var(--primary)]/20 cursor-pointer"
                   : "text-[var(--primary)]/50 cursor-not-allowed"
               }`}
             >
-              <span className="terminal-prefix">&gt;</span> [TRANSACTION_HISTORY]
+              <span className="terminal-prefix">&gt;</span>{" "}
+              [TRANSACTION_HISTORY]
             </button>
           </div>
         </div>

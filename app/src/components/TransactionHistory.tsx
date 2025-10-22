@@ -24,12 +24,16 @@ interface TransactionHistoryProps {
   onClose?: () => void;
 }
 
-export const TransactionHistory = ({ onClose }: TransactionHistoryProps = {}) => {
+export const TransactionHistory = ({
+  onClose,
+}: TransactionHistoryProps = {}) => {
   const { connected, publicKey } = useWallet();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isOpen, setIsOpen] = useState(true);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
-  const [filter, setFilter] = useState<"all" | "swap" | "lock" | "unlock">("all");
+  const [filter, setFilter] = useState<"all" | "swap" | "lock" | "unlock">(
+    "all"
+  );
 
   // Charger l'historique depuis localStorage
   useEffect(() => {
@@ -84,7 +88,12 @@ export const TransactionHistory = ({ onClose }: TransactionHistoryProps = {}) =>
   }
 
   // Le composant est maintenant contrôlé par le parent via isOpen
-  console.log("📜 TransactionHistory rendered, isOpen:", isOpen, "transactions:", transactions.length);
+  console.log(
+    "📜 TransactionHistory rendered, isOpen:",
+    isOpen,
+    "transactions:",
+    transactions.length
+  );
 
   return (
     <>
@@ -96,7 +105,8 @@ export const TransactionHistory = ({ onClose }: TransactionHistoryProps = {}) =>
             <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-[var(--primary)]">
               <div>
                 <h2 className="text-2xl font-bold terminal-text mb-2">
-                  <span className="terminal-prefix">&gt;</span> TRANSACTION_HISTORY
+                  <span className="terminal-prefix">&gt;</span>{" "}
+                  TRANSACTION_HISTORY
                 </h2>
                 <p className="text-sm terminal-text opacity-70">
                   [{transactions.length} RECORDS] | BLOCKCHAIN_EXPLORER
@@ -126,7 +136,8 @@ export const TransactionHistory = ({ onClose }: TransactionHistoryProps = {}) =>
                       : "border-2 border-transparent hover:border-[var(--primary)]/50"
                   }`}
                 >
-                  <span className="terminal-prefix">&gt;</span>[{f.toUpperCase()}]
+                  <span className="terminal-prefix">&gt;</span>[
+                  {f.toUpperCase()}]
                 </button>
               ))}
               {transactions.length > 0 && (
@@ -143,7 +154,8 @@ export const TransactionHistory = ({ onClose }: TransactionHistoryProps = {}) =>
             <div className="flex-1 overflow-y-auto space-y-3">
               {filteredTransactions.length === 0 ? (
                 <div className="text-center py-12 terminal-text opacity-50">
-                  <span className="terminal-prefix">&gt;</span> NO_TRANSACTIONS_FOUND
+                  <span className="terminal-prefix">&gt;</span>{" "}
+                  NO_TRANSACTIONS_FOUND
                   <div className="mt-2 text-sm">[DATABASE_EMPTY]</div>
                 </div>
               ) : (
@@ -155,18 +167,22 @@ export const TransactionHistory = ({ onClose }: TransactionHistoryProps = {}) =>
                         ? "border-2 border-[var(--primary)] bg-[var(--primary)]/10"
                         : "hover:bg-[var(--primary)]/5"
                     }`}
-                    onClick={() => setSelectedTx(selectedTx?.id === tx.id ? null : tx)}
+                    onClick={() =>
+                      setSelectedTx(selectedTx?.id === tx.id ? null : tx)
+                    }
                   >
                     <div className="flex items-start justify-between gap-4">
                       {/* Info principale */}
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">\n                          <span
+                        <div className="flex items-center gap-2 mb-2">
+                          \n{" "}
+                          <span
                             className={`px-2 py-1 text-xs font-bold border-2 ${
                               tx.status === "success"
                                 ? "border-[var(--primary)] text-[var(--primary)]"
                                 : tx.status === "pending"
-                                ? "border-yellow-500 text-yellow-500"
-                                : "border-red-500 text-red-500"
+                                  ? "border-yellow-500 text-yellow-500"
+                                  : "border-red-500 text-red-500"
                             }`}
                           >
                             [{tx.status.toUpperCase()}]
@@ -180,16 +196,21 @@ export const TransactionHistory = ({ onClose }: TransactionHistoryProps = {}) =>
                         </div>
 
                         <div className="terminal-text text-sm mb-2">
-                          <span className="terminal-prefix">&gt;</span> {tx.inputAmount}{" "}
-                          {tx.inputToken} → {tx.outputAmount} {tx.outputToken}
+                          <span className="terminal-prefix">&gt;</span>{" "}
+                          {tx.inputAmount} {tx.inputToken} → {tx.outputAmount}{" "}
+                          {tx.outputToken}
                         </div>
 
                         {/* Détails financiers */}
                         {(tx.npi || tx.rebate || tx.burn) && (
                           <div className="flex gap-4 text-xs terminal-text opacity-70">
                             {tx.npi && <span>NPI: +${tx.npi.toFixed(2)}</span>}
-                            {tx.rebate && <span>REBATE: ${tx.rebate.toFixed(4)}</span>}
-                            {tx.burn && <span>BURN: ${tx.burn.toFixed(4)}</span>}
+                            {tx.rebate && (
+                              <span>REBATE: ${tx.rebate.toFixed(4)}</span>
+                            )}
+                            {tx.burn && (
+                              <span>BURN: ${tx.burn.toFixed(4)}</span>
+                            )}
                           </div>
                         )}
 
@@ -205,7 +226,8 @@ export const TransactionHistory = ({ onClose }: TransactionHistoryProps = {}) =>
                             {/* Signature complète */}
                             <div className="stat-card p-3">
                               <div className="text-xs terminal-text opacity-70 mb-2">
-                                <span className="terminal-prefix">&gt;</span> FULL_SIGNATURE
+                                <span className="terminal-prefix">&gt;</span>{" "}
+                                FULL_SIGNATURE
                               </div>
                               <div className="text-xs terminal-text font-mono break-all">
                                 {tx.signature}
@@ -224,7 +246,8 @@ export const TransactionHistory = ({ onClose }: TransactionHistoryProps = {}) =>
                             {/* Blockchain Explorer Links */}
                             <div className="stat-card p-3">
                               <div className="text-xs terminal-text opacity-70 mb-2">
-                                <span className="terminal-prefix">&gt;</span> BLOCKCHAIN_EXPLORERS
+                                <span className="terminal-prefix">&gt;</span>{" "}
+                                BLOCKCHAIN_EXPLORERS
                               </div>
                               <div className="flex flex-wrap gap-2">
                                 <a
@@ -260,11 +283,13 @@ export const TransactionHistory = ({ onClose }: TransactionHistoryProps = {}) =>
                             {/* Blockchain Data */}
                             <div className="stat-card p-3">
                               <div className="text-xs terminal-text opacity-70 mb-2">
-                                <span className="terminal-prefix">&gt;</span> ON_CHAIN_DATA
+                                <span className="terminal-prefix">&gt;</span>{" "}
+                                ON_CHAIN_DATA
                               </div>
                               <div className="grid grid-cols-2 gap-2 text-xs terminal-text">
                                 <div>
-                                  <span className="opacity-70">NETWORK:</span> DEVNET
+                                  <span className="opacity-70">NETWORK:</span>{" "}
+                                  DEVNET
                                 </div>
                                 <div>
                                   <span className="opacity-70">TIMESTAMP:</span>{" "}
@@ -307,16 +332,21 @@ export const TransactionHistory = ({ onClose }: TransactionHistoryProps = {}) =>
             {transactions.length > 0 && (
               <div className="mt-4 pt-4 border-t-2 border-[var(--primary)] grid grid-cols-3 gap-4 text-center">
                 <div>
-                  <div className="text-xs terminal-text opacity-70 mb-1">TOTAL_TX</div>
+                  <div className="text-xs terminal-text opacity-70 mb-1">
+                    TOTAL_TX
+                  </div>
                   <div className="text-lg font-bold terminal-text">
                     {transactions.length}
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs terminal-text opacity-70 mb-1">SUCCESS_RATE</div>
+                  <div className="text-xs terminal-text opacity-70 mb-1">
+                    SUCCESS_RATE
+                  </div>
                   <div className="text-lg font-bold terminal-text">
                     {(
-                      (transactions.filter((tx) => tx.status === "success").length /
+                      (transactions.filter((tx) => tx.status === "success")
+                        .length /
                         transactions.length) *
                       100
                     ).toFixed(0)}
@@ -324,7 +354,9 @@ export const TransactionHistory = ({ onClose }: TransactionHistoryProps = {}) =>
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs terminal-text opacity-70 mb-1">TOTAL_NPI</div>
+                  <div className="text-xs terminal-text opacity-70 mb-1">
+                    TOTAL_NPI
+                  </div>
                   <div className="text-lg font-bold terminal-text">
                     $
                     {transactions
