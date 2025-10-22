@@ -223,7 +223,10 @@ export const SwapInterface = () => {
           fees: data.fees / 1000000 || 0,
           route: data.route || [],
           priceImpact: data.priceImpact || 0,
-          dex: data.route && data.route.length > 0 ? data.route[0].label : "SwapBack",
+          dex:
+            data.route && data.route.length > 0
+              ? data.route[0].label
+              : "SwapBack",
         };
 
         console.log("✅ RouteInfo transformé:", route);
@@ -882,7 +885,8 @@ export const SwapInterface = () => {
               </span>
               {routeInfo.dex && (
                 <span className="px-3 py-1 bg-[var(--primary)]/10 text-[var(--primary)] text-xs font-bold border border-[var(--primary)]/30 terminal-text">
-                  <span className="terminal-prefix">&gt;</span> DEX: {routeInfo.dex}
+                  <span className="terminal-prefix">&gt;</span> DEX:{" "}
+                  {routeInfo.dex}
                 </span>
               )}
             </div>

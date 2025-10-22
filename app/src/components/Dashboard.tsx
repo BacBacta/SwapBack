@@ -12,9 +12,9 @@ import { NoActivityState, NoConnectionState } from "./EmptyState";
 
 export const Dashboard = () => {
   const { connected, publicKey } = useWallet();
-  const [activeTab, setActiveTab] = useState<"overview" | "analytics" | "lockunlock">(
-    "overview"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "analytics" | "lockunlock"
+  >("overview");
 
   const { cnftData, levelName } = useCNFT();
   const { userStats, globalStats, loading } = useRealtimeStats(

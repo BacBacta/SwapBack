@@ -44,7 +44,9 @@ export const LockUnlock = () => {
       setLockAmount("");
     } catch (error) {
       console.error("❌ Lock error:", error);
-      alert(`❌ Lock failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      alert(
+        `❌ Lock failed: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
     } finally {
       setLoading(false);
     }
@@ -88,7 +90,9 @@ export const LockUnlock = () => {
       );
     } catch (error) {
       console.error("❌ Unlock error:", error);
-      alert(`❌ Unlock failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      alert(
+        `❌ Unlock failed: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
     } finally {
       setLoading(false);
     }
@@ -142,7 +146,9 @@ export const LockUnlock = () => {
               <option value="30">[30_DAYS] - Bronze cNFT (+3% boost)</option>
               <option value="90">[90_DAYS] - Silver cNFT (+9% boost)</option>
               <option value="180">[180_DAYS] - Gold cNFT (+18% boost)</option>
-              <option value="365">[365_DAYS] - Platinum cNFT (+36.5% boost)</option>
+              <option value="365">
+                [365_DAYS] - Platinum cNFT (+36.5% boost)
+              </option>
             </select>
           </div>
 
@@ -159,7 +165,8 @@ export const LockUnlock = () => {
                 <span className="opacity-70">UNLOCK_DATE:</span>
                 <span>
                   {new Date(
-                    Date.now() + Number.parseInt(lockDuration) * 24 * 60 * 60 * 1000
+                    Date.now() +
+                      Number.parseInt(lockDuration) * 24 * 60 * 60 * 1000
                   ).toLocaleDateString()}
                 </span>
               </div>
@@ -198,7 +205,8 @@ export const LockUnlock = () => {
               </span>
             ) : (
               <span>
-                <span className="terminal-prefix">&gt;</span> [LOCK_$BACK_TOKENS]
+                <span className="terminal-prefix">&gt;</span>{" "}
+                [LOCK_$BACK_TOKENS]
               </span>
             )}
           </button>
@@ -246,12 +254,14 @@ export const LockUnlock = () => {
                   <span className="opacity-70">STATUS:</span>
                   <span
                     className={
-                      cnftData.unlockDate && Date.now() >= cnftData.unlockDate.getTime()
+                      cnftData.unlockDate &&
+                      Date.now() >= cnftData.unlockDate.getTime()
                         ? "text-[var(--primary)]"
                         : "text-yellow-500"
                     }
                   >
-                    {cnftData.unlockDate && Date.now() >= cnftData.unlockDate.getTime()
+                    {cnftData.unlockDate &&
+                    Date.now() >= cnftData.unlockDate.getTime()
                       ? "[UNLOCKABLE]"
                       : "[LOCKED]"}
                   </span>
@@ -296,7 +306,8 @@ export const LockUnlock = () => {
                 </span>
               ) : (
                 <span>
-                  <span className="terminal-prefix">&gt;</span> [UNLOCK_$BACK_TOKENS]
+                  <span className="terminal-prefix">&gt;</span>{" "}
+                  [UNLOCK_$BACK_TOKENS]
                 </span>
               )}
             </button>
