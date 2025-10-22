@@ -20,6 +20,14 @@ interface DCAOrder {
   averagePrice: number;
 }
 
+// Token symbol to mint address mapping
+const TOKEN_MINTS: Record<string, string> = {
+  SOL: "So11111111111111111111111111111111111111112",
+  USDC: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+  USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+  BACK: "BH8thpWca6kpN2pKwWTaKv2F5s4MEkbML18LtJ8eFypU",
+};
+
 export const DCA = () => {
   const { connected, publicKey } = useWallet();
   const [activeTab, setActiveTab] = useState<"create" | "orders" | "simulator">(
@@ -39,8 +47,9 @@ export const DCA = () => {
   // DCA Orders State
   const [dcaOrders, setDcaOrders] = useState<DCAOrder[]>([]);
 
-  // Token Data
-  const inputTokenData = useTokenData(inputToken);
+  // Token Data - Convert symbol to mint address
+  const inputTokenMint = TOKEN_MINTS[inputToken] || TOKEN_MINTS.SOL;
+  const inputTokenData = useTokenData(inputTokenMint);
 
   // Helper functions
   const getFrequencyDuration = (freq: string, count = 1): string => {
@@ -109,24 +118,35 @@ export const DCA = () => {
 
   // Handle Create DCA
   const handleCreateDCA = async () => {
+    console.log("🎯 handleCreateDCA called", {
+      connected,
+      publicKey: publicKey?.toString(),
+      amountPerOrder,
+      totalOrders,
+    });
+
     if (!connected || !publicKey) {
+      console.warn("❌ Wallet not connected");
       alert("⚠️ Veuillez connecter votre wallet");
       return;
     }
 
     if (!amountPerOrder || Number.parseFloat(amountPerOrder) <= 0) {
+      console.warn("❌ Invalid amount:", amountPerOrder);
       alert("⚠️ Veuillez entrer un montant valide");
       return;
     }
 
     if (!totalOrders || Number.parseInt(totalOrders) <= 0) {
+      console.warn("❌ Invalid total orders:", totalOrders);
       alert("⚠️ Veuillez entrer un nombre d'ordres valide");
       return;
     }
 
     setLoading(true);
+    console.log("✅ All validations passed, creating DCA order...");
     try {
-      console.log("🔄 Creating DCA order...", {
+      console.log("🔄 Creating DCA order with params:", {
         inputToken,
         outputToken,
         amountPerOrder,
@@ -406,11 +426,15 @@ export const DCA = () => {
                 value={amountPerOrder}
                 onChange={(e) => setAmountPerOrder(e.target.value)}
                 placeholder="0.00"
-                disabled={loading}
+                disabled={loading || !connected}
                 className="input-field w-full"
               />
               <div className="mt-2 text-xs terminal-text opacity-70">
-                BALANCE: {inputTokenData.balance.toFixed(4)} {inputToken}
+                {connected ? (
+                  <>BALANCE: {(inputTokenData?.balance || 0).toFixed(4)} {inputToken}</>
+                ) : (
+                  <>CONNECT_WALLET_TO_SEE_BALANCE</>
+                )}
               </div>
             </div>
 
@@ -483,6 +507,17 @@ export const DCA = () => {
                 </div>
               </div>
             </div>
+
+            {/* Warning if not connected */}
+            {!connected && (
+              <div className="stat-card p-4 bg-yellow-500/10 border-2 border-yellow-500">
+                <div className="text-sm terminal-text text-yellow-500 text-center">
+                  <span className="terminal-prefix">&gt;</span> WALLET_NOT_CONNECTED
+                  <br />
+                  Please connect your wallet to create DCA orders
+                </div>
+              </div>
+            )}
 
             {/* Create Button */}
             <button

@@ -14,8 +14,9 @@ import { NoActivityState, NoConnectionState } from "./EmptyState";
 export const Dashboard = () => {
   const { connected, publicKey } = useWallet();
   const [activeTab, setActiveTab] = useState<
-    "overview" | "analytics" | "lockunlock" | "dca"
+    "overview" | "analytics" | "strategies"
   >("overview");
+  const [strategyTab, setStrategyTab] = useState<"dca" | "lockunlock">("lockunlock");
 
   const { cnftData, levelName } = useCNFT();
   const { userStats, globalStats, loading } = useRealtimeStats(
@@ -168,26 +169,42 @@ export const Dashboard = () => {
           <span className="terminal-prefix">&gt;</span>[ANALYTICS]
         </button>
         <button
-          onClick={() => setActiveTab("lockunlock")}
+          onClick={() => setActiveTab("strategies")}
           className={`flex-1 px-6 py-3 font-bold transition-all terminal-text ${
-            activeTab === "lockunlock"
+            activeTab === "strategies"
               ? "bg-[var(--primary)]/20 border-2 border-[var(--primary)]"
               : "border-2 border-transparent hover:border-[var(--primary)]/50"
           }`}
         >
-          <span className="terminal-prefix">&gt;</span>[LOCK/UNLOCK]
-        </button>
-        <button
-          onClick={() => setActiveTab("dca")}
-          className={`flex-1 px-6 py-3 font-bold transition-all terminal-text ${
-            activeTab === "dca"
-              ? "bg-[var(--primary)]/20 border-2 border-[var(--primary)]"
-              : "border-2 border-transparent hover:border-[var(--primary)]/50"
-          }`}
-        >
-          <span className="terminal-prefix">&gt;</span>[DCA]
+          <span className="terminal-prefix">&gt;</span>[STRATEGIES]
         </button>
       </div>
+
+      {/* Strategies Sub-tabs */}
+      {activeTab === "strategies" && (
+        <div className="flex gap-2 p-1 bg-black/20 border-2 border-[var(--primary)]/50">
+          <button
+            onClick={() => setStrategyTab("lockunlock")}
+            className={`flex-1 px-4 py-2 font-bold transition-all terminal-text text-sm ${
+              strategyTab === "lockunlock"
+                ? "bg-[var(--primary)]/10 border-2 border-[var(--primary)]"
+                : "border-2 border-transparent hover:border-[var(--primary)]/30"
+            }`}
+          >
+            <span className="terminal-prefix">&gt;</span>[LOCK_UNLOCK]
+          </button>
+          <button
+            onClick={() => setStrategyTab("dca")}
+            className={`flex-1 px-4 py-2 font-bold transition-all terminal-text text-sm ${
+              strategyTab === "dca"
+                ? "bg-[var(--primary)]/10 border-2 border-[var(--primary)]"
+                : "border-2 border-transparent hover:border-[var(--primary)]/30"
+            }`}
+          >
+            <span className="terminal-prefix">&gt;</span>[DCA_STRATEGY]
+          </button>
+        </div>
+      )}
 
       {/* Content based on active tab */}
       {activeTab === "overview" && userStats && (
@@ -381,15 +398,13 @@ export const Dashboard = () => {
         </div>
       )}
 
-      {/* Lock/Unlock Tab */}
-      {activeTab === "lockunlock" && (
+      {/* Strategies Tab with Sub-tabs */}
+      {activeTab === "strategies" && (
         <div className="space-y-6">
-          <LockUnlock />
+          {strategyTab === "lockunlock" && <LockUnlock />}
+          {strategyTab === "dca" && <DCA />}
         </div>
       )}
-
-      {/* DCA Tab */}
-      {activeTab === "dca" && <DCA />}
     </div>
   );
 };

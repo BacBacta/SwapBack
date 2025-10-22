@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useCNFT } from "../hooks/useCNFT";
+import {
+  calculateLevel,
+  calculateBoost,
+} from "../lib/cnft";
 
 export const LockUnlock = () => {
   const { connected, publicKey } = useWallet();
@@ -24,21 +28,41 @@ export const LockUnlock = () => {
 
     setLoading(true);
     try {
+      const amount = Number.parseFloat(lockAmount);
+      const durationDays = Number.parseInt(lockDuration);
+
+      const level = calculateLevel(amount, durationDays);
+      const boost = calculateBoost(amount, durationDays);
+
       console.log("🔒 Locking tokens...", {
-        amount: lockAmount,
-        duration: lockDuration,
+        amount,
+        duration: durationDays,
+        level,
+        boost,
         wallet: publicKey.toString(),
       });
 
-      // Simulation de lock (à remplacer par la vraie transaction)
+      // TODO: Décommenter quand le programme sera déployé
+      // const durationSeconds = durationDays * 24 * 60 * 60;
+      // const transaction = await createLockTransaction(connection, wallet, {
+      //   amount,
+      //   duration: durationSeconds,
+      // });
+      // const signature = await sendTransaction(transaction, connection);
+      // const latestBlockhash = await connection.getLatestBlockhash();
+      // await connection.confirmTransaction({signature, ...latestBlockhash}, "confirmed");
+      
+      // Pour l'instant, simulons le comportement
+      console.log("⚠️ Programme non encore déployé - simulation activée");
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
       alert(
         `✅ $BACK Tokens Locked!\n\n` +
           `💰 Amount: ${lockAmount} $BACK\n` +
           `⏰ Duration: ${lockDuration} days\n` +
-          `🎁 Boost: +${(Number.parseFloat(lockDuration) / 10).toFixed(1)}%\n\n` +
-          `Your cNFT will be minted shortly!`
+          `🎁 Level: ${level}\n` +
+          `📈 Boost: +${boost}%\n\n` +
+          `Your cNFT has been minted!`
       );
 
       setLockAmount("");
