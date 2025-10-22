@@ -5,9 +5,11 @@
 ---
 
 ## Template 1: **Glassmorphism Premium** 🌟
+
 **Tendance**: Ultra-moderne, élégant, professionnel
 
 ### Caractéristiques Visuelles
+
 ```
 • Fond: Dégradé violet foncé → bleu nuit profond
 • Cards: Effet verre dépoli (backdrop-blur-xl)
@@ -17,6 +19,7 @@
 ```
 
 ### Structure
+
 ```
 ┌─────────────────────────────────────────────┐
 │  [Logo] SwapBack        [Wallet] [Settings] │
@@ -48,6 +51,7 @@
 ```
 
 ### Palette de Couleurs
+
 - Primary: `#7C3AED` (violet)
 - Secondary: `#06B6D4` (cyan)
 - Accent: `#10B981` (vert succès)
@@ -55,6 +59,7 @@
 - Glass: `rgba(255, 255, 255, 0.05)` + backdrop-blur
 
 ### Points Forts
+
 ✅ Très moderne et premium
 ✅ Excellent pour la confiance professionnelle
 ✅ Animations fluides possibles
@@ -63,9 +68,11 @@
 ---
 
 ## Template 2: **Neomorphism Dark** 🌑
+
 **Tendance**: Minimaliste, tactile, sophistiqué
 
 ### Caractéristiques Visuelles
+
 ```
 • Fond: Gris anthracite uniforme (#1A1A1A)
 • Cards: Effet embossé/debossé (ombres soft)
@@ -75,6 +82,7 @@
 ```
 
 ### Structure
+
 ```
 ┌─────────────────────────────────────────────┐
 │  ⚡ SwapBack              👤 [0x1234...5678] │
@@ -112,6 +120,7 @@
 ```
 
 ### Palette de Couleurs
+
 - Primary: `#FF6B35` (orange)
 - Secondary: `#F7931E` (or)
 - Background: `#1A1A1A` (anthracite)
@@ -119,6 +128,7 @@
 - Card Shadow Outer: `8px 8px 16px #0d0d0d, -8px -8px 16px #272727`
 
 ### Points Forts
+
 ✅ Unique et mémorable
 ✅ Effet tactile/physique
 ✅ Parfait pour dark mode lovers
@@ -127,9 +137,11 @@
 ---
 
 ## Template 3: **Gradient Mesh Modern** 🌈
+
 **Tendance**: Coloré, dynamique, jeune
 
 ### Caractéristiques Visuelles
+
 ```
 • Fond: Mesh gradient animé (multi-couleurs)
 • Cards: Semi-transparentes avec blur fort
@@ -139,6 +151,7 @@
 ```
 
 ### Structure
+
 ```
 ┌─────────────────────────────────────────────┐
 │ 🎨 SwapBack    [Swap] [Pool] [Bridge]  [👤] │
@@ -172,6 +185,7 @@
 ```
 
 ### Palette de Couleurs
+
 - Background: Animated mesh gradient
   ```
   radial-gradient(at 0% 0%, #667eea 0%, transparent 50%),
@@ -182,6 +196,7 @@
 - Border: Gradient animé rainbow
 
 ### Points Forts
+
 ✅ Très moderne et tendance
 ✅ Attire l'attention
 ✅ Parfait pour public jeune/crypto natif
@@ -190,9 +205,11 @@
 ---
 
 ## Template 4: **Minimalist Swiss** 🇨🇭
+
 **Tendance**: Clean, précis, professionnel
 
 ### Caractéristiques Visuelles
+
 ```
 • Fond: Blanc pur ou gris très clair
 • Cards: Blanc avec ombres subtiles
@@ -202,6 +219,7 @@
 ```
 
 ### Structure
+
 ```
 ┌─────────────────────────────────────────────┐
 │  SwapBack                           Connect │
@@ -240,6 +258,7 @@
 ```
 
 ### Palette de Couleurs
+
 - Primary: `#0066FF` (bleu vif)
 - Background: `#FFFFFF` ou `#F8F9FA`
 - Text: `#000000` (noir pur)
@@ -247,6 +266,7 @@
 - Accent: `#28A745` (vert succès)
 
 ### Points Forts
+
 ✅ Extrêmement professionnel
 ✅ Lisibilité maximale
 ✅ Confiance institutionnelle
@@ -255,9 +275,11 @@
 ---
 
 ## Template 5: **Cyberpunk Neon** ⚡
+
 **Tendance**: Futuriste, gaming, DeFi natif
 
 ### Caractéristiques Visuelles
+
 ```
 • Fond: Noir profond avec grid animé
 • Cards: Bordures néon luminescentes
@@ -267,6 +289,7 @@
 ```
 
 ### Structure
+
 ```
 ┌─────────────────────────────────────────────┐
 │ ▓▓ SWAPBACK.IO              [CONNECT_WALLET]│
@@ -307,6 +330,7 @@
 ```
 
 ### Palette de Couleurs
+
 - Primary: `#00FFFF` (cyan néon)
 - Secondary: `#FF00FF` (magenta néon)
 - Background: `#0A0A0F` (noir bleuté)
@@ -314,6 +338,7 @@
 - Grid: `#1A1A2E` avec lignes cyan
 
 ### Points Forts
+
 ✅ Identité forte et unique
 ✅ Parfait pour crypto/DeFi
 ✅ Mémorable et viral
@@ -322,9 +347,11 @@
 ---
 
 ## Template 6: **Material Design 3** 📱
+
 **Tendance**: Google, mobile-first, accessible
 
 ### Caractéristiques Visuelles
+
 ```
 • Fond: Dynamic color system
 • Cards: Elevated avec shadow layers
@@ -334,6 +361,7 @@
 ```
 
 ### Structure
+
 ```
 ┌─────────────────────────────────────────────┐
 │  ☰ SwapBack              🔔  👤  ⋮          │
@@ -384,6 +412,7 @@
 ```
 
 ### Palette de Couleurs
+
 - Primary: Dynamic (adaptatif)
 - Surface: Elevation layers
 - Background: `#FAFAFA` (light) / `#1C1B1F` (dark)
@@ -391,6 +420,7 @@
 - System: Material You dynamic colors
 
 ### Points Forts
+
 ✅ Excellent pour mobile
 ✅ Accessibilité AAA
 ✅ Familier (Android users)
@@ -399,9 +429,11 @@
 ---
 
 ## Template 7: **Apple Human Interface** 🍎
+
 **Tendance**: iOS, clean, premium
 
 ### Caractéristiques Visuelles
+
 ```
 • Fond: Blanc/Noir pur avec blur
 • Cards: Semi-transparent avec vibrancy
@@ -411,6 +443,7 @@
 ```
 
 ### Structure
+
 ```
 ┌─────────────────────────────────────────────┐
 │  ⟨ Back         Swap              Settings ⟩│
@@ -452,6 +485,7 @@
 ```
 
 ### Palette de Couleurs
+
 - Primary: `#007AFF` (bleu iOS)
 - Background: `#FFFFFF` (light) / `#000000` (dark)
 - Surface: `rgba(255, 255, 255, 0.8)` avec blur
@@ -459,6 +493,7 @@
 - Accent: `#34C759` (vert iOS)
 
 ### Points Forts
+
 ✅ Premium et raffiné
 ✅ Familier pour iOS users (énorme base)
 ✅ Excellent blur/vibrancy
@@ -467,9 +502,11 @@
 ---
 
 ## Template 8: **Brutalist Bold** 🔲
+
 **Tendance**: Raw, direct, contre-culture
 
 ### Caractéristiques Visuelles
+
 ```
 • Fond: Couleurs vives et contrastées
 • Cards: Bordures épaisses noires
@@ -479,6 +516,7 @@
 ```
 
 ### Structure
+
 ```
 ┌━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ ▓▓▓ SWAPBACK ▓▓▓            [CONNECT WALLET]┃
@@ -515,6 +553,7 @@
 ```
 
 ### Palette de Couleurs
+
 - Primary: `#FFFF00` (jaune flash)
 - Secondary: `#FF0000` (rouge vif)
 - Background: `#FFFFFF` ou couleurs vives
@@ -522,6 +561,7 @@
 - Text: `#000000` (noir pur)
 
 ### Points Forts
+
 ✅ Très unique et mémorable
 ✅ Statement fort de marque
 ✅ Performance excellente
@@ -530,9 +570,11 @@
 ---
 
 ## Template 9: **Aurora Fluid** 🌊
+
 **Tendance**: Organique, fluide, apaisant
 
 ### Caractéristiques Visuelles
+
 ```
 • Fond: Gradients fluides animés
 • Cards: Formes organiques (border-radius variables)
@@ -542,6 +584,7 @@
 ```
 
 ### Structure
+
 ```
 ┌─────────────────────────────────────────────┐
 │  ∿ SwapBack        ○ ○ ○            [Wallet]│
@@ -588,6 +631,7 @@
 ```
 
 ### Palette de Couleurs
+
 - Background: Gradient fluide animé
   ```
   linear-gradient(45deg,
@@ -603,6 +647,7 @@
 - Text: `#2D3748` (gris foncé doux)
 
 ### Points Forts
+
 ✅ Apaisant et unique
 ✅ Parfait pour UX douce
 ✅ Différenciation forte
@@ -611,9 +656,11 @@
 ---
 
 ## Template 10: **Terminal Hacker** 💻
+
 **Tendance**: Dev-focused, retro-futuriste, geek
 
 ### Caractéristiques Visuelles
+
 ```
 • Fond: Noir terminal (#0C0C0C)
 • Cards: Vert monospace terminal
@@ -623,6 +670,7 @@
 ```
 
 ### Structure
+
 ```
 ┌─────────────────────────────────────────────┐
 │ user@swapback:~$ ./swap --interactive       │
@@ -662,6 +710,7 @@
 ```
 
 ### Palette de Couleurs
+
 - Primary: `#00FF00` (vert terminal)
 - Background: `#0C0C0C` (noir terminal)
 - Text: `#33FF33` (vert phosphorescent)
@@ -669,6 +718,7 @@
 - Error: `#FF0000` (rouge)
 
 ### Points Forts
+
 ✅ Parfait pour devs/geeks
 ✅ Très unique
 ✅ Communauté technique forte
@@ -678,43 +728,51 @@
 
 ## 📊 Tableau Comparatif
 
-| Template | Difficulté | Performance | Mobile | Originalité | Professionnel |
-|----------|-----------|-------------|--------|-------------|---------------|
-| 1. Glassmorphism | ⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| 2. Neomorphism | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
-| 3. Gradient Mesh | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
-| 4. Swiss Minimal | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ |
-| 5. Cyberpunk | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
-| 6. Material 3 | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐ |
-| 7. Apple HI | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| 8. Brutalist | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ |
-| 9. Aurora Fluid | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
-| 10. Terminal | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
+| Template         | Difficulté | Performance | Mobile     | Originalité | Professionnel |
+| ---------------- | ---------- | ----------- | ---------- | ----------- | ------------- |
+| 1. Glassmorphism | ⭐⭐⭐     | ⭐⭐⭐⭐    | ⭐⭐⭐⭐   | ⭐⭐⭐⭐    | ⭐⭐⭐⭐⭐    |
+| 2. Neomorphism   | ⭐⭐⭐⭐   | ⭐⭐⭐⭐⭐  | ⭐⭐⭐     | ⭐⭐⭐⭐⭐  | ⭐⭐⭐⭐      |
+| 3. Gradient Mesh | ⭐⭐⭐⭐   | ⭐⭐⭐      | ⭐⭐⭐⭐   | ⭐⭐⭐⭐⭐  | ⭐⭐⭐        |
+| 4. Swiss Minimal | ⭐⭐       | ⭐⭐⭐⭐⭐  | ⭐⭐⭐⭐⭐ | ⭐⭐        | ⭐⭐⭐⭐⭐    |
+| 5. Cyberpunk     | ⭐⭐⭐⭐   | ⭐⭐⭐⭐    | ⭐⭐⭐     | ⭐⭐⭐⭐⭐  | ⭐⭐⭐        |
+| 6. Material 3    | ⭐⭐⭐     | ⭐⭐⭐⭐⭐  | ⭐⭐⭐⭐⭐ | ⭐⭐        | ⭐⭐⭐⭐      |
+| 7. Apple HI      | ⭐⭐⭐⭐   | ⭐⭐⭐⭐⭐  | ⭐⭐⭐⭐⭐ | ⭐⭐⭐      | ⭐⭐⭐⭐⭐    |
+| 8. Brutalist     | ⭐⭐       | ⭐⭐⭐⭐⭐  | ⭐⭐⭐⭐   | ⭐⭐⭐⭐⭐  | ⭐⭐          |
+| 9. Aurora Fluid  | ⭐⭐⭐⭐⭐ | ⭐⭐⭐      | ⭐⭐⭐⭐   | ⭐⭐⭐⭐⭐  | ⭐⭐⭐⭐      |
+| 10. Terminal     | ⭐⭐       | ⭐⭐⭐⭐⭐  | ⭐⭐       | ⭐⭐⭐⭐⭐  | ⭐⭐⭐        |
 
 ---
 
 ## 🎯 Recommandations par Audience
 
 ### Pour une Audience Institutionnelle/Professionnelle
+
 **Top 3:**
+
 1. **Swiss Minimalist** - Confiance maximale
 2. **Apple Human Interface** - Premium et raffiné
 3. **Glassmorphism Premium** - Moderne et professionnel
 
 ### Pour une Audience Crypto Native/DeFi
+
 **Top 3:**
+
 1. **Cyberpunk Neon** - Identité crypto forte
 2. **Glassmorphism Premium** - Moderne
 3. **Terminal Hacker** - Communauté tech
 
 ### Pour une Audience Grand Public
+
 **Top 3:**
+
 1. **Material Design 3** - Familier et accessible
 2. **Aurora Fluid** - Apaisant et unique
 3. **Gradient Mesh** - Moderne et attrayant
 
 ### Pour se Démarquer Complètement
+
 **Top 3:**
+
 1. **Neomorphism Dark** - Très unique
 2. **Brutalist Bold** - Statement fort
 3. **Terminal Hacker** - Viral potential
@@ -724,6 +782,7 @@
 ## 💡 Conseil Final
 
 **Meilleur choix global**: **Glassmorphism Premium (Template 1)**
+
 - ✅ Équilibre parfait moderne/professionnel
 - ✅ Excellent sur desktop ET mobile
 - ✅ Performance optimale
@@ -731,6 +790,7 @@
 - ✅ Facile à implémenter avec Tailwind
 
 **Choix audacieux**: **Cyberpunk Neon (Template 5)**
+
 - ✅ Identité ultra-forte
 - ✅ Parfait pour DeFi/crypto
 - ✅ Mémorable et viral

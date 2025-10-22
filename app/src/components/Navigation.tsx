@@ -37,7 +37,9 @@ export const Navigation = () => {
                 className="text-2xl font-bold transition-all duration-300 flex items-center gap-3"
               >
                 <div className="w-10 h-10 bg-transparent border-2 border-[#00ff00] flex items-center justify-center">
-                  <span className="text-[#00ff00] font-bold text-xl terminal-text">&gt;</span>
+                  <span className="text-[#00ff00] font-bold text-xl terminal-text">
+                    &gt;
+                  </span>
                 </div>
                 <span className="terminal-text text-[#00ff00]">
                   SWAPBACK_v1.0
@@ -56,7 +58,8 @@ export const Navigation = () => {
                         : "text-[#006600] hover:text-[#00ff00] border-2 border-transparent hover:border-[#00ff00]/50"
                     }`}
                   >
-                    <span className="terminal-prefix">&gt;</span>{link.label.toUpperCase()}
+                    <span className="terminal-prefix">&gt;</span>
+                    {link.label.toUpperCase()}
                     {isActive(link.href) && (
                       <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-gradient-to-r from-[var(--primary)] via-[var(--accent)] to-[var(--secondary)] rounded-full shadow-[0_0_8px_var(--primary)]" />
                     )}
