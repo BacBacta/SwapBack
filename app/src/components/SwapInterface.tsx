@@ -883,13 +883,29 @@ export const SwapInterface = () => {
               >
                 {routeInfo.type === "Direct" ? "⚡ DIRECT" : "🔀 AGGREGATOR"}
               </span>
-              {routeInfo.dex && (
-                <span className="px-3 py-1 bg-[var(--primary)]/10 text-[var(--primary)] text-xs font-bold border border-[var(--primary)]/30 terminal-text">
-                  <span className="terminal-prefix">&gt;</span> DEX:{" "}
-                  {routeInfo.dex}
-                </span>
-              )}
             </div>
+
+            {/* DEX Information - Affichage proéminent */}
+            {routeInfo.dex && (
+              <div className="mb-4 p-3 bg-[var(--primary)]/10 border-2 border-[var(--primary)]">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">🏪</span>
+                    <div>
+                      <div className="text-xs terminal-text opacity-70 mb-1">
+                        <span className="terminal-prefix">&gt;</span> MEILLEURE_ROUTE_TROUVÉE_SUR:
+                      </div>
+                      <div className="text-lg font-bold text-[var(--primary)] terminal-text">
+                        {routeInfo.dex.toUpperCase()}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="px-3 py-1 bg-[var(--primary)]/20 border border-[var(--primary)] terminal-text text-xs">
+                    [BEST_PRICE]
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center gap-2 text-sm">
               {routeInfo.route.map((step, index) => (

@@ -234,24 +234,26 @@ export const Dashboard = () => {
 
           {/* Pending Rebates Card */}
           {userStats.pendingRebates > 0 && (
-            <div className="glass-effect rounded-xl p-6 border border-[var(--primary)]/30 bg-gradient-to-r from-[var(--primary)]/10 to-[var(--accent)]/5 hover:scale-[1.02] transition-all relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-r from-[var(--primary)]/5 via-[var(--accent)]/5 to-transparent animate-shimmer"></div>
+            <div className="swap-card p-6 border-2 border-[var(--primary)] bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 transition-all relative overflow-hidden">
+              <div className="absolute inset-0 opacity-20">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--primary)]/20 to-transparent animate-shimmer"></div>
+              </div>
               <div className="relative flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[var(--primary)]/30 to-[var(--accent)]/30 flex items-center justify-center animate-pulse-glow">
+                  <div className="w-14 h-14 bg-transparent border-2 border-[var(--primary)] flex items-center justify-center">
                     <span className="text-2xl">💎</span>
                   </div>
                   <div>
-                    <div className="font-bold text-lg mb-1">
-                      Pending Rebates
+                    <div className="font-bold text-lg mb-1 terminal-text">
+                      <span className="terminal-prefix">&gt;</span> PENDING_REBATES
                     </div>
-                    <div className="text-3xl font-bold bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] bg-clip-text text-transparent">
+                    <div className="text-3xl font-bold text-[var(--primary)] terminal-text">
                       ${userStats.pendingRebates.toFixed(2)}
                     </div>
                   </div>
                 </div>
-                <button className="btn-primary px-8 py-3 text-lg font-bold">
-                  🎁 Claim Now
+                <button className="btn-primary px-8 py-3 text-lg font-bold terminal-text">
+                  <span className="terminal-prefix">&gt;</span> [CLAIM_NOW]
                 </button>
               </div>
             </div>
@@ -264,9 +266,9 @@ export const Dashboard = () => {
         <div className="space-y-6">
           {/* Volume Chart */}
           <div className="swap-card">
-            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-              <span>📊</span>
-              <span>Volume Trend (7 Days)</span>
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2 terminal-text">
+              <span className="terminal-prefix">&gt;</span>
+              <span>[VOLUME_TREND] - 7_DAYS</span>
             </h3>
             <div className="h-64">
               <VolumeChart data={volumeData} />
@@ -275,9 +277,9 @@ export const Dashboard = () => {
 
           {/* Activity Chart */}
           <div className="swap-card">
-            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-              <span>📈</span>
-              <span>Trading Activity (7 Days)</span>
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2 terminal-text">
+              <span className="terminal-prefix">&gt;</span>
+              <span>[TRADING_ACTIVITY] - 7_DAYS</span>
             </h3>
             <div className="h-64">
               <ActivityChart data={activityData} />
@@ -287,13 +289,13 @@ export const Dashboard = () => {
           {/* Stats Summary */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="swap-card">
-              <h4 className="font-bold mb-4 text-[var(--primary)]">
-                Performance
+              <h4 className="font-bold mb-4 terminal-text">
+                <span className="terminal-prefix">&gt;</span> [PERFORMANCE_METRICS]
               </h4>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Avg. Swap Size</span>
-                  <span className="font-semibold">
+                  <span className="terminal-text opacity-70">AVG_SWAP_SIZE:</span>
+                  <span className="font-semibold terminal-text">
                     $
                     {(
                       userStats?.totalVolume || 0 / (userStats?.totalSwaps || 1)
@@ -301,8 +303,8 @@ export const Dashboard = () => {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Avg. NPI per Swap</span>
-                  <span className="font-semibold text-[var(--secondary)]">
+                  <span className="terminal-text opacity-70">AVG_NPI_PER_SWAP:</span>
+                  <span className="font-semibold text-[var(--primary)] terminal-text">
                     $
                     {(
                       userStats?.totalNPI || 0 / (userStats?.totalSwaps || 1)
@@ -310,8 +312,8 @@ export const Dashboard = () => {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Rebate Rate</span>
-                  <span className="font-semibold text-[var(--secondary)]">
+                  <span className="terminal-text opacity-70">REBATE_RATE:</span>
+                  <span className="font-semibold text-[var(--primary)] terminal-text">
                     {(
                       ((userStats?.totalRebates || 0) /
                         (userStats?.totalVolume || 1)) *
@@ -324,13 +326,13 @@ export const Dashboard = () => {
             </div>
 
             <div className="swap-card">
-              <h4 className="font-bold mb-4 text-[var(--secondary)]">
-                Rewards
+              <h4 className="font-bold mb-4 terminal-text">
+                <span className="terminal-prefix">&gt;</span> [REWARDS_SUMMARY]
               </h4>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Total Earned</span>
-                  <span className="font-semibold text-[var(--secondary)]">
+                  <span className="terminal-text opacity-70">TOTAL_EARNED:</span>
+                  <span className="font-semibold text-[var(--primary)] terminal-text">
                     $
                     {(
                       (userStats?.totalNPI || 0) +
@@ -339,14 +341,14 @@ export const Dashboard = () => {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Rebate Boost</span>
-                  <span className="font-semibold">
+                  <span className="terminal-text opacity-70">REBATE_BOOST:</span>
+                  <span className="font-semibold terminal-text">
                     +{userStats?.rebateBoost || 0}%
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Locked Amount</span>
-                  <span className="font-semibold">
+                  <span className="terminal-text opacity-70">LOCKED_AMOUNT:</span>
+                  <span className="font-semibold terminal-text">
                     {(userStats?.lockedAmount || 0).toLocaleString()} $BACK
                   </span>
                 </div>
