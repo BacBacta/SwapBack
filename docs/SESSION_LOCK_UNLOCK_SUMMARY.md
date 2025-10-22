@@ -9,6 +9,7 @@
 ## 📝 Demande Initiale
 
 Vous avez demandé:
+
 > "dans l'onglet Dashboard, créer 2 sous onglets : 'DCA Stratégy', et 'Lock-Unlock'. Développe complètement l'option lock-unlock et déploie le programme cnft sur le devnet"
 
 ---
@@ -16,6 +17,7 @@ Vous avez demandé:
 ## ✅ Réalisations
 
 ### 1. **Restructuration du Dashboard** ✅
+
 - ✅ Remplacé les 4 onglets principaux par 3: Overview, Analytics, **Strategies**
 - ✅ Ajouté 2 sous-onglets dans Strategies:
   - **DCA Strategy** (déjà existant)
@@ -28,6 +30,7 @@ Vous avez demandé:
 ### 2. **Développement Complet Lock-Unlock** ✅
 
 #### Programme Solana (`swapback_cnft`)
+
 - ✅ **Compilé avec succès** via `cargo build-sbf`
 - ✅ **3 instructions**:
   - `initialize_collection`: Setup de la collection cNFT
@@ -41,6 +44,7 @@ Vous avez demandé:
 **Fichier**: `/programs/swapback_cnft/src/lib.rs` (221 lignes)
 
 #### SDK Frontend
+
 - ✅ **Fonctions complètes** (231 lignes):
   ```typescript
   - calculateLevel(amount, durationDays): Calcul du niveau
@@ -57,6 +61,7 @@ Vous avez demandé:
 **Fichier**: `/app/src/lib/cnft.ts` (231 lignes)
 
 #### Composant UI
+
 - ✅ **Interface complète**:
   - 💰 Input montant à verrouiller
   - ⏰ Sélecteur de durée (30/90/180/365 jours)
@@ -70,6 +75,7 @@ Vous avez demandé:
 **Fichier**: `/app/src/components/LockUnlock.tsx`
 
 #### Hook Custom
+
 - ✅ **Fetching automatique** du cNFT de l'utilisateur
 - ✅ **Calcul du niveau** (Bronze/Silver/Gold)
 - ✅ **Rafraîchissement** à la demande après transactions
@@ -77,6 +83,7 @@ Vous avez demandé:
 **Fichier**: `/app/src/hooks/useCNFT.ts`
 
 ### 3. **Documentation** ✅
+
 - ✅ **Rapport technique complet**: `/docs/LOCK_UNLOCK_INTEGRATION.md`
   - Architecture détaillée
   - Exemples de code
@@ -89,6 +96,7 @@ Vous avez demandé:
 ## 🚧 Déploiement - État Actuel
 
 ### ✅ Prêt au Déploiement
+
 - [x] Programme compilé (`.so` généré)
 - [x] Program ID: `CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH`
 - [x] SDK intégré au frontend
@@ -96,6 +104,7 @@ Vous avez demandé:
 - [x] Tests unitaires du SDK validés
 
 ### ⏸️ Bloqué par Manque de SOL
+
 ```bash
 # Configuration actuelle
 Cluster: https://api.devnet.solana.com ✅
@@ -104,13 +113,14 @@ Balance: 0 SOL ❌
 
 # Tentative d'airdrop
 $ solana airdrop 2
-❌ Error: airdrop request failed. 
+❌ Error: airdrop request failed.
    This can happen when the rate limit is reached.
 ```
 
 **Raison**: Le faucet Solana devnet a un rate limit qui empêche d'obtenir du SOL.
 
 **Solutions possibles**:
+
 1. ⏰ **Attendre 1 heure** pour que le rate limit reset
 2. 🌐 **Utiliser un faucet web** alternatif: https://sol-faucet.com
 3. 💬 **Demander sur Discord** Solana: https://discord.gg/solana
@@ -121,6 +131,7 @@ $ solana airdrop 2
 ## 🎮 Mode de Fonctionnement Actuel
 
 ### Simulation Active ✅
+
 Pour permettre le développement sans blocage, le code fonctionne en **mode simulation**:
 
 ```typescript
@@ -135,6 +146,7 @@ await new Promise((resolve) => setTimeout(resolve, 2000));
 ```
 
 **Comportement actuel**:
+
 - ✅ UI entièrement fonctionnelle
 - ✅ Calculs corrects (niveau, boost, dates)
 - ✅ Validation des inputs
@@ -148,6 +160,7 @@ await new Promise((resolve) => setTimeout(resolve, 2000));
 ### Étape 1: Obtenir du SOL (15 min)
 
 **Option A - Faucet Web** (recommandé):
+
 ```bash
 # 1. Aller sur https://sol-faucet.com
 # 2. Entrer l'adresse: 65abbvvVT4L7hdd9JMgk3g2eeu6sfSyVqVKQjLZnyBo
@@ -157,6 +170,7 @@ solana balance
 ```
 
 **Option B - Discord Solana**:
+
 ```
 1. Rejoindre: https://discord.gg/solana
 2. Aller dans #devnet-faucet
@@ -164,12 +178,14 @@ solana balance
 ```
 
 **Option C - Attendre le rate limit**:
+
 ```bash
 # Attendre ~1 heure puis réessayer:
 solana airdrop 2
 ```
 
 ### Étape 2: Déployer le Programme (5 min)
+
 ```bash
 cd /workspaces/SwapBack
 
@@ -183,6 +199,7 @@ solana program deploy target/deploy/swapback_cnft.so \
 ```
 
 ### Étape 3: Initialiser la Collection (5 min)
+
 ```bash
 # Créer le script d'initialisation
 cd scripts
@@ -195,7 +212,7 @@ import { getCollectionConfigPDA } from "../app/src/lib/cnft";
 async function main() {
   const connection = new Connection("https://api.devnet.solana.com");
   const wallet = // Charger wallet depuis fichier
-  
+
   // Appeler initialize_collection
   // ...
 }
@@ -206,6 +223,7 @@ ts-node initialize-cnft.ts
 ```
 
 ### Étape 4: Activer les Vraies Transactions (2 min)
+
 ```typescript
 // Dans /app/src/components/LockUnlock.tsx
 
@@ -221,10 +239,14 @@ const transaction = await createLockTransaction(connection, wallet, {
 });
 const signature = await sendTransaction(transaction, connection);
 const latestBlockhash = await connection.getLatestBlockhash();
-await connection.confirmTransaction({signature, ...latestBlockhash}, "confirmed");
+await connection.confirmTransaction(
+  { signature, ...latestBlockhash },
+  "confirmed"
+);
 ```
 
 ### Étape 5: Tester en Production (30 min)
+
 ```bash
 # 1. Ouvrir l'app: http://localhost:3000
 # 2. Connecter le wallet
@@ -253,18 +275,21 @@ await connection.confirmTransaction({signature, ...latestBlockhash}, "confirmed"
 ## 📊 Récapitulatif des Fichiers
 
 ### Nouveaux Fichiers
+
 ```
 /app/src/lib/cnft.ts                         (231 lignes) ✅ SDK complet
 /docs/LOCK_UNLOCK_INTEGRATION.md             (500+ lignes) ✅ Documentation
 ```
 
 ### Fichiers Modifiés
+
 ```
 /app/src/components/Dashboard.tsx            Restructuré avec sous-onglets
 /app/src/components/LockUnlock.tsx           Intégré SDK + UI complète
 ```
 
 ### Fichiers Existants (Inchangés)
+
 ```
 /programs/swapback_cnft/src/lib.rs           Programme compilé ✅
 /app/src/hooks/useCNFT.ts                    Hook existant utilisé
@@ -275,6 +300,7 @@ await connection.confirmTransaction({signature, ...latestBlockhash}, "confirmed"
 ## 🎯 Résultat Final
 
 ### Ce qui Fonctionne ✅
+
 - ✅ **Dashboard restructuré** avec sous-onglets
 - ✅ **Programme compilé** et prêt au déploiement
 - ✅ **SDK complet** avec toutes les fonctions nécessaires
@@ -284,11 +310,13 @@ await connection.confirmTransaction({signature, ...latestBlockhash}, "confirmed"
 - ✅ **Documentation complète**
 
 ### Ce qui Manque ⏳
+
 - ⏳ **Déploiement on-chain** (bloqué par manque de SOL)
 - ⏳ **Tests en production** avec vraies transactions
 - ⏳ **Script d'initialisation** de la collection
 
 ### Temps de Développement
+
 - ✅ **Développement**: ~2h (100% terminé)
 - ⏳ **Déploiement**: ~1h (en attente de SOL)
 - ⏳ **Tests**: ~30min (après déploiement)
@@ -300,16 +328,19 @@ await connection.confirmTransaction({signature, ...latestBlockhash}, "confirmed"
 ## 💡 Recommandations
 
 ### Immédiat
+
 1. 🔥 **Priorité 1**: Obtenir du SOL via faucet web (5 min)
 2. 🚀 **Priorité 2**: Déployer le programme (5 min)
 3. 🧪 **Priorité 3**: Tester avec vraies transactions (30 min)
 
 ### Court Terme
+
 1. **Ajouter un indicateur visuel** du mode (simulation vs production)
 2. **Créer un script d'initialisation** automatique
 3. **Ajouter des tests end-to-end** automatisés
 
 ### Moyen Terme
+
 1. **Implémenter early unlock** avec pénalité
 2. **Ajouter historique** des locks/unlocks
 3. **Notifications push** à l'approche de la date de unlock
@@ -330,6 +361,7 @@ Une fois le SOL obtenu, le déploiement et les tests prendront environ **1 heure
 ---
 
 **Questions ?** N'hésitez pas à demander !
+
 - 💬 Comment obtenir du SOL sur le devnet ?
 - 🚀 Comment déployer le programme ?
 - 🧪 Comment tester en production ?

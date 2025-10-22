@@ -16,7 +16,9 @@ export const Dashboard = () => {
   const [activeTab, setActiveTab] = useState<
     "overview" | "analytics" | "strategies"
   >("overview");
-  const [strategyTab, setStrategyTab] = useState<"dca" | "lockunlock">("lockunlock");
+  const [strategyTab, setStrategyTab] = useState<"dca" | "lockunlock">(
+    "lockunlock"
+  );
 
   const { cnftData, levelName } = useCNFT();
   const { userStats, globalStats, loading } = useRealtimeStats(

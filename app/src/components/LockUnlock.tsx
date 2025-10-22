@@ -3,10 +3,7 @@
 import { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useCNFT } from "../hooks/useCNFT";
-import {
-  calculateLevel,
-  calculateBoost,
-} from "../lib/cnft";
+import { calculateLevel, calculateBoost } from "../lib/cnft";
 
 export const LockUnlock = () => {
   const { connected, publicKey } = useWallet();
@@ -51,7 +48,7 @@ export const LockUnlock = () => {
       // const signature = await sendTransaction(transaction, connection);
       // const latestBlockhash = await connection.getLatestBlockhash();
       // await connection.confirmTransaction({signature, ...latestBlockhash}, "confirmed");
-      
+
       // Pour l'instant, simulons le comportement
       console.log("⚠️ Programme non encore déployé - simulation activée");
       await new Promise((resolve) => setTimeout(resolve, 2000));

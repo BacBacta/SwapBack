@@ -8,6 +8,7 @@
 ## 🎯 Checklist Rapide
 
 ### ✅ Déjà Fait
+
 - [x] Programme compilé: `swapback_cnft.so`
 - [x] Program ID: `CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH`
 - [x] SDK créé: `/app/src/lib/cnft.ts` (231 lignes)
@@ -15,6 +16,7 @@
 - [x] Mode simulation actif pour dev
 
 ### ⏳ À Faire (30 min total)
+
 - [ ] Obtenir 2 SOL sur devnet (5 min)
 - [ ] Déployer le programme (5 min)
 - [ ] Initialiser la collection (5 min)
@@ -26,10 +28,11 @@
 ## 📋 Commandes à Exécuter
 
 ### 1. Vérifier la Configuration Actuelle
+
 ```bash
 # Devrait afficher:
 # Config File: /home/codespace/.config/solana/cli/config.yml
-# RPC URL: https://api.devnet.solana.com 
+# RPC URL: https://api.devnet.solana.com
 # WebSocket URL: wss://api.devnet.solana.com/
 # Keypair Path: /home/codespace/.config/solana/id.json
 solana config get
@@ -45,12 +48,13 @@ solana balance
 ### 2. Obtenir du SOL (PRIORITÉ #1)
 
 **Option A: Faucet Web** ⭐ (Recommandé - 5 min)
+
 ```bash
 # 1. Ouvrir dans le navigateur:
 #    https://sol-faucet.com
 #    OU
 #    https://solfaucet.com
-#    OU  
+#    OU
 #    https://faucet.solana.com
 
 # 2. Coller l'adresse:
@@ -64,6 +68,7 @@ solana balance
 ```
 
 **Option B: CLI** (Si le rate limit a reset)
+
 ```bash
 # Tenter l'airdrop via CLI:
 solana airdrop 2
@@ -72,6 +77,7 @@ solana airdrop 2
 ```
 
 **Option C: Discord Solana** (5-10 min)
+
 ```bash
 # 1. Rejoindre: https://discord.gg/solana
 # 2. Aller dans le canal #devnet-faucet
@@ -80,6 +86,7 @@ solana airdrop 2
 ```
 
 ### 3. Déployer le Programme (5 min)
+
 ```bash
 cd /workspaces/SwapBack
 
@@ -109,6 +116,7 @@ solana balance
 ### 4. Initialiser la Collection cNFT (5 min)
 
 **Créer le script d'initialisation:**
+
 ```bash
 cd /workspaces/SwapBack/scripts
 cat > init-cnft-collection.ts << 'EOF'
@@ -121,42 +129,42 @@ const RPC_URL = "https://api.devnet.solana.com";
 
 async function main() {
   console.log("🚀 Initializing cNFT Collection...");
-  
+
   // Charger le wallet
   const keypairPath = "/home/codespace/.config/solana/id.json";
   const secretKey = JSON.parse(fs.readFileSync(keypairPath, "utf-8"));
   const keypair = Keypair.fromSecretKey(Uint8Array.from(secretKey));
-  
+
   console.log("💼 Wallet:", keypair.publicKey.toString());
-  
+
   const connection = new Connection(RPC_URL, "confirmed");
   const wallet = new Wallet(keypair);
   const provider = new AnchorProvider(connection, wallet, {});
-  
+
   // Charger l'IDL du programme
   const idl = JSON.parse(
     fs.readFileSync("target/idl/swapback_cnft.json", "utf-8")
   );
-  
+
   const program = new Program(idl, PROGRAM_ID, provider);
-  
+
   // Dériver le PDA de la collection
   const [collectionConfigPDA] = await PublicKey.findProgramAddress(
     [Buffer.from("collection_config")],
     PROGRAM_ID
   );
-  
+
   console.log("📦 Collection Config PDA:", collectionConfigPDA.toString());
-  
+
   // TODO: Créer le tree_config pour les compressed NFTs
   // Pour l'instant, utilisons une clé temporaire
   const treeConfig = Keypair.generate();
-  
+
   console.log("🌳 Tree Config:", treeConfig.publicKey.toString());
-  
+
   // Appeler initialize_collection
   console.log("📝 Sending initialize_collection transaction...");
-  
+
   const tx = await program.methods
     .initializeCollection()
     .accounts({
@@ -167,7 +175,7 @@ async function main() {
     })
     .signers([treeConfig])
     .rpc();
-  
+
   console.log("✅ Collection initialized!");
   console.log("📝 Transaction:", tx);
   console.log("🔗 View on Solscan:", `https://solscan.io/tx/${tx}?cluster=devnet`);
@@ -191,11 +199,13 @@ npx ts-node init-cnft-collection.ts
 ### 5. Activer les Vraies Transactions (2 min)
 
 **Modifier le fichier LockUnlock.tsx:**
+
 ```bash
 code /workspaces/SwapBack/app/src/components/LockUnlock.tsx
 ```
 
 **Chercher la section avec `// TODO: Décommenter` et remplacer:**
+
 ```typescript
 // AVANT (simulation):
 // TODO: Décommenter quand le programme sera déployé
@@ -237,6 +247,7 @@ await connection.confirmTransaction(
 ```
 
 **Sauvegarder et redémarrer le serveur:**
+
 ```bash
 # Ctrl+C dans le terminal du serveur, puis:
 cd /workspaces/SwapBack/app
@@ -246,6 +257,7 @@ npm run dev
 ### 6. Tester Lock + Unlock (15 min)
 
 **Ouvrir l'application:**
+
 ```bash
 # Dans le navigateur:
 http://localhost:3000
@@ -255,6 +267,7 @@ Dashboard > Strategies > Lock-Unlock
 ```
 
 **Test 1: Lock Minimum (Bronze)**
+
 ```
 1. Connecter le wallet
 2. Montant: 100
@@ -266,6 +279,7 @@ Dashboard > Strategies > Lock-Unlock
 ```
 
 **Test 2: Vérifier le cNFT On-Chain**
+
 ```bash
 # Récupérer le PDA du user
 USER_PUBKEY="<VOTRE_WALLET_PUBKEY>"
@@ -278,6 +292,7 @@ solana account <USER_NFT_PDA> --url devnet --output json-compact
 ```
 
 **Test 3: Unlock (après expiration)**
+
 ```
 1. Attendre que la date de unlock soit passée
    OU
@@ -293,6 +308,7 @@ solana account <USER_NFT_PDA> --url devnet --output json-compact
 ## 🐛 Troubleshooting
 
 ### Problème: "Insufficient funds"
+
 ```bash
 # Solution: Vérifier le balance
 solana balance
@@ -302,6 +318,7 @@ solana airdrop 1
 ```
 
 ### Problème: "Program not deployed"
+
 ```bash
 # Vérifier que le programme existe:
 solana program show CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH --url devnet
@@ -311,6 +328,7 @@ solana program deploy target/deploy/swapback_cnft.so --program-id CxBwdrrSZVUycb
 ```
 
 ### Problème: "Collection not initialized"
+
 ```bash
 # Réexécuter le script d'initialisation:
 cd /workspaces/SwapBack/scripts
@@ -318,6 +336,7 @@ npx ts-node init-cnft-collection.ts
 ```
 
 ### Problème: Compilation errors dans Next.js
+
 ```bash
 # Nettoyer et rebuild:
 cd /workspaces/SwapBack/app
@@ -326,6 +345,7 @@ npm run dev
 ```
 
 ### Problème: Transaction timeout
+
 ```bash
 # Augmenter le timeout dans le code:
 const signature = await sendTransaction(transaction, connection, {
@@ -340,6 +360,7 @@ const signature = await sendTransaction(transaction, connection, {
 ## 📊 Commandes de Monitoring
 
 ### Voir les logs du programme
+
 ```bash
 # En temps réel:
 solana logs CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH --url devnet
@@ -349,6 +370,7 @@ solana confirm <SIGNATURE> --url devnet -v
 ```
 
 ### Vérifier l'état d'un compte
+
 ```bash
 # Collection Config:
 solana account <COLLECTION_CONFIG_PDA> --url devnet --output json
@@ -358,6 +380,7 @@ solana account <USER_NFT_PDA> --url devnet --output json
 ```
 
 ### Stats du programme
+
 ```bash
 # Infos générales:
 solana program show CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH --url devnet
@@ -388,6 +411,7 @@ Une fois tout déployé et testé:
 ## 🎯 Prochaines Fonctionnalités (Optionnel)
 
 ### Court Terme
+
 1. **Early Unlock avec Pénalité**
    - Permettre unlock avant date
    - Appliquer -20% de pénalité
@@ -404,6 +428,7 @@ Une fois tout déployé et testé:
    - Graphique des boosts obtenus
 
 ### Moyen Terme
+
 1. **Notifications**
    - Email/Push 7 jours avant unlock
    - Reminder le jour J
@@ -424,6 +449,7 @@ Une fois tout déployé et testé:
 ## 📞 Support
 
 **Besoin d'aide ?**
+
 - 📖 Documentation: `/docs/LOCK_UNLOCK_INTEGRATION.md`
 - 💬 Discord Solana: https://discord.gg/solana
 - 🐦 Twitter: @solana

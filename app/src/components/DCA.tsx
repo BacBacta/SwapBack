@@ -431,7 +431,10 @@ export const DCA = () => {
               />
               <div className="mt-2 text-xs terminal-text opacity-70">
                 {connected ? (
-                  <>BALANCE: {(inputTokenData?.balance || 0).toFixed(4)} {inputToken}</>
+                  <>
+                    BALANCE: {(inputTokenData?.balance || 0).toFixed(4)}{" "}
+                    {inputToken}
+                  </>
                 ) : (
                   <>CONNECT_WALLET_TO_SEE_BALANCE</>
                 )}
@@ -512,7 +515,8 @@ export const DCA = () => {
             {!connected && (
               <div className="stat-card p-4 bg-yellow-500/10 border-2 border-yellow-500">
                 <div className="text-sm terminal-text text-yellow-500 text-center">
-                  <span className="terminal-prefix">&gt;</span> WALLET_NOT_CONNECTED
+                  <span className="terminal-prefix">&gt;</span>{" "}
+                  WALLET_NOT_CONNECTED
                   <br />
                   Please connect your wallet to create DCA orders
                 </div>

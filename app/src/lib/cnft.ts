@@ -1,9 +1,16 @@
-import { Connection, PublicKey, Transaction, SystemProgram } from "@solana/web3.js";
+import {
+  Connection,
+  PublicKey,
+  Transaction,
+  SystemProgram,
+} from "@solana/web3.js";
 import { AnchorProvider, Program, web3 } from "@project-serum/anchor";
 import { WalletContextState } from "@solana/wallet-adapter-react";
 
 // Program ID du programme swapback_cnft déployé
-export const CNFT_PROGRAM_ID = new PublicKey("CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH");
+export const CNFT_PROGRAM_ID = new PublicKey(
+  "CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH"
+);
 
 export enum LockLevel {
   Bronze = "Bronze",
@@ -29,9 +36,12 @@ export interface CNFTLockParams {
 /**
  * Calcule le niveau de cNFT basé sur le montant et la durée
  */
-export function calculateLevel(amount: number, durationDays: number): LockLevel {
+export function calculateLevel(
+  amount: number,
+  durationDays: number
+): LockLevel {
   const amountLamports = amount * 1e9; // Convertir en lamports
-  
+
   if (amountLamports >= 10_000_000_000 && durationDays >= 365) {
     return LockLevel.Gold; // 10,000 $BACK, 1 an → Gold (50% boost)
   } else if (amountLamports >= 1_000_000_000 && durationDays >= 180) {
@@ -39,7 +49,7 @@ export function calculateLevel(amount: number, durationDays: number): LockLevel 
   } else if (amountLamports >= 100_000_000 && durationDays >= 90) {
     return LockLevel.Bronze; // 100 $BACK, 3 mois → Bronze (10% boost)
   }
-  
+
   return LockLevel.Bronze; // Par défaut
 }
 
@@ -48,7 +58,7 @@ export function calculateLevel(amount: number, durationDays: number): LockLevel 
  */
 export function calculateBoost(amount: number, durationDays: number): number {
   const level = calculateLevel(amount, durationDays);
-  
+
   switch (level) {
     case LockLevel.Gold:
       return 50;
@@ -90,13 +100,13 @@ export async function createInitializeCollectionTransaction(
   authority: PublicKey
 ): Promise<Transaction> {
   const [collectionConfig] = getCollectionConfigPDA();
-  
+
   // Pour l'instant, transaction simulée
   // TODO: Intégrer avec le vrai programme Anchor
   const transaction = new Transaction();
-  
+
   console.log("Initialize collection PDA:", collectionConfig.toString());
-  
+
   return transaction;
 }
 

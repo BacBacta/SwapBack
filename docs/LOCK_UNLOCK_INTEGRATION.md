@@ -10,6 +10,7 @@
 ## 📋 Résumé
 
 Développement complet de la fonctionnalité Lock-Unlock avec système de cNFT (compressed NFT) permettant aux utilisateurs de :
+
 - 🔒 **Verrouiller** des tokens $BACK pour une durée déterminée
 - 🎁 **Recevoir** un cNFT de niveau (Bronze/Silver/Gold) avec boost associé
 - 🔓 **Déverrouiller** leurs tokens après la période
@@ -22,6 +23,7 @@ Développement complet de la fonctionnalité Lock-Unlock avec système de cNFT (
 ### Composants Développés
 
 #### 1. **Programme Solana** (`/programs/swapback_cnft/src/lib.rs`)
+
 - **Compilé avec succès** ✅
 - **Instructions**:
   - `initialize_collection`: Initialisation de la collection cNFT
@@ -29,13 +31,14 @@ Développement complet de la fonctionnalité Lock-Unlock avec système de cNFT (
   - `update_nft_status`: Update lors du unlock
 
 - **Comptes**:
+
   ```rust
   pub struct CollectionConfig {
       pub authority: Pubkey,
       pub tree_config: Pubkey,
       pub total_minted: u64,
   }
-  
+
   pub struct UserNft {
       pub user: Pubkey,
       pub level: LockLevel,
@@ -56,6 +59,7 @@ Développement complet de la fonctionnalité Lock-Unlock avec système de cNFT (
   ```
 
 #### 2. **SDK Frontend** (`/app/src/lib/cnft.ts` - 231 lignes)
+
 ```typescript
 // Fonctions principales
 export function calculateLevel(amount: number, durationDays: number): string
@@ -70,6 +74,7 @@ export function getUnlockDate(cnftData: UserCNFTData): Date
 ```
 
 **Caractéristiques**:
+
 - ✅ Dérivation automatique des PDAs
 - ✅ Calcul dynamique des niveaux et boosts
 - ✅ Construction de transactions prêtes à signer
@@ -77,24 +82,30 @@ export function getUnlockDate(cnftData: UserCNFTData): Date
 - ✅ Validation de l'unlock (date expirée)
 
 #### 3. **Composant React** (`/app/src/components/LockUnlock.tsx`)
+
 ```typescript
 export const LockUnlock = () => {
   // States
   const [lockAmount, setLockAmount] = useState("");
   const [lockDuration, setLockDuration] = useState("30");
   const [loading, setLoading] = useState(false);
-  
+
   // Hooks
   const { connected, publicKey } = useWallet();
   const { cnftData, levelName } = useCNFT();
-  
+
   // Handlers
-  const handleLock = async () => { /* ... */ }
-  const handleUnlock = async () => { /* ... */ }
-}
+  const handleLock = async () => {
+    /* ... */
+  };
+  const handleUnlock = async () => {
+    /* ... */
+  };
+};
 ```
 
 **Fonctionnalités UI**:
+
 - 🎨 Harmonisé avec le thème Terminal Hacker
 - 💰 Input montant avec validation
 - ⏰ Sélecteur de durée (30/90/180/365 jours)
@@ -104,6 +115,7 @@ export const LockUnlock = () => {
 - 🔓 Bouton unlock avec validation de la date
 
 #### 4. **Hook Custom** (`/app/src/hooks/useCNFT.ts`)
+
 ```typescript
 export interface CNFTData {
   level: number;
@@ -142,30 +154,31 @@ function calculateLevel(amount: number, durationDays: number): string {
 ```typescript
 function calculateBoost(amount: number, durationDays: number): number {
   const level = calculateLevel(amount, durationDays);
-  
-  if (level === "Gold") return 50;    // +50%
-  if (level === "Silver") return 30;  // +30%
-  if (level === "Bronze") return 10;  // +10%
+
+  if (level === "Gold") return 50; // +50%
+  if (level === "Silver") return 30; // +30%
+  if (level === "Bronze") return 10; // +10%
   return 0;
 }
 ```
 
 ### Exemples
 
-| Montant | Durée | Niveau | Boost |
-|---------|-------|--------|-------|
-| 100 $BACK | 90 jours | Bronze | +10% |
-| 1,000 $BACK | 90 jours | Bronze | +10% |
-| 10,000 $BACK | 180 jours | Silver | +30% |
-| 50,000 $BACK | 180 jours | Silver | +30% |
-| 100,000 $BACK | 365 jours | Gold | +50% |
-| 500,000 $BACK | 365 jours | Gold | +50% |
+| Montant       | Durée     | Niveau | Boost |
+| ------------- | --------- | ------ | ----- |
+| 100 $BACK     | 90 jours  | Bronze | +10%  |
+| 1,000 $BACK   | 90 jours  | Bronze | +10%  |
+| 10,000 $BACK  | 180 jours | Silver | +30%  |
+| 50,000 $BACK  | 180 jours | Silver | +30%  |
+| 100,000 $BACK | 365 jours | Gold   | +50%  |
+| 500,000 $BACK | 365 jours | Gold   | +50%  |
 
 ---
 
 ## 🔄 Flow d'Utilisation
 
 ### 1. **Lock Flow**
+
 ```
 Utilisateur connecte wallet
     ↓
@@ -187,6 +200,7 @@ Tokens verrouillés dans le programme
 ```
 
 ### 2. **Unlock Flow**
+
 ```
 Hook useCNFT fetch le cNFT
     ↓
@@ -212,6 +226,7 @@ cNFT brûlé
 ## 🚧 État Actuel du Déploiement
 
 ### ✅ Terminé
+
 - [x] Programme compilé avec `cargo build-sbf`
 - [x] Program ID généré et intégré
 - [x] SDK frontend complet (231 lignes)
@@ -221,6 +236,7 @@ cNFT brûlé
 - [x] Validation et gestion des erreurs
 
 ### ⏳ En Attente
+
 - [ ] **Déploiement sur devnet** (bloqué par faucet rate limit)
 - [ ] **Test on-chain** avec vraies transactions
 - [ ] **Intégration avec le token $BACK** officiel
@@ -229,6 +245,7 @@ cNFT brûlé
 ### 🔴 Bloqueurs Actuels
 
 #### 1. **Pas de SOL pour le déploiement**
+
 ```bash
 # Configuration Solana
 Cluster: https://api.devnet.solana.com
@@ -241,12 +258,14 @@ Error: airdrop request failed. This can happen when the rate limit is reached.
 ```
 
 **Solutions**:
+
 1. **Attendre 1h** pour que le rate limit reset
 2. **Utiliser un faucet alternatif**: https://sol-faucet.com
 3. **Demander du SOL** via Discord Solana
 4. **Utiliser un autre wallet** avec SOL
 
 #### 2. **Simulation active pour le dev**
+
 Le code actuel utilise une **simulation** pour permettre le développement sans déploiement :
 
 ```typescript
@@ -266,17 +285,20 @@ await new Promise((resolve) => setTimeout(resolve, 2000));
 ## 🎯 Prochaines Étapes
 
 ### Phase 1: Déploiement (1-2h)
+
 1. **Obtenir du SOL** pour le déploiement
+
    ```bash
    # Option 1: Attendre le rate limit
    solana airdrop 2
-   
+
    # Option 2: Faucet web
    # Aller sur https://sol-faucet.com
    # Entrer: 65abbvvVT4L7hdd9JMgk3g2eeu6sfSyVqVKQjLZnyBo
    ```
 
 2. **Déployer le programme**
+
    ```bash
    cd /workspaces/SwapBack
    anchor deploy --provider.cluster devnet
@@ -292,6 +314,7 @@ await new Promise((resolve) => setTimeout(resolve, 2000));
    ```
 
 ### Phase 2: Tests On-Chain (2-3h)
+
 1. **Tests unitaires**
    - Test Lock avec différents montants
    - Test Lock avec différentes durées
@@ -311,6 +334,7 @@ await new Promise((resolve) => setTimeout(resolve, 2000));
    - Test refresh après transaction
 
 ### Phase 3: Optimisations (1-2h)
+
 1. **Améliorer la gestion d'erreurs**
    - Messages d'erreur plus détaillés
    - Retry automatique en cas d'échec réseau
@@ -334,6 +358,7 @@ await new Promise((resolve) => setTimeout(resolve, 2000));
 ### Structure des PDAs
 
 #### Collection Config PDA
+
 ```typescript
 Seeds: ["collection_config"]
 Program: swapback_cnft
@@ -345,6 +370,7 @@ Contenu: {
 ```
 
 #### User NFT PDA
+
 ```typescript
 Seeds: ["user_nft", userPubkey]
 Program: swapback_cnft
@@ -361,12 +387,12 @@ Contenu: {
 ### Exemple d'Utilisation du SDK
 
 ```typescript
-import { 
-  createLockTransaction, 
+import {
+  createLockTransaction,
   createUnlockTransaction,
   fetchUserCNFT,
   calculateLevel,
-  calculateBoost 
+  calculateBoost,
 } from "@/lib/cnft";
 
 // 1. Calculer le niveau et boost
@@ -374,14 +400,10 @@ const level = calculateLevel(10000, 180); // "Silver"
 const boost = calculateBoost(10000, 180); // 30
 
 // 2. Lock tokens
-const { transaction } = await createLockTransaction(
-  connection,
-  wallet,
-  {
-    amount: 10000 * 1e9, // 10k tokens en lamports
-    duration: 180 * 24 * 60 * 60, // 180 jours en secondes
-  }
-);
+const { transaction } = await createLockTransaction(connection, wallet, {
+  amount: 10000 * 1e9, // 10k tokens en lamports
+  duration: 180 * 24 * 60 * 60, // 180 jours en secondes
+});
 
 const signature = await sendTransaction(transaction, connection);
 await connection.confirmTransaction(signature);
@@ -408,6 +430,7 @@ await connection.confirmTransaction(unlockSig);
 ## 🐛 Débogage et Logs
 
 ### Activer les logs détaillés
+
 ```typescript
 // Dans cnft.ts
 const ENABLE_DEBUG = true;
@@ -417,12 +440,13 @@ if (ENABLE_DEBUG) {
     user: wallet.publicKey.toString(),
     amount,
     duration,
-    level: calculateLevel(amount / 1e9, duration / (24*60*60)),
+    level: calculateLevel(amount / 1e9, duration / (24 * 60 * 60)),
   });
 }
 ```
 
 ### Commandes utiles
+
 ```bash
 # Voir les logs du programme
 solana logs CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH --url devnet
@@ -439,6 +463,7 @@ solana confirm <SIGNATURE> --url devnet -v
 ## 📊 Métriques de Succès
 
 ### Objectifs à atteindre
+
 - ✅ 100% des transactions Lock réussies
 - ✅ 100% des transactions Unlock réussies (après date)
 - ✅ 0% de transactions Unlock avant date (correctement bloquées)
@@ -446,6 +471,7 @@ solana confirm <SIGNATURE> --url devnet -v
 - ✅ UI responsive sans lag
 
 ### KPIs à surveiller
+
 - Nombre total de locks
 - Montant total verrouillé
 - Distribution des niveaux (Bronze/Silver/Gold)
@@ -456,15 +482,16 @@ solana confirm <SIGNATURE> --url devnet -v
 
 ## 🎉 Conclusion
 
-Le système Lock-Unlock avec cNFT est **entièrement développé** et **prêt au déploiement**. 
+Le système Lock-Unlock avec cNFT est **entièrement développé** et **prêt au déploiement**.
 
-**Progrès**: 
+**Progrès**:
+
 - ✅ Architecture complète (programme + SDK + UI)
 - ✅ Code compilé sans erreurs
 - ✅ Tests unitaires du SDK validés
 - ⏳ Déploiement on-chain en attente de SOL
 
-**Prochaine Action Immédiate**: 
+**Prochaine Action Immédiate**:
 Obtenir du SOL sur le devnet pour déployer le programme et tester en conditions réelles.
 
 ---
