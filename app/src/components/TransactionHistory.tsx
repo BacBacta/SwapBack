@@ -39,9 +39,9 @@ export const TransactionHistory = ({
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isOpen, setIsOpen] = useState(true);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
-  const [filter, setFilter] = useState<"all" | "swap" | "lock" | "unlock" | "dca">(
-    "all"
-  );
+  const [filter, setFilter] = useState<
+    "all" | "swap" | "lock" | "unlock" | "dca"
+  >("all");
 
   // Charger l'historique depuis localStorage
   useEffect(() => {
@@ -199,8 +199,8 @@ export const TransactionHistory = ({
                             {tx.type === "swap" && "🔄 "}
                             {tx.type === "lock" && "🔒 "}
                             {tx.type === "unlock" && "🔓 "}
-                            {tx.type === "dca" && "📊 "}
-                            [{tx.type.toUpperCase()}]
+                            {tx.type === "dca" && "📊 "}[{tx.type.toUpperCase()}
+                            ]
                           </span>
                           <span className="px-2 py-1 text-xs font-bold border-2 border-[var(--primary)] text-[var(--primary)]">
                             [{tx.router.toUpperCase()}]
@@ -249,11 +249,13 @@ export const TransactionHistory = ({
                             {tx.dcaInterval && (
                               <span>INTERVAL: Every {tx.dcaInterval} days</span>
                             )}
-                            {tx.dcaSwapsExecuted !== undefined && tx.dcaTotalSwaps && (
-                              <span className="text-[var(--primary)]">
-                                PROGRESS: {tx.dcaSwapsExecuted}/{tx.dcaTotalSwaps} swaps
-                              </span>
-                            )}
+                            {tx.dcaSwapsExecuted !== undefined &&
+                              tx.dcaTotalSwaps && (
+                                <span className="text-[var(--primary)]">
+                                  PROGRESS: {tx.dcaSwapsExecuted}/
+                                  {tx.dcaTotalSwaps} swaps
+                                </span>
+                              )}
                           </div>
                         )}
 

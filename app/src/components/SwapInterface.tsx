@@ -947,7 +947,9 @@ export const SwapInterface = () => {
                 <div className="flex items-center gap-2">
                   <span className="text-red-400 text-xl">❌</span>
                   <div>
-                    <div className="text-xs text-gray-400">Without SwapBack</div>
+                    <div className="text-xs text-gray-400">
+                      Without SwapBack
+                    </div>
                     <div className="text-sm font-semibold text-gray-300">
                       Standard market price
                     </div>

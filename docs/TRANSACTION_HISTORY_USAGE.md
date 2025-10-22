@@ -16,10 +16,10 @@ import {
 // Après une transaction Lock réussie
 const handleLock = async () => {
   // ... votre logique de lock ...
-  
+
   const signature = await sendTransaction(transaction, connection);
   await connection.confirmTransaction(signature);
-  
+
   // Ajouter à l'historique
   if (publicKey) {
     addLockTransaction(publicKey.toString(), {
@@ -36,10 +36,10 @@ const handleLock = async () => {
 // Après une transaction Unlock réussie
 const handleUnlock = async () => {
   // ... votre logique de unlock ...
-  
+
   const signature = await sendTransaction(transaction, connection);
   await connection.confirmTransaction(signature);
-  
+
   // Ajouter à l'historique
   if (publicKey && cnftData) {
     addUnlockTransaction(publicKey.toString(), {
@@ -58,10 +58,10 @@ const handleUnlock = async () => {
 // Après l'exécution d'un swap DCA
 const executeDCASwap = async () => {
   // ... votre logique de DCA ...
-  
+
   const signature = await sendTransaction(transaction, connection);
   await connection.confirmTransaction(signature);
-  
+
   // Ajouter à l'historique
   if (publicKey) {
     addDCATransaction(publicKey.toString(), {
@@ -99,18 +99,21 @@ import { TransactionHistory } from "@/components/TransactionHistory";
 ## Informations affichées
 
 ### Pour Lock/Unlock
+
 - ✅ Niveau (Bronze/Silver/Gold)
 - ✅ Durée de verrouillage (en jours)
 - ✅ Boost (pourcentage)
 - ✅ Montant verrouillé/déverrouillé
 
 ### Pour DCA
+
 - ✅ Intervalle entre swaps (en jours)
 - ✅ Progression (swaps exécutés / total)
 - ✅ Montants d'entrée/sortie
 - ✅ Tokens échangés
 
 ### Icônes
+
 - 🔄 SWAP
 - 🔒 LOCK
 - 🔓 UNLOCK

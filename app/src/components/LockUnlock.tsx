@@ -4,10 +4,7 @@ import { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useCNFT } from "../hooks/useCNFT";
 import { calculateLevel, calculateBoost } from "../lib/cnft";
-import {
-  addLockTransaction,
-  addUnlockTransaction,
-} from "./TransactionHistory";
+import { addLockTransaction, addUnlockTransaction } from "./TransactionHistory";
 
 export const LockUnlock = () => {
   const { connected, publicKey } = useWallet();

@@ -3,6 +3,7 @@
 ## ✅ Fonctionnalités Intégrées
 
 L'historique des transactions enregistre maintenant automatiquement :
+
 - 🔒 **Lock** : Verrouillages de tokens avec niveau et boost
 - 🔓 **Unlock** : Déverrouillages de tokens
 - 📊 **DCA** : Création de plans DCA automatiques
@@ -15,6 +16,7 @@ L'historique des transactions enregistre maintenant automatiquement :
 ### 1. **Tester Lock-Unlock**
 
 #### Créer un Lock
+
 1. Ouvrez http://localhost:3000
 2. Cliquez sur **[DASHBOARD]**
 3. Cliquez sur le sous-onglet **[LOCK_UNLOCK]**
@@ -25,6 +27,7 @@ L'historique des transactions enregistre maintenant automatiquement :
 6. ✅ Une transaction Lock devrait être enregistrée
 
 #### Vérifier dans l'historique
+
 1. Cliquez sur **[TRANSACTION_HISTORY]** (en haut)
 2. Cliquez sur le filtre **[LOCK]**
 3. ✅ Vous devriez voir :
@@ -33,11 +36,13 @@ L'historique des transactions enregistre maintenant automatiquement :
    - Détails : `LEVEL: Silver`, `DURATION: 90 days`, `BOOST: +30%`
 
 #### Créer un Unlock
+
 1. Retournez sur **[LOCK_UNLOCK]**
 2. Cliquez sur **[UNLOCK TOKENS]** (si disponible)
 3. ✅ Une transaction Unlock devrait être enregistrée
 
 #### Vérifier dans l'historique
+
 1. Cliquez sur **[TRANSACTION_HISTORY]**
 2. Cliquez sur le filtre **[UNLOCK]**
 3. ✅ Vous devriez voir :
@@ -50,6 +55,7 @@ L'historique des transactions enregistre maintenant automatiquement :
 ### 2. **Tester DCA**
 
 #### Créer un Plan DCA
+
 1. Ouvrez http://localhost:3000
 2. Cliquez sur **[DASHBOARD]**
 3. Cliquez sur le sous-onglet **[DCA_STRATEGY]**
@@ -64,6 +70,7 @@ L'historique des transactions enregistre maintenant automatiquement :
 7. ✅ Une transaction DCA devrait être enregistrée
 
 #### Vérifier dans l'historique
+
 1. Cliquez sur **[TRANSACTION_HISTORY]**
 2. Cliquez sur le filtre **[DCA]**
 3. ✅ Vous devriez voir :
@@ -76,11 +83,13 @@ L'historique des transactions enregistre maintenant automatiquement :
 ### 3. **Tester les Filtres**
 
 #### Filtre ALL
+
 1. Ouvrez **[TRANSACTION_HISTORY]**
 2. Cliquez sur **[ALL]**
 3. ✅ Toutes les transactions (Lock, Unlock, DCA, Swap) sont affichées
 
 #### Filtres Spécifiques
+
 - **[SWAP]** : Affiche seulement les swaps classiques
 - **[LOCK]** : Affiche seulement les locks 🔒
 - **[UNLOCK]** : Affiche seulement les unlocks 🔓
@@ -91,6 +100,7 @@ L'historique des transactions enregistre maintenant automatiquement :
 ## 🎯 Données Affichées
 
 ### Pour Lock (🔒)
+
 ```
 Type: [LOCK]
 Montant: X $BACK → 1 cNFT
@@ -102,6 +112,7 @@ Signature: simXXXXXXXXXXXXX...
 ```
 
 ### Pour Unlock (🔓)
+
 ```
 Type: [UNLOCK]
 Montant: 1 cNFT → X $BACK
@@ -111,6 +122,7 @@ Signature: simXXXXXXXXXXXXX...
 ```
 
 ### Pour DCA (📊)
+
 ```
 Type: [DCA]
 Montant: X SOL → USDC
@@ -126,6 +138,7 @@ Signature: simXXXXXXXXXXXXX...
 ## 🔍 Détails Étendus
 
 Cliquez sur une transaction pour voir :
+
 - ✅ Signature complète (cliquable pour copier)
 - ✅ Lien vers Solscan Explorer
 - ✅ Timestamp exact
@@ -136,6 +149,7 @@ Cliquez sur une transaction pour voir :
 ## 💾 Stockage
 
 Les transactions sont stockées dans **localStorage** par wallet :
+
 - Clé : `swapback_history_<WALLET_ADDRESS>`
 - Limite : 100 dernières transactions
 - Persistant entre les sessions
@@ -145,6 +159,7 @@ Les transactions sont stockées dans **localStorage** par wallet :
 ## 🧹 Nettoyage
 
 Pour effacer l'historique :
+
 1. Ouvrez **[TRANSACTION_HISTORY]**
 2. Cliquez sur **[CLEAR_ALL]** (bouton rouge en haut à droite)
 3. ✅ Tout l'historique est supprimé
@@ -154,15 +169,19 @@ Pour effacer l'historique :
 ## 🐛 Troubleshooting
 
 ### Problème : Transactions non enregistrées
+
 **Solution** : Vérifiez que le wallet est bien connecté avant d'effectuer une opération
 
 ### Problème : Historique vide
+
 **Solutions** :
+
 1. Connectez votre wallet
 2. Effectuez au moins une opération (Lock/Unlock/DCA)
 3. Vérifiez le filtre sélectionné (ALL/SWAP/LOCK/UNLOCK/DCA)
 
 ### Problème : Signatures "sim..."
+
 **Explication** : C'est normal ! En mode simulation (programme non déployé), les signatures sont simulées avec le préfixe "sim"
 
 ---
