@@ -29,6 +29,7 @@ interface RouteInfo {
   fees: number;
   route?: RouteStep[];
   priceImpact?: number;
+  dex?: string; // 🆕 DEX utilisé pour la meilleure route
 }
 
 export const SwapInterface = () => {
@@ -222,10 +223,12 @@ export const SwapInterface = () => {
           fees: data.fees / 1000000 || 0,
           route: data.route || [],
           priceImpact: data.priceImpact || 0,
+          dex: data.route && data.route.length > 0 ? data.route[0].label : "SwapBack",
         };
 
         console.log("✅ RouteInfo transformé:", route);
         console.log("🛣️ Nombre d'étapes de route:", route.route?.length);
+        console.log("🏪 DEX principal:", route.dex);
 
         setRouteInfo(route);
         setJupiterQuote(null);
@@ -877,6 +880,11 @@ export const SwapInterface = () => {
               >
                 {routeInfo.type === "Direct" ? "⚡ DIRECT" : "🔀 AGGREGATOR"}
               </span>
+              {routeInfo.dex && (
+                <span className="px-3 py-1 bg-[var(--primary)]/10 text-[var(--primary)] text-xs font-bold border border-[var(--primary)]/30 terminal-text">
+                  <span className="terminal-prefix">&gt;</span> DEX: {routeInfo.dex}
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-2 text-sm">
