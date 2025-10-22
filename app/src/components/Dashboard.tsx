@@ -245,7 +245,8 @@ export const Dashboard = () => {
                   </div>
                   <div>
                     <div className="font-bold text-lg mb-1 terminal-text">
-                      <span className="terminal-prefix">&gt;</span> PENDING_REBATES
+                      <span className="terminal-prefix">&gt;</span>{" "}
+                      PENDING_REBATES
                     </div>
                     <div className="text-3xl font-bold text-[var(--primary)] terminal-text">
                       ${userStats.pendingRebates.toFixed(2)}
@@ -290,11 +291,14 @@ export const Dashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="swap-card">
               <h4 className="font-bold mb-4 terminal-text">
-                <span className="terminal-prefix">&gt;</span> [PERFORMANCE_METRICS]
+                <span className="terminal-prefix">&gt;</span>{" "}
+                [PERFORMANCE_METRICS]
               </h4>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="terminal-text opacity-70">AVG_SWAP_SIZE:</span>
+                  <span className="terminal-text opacity-70">
+                    AVG_SWAP_SIZE:
+                  </span>
                   <span className="font-semibold terminal-text">
                     $
                     {(
@@ -303,7 +307,9 @@ export const Dashboard = () => {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="terminal-text opacity-70">AVG_NPI_PER_SWAP:</span>
+                  <span className="terminal-text opacity-70">
+                    AVG_NPI_PER_SWAP:
+                  </span>
                   <span className="font-semibold text-[var(--primary)] terminal-text">
                     $
                     {(
@@ -331,7 +337,9 @@ export const Dashboard = () => {
               </h4>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="terminal-text opacity-70">TOTAL_EARNED:</span>
+                  <span className="terminal-text opacity-70">
+                    TOTAL_EARNED:
+                  </span>
                   <span className="font-semibold text-[var(--primary)] terminal-text">
                     $
                     {(
@@ -341,13 +349,17 @@ export const Dashboard = () => {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="terminal-text opacity-70">REBATE_BOOST:</span>
+                  <span className="terminal-text opacity-70">
+                    REBATE_BOOST:
+                  </span>
                   <span className="font-semibold terminal-text">
                     +{userStats?.rebateBoost || 0}%
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="terminal-text opacity-70">LOCKED_AMOUNT:</span>
+                  <span className="terminal-text opacity-70">
+                    LOCKED_AMOUNT:
+                  </span>
                   <span className="font-semibold terminal-text">
                     {(userStats?.lockedAmount || 0).toLocaleString()} $BACK
                   </span>

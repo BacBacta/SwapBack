@@ -893,7 +893,8 @@ export const SwapInterface = () => {
                     <span className="text-xl">🏪</span>
                     <div>
                       <div className="text-xs terminal-text opacity-70 mb-1">
-                        <span className="terminal-prefix">&gt;</span> MEILLEURE_ROUTE_TROUVÉE_SUR:
+                        <span className="terminal-prefix">&gt;</span>{" "}
+                        MEILLEURE_ROUTE_TROUVÉE_SUR:
                       </div>
                       <div className="text-lg font-bold text-[var(--primary)] terminal-text">
                         {routeInfo.dex.toUpperCase()}

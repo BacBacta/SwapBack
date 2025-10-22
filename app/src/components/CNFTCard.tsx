@@ -29,7 +29,10 @@ export const CNFTCard = ({
   };
 
   const daysRemaining = unlockDate
-    ? Math.max(0, Math.ceil((unlockDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    ? Math.max(
+        0,
+        Math.ceil((unlockDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+      )
     : 0;
 
   const getRemainingDaysColor = () => {
@@ -42,7 +45,7 @@ export const CNFTCard = ({
     <div className="swap-card hover:border-[var(--primary)] transition-all duration-300 relative overflow-hidden group">
       {/* Effet CRT Terminal */}
       <div className="absolute inset-0 bg-[var(--primary)]/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-      
+
       <div className="relative">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -53,7 +56,12 @@ export const CNFTCard = ({
               <span className="terminal-prefix">&gt;</span> VOTRE_CNFT
             </h3>
           </div>
-          <LevelBadge level={level} boost={boost} isActive={isActive} size="md" />
+          <LevelBadge
+            level={level}
+            boost={boost}
+            isActive={isActive}
+            size="md"
+          />
         </div>
 
         <div className="space-y-3 mt-4">
@@ -64,7 +72,8 @@ export const CNFTCard = ({
                 <span className="terminal-text opacity-70">MONTANT_LOCKÉ:</span>
               </div>
               <span className="terminal-text font-bold text-lg">
-                {lockedAmount.toLocaleString()} <span className="text-[var(--primary)]">$BACK</span>
+                {lockedAmount.toLocaleString()}{" "}
+                <span className="text-[var(--primary)]">$BACK</span>
               </span>
             </div>
           </div>
@@ -75,7 +84,9 @@ export const CNFTCard = ({
                 <span className="text-lg">⏱️</span>
                 <span className="terminal-text opacity-70">DURÉE_DE_LOCK:</span>
               </div>
-              <span className="terminal-text font-bold text-lg">{lockDuration} JOURS</span>
+              <span className="terminal-text font-bold text-lg">
+                {lockDuration} JOURS
+              </span>
             </div>
           </div>
 
@@ -85,9 +96,13 @@ export const CNFTCard = ({
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <span className="text-lg">📅</span>
-                    <span className="terminal-text opacity-70">DATE_DÉBLOCAGE:</span>
+                    <span className="terminal-text opacity-70">
+                      DATE_DÉBLOCAGE:
+                    </span>
                   </div>
-                  <span className="terminal-text font-bold">{formatDate(unlockDate)}</span>
+                  <span className="terminal-text font-bold">
+                    {formatDate(unlockDate)}
+                  </span>
                 </div>
               </div>
 
@@ -95,9 +110,13 @@ export const CNFTCard = ({
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <span className="text-lg">⏳</span>
-                    <span className="terminal-text opacity-70">TEMPS_RESTANT:</span>
+                    <span className="terminal-text opacity-70">
+                      TEMPS_RESTANT:
+                    </span>
                   </div>
-                  <span className={`font-bold text-lg terminal-text ${getRemainingDaysColor()}`}>
+                  <span
+                    className={`font-bold text-lg terminal-text ${getRemainingDaysColor()}`}
+                  >
                     {daysRemaining} JOUR{daysRemaining !== 1 ? "S" : ""}
                   </span>
                 </div>
@@ -114,7 +133,9 @@ export const CNFTCard = ({
                 <span className="text-2xl">⚡</span>
               </div>
               <div className="flex-1">
-                <div className="text-sm terminal-text opacity-70 mb-1">BOOST_ACTIF:</div>
+                <div className="text-sm terminal-text opacity-70 mb-1">
+                  BOOST_ACTIF:
+                </div>
                 <div className="text-2xl font-bold text-[var(--primary)] terminal-text">
                   +{boost}% SUR_LES_REBATES
                 </div>
