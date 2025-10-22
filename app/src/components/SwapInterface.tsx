@@ -7,6 +7,7 @@ import { useTokenData } from "../hooks/useTokenData";
 import { useJupiter } from "../hooks/useJupiter";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { TokenSelector } from "./TokenSelector";
+import { TransactionHistory } from "./TransactionHistory";
 import type { JupiterQuote } from "@swapback/sdk";
 
 interface RouteStep {
@@ -41,8 +42,42 @@ export const SwapInterface = () => {
     "swapback"
   );
 
-  // 🔍 Blockchain Tracer
+  // � Transaction History Modal
+  const [showHistory, setShowHistory] = useState(false);
+
+  // �🔍 Blockchain Tracer
   const { traceSwap } = useBlockchainTracer();
+
+  // 📝 Fonction pour sauvegarder dans l'historique
+  const saveToHistory = (tx: {
+    signature: string;
+    type: "swap" | "lock" | "unlock";
+    router: "swapback" | "jupiter";
+    inputToken: string;
+    outputToken: string;
+    inputAmount: number;
+    outputAmount: number;
+    npi?: number;
+    rebate?: number;
+    burn?: number;
+    status: "success" | "pending" | "failed";
+  }) => {
+    if (!publicKey) return;
+
+    const storageKey = `swapback_history_${publicKey.toString()}`;
+    const existing = localStorage.getItem(storageKey);
+    const history = existing ? JSON.parse(existing) : [];
+
+    const newTx = {
+      ...tx,
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: Date.now(),
+      explorerUrl: `https://explorer.solana.com/tx/${tx.signature}?cluster=devnet`,
+    };
+
+    const updated = [newTx, ...history].slice(0, 50); // Garder les 50 dernières
+    localStorage.setItem(storageKey, JSON.stringify(updated));
+  };
 
   const [inputAmount, setInputAmount] = useState("");
   const [outputAmount, setOutputAmount] = useState("");
@@ -243,6 +278,19 @@ export const SwapInterface = () => {
 
         if (signature) {
           console.log("✅ Swap Jupiter exécuté:", signature);
+          
+          // 💾 Sauvegarder dans l'historique
+          saveToHistory({
+            signature,
+            type: "swap",
+            router: "jupiter",
+            inputToken,
+            outputToken,
+            inputAmount: Number.parseFloat(inputAmount),
+            outputAmount: jupiterQuote?.outAmount ? Number(jupiterQuote.outAmount) / 1000000 : 0,
+            status: "success"
+          });
+
           alert(
             `✅ Swap Jupiter exécuté avec succès!\n\n` +
               `📋 Signature: ${signature.substring(0, 20)}...\n` +
@@ -292,6 +340,21 @@ export const SwapInterface = () => {
             "🔗 Voir sur Solana Explorer:",
             `https://explorer.solana.com/tx/${operation.signature}?cluster=devnet`
           );
+
+          // 💾 Sauvegarder dans l'historique
+          saveToHistory({
+            signature: operation.signature,
+            type: "swap",
+            router: "swapback",
+            inputToken,
+            outputToken,
+            inputAmount: Number.parseFloat(inputAmount),
+            outputAmount: routeInfo.estimatedOutput / 1000000,
+            npi: routeInfo.npi,
+            rebate: routeInfo.rebate,
+            burn: routeInfo.burn,
+            status: "success"
+          });
 
           alert(
             `✅ Swap SwapBack exécuté avec succès!\n\n` +
@@ -371,6 +434,24 @@ export const SwapInterface = () => {
           {/* Connection Status */}
           <div className="flex justify-center mb-4">
             <ConnectionStatus />
+          </div>
+
+          {/* Transaction History Button */}
+          <div className="flex justify-center mb-4">
+            <button
+              onClick={() => {
+                console.log("🔍 Opening transaction history, connected:", connected);
+                setShowHistory(true);
+              }}
+              disabled={!connected}
+              className={`px-6 py-2 border-2 border-[var(--primary)] bg-transparent font-bold transition-all terminal-text ${
+                connected 
+                  ? "text-[var(--primary)] hover:bg-[var(--primary)]/20 cursor-pointer" 
+                  : "text-[var(--primary)]/50 cursor-not-allowed"
+              }`}
+            >
+              <span className="terminal-prefix">&gt;</span> [TRANSACTION_HISTORY]
+            </button>
           </div>
         </div>
 
@@ -1014,6 +1095,11 @@ export const SwapInterface = () => {
           onSelect={(token) => setOutputToken(token.symbol)}
           onClose={() => setShowOutputTokenSelector(false)}
         />
+      )}
+
+      {/* Transaction History Modal */}
+      {showHistory && (
+        <TransactionHistory onClose={() => setShowHistory(false)} />
       )}
     </>
   );
