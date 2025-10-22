@@ -20,9 +20,13 @@ export default function Home() {
               {/* LOGO */}
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-transparent border-2 border-[#00ff00] flex items-center justify-center">
-                  <span className="text-[#00ff00] font-bold text-xl terminal-text">&gt;</span>
+                  <span className="text-[#00ff00] font-bold text-xl terminal-text">
+                    &gt;
+                  </span>
                 </div>
-                <span className="text-[#00ff00] font-bold text-2xl terminal-text">SWAPBACK_v1.0</span>
+                <span className="text-[#00ff00] font-bold text-2xl terminal-text">
+                  SWAPBACK_v1.0
+                </span>
               </div>
 
               {/* TABS */}

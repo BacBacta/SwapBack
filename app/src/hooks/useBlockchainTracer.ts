@@ -3,19 +3,19 @@
  * Mock implementation until SDK is properly built
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { PublicKey } from '@solana/web3.js';
+import { useState, useEffect, useCallback } from "react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
 
 // Mock types until @swapback/sdk is properly built
-type OperationType = 'swap' | 'lock' | 'unlock' | 'burn';
+type OperationType = "swap" | "lock" | "unlock" | "burn";
 
 interface TracedOperation {
   signature: string;
   timestamp: number;
   type: OperationType;
   user: string;
-  status: 'success' | 'failed';
+  status: "success" | "failed";
   details: any;
   metadata?: any;
 }
@@ -47,26 +47,48 @@ interface BurnDetails {
 }
 
 interface BlockchainTracer {
-  traceSwap: (publicKey: PublicKey, details: SwapDetails, metadata?: any) => Promise<TracedOperation>;
-  traceLock: (publicKey: PublicKey, details: LockDetails) => Promise<TracedOperation>;
-  traceUnlock: (publicKey: PublicKey, details: UnlockDetails) => Promise<TracedOperation>;
-  traceBurn: (publicKey: PublicKey, details: BurnDetails) => Promise<TracedOperation>;
+  traceSwap: (
+    publicKey: PublicKey,
+    details: SwapDetails,
+    metadata?: any
+  ) => Promise<TracedOperation>;
+  traceLock: (
+    publicKey: PublicKey,
+    details: LockDetails
+  ) => Promise<TracedOperation>;
+  traceUnlock: (
+    publicKey: PublicKey,
+    details: UnlockDetails
+  ) => Promise<TracedOperation>;
+  traceBurn: (
+    publicKey: PublicKey,
+    details: BurnDetails
+  ) => Promise<TracedOperation>;
   getOperationsByUser: (publicKey: PublicKey) => Promise<TracedOperation[]>;
-  getOperationBySignature: (signature: string) => Promise<TracedOperation | null>;
+  getOperationBySignature: (
+    signature: string
+  ) => Promise<TracedOperation | null>;
 }
 
 // Mock implementation of createBlockchainTracer
-function createBlockchainTracer(connection: any, programId: string): BlockchainTracer {
+function createBlockchainTracer(
+  connection: any,
+  programId: string
+): BlockchainTracer {
   return {
-    traceSwap: async (publicKey: PublicKey, details: SwapDetails, metadata?: any) => {
+    traceSwap: async (
+      publicKey: PublicKey,
+      details: SwapDetails,
+      metadata?: any
+    ) => {
       // Mock implementation - generate a fake signature
       const signature = `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       return {
         signature,
         timestamp: Date.now(),
-        type: 'swap',
+        type: "swap",
         user: publicKey.toBase58(),
-        status: 'success',
+        status: "success",
         details,
         metadata,
       };
@@ -76,9 +98,9 @@ function createBlockchainTracer(connection: any, programId: string): BlockchainT
       return {
         signature,
         timestamp: Date.now(),
-        type: 'lock',
+        type: "lock",
         user: publicKey.toBase58(),
-        status: 'success',
+        status: "success",
         details,
       };
     },
@@ -87,9 +109,9 @@ function createBlockchainTracer(connection: any, programId: string): BlockchainT
       return {
         signature,
         timestamp: Date.now(),
-        type: 'unlock',
+        type: "unlock",
         user: publicKey.toBase58(),
-        status: 'success',
+        status: "success",
         details,
       };
     },
@@ -98,9 +120,9 @@ function createBlockchainTracer(connection: any, programId: string): BlockchainT
       return {
         signature,
         timestamp: Date.now(),
-        type: 'burn',
+        type: "burn",
         user: publicKey.toBase58(),
-        status: 'success',
+        status: "success",
         details,
       };
     },
@@ -116,24 +138,31 @@ function createBlockchainTracer(connection: any, programId: string): BlockchainT
 }
 
 // ID du programme SwapBack (adresse de test valide)
-const SWAPBACK_PROGRAM_ID = '11111111111111111111111111111112';
+const SWAPBACK_PROGRAM_ID = "11111111111111111111111111111112";
 
 export interface UseBlockchainTracerReturn {
   tracer: BlockchainTracer | null;
   operations: TracedOperation[];
   loading: boolean;
   error: string | null;
-  
+
   // Fonctions de traçage
-  traceSwap: (swapDetails: SwapDetails, metadata?: any) => Promise<TracedOperation | null>;
+  traceSwap: (
+    swapDetails: SwapDetails,
+    metadata?: any
+  ) => Promise<TracedOperation | null>;
   traceLock: (lockDetails: LockDetails) => Promise<TracedOperation | null>;
-  traceUnlock: (unlockDetails: UnlockDetails) => Promise<TracedOperation | null>;
+  traceUnlock: (
+    unlockDetails: UnlockDetails
+  ) => Promise<TracedOperation | null>;
   traceBurn: (burnDetails: BurnDetails) => Promise<TracedOperation | null>;
-  
+
   // Fonctions de récupération
   refreshOperations: () => Promise<void>;
-  getOperationBySignature: (signature: string) => Promise<TracedOperation | null>;
-  
+  getOperationBySignature: (
+    signature: string
+  ) => Promise<TracedOperation | null>;
+
   // Statistiques
   statistics: {
     totalSwaps: number;
@@ -142,7 +171,7 @@ export interface UseBlockchainTracerReturn {
     totalVolume: number;
     totalSavings: number;
   } | null;
-  
+
   refreshStatistics: () => Promise<void>;
 }
 
@@ -152,7 +181,7 @@ export interface UseBlockchainTracerReturn {
 export function useBlockchainTracer(): UseBlockchainTracerReturn {
   const { connection } = useConnection();
   const { publicKey } = useWallet();
-  
+
   const [tracer, setTracer] = useState<BlockchainTracer | null>(null);
   const [operations, setOperations] = useState<TracedOperation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -162,10 +191,7 @@ export function useBlockchainTracer(): UseBlockchainTracerReturn {
   // Initialiser le tracer
   useEffect(() => {
     if (connection) {
-      const newTracer = createBlockchainTracer(
-        connection,
-        SWAPBACK_PROGRAM_ID
-      );
+      const newTracer = createBlockchainTracer(connection, SWAPBACK_PROGRAM_ID);
       setTracer(newTracer);
     }
   }, [connection]);
@@ -181,121 +207,131 @@ export function useBlockchainTracer(): UseBlockchainTracerReturn {
   /**
    * Trace un swap
    */
-  const traceSwap = useCallback(async (
-    swapDetails: SwapDetails,
-    metadata?: any
-  ): Promise<TracedOperation | null> => {
-    if (!tracer || !publicKey) {
-      setError('Tracer ou wallet non initialisé');
-      return null;
-    }
+  const traceSwap = useCallback(
+    async (
+      swapDetails: SwapDetails,
+      metadata?: any
+    ): Promise<TracedOperation | null> => {
+      if (!tracer || !publicKey) {
+        setError("Tracer ou wallet non initialisé");
+        return null;
+      }
 
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const operation = await tracer.traceSwap(publicKey, swapDetails, metadata);
-      
-      // Ajouter à la liste des opérations
-      setOperations(prev => [operation, ...prev]);
-      
-      return operation;
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Erreur inconnue';
-      setError(errorMsg);
-      console.error('Erreur lors du traçage du swap:', err);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [tracer, publicKey]);
+      try {
+        setLoading(true);
+        setError(null);
+
+        const operation = await tracer.traceSwap(
+          publicKey,
+          swapDetails,
+          metadata
+        );
+
+        // Ajouter à la liste des opérations
+        setOperations((prev) => [operation, ...prev]);
+
+        return operation;
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : "Erreur inconnue";
+        setError(errorMsg);
+        console.error("Erreur lors du traçage du swap:", err);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [tracer, publicKey]
+  );
 
   /**
    * Trace un lock
    */
-  const traceLock = useCallback(async (
-    lockDetails: LockDetails
-  ): Promise<TracedOperation | null> => {
-    if (!tracer || !publicKey) {
-      setError('Tracer ou wallet non initialisé');
-      return null;
-    }
+  const traceLock = useCallback(
+    async (lockDetails: LockDetails): Promise<TracedOperation | null> => {
+      if (!tracer || !publicKey) {
+        setError("Tracer ou wallet non initialisé");
+        return null;
+      }
 
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const operation = await tracer.traceLock(publicKey, lockDetails);
-      setOperations(prev => [operation, ...prev]);
-      
-      return operation;
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Erreur inconnue';
-      setError(errorMsg);
-      console.error('Erreur lors du traçage du lock:', err);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [tracer, publicKey]);
+      try {
+        setLoading(true);
+        setError(null);
+
+        const operation = await tracer.traceLock(publicKey, lockDetails);
+        setOperations((prev) => [operation, ...prev]);
+
+        return operation;
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : "Erreur inconnue";
+        setError(errorMsg);
+        console.error("Erreur lors du traçage du lock:", err);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [tracer, publicKey]
+  );
 
   /**
    * Trace un unlock
    */
-  const traceUnlock = useCallback(async (
-    unlockDetails: UnlockDetails
-  ): Promise<TracedOperation | null> => {
-    if (!tracer || !publicKey) {
-      setError('Tracer ou wallet non initialisé');
-      return null;
-    }
+  const traceUnlock = useCallback(
+    async (unlockDetails: UnlockDetails): Promise<TracedOperation | null> => {
+      if (!tracer || !publicKey) {
+        setError("Tracer ou wallet non initialisé");
+        return null;
+      }
 
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const operation = await tracer.traceUnlock(publicKey, unlockDetails);
-      setOperations(prev => [operation, ...prev]);
-      
-      return operation;
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Erreur inconnue';
-      setError(errorMsg);
-      console.error('Erreur lors du traçage du unlock:', err);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [tracer, publicKey]);
+      try {
+        setLoading(true);
+        setError(null);
+
+        const operation = await tracer.traceUnlock(publicKey, unlockDetails);
+        setOperations((prev) => [operation, ...prev]);
+
+        return operation;
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : "Erreur inconnue";
+        setError(errorMsg);
+        console.error("Erreur lors du traçage du unlock:", err);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [tracer, publicKey]
+  );
 
   /**
    * Trace un burn
    */
-  const traceBurn = useCallback(async (
-    burnDetails: BurnDetails
-  ): Promise<TracedOperation | null> => {
-    if (!tracer || !publicKey) {
-      setError('Tracer ou wallet non initialisé');
-      return null;
-    }
+  const traceBurn = useCallback(
+    async (burnDetails: BurnDetails): Promise<TracedOperation | null> => {
+      if (!tracer || !publicKey) {
+        setError("Tracer ou wallet non initialisé");
+        return null;
+      }
 
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const operation = await tracer.traceBurn(publicKey, burnDetails);
-      setOperations(prev => [operation, ...prev]);
-      
-      return operation;
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Erreur inconnue';
-      setError(errorMsg);
-      console.error('Erreur lors du traçage du burn:', err);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [tracer, publicKey]);
+      try {
+        setLoading(true);
+        setError(null);
+
+        const operation = await tracer.traceBurn(publicKey, burnDetails);
+        setOperations((prev) => [operation, ...prev]);
+
+        return operation;
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : "Erreur inconnue";
+        setError(errorMsg);
+        console.error("Erreur lors du traçage du burn:", err);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [tracer, publicKey]
+  );
 
   /**
    * Rafraîchit la liste des opérations
@@ -306,16 +342,16 @@ export function useBlockchainTracer(): UseBlockchainTracerReturn {
     try {
       setLoading(true);
       setError(null);
-      
+
       const ops = await tracer.getOperationHistory(publicKey, {
-        limit: 100
+        limit: 100,
       });
-      
+
       setOperations(ops);
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Erreur inconnue';
+      const errorMsg = err instanceof Error ? err.message : "Erreur inconnue";
       setError(errorMsg);
-      console.error('Erreur lors du chargement des opérations:', err);
+      console.error("Erreur lors du chargement des opérations:", err);
     } finally {
       setLoading(false);
     }
@@ -324,26 +360,27 @@ export function useBlockchainTracer(): UseBlockchainTracerReturn {
   /**
    * Récupère une opération par signature
    */
-  const getOperationBySignature = useCallback(async (
-    signature: string
-  ): Promise<TracedOperation | null> => {
-    if (!tracer) return null;
+  const getOperationBySignature = useCallback(
+    async (signature: string): Promise<TracedOperation | null> => {
+      if (!tracer) return null;
 
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const operation = await tracer.getOperation(signature);
-      return operation;
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Erreur inconnue';
-      setError(errorMsg);
-      console.error('Erreur lors de la récupération de l\'opération:', err);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [tracer]);
+      try {
+        setLoading(true);
+        setError(null);
+
+        const operation = await tracer.getOperation(signature);
+        return operation;
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : "Erreur inconnue";
+        setError(errorMsg);
+        console.error("Erreur lors de la récupération de l'opération:", err);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [tracer]
+  );
 
   /**
    * Rafraîchit les statistiques
@@ -355,7 +392,7 @@ export function useBlockchainTracer(): UseBlockchainTracerReturn {
       const stats = await tracer.getUserStatistics(publicKey);
       setStatistics(stats);
     } catch (err) {
-      console.error('Erreur lors du chargement des statistiques:', err);
+      console.error("Erreur lors du chargement des statistiques:", err);
     }
   }, [tracer, publicKey]);
 
@@ -371,7 +408,7 @@ export function useBlockchainTracer(): UseBlockchainTracerReturn {
     refreshOperations,
     getOperationBySignature,
     statistics,
-    refreshStatistics
+    refreshStatistics,
   };
 }
 
@@ -386,7 +423,7 @@ export function useFilteredOperations(
     endDate?: Date;
   }
 ): TracedOperation[] {
-  return operations.filter(op => {
+  return operations.filter((op) => {
     // Filtre par type
     if (filters?.type && op.type !== filters.type) {
       return false;

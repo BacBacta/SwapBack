@@ -364,7 +364,8 @@ export const SwapInterface = () => {
             <span className="terminal-prefix">&gt;</span> SWAPBACK_v1.0
           </h2>
           <p className="body-regular terminal-text">
-            <span className="terminal-prefix">&gt;</span> SOLANA DEX AGGREGATOR - BEST EXECUTION PROTOCOL
+            <span className="terminal-prefix">&gt;</span> SOLANA DEX AGGREGATOR
+            - BEST EXECUTION PROTOCOL
           </p>
 
           {/* Connection Status */}
@@ -394,7 +395,9 @@ export const SwapInterface = () => {
                 <span>[SWAPBACK_PROTOCOL]</span>
               </div>
               {selectedRouter === "swapback" && (
-                <div className="text-xs mt-1 opacity-90 terminal-text">+REBATES +BURN</div>
+                <div className="text-xs mt-1 opacity-90 terminal-text">
+                  +REBATES +BURN
+                </div>
               )}
             </button>
             <button
@@ -415,7 +418,9 @@ export const SwapInterface = () => {
                 <span>[JUPITER_V6]</span>
               </div>
               {selectedRouter === "jupiter" && (
-                <div className="text-xs mt-1 opacity-90 terminal-text">MARKET_PRICE</div>
+                <div className="text-xs mt-1 opacity-90 terminal-text">
+                  MARKET_PRICE
+                </div>
               )}
             </button>
           </div>

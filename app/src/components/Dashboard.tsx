@@ -64,7 +64,10 @@ export const Dashboard = () => {
       {/* Global Stats avec animation */}
       <div className="swap-card">
         <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold terminal-text" id="protocol-stats-heading">
+          <h2
+            className="text-2xl font-bold terminal-text"
+            id="protocol-stats-heading"
+          >
             <span className="terminal-prefix">&gt;</span> PROTOCOL_STATISTICS
           </h2>
           <div className="flex items-center gap-2 px-3 py-1 bg-[var(--primary)]/10 border-2 border-[var(--primary)]">
@@ -107,7 +110,9 @@ export const Dashboard = () => {
             <div className="text-3xl font-bold text-[var(--primary)] terminal-text">
               {globalStats.totalBurned.toLocaleString("en-US")}
             </div>
-            <div className="text-xs terminal-text mt-2">[MODE: DEFLATIONARY]</div>
+            <div className="text-xs terminal-text mt-2">
+              [MODE: DEFLATIONARY]
+            </div>
           </div>
           <div className="stat-card text-center group">
             <div className="text-sm terminal-text mb-2">
@@ -174,7 +179,9 @@ export const Dashboard = () => {
                 </div>
                 <span className="terminal-text text-sm">SWAPS</span>
               </div>
-              <div className="text-2xl font-bold terminal-text">{userStats.totalSwaps}</div>
+              <div className="text-2xl font-bold terminal-text">
+                {userStats.totalSwaps}
+              </div>
             </div>
 
             <div className="stat-card p-5 border-2 border-[var(--primary)] transition-all group">
