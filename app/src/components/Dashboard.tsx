@@ -64,30 +64,30 @@ export const Dashboard = () => {
       {/* Global Stats avec animation */}
       <div className="swap-card">
         <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold" id="protocol-stats-heading">
-            Protocol Statistics
+          <h2 className="text-2xl font-bold terminal-text" id="protocol-stats-heading">
+            <span className="terminal-prefix">&gt;</span> PROTOCOL_STATISTICS
           </h2>
-          <div className="flex items-center gap-2 px-3 py-1 bg-[var(--secondary)]/10 rounded-full border border-[var(--secondary)]/20">
+          <div className="flex items-center gap-2 px-3 py-1 bg-[var(--primary)]/10 border-2 border-[var(--primary)]">
             <span
-              className="w-2 h-2 bg-[var(--secondary)] rounded-full animate-pulse"
+              className="w-2 h-2 bg-[var(--primary)] animate-pulse"
               aria-hidden="true"
             ></span>
-            <span className="text-xs font-semibold text-[var(--secondary)]">
-              Live
+            <span className="text-xs font-bold text-[var(--primary)] terminal-text">
+              [LIVE_DATA]
             </span>
+            <span className="terminal-cursor"></span>
           </div>
         </div>
         <div
           className="grid grid-cols-1 md:grid-cols-3 gap-6"
-          role="group"
           aria-labelledby="protocol-stats-heading"
         >
-          <div className="stat-card text-center group hover:scale-105 transition-transform">
-            <div className="text-sm text-gray-400 mb-2" id="total-volume-label">
-              Total Volume
+          <div className="stat-card text-center group">
+            <div className="text-sm terminal-text mb-2" id="total-volume-label">
+              <span className="terminal-prefix">&gt;</span> TOTAL_VOLUME
             </div>
             <div
-              className="text-3xl font-bold text-[var(--primary)]"
+              className="text-3xl font-bold text-[var(--primary)] terminal-text"
               aria-labelledby="total-volume-label"
               aria-live="polite"
             >
@@ -96,29 +96,31 @@ export const Dashboard = () => {
                 maximumFractionDigits: 0,
               })}
             </div>
-            <div className="text-xs text-gray-500 mt-2">
-              +{globalStats.swapsLast24h} swaps (24h)
+            <div className="text-xs terminal-text mt-2">
+              [+{globalStats.swapsLast24h} SWAPS_24H]
             </div>
           </div>
-          <div className="stat-card text-center group hover:scale-105 transition-transform">
-            <div className="text-sm text-gray-400 mb-2">$BACK Burned</div>
-            <div className="text-3xl font-bold text-orange-400">
+          <div className="stat-card text-center group">
+            <div className="text-sm terminal-text mb-2">
+              <span className="terminal-prefix">&gt;</span> $BACK_BURNED
+            </div>
+            <div className="text-3xl font-bold text-[var(--primary)] terminal-text">
               {globalStats.totalBurned.toLocaleString("en-US")}
             </div>
-            <div className="text-xs text-gray-500 mt-2">🔥 Deflationary</div>
+            <div className="text-xs terminal-text mt-2">[MODE: DEFLATIONARY]</div>
           </div>
-          <div className="stat-card text-center group hover:scale-105 transition-transform">
-            <div className="text-sm text-gray-400 mb-2">
-              Rebates Distributed
+          <div className="stat-card text-center group">
+            <div className="text-sm terminal-text mb-2">
+              <span className="terminal-prefix">&gt;</span> REBATES_DISTRIBUTED
             </div>
-            <div className="text-3xl font-bold text-[var(--secondary)]">
+            <div className="text-3xl font-bold text-[var(--primary)] terminal-text">
               $
               {globalStats.totalRebates.toLocaleString("en-US", {
                 maximumFractionDigits: 0,
               })}
             </div>
-            <div className="text-xs text-gray-500 mt-2">
-              {globalStats.activeUsers.toLocaleString()} active users
+            <div className="text-xs terminal-text mt-2">
+              [{globalStats.activeUsers.toLocaleString()} ACTIVE_USERS]
             </div>
           </div>
         </div>
@@ -137,26 +139,26 @@ export const Dashboard = () => {
       )}
 
       {/* Tabs Navigation */}
-      <div className="flex gap-2 p-1 bg-black/30 rounded-xl border border-white/5">
+      <div className="flex gap-2 p-1 bg-black/30 border-2 border-[var(--primary)]">
         <button
           onClick={() => setActiveTab("overview")}
-          className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+          className={`flex-1 px-6 py-3 font-bold transition-all terminal-text ${
             activeTab === "overview"
-              ? "bg-[var(--primary)] text-white shadow-[0_0_20px_rgba(153,69,255,0.3)]"
-              : "text-gray-400 hover:text-white hover:bg-white/5"
+              ? "bg-[var(--primary)]/20 border-2 border-[var(--primary)]"
+              : "border-2 border-transparent hover:border-[var(--primary)]/50"
           }`}
         >
-          📊 Overview
+          <span className="terminal-prefix">&gt;</span>[OVERVIEW]
         </button>
         <button
           onClick={() => setActiveTab("analytics")}
-          className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+          className={`flex-1 px-6 py-3 font-bold transition-all terminal-text ${
             activeTab === "analytics"
-              ? "bg-[var(--primary)] text-white shadow-[0_0_20px_rgba(153,69,255,0.3)]"
-              : "text-gray-400 hover:text-white hover:bg-white/5"
+              ? "bg-[var(--primary)]/20 border-2 border-[var(--primary)]"
+              : "border-2 border-transparent hover:border-[var(--primary)]/50"
           }`}
         >
-          📈 Analytics
+          <span className="terminal-prefix">&gt;</span>[ANALYTICS]
         </button>
       </div>
 
@@ -165,48 +167,48 @@ export const Dashboard = () => {
         <div className="space-y-6">
           {/* Quick Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="glass-effect rounded-xl p-5 border border-gray-700/50 hover:border-[var(--primary)]/30 transition-all group">
+            <div className="stat-card p-5 border-2 border-[var(--primary)] transition-all group">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)]/20 to-[var(--primary)]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <span className="text-lg">🔄</span>
+                <div className="w-10 h-10 bg-transparent border-2 border-[var(--primary)] flex items-center justify-center">
+                  <span className="text-lg terminal-text">&gt;</span>
                 </div>
-                <span className="text-gray-400 text-sm">Swaps</span>
+                <span className="terminal-text text-sm">SWAPS</span>
               </div>
-              <div className="text-2xl font-bold">{userStats.totalSwaps}</div>
+              <div className="text-2xl font-bold terminal-text">{userStats.totalSwaps}</div>
             </div>
 
-            <div className="glass-effect rounded-xl p-5 border border-gray-700/50 hover:border-[var(--secondary)]/30 transition-all group">
+            <div className="stat-card p-5 border-2 border-[var(--primary)] transition-all group">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--secondary)]/20 to-[var(--secondary)]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <span className="text-lg">💰</span>
+                <div className="w-10 h-10 bg-transparent border-2 border-[var(--primary)] flex items-center justify-center">
+                  <span className="text-lg terminal-text">$</span>
                 </div>
-                <span className="text-gray-400 text-sm">Volume</span>
+                <span className="terminal-text text-sm">VOLUME</span>
               </div>
-              <div className="text-2xl font-bold">
+              <div className="text-2xl font-bold terminal-text">
                 ${userStats.totalVolume.toLocaleString()}
               </div>
             </div>
 
-            <div className="glass-effect rounded-xl p-5 border border-gray-700/50 hover:border-[var(--secondary)]/30 transition-all group">
+            <div className="stat-card p-5 border-2 border-[var(--primary)] transition-all group">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--secondary)]/20 to-[var(--secondary)]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <span className="text-lg">📈</span>
+                <div className="w-10 h-10 bg-transparent border-2 border-[var(--primary)] flex items-center justify-center">
+                  <span className="text-lg terminal-text">+</span>
                 </div>
-                <span className="text-gray-400 text-sm">NPI</span>
+                <span className="terminal-text text-sm">NPI</span>
               </div>
-              <div className="text-2xl font-bold text-[var(--secondary)]">
+              <div className="text-2xl font-bold text-[var(--primary)] terminal-text">
                 +${userStats.totalNPI.toFixed(2)}
               </div>
             </div>
 
-            <div className="glass-effect rounded-xl p-5 border border-gray-700/50 hover:border-[var(--secondary)]/30 transition-all group">
+            <div className="stat-card p-5 border-2 border-[var(--primary)] transition-all group">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--secondary)]/20 to-[var(--secondary)]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <span className="text-lg">✅</span>
+                <div className="w-10 h-10 bg-transparent border-2 border-[var(--primary)] flex items-center justify-center">
+                  <span className="text-lg terminal-text">✓</span>
                 </div>
-                <span className="text-gray-400 text-sm">Rebates</span>
+                <span className="terminal-text text-sm">REBATES</span>
               </div>
-              <div className="text-2xl font-bold text-[var(--secondary)]">
+              <div className="text-2xl font-bold text-[var(--primary)] terminal-text">
                 ${userStats.totalRebates.toFixed(2)}
               </div>
             </div>

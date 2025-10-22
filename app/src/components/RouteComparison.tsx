@@ -37,8 +37,10 @@ export function RouteComparison() {
   }));
 
   return (
-    <div className="w-full bg-gray-900 rounded-2xl p-6 shadow-xl">
-      <h3 className="text-xl font-bold text-white mb-4">Route Comparison</h3>
+    <div className="w-full swap-card p-6">
+      <h3 className="text-xl font-bold terminal-text mb-4">
+        <span className="terminal-prefix">&gt;</span> ROUTE_COMPARISON
+      </h3>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />

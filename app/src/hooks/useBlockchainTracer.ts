@@ -1,20 +1,119 @@
 /**
  * Hook React pour utiliser le Blockchain Tracer
+ * Mock implementation until SDK is properly built
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
-import {
-  BlockchainTracer,
-  createBlockchainTracer,
-  TracedOperation,
-  OperationType,
-  SwapDetails,
-  LockDetails,
-  UnlockDetails,
-  BurnDetails
-} from '@swapback/sdk';
+
+// Mock types until @swapback/sdk is properly built
+type OperationType = 'swap' | 'lock' | 'unlock' | 'burn';
+
+interface TracedOperation {
+  signature: string;
+  timestamp: number;
+  type: OperationType;
+  user: string;
+  status: 'success' | 'failed';
+  details: any;
+  metadata?: any;
+}
+
+interface SwapDetails {
+  inputToken: string;
+  outputToken: string;
+  inputAmount: number;
+  outputAmount: number;
+  route: string[];
+  priceImpact: number;
+  slippage: number;
+}
+
+interface LockDetails {
+  amount: number;
+  duration: number;
+  tokenMint: string;
+}
+
+interface UnlockDetails {
+  lockId: string;
+  amount: number;
+}
+
+interface BurnDetails {
+  amount: number;
+  tokenMint: string;
+}
+
+interface BlockchainTracer {
+  traceSwap: (publicKey: PublicKey, details: SwapDetails, metadata?: any) => Promise<TracedOperation>;
+  traceLock: (publicKey: PublicKey, details: LockDetails) => Promise<TracedOperation>;
+  traceUnlock: (publicKey: PublicKey, details: UnlockDetails) => Promise<TracedOperation>;
+  traceBurn: (publicKey: PublicKey, details: BurnDetails) => Promise<TracedOperation>;
+  getOperationsByUser: (publicKey: PublicKey) => Promise<TracedOperation[]>;
+  getOperationBySignature: (signature: string) => Promise<TracedOperation | null>;
+}
+
+// Mock implementation of createBlockchainTracer
+function createBlockchainTracer(connection: any, programId: string): BlockchainTracer {
+  return {
+    traceSwap: async (publicKey: PublicKey, details: SwapDetails, metadata?: any) => {
+      // Mock implementation - generate a fake signature
+      const signature = `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      return {
+        signature,
+        timestamp: Date.now(),
+        type: 'swap',
+        user: publicKey.toBase58(),
+        status: 'success',
+        details,
+        metadata,
+      };
+    },
+    traceLock: async (publicKey: PublicKey, details: LockDetails) => {
+      const signature = `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      return {
+        signature,
+        timestamp: Date.now(),
+        type: 'lock',
+        user: publicKey.toBase58(),
+        status: 'success',
+        details,
+      };
+    },
+    traceUnlock: async (publicKey: PublicKey, details: UnlockDetails) => {
+      const signature = `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      return {
+        signature,
+        timestamp: Date.now(),
+        type: 'unlock',
+        user: publicKey.toBase58(),
+        status: 'success',
+        details,
+      };
+    },
+    traceBurn: async (publicKey: PublicKey, details: BurnDetails) => {
+      const signature = `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      return {
+        signature,
+        timestamp: Date.now(),
+        type: 'burn',
+        user: publicKey.toBase58(),
+        status: 'success',
+        details,
+      };
+    },
+    getOperationsByUser: async (publicKey: PublicKey) => {
+      // Mock: return empty array for now
+      return [];
+    },
+    getOperationBySignature: async (signature: string) => {
+      // Mock: return null for now
+      return null;
+    },
+  };
+}
 
 // ID du programme SwapBack (adresse de test valide)
 const SWAPBACK_PROGRAM_ID = '11111111111111111111111111111112';

@@ -352,15 +352,19 @@ export const SwapInterface = () => {
         <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-[var(--secondary)]/10 rounded-full blur-3xl -z-10"></div>
 
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-4 px-4 py-2 bg-[var(--primary)]/10 rounded-full border border-[var(--primary)]/20">
-            <span className="w-2 h-2 bg-[var(--primary)] rounded-full animate-pulse"></span>
-            <span className="text-xs font-semibold text-[var(--primary)]">
-              Smart Router Active
+          <div className="inline-flex items-center gap-2 mb-4 px-4 py-2 bg-[var(--primary)]/10 border-2 border-[var(--primary)]">
+            <span className="terminal-prefix">&gt;</span>
+            <span className="w-2 h-2 bg-[var(--primary)] animate-pulse"></span>
+            <span className="text-xs font-bold terminal-text">
+              SYSTEM_STATUS: ONLINE
             </span>
+            <span className="terminal-cursor"></span>
           </div>
-          <h2 className="section-title mb-3">Swap Tokens</h2>
-          <p className="body-regular text-gray-400">
-            Get the best price across all Solana DEXs
+          <h2 className="section-title mb-3">
+            <span className="terminal-prefix">&gt;</span> SWAPBACK_v1.0
+          </h2>
+          <p className="body-regular terminal-text">
+            <span className="terminal-prefix">&gt;</span> SOLANA DEX AGGREGATOR - BEST EXECUTION PROTOCOL
           </p>
 
           {/* Connection Status */}
@@ -371,7 +375,7 @@ export const SwapInterface = () => {
 
         {/* Router Selection Toggle */}
         <div className="mb-6">
-          <div className="flex gap-2 p-1 bg-black/30 rounded-xl border border-white/10">
+          <div className="flex gap-2 p-1 bg-black/30 border-2 border-[var(--primary)]">
             <button
               onClick={() => {
                 setSelectedRouter("swapback");
@@ -379,18 +383,18 @@ export const SwapInterface = () => {
                 setJupiterQuote(null);
                 setOutputAmount("");
               }}
-              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
+              className={`flex-1 py-3 px-4 font-bold transition-all terminal-text ${
                 selectedRouter === "swapback"
-                  ? "bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] text-white shadow-lg"
-                  : "text-gray-400 hover:text-white hover:bg-white/5"
+                  ? "bg-[var(--primary)]/20 border-2 border-[var(--primary)]"
+                  : "border-2 border-transparent hover:border-[var(--primary)]/50"
               }`}
             >
               <div className="flex items-center justify-center gap-2">
-                <span>⚡</span>
-                <span>SwapBack</span>
+                <span className="terminal-prefix">&gt;</span>
+                <span>[SWAPBACK_PROTOCOL]</span>
               </div>
               {selectedRouter === "swapback" && (
-                <div className="text-xs mt-1 opacity-90">+Rebates +Burn</div>
+                <div className="text-xs mt-1 opacity-90 terminal-text">+REBATES +BURN</div>
               )}
             </button>
             <button
@@ -400,18 +404,18 @@ export const SwapInterface = () => {
                 setJupiterQuote(null);
                 setOutputAmount("");
               }}
-              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
+              className={`flex-1 py-3 px-4 font-bold transition-all terminal-text ${
                 selectedRouter === "jupiter"
-                  ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg"
-                  : "text-gray-400 hover:text-white hover:bg-white/5"
+                  ? "bg-[var(--primary)]/20 border-2 border-[var(--primary)]"
+                  : "border-2 border-transparent hover:border-[var(--primary)]/50"
               }`}
             >
               <div className="flex items-center justify-center gap-2">
-                <span>🪐</span>
-                <span>Jupiter V6</span>
+                <span className="terminal-prefix">&gt;</span>
+                <span>[JUPITER_V6]</span>
               </div>
               {selectedRouter === "jupiter" && (
-                <div className="text-xs mt-1 opacity-90">Best Market Price</div>
+                <div className="text-xs mt-1 opacity-90 terminal-text">MARKET_PRICE</div>
               )}
             </button>
           </div>
@@ -481,15 +485,15 @@ export const SwapInterface = () => {
             <div className="flex gap-2 mt-3">
               <button
                 onClick={setHalfBalance}
-                className="px-3 py-1.5 text-xs font-semibold bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                className="px-3 py-1.5 text-xs font-bold bg-transparent hover:bg-[var(--primary)]/10 border border-[var(--primary)] transition-colors terminal-text"
               >
-                HALF
+                <span className="terminal-prefix">&gt;</span>[HALF]
               </button>
               <button
                 onClick={setMaxBalance}
-                className="px-3 py-1.5 text-xs font-semibold bg-[var(--primary)]/10 hover:bg-[var(--primary)]/20 text-[var(--primary)] rounded-lg transition-colors border border-[var(--primary)]/20"
+                className="px-3 py-1.5 text-xs font-bold bg-[var(--primary)]/10 hover:bg-[var(--primary)]/20 text-[var(--primary)] border-2 border-[var(--primary)] transition-colors terminal-text"
               >
-                MAX
+                <span className="terminal-prefix">&gt;</span>[MAX]
               </button>
             </div>
           )}

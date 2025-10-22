@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwapBack - 10 Templates de Design Professionnels</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #0a0a0a;
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 20px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .navigation {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 20px;
+            background: #1a1a1a;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        .nav-btn {
+            padding: 10px 20px;
+            background: #2a2a2a;
+            border: 2px solid #667eea;
+            color: #fff;
+            cursor: pointer;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .nav-btn:hover {
+            background: #667eea;
+            transform: translateY(-2px);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .template-card {
+            background: #1a1a1a;
+            border-radius: 20px;
+            margin-bottom: 60px;
+            overflow: hidden;
+            border: 2px solid #2a2a2a;
+            transition: all 0.3s;
+        }
+
+        .template-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.2);
+        }
+
+        .template-header {
+            padding: 30px;
+            background: #2a2a2a;
+            border-bottom: 2px solid #3a3a3a;
+        }
+
+        .template-title {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .template-description {
+            color: #aaa;
+            font-size: 1.1rem;
+        }
+
+        .template-preview {
+            padding: 40px;
+            min-height: 500px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .swap-interface {
+            width: 100%;
+            max-width: 480px;
+            border-radius: 24px;
+            padding: 32px;
+            position: relative;
+        }
+
+        .colors-palette {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            padding: 30px;
+            background: #0f0f0f;
+        }
+
+        .color-swatch {
+            flex: 1;
+            min-width: 120px;
+            height: 80px;
+            border-radius: 12px;
+            display: flex;
+            align-items: flex-end;
+            padding: 10px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #0f0f0f;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            color: #667eea;
+            font-size: 1.3rem;
+            font-weight: bold;
+        }
+
+        /* Template 1: Glassmorphism Premium */
+        #template-1 .swap-interface {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.15);
+        }
+
+        #template-1 .template-preview {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        /* Template 2: Neomorphism Dark */
+        #template-2 .swap-interface {
+            background: #1e1e2e;
+            box-shadow: 
+                12px 12px 24px rgba(0, 0, 0, 0.5),
+                -12px -12px 24px rgba(40, 40, 60, 0.1);
+            border: 1px solid #2a2a3e;
+        }
+
+        #template-2 .template-preview {
+            background: #1a1a2e;
+        }
+
+        /* Template 3: Gradient Mesh Modern */
+        #template-3 .swap-interface {
+            background: rgba(15, 15, 35, 0.9);
+            border: 2px solid transparent;
+            background-clip: padding-box;
+        }
+
+        #template-3 .template-preview {
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(255, 0, 128, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(0, 255, 255, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(128, 0, 255, 0.3) 0%, transparent 50%),
+                #0f0f23;
+        }
+
+        /* Template 4: Swiss Minimalist */
+        #template-4 .swap-interface {
+            background: #ffffff;
+            color: #000000;
+            border: 2px solid #000000;
+            box-shadow: 8px 8px 0 #000000;
+        }
+
+        #template-4 .template-preview {
+            background: #f5f5f5;
+        }
+
+        /* Template 5: Cyberpunk Neon */
+        #template-5 .swap-interface {
+            background: rgba(10, 0, 30, 0.95);
+            border: 2px solid #00ffff;
+            box-shadow: 
+                0 0 20px rgba(0, 255, 255, 0.5),
+                0 0 40px rgba(255, 0, 255, 0.3),
+                inset 0 0 20px rgba(0, 255, 255, 0.1);
+        }
+
+        #template-5 .template-preview {
+            background: 
+                repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 255, 255, 0.03) 2px, rgba(0, 255, 255, 0.03) 4px),
+                #0a001e;
+        }
+
+        /* Template 6: Material Design 3 */
+        #template-6 .swap-interface {
+            background: #1c1b1f;
+            border-radius: 28px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        #template-6 .template-preview {
+            background: #141218;
+        }
+
+        /* Template 7: Apple HI */
+        #template-7 .swap-interface {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(40px) saturate(180%);
+            border: 0.5px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        #template-7 .template-preview {
+            background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
+        }
+
+        /* Template 8: Brutalist Bold */
+        #template-8 .swap-interface {
+            background: #ffff00;
+            color: #000000;
+            border: 8px solid #000000;
+            border-radius: 0;
+        }
+
+        #template-8 .template-preview {
+            background: #ffffff;
+        }
+
+        /* Template 9: Aurora Fluid */
+        #template-9 .swap-interface {
+            background: rgba(20, 20, 40, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+            position: relative;
+        }
+
+        #template-9 .template-preview {
+            background: 
+                radial-gradient(ellipse at 30% 50%, rgba(138, 43, 226, 0.4) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 70%, rgba(0, 191, 255, 0.4) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 20%, rgba(255, 105, 180, 0.3) 0%, transparent 50%),
+                #0f0f1f;
+        }
+
+        /* Template 10: Terminal Hacker */
+        #template-10 .swap-interface {
+            background: #000000;
+            border: 2px solid #00ff00;
+            font-family: 'Courier New', monospace;
+            color: #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+        }
+
+        #template-10 .template-preview {
+            background: #0a0a0a;
+        }
+
+        .mock-content {
+            text-align: center;
+        }
+
+        .mock-title {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+
+        .mock-input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+
+        .mock-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 16px;
+            width: 100%;
+            font-size: 1.1rem;
+            margin-top: 20px;
+            cursor: pointer;
+        }
+
+        #template-4 .mock-input,
+        #template-8 .mock-input {
+            background: rgba(0, 0, 0, 0.05);
+            border: 2px solid #000000;
+        }
+
+        #template-4 .mock-button {
+            background: #000000;
+            color: #ffffff;
+        }
+
+        #template-8 .mock-button {
+            background: #ff0000;
+            color: #000000;
+            border: 4px solid #000000;
+            font-weight: bold;
+            border-radius: 0;
+        }
+
+        #template-5 .mock-input {
+            background: rgba(0, 255, 255, 0.05);
+            border: 1px solid #00ffff;
+        }
+
+        #template-5 .mock-button {
+            background: transparent;
+            border: 2px solid #00ffff;
+            color: #00ffff;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+        }
+
+        #template-10 .mock-input {
+            background: transparent;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+        }
+
+        #template-10 .mock-button {
+            background: transparent;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+        }
+
+        .rating {
+            display: inline-block;
+            color: #ffd700;
+            font-size: 1.5rem;
+            margin-left: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .template-title {
+                font-size: 1.5rem;
+            }
+
+            .swap-interface {
+                max-width: 100%;
+            }
+        }
+
+        .comparison-table {
+            width: 100%;
+            margin: 40px 0;
+            border-collapse: collapse;
+            background: #1a1a1a;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .comparison-table th {
+            background: #2a2a2a;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .comparison-table tr:hover {
+            background: #252525;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin: 2px;
+        }
+
+        .badge-easy { background: #00ff88; color: #000; }
+        .badge-medium { background: #ffaa00; color: #000; }
+        .badge-hard { background: #ff4444; color: #fff; }
+        .badge-excellent { background: #667eea; color: #fff; }
+        .badge-good { background: #00aa88; color: #fff; }
+        .badge-average { background: #888888; color: #fff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎨 SwapBack - 10 Templates de Design Professionnels</h1>
+        <p>Visualisation interactive des propositions de design</p>
+    </div>
+
+    <div class="navigation">
+        <button class="nav-btn" onclick="scrollToTemplate(1)">1. Glassmorphism</button>
+        <button class="nav-btn" onclick="scrollToTemplate(2)">2. Neomorphism</button>
+        <button class="nav-btn" onclick="scrollToTemplate(3)">3. Gradient Mesh</button>
+        <button class="nav-btn" onclick="scrollToTemplate(4)">4. Swiss Minimal</button>
+        <button class="nav-btn" onclick="scrollToTemplate(5)">5. Cyberpunk</button>
+        <button class="nav-btn" onclick="scrollToTemplate(6)">6. Material 3</button>
+        <button class="nav-btn" onclick="scrollToTemplate(7)">7. Apple HI</button>
+        <button class="nav-btn" onclick="scrollToTemplate(8)">8. Brutalist</button>
+        <button class="nav-btn" onclick="scrollToTemplate(9)">9. Aurora Fluid</button>
+        <button class="nav-btn" onclick="scrollToTemplate(10)">10. Terminal</button>
+    </div>
+
+    <div class="container">
+        <!-- Template 1: Glassmorphism Premium -->
+        <div id="template-1" class="template-card">
+            <div class="template-header">
+                <div class="template-title">
+                    🌟 Template 1: Glassmorphism Premium
+                    <span class="rating">⭐⭐⭐⭐⭐</span>
+                </div>
+                <div class="template-description">
+                    Moderne, élégant avec effet de verre transparent et flou. Parfait pour un look premium et contemporain.
+                </div>
+            </div>
+            <div class="template-preview">
+                <div class="swap-interface">
+                    <div class="mock-content">
+                        <div class="mock-title">SwapBack Interface</div>
+                        <div class="mock-input">SOL: 0.00</div>
+                        <div style="text-align: center; font-size: 2rem; margin: 15px 0;">↓</div>
+                        <div class="mock-input">USDC: 0.00</div>
+                        <button class="mock-button">Swap Tokens</button>
+                    </div>
+                </div>
+            </div>
+            <div class="colors-palette">
+                <div class="color-swatch" style="background: #667eea;">#667eea</div>
+                <div class="color-swatch" style="background: #764ba2;">#764ba2</div>
+                <div class="color-swatch" style="background: rgba(255,255,255,0.1); border: 1px solid #fff;">Glass BG</div>
+                <div class="color-swatch" style="background: #00ffff;">#00ffff</div>
+            </div>
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-label">Difficulté</div>
+                    <div class="stat-value">Moyenne</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Performance</div>
+                    <div class="stat-value">Excellente</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Mobile</div>
+                    <div class="stat-value">Excellent</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Originalité</div>
+                    <div class="stat-value">8/10</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Template 2: Neomorphism Dark -->
+        <div id="template-2" class="template-card">
+            <div class="template-header">
+                <div class="template-title">
+                    🌑 Template 2: Neomorphism Dark
+                    <span class="rating">⭐⭐⭐⭐</span>
+                </div>
+                <div class="template-description">
+                    Design minimaliste avec effet 3D soft et ombres tactiles. Look moderne et épuré.
+                </div>
+            </div>
+            <div class="template-preview">
+                <div class="swap-interface">
+                    <div class="mock-content">
+                        <div class="mock-title">SwapBack Interface</div>
+                        <div class="mock-input">SOL: 0.00</div>
+                        <div style="text-align: center; font-size: 2rem; margin: 15px 0;">↓</div>
+                        <div class="mock-input">USDC: 0.00</div>
+                        <button class="mock-button">Swap Tokens</button>
+                    </div>
+                </div>
+            </div>
+            <div class="colors-palette">
+                <div class="color-swatch" style="background: #1e1e2e;">#1e1e2e</div>
+                <div class="color-swatch" style="background: #2a2a3e;">#2a2a3e</div>
+                <div class="color-swatch" style="background: #7c7c9e;">#7c7c9e</div>
+                <div class="color-swatch" style="background: #6366f1;">#6366f1</div>
+            </div>
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-label">Difficulté</div>
+                    <div class="stat-value">Difficile</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Performance</div>
+                    <div class="stat-value">Bonne</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Mobile</div>
+                    <div class="stat-value">Bon</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Originalité</div>
+                    <div class="stat-value">9/10</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Template 3: Gradient Mesh Modern -->
+        <div id="template-3" class="template-card">
+            <div class="template-header">
+                <div class="template-title">
+                    🌈 Template 3: Gradient Mesh Modern
+                    <span class="rating">⭐⭐⭐⭐</span>
+                </div>
+                <div class="template-description">
+                    Design coloré avec dégradés animés et maillage dynamique. Jeune et énergique.
+                </div>
+            </div>
+            <div class="template-preview">
+                <div class="swap-interface">
+                    <div class="mock-content">
+                        <div class="mock-title">SwapBack Interface</div>
+                        <div class="mock-input">SOL: 0.00</div>
+                        <div style="text-align: center; font-size: 2rem; margin: 15px 0;">↓</div>
+                        <div class="mock-input">USDC: 0.00</div>
+                        <button class="mock-button">Swap Tokens</button>
+                    </div>
+                </div>
+            </div>
+            <div class="colors-palette">
+                <div class="color-swatch" style="background: #ff0080;">#ff0080</div>
+                <div class="color-swatch" style="background: #00ffff;">#00ffff</div>
+                <div class="color-swatch" style="background: #8000ff;">#8000ff</div>
+                <div class="color-swatch" style="background: #ffaa00;">#ffaa00</div>
+            </div>
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-label">Difficulté</div>
+                    <div class="stat-value">Difficile</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Performance</div>
+                    <div class="stat-value">Moyenne</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Mobile</div>
+                    <div class="stat-value">Moyen</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Originalité</div>
+                    <div class="stat-value">10/10</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Template 4: Swiss Minimalist -->
+        <div id="template-4" class="template-card">
+            <div class="template-header">
+                <div class="template-title">
+                    🇨🇭 Template 4: Minimalist Swiss
+                    <span class="rating">⭐⭐⭐⭐⭐</span>
+                </div>
+                <div class="template-description">
+                    Design ultra-clean et précis, inspiré du design suisse. Professionnel et institutionnel.
+                </div>
+            </div>
+            <div class="template-preview">
+                <div class="swap-interface">
+                    <div class="mock-content" style="color: #000;">
+                        <div class="mock-title">SwapBack Interface</div>
+                        <div class="mock-input">SOL: 0.00</div>
+                        <div style="text-align: center; font-size: 2rem; margin: 15px 0;">↓</div>
+                        <div class="mock-input">USDC: 0.00</div>
+                        <button class="mock-button">Swap Tokens</button>
+                    </div>
+                </div>
+            </div>
+            <div class="colors-palette">
+                <div class="color-swatch" style="background: #ffffff; color: #000; border: 1px solid #000;">#ffffff</div>
+                <div class="color-swatch" style="background: #000000;">#000000</div>
+                <div class="color-swatch" style="background: #f5f5f5; color: #000; border: 1px solid #000;">#f5f5f5</div>
+                <div class="color-swatch" style="background: #0066ff;">#0066ff</div>
+            </div>
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-label">Difficulté</div>
+                    <div class="stat-value">Facile</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Performance</div>
+                    <div class="stat-value">Excellente</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Mobile</div>
+                    <div class="stat-value">Excellent</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Originalité</div>
+                    <div class="stat-value">7/10</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Template 5: Cyberpunk Neon -->
+        <div id="template-5" class="template-card">
+            <div class="template-header">
+                <div class="template-title">
+                    ⚡ Template 5: Cyberpunk Neon
+                    <span class="rating">⭐⭐⭐⭐⭐</span>
+                </div>
+                <div class="template-description">
+                    Design futuriste avec néons cyan et magenta. Parfait pour l'identité crypto et gaming.
+                </div>
+            </div>
+            <div class="template-preview">
+                <div class="swap-interface">
+                    <div class="mock-content">
+                        <div class="mock-title" style="color: #00ffff;">SwapBack Interface</div>
+                        <div class="mock-input">SOL: 0.00</div>
+                        <div style="text-align: center; font-size: 2rem; margin: 15px 0; color: #ff00ff;">↓</div>
+                        <div class="mock-input">USDC: 0.00</div>
+                        <button class="mock-button">Swap Tokens</button>
+                    </div>
+                </div>
+            </div>
+            <div class="colors-palette">
+                <div class="color-swatch" style="background: #00ffff;">#00ffff</div>
+                <div class="color-swatch" style="background: #ff00ff;">#ff00ff</div>
+                <div class="color-swatch" style="background: #0a001e;">#0a001e</div>
+                <div class="color-swatch" style="background: #7700ff;">#7700ff</div>
+            </div>
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-label">Difficulté</div>
+                    <div class="stat-value">Moyenne</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Performance</div>
+                    <div class="stat-value">Bonne</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Mobile</div>
+                    <div class="stat-value">Bon</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Originalité</div>
+                    <div class="stat-value">10/10</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Template 6: Material Design 3 -->
+        <div id="template-6" class="template-card">
+            <div class="template-header">
+                <div class="template-title">
+                    📱 Template 6: Material Design 3
+                    <span class="rating">⭐⭐⭐⭐</span>
+                </div>
+                <div class="template-description">
+                    Système de design de Google, mobile-first et accessible. Fiable et reconnaissable.
+                </div>
+            </div>
+            <div class="template-preview">
+                <div class="swap-interface">
+                    <div class="mock-content">
+                        <div class="mock-title">SwapBack Interface</div>
+                        <div class="mock-input">SOL: 0.00</div>
+                        <div style="text-align: center; font-size: 2rem; margin: 15px 0;">↓</div>
+                        <div class="mock-input">USDC: 0.00</div>
+                        <button class="mock-button">Swap Tokens</button>
+                    </div>
+                </div>
+            </div>
+            <div class="colors-palette">
+                <div class="color-swatch" style="background: #1c1b1f;">#1c1b1f</div>
+                <div class="color-swatch" style="background: #d0bcff;">#d0bcff</div>
+                <div class="color-swatch" style="background: #6750a4;">#6750a4</div>
+                <div class="color-swatch" style="background: #e8def8;">#e8def8</div>
+            </div>
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-label">Difficulté</div>
+                    <div class="stat-value">Facile</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Performance</div>
+                    <div class="stat-value">Excellente</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Mobile</div>
+                    <div class="stat-value">Excellent</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Originalité</div>
+                    <div class="stat-value">6/10</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Template 7: Apple Human Interface -->
+        <div id="template-7" class="template-card">
+            <div class="template-header">
+                <div class="template-title">
+                    🍎 Template 7: Apple Human Interface
+                    <span class="rating">⭐⭐⭐⭐⭐</span>
+                </div>
+                <div class="template-description">
+                    Design premium inspiré d'iOS, ultra-raffiné et élégant. Performance optimale.
+                </div>
+            </div>
+            <div class="template-preview">
+                <div class="swap-interface">
+                    <div class="mock-content">
+                        <div class="mock-title">SwapBack Interface</div>
+                        <div class="mock-input">SOL: 0.00</div>
+                        <div style="text-align: center; font-size: 2rem; margin: 15px 0;">↓</div>
+                        <div class="mock-input">USDC: 0.00</div>
+                        <button class="mock-button">Swap Tokens</button>
+                    </div>
+                </div>
+            </div>
+            <div class="colors-palette">
+                <div class="color-swatch" style="background: #1a1a1a;">#1a1a1a</div>
+                <div class="color-swatch" style="background: #0a84ff;">#0a84ff</div>
+                <div class="color-swatch" style="background: #30d158;">#30d158</div>
+                <div class="color-swatch" style="background: rgba(255,255,255,0.08); border: 1px solid #fff;">Glass</div>
+            </div>
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-label">Difficulté</div>
+                    <div class="stat-value">Moyenne</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Performance</div>
+                    <div class="stat-value">Excellente</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Mobile</div>
+                    <div class="stat-value">Excellent</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Originalité</div>
+                    <div class="stat-value">7/10</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Template 8: Brutalist Bold -->
+        <div id="template-8" class="template-card">
+            <div class="template-header">
+                <div class="template-title">
+                    🔲 Template 8: Brutalist Bold
+                    <span class="rating">⭐⭐⭐</span>
+                </div>
+                <div class="template-description">
+                    Design brut et direct avec bordures épaisses. Unique et mémorable.
+                </div>
+            </div>
+            <div class="template-preview">
+                <div class="swap-interface">
+                    <div class="mock-content" style="color: #000;">
+                        <div class="mock-title">SwapBack Interface</div>
+                        <div class="mock-input">SOL: 0.00</div>
+                        <div style="text-align: center; font-size: 2rem; margin: 15px 0;">↓</div>
+                        <div class="mock-input">USDC: 0.00</div>
+                        <button class="mock-button">Swap Tokens</button>
+                    </div>
+                </div>
+            </div>
+            <div class="colors-palette">
+                <div class="color-swatch" style="background: #ffff00; color: #000;">#ffff00</div>
+                <div class="color-swatch" style="background: #ff0000; color: #fff;">#ff0000</div>
+                <div class="color-swatch" style="background: #000000;">#000000</div>
+                <div class="color-swatch" style="background: #00ff00; color: #000;">#00ff00</div>
+            </div>
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-label">Difficulté</div>
+                    <div class="stat-value">Facile</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Performance</div>
+                    <div class="stat-value">Excellente</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Mobile</div>
+                    <div class="stat-value">Bon</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Originalité</div>
+                    <div class="stat-value">10/10</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Template 9: Aurora Fluid -->
+        <div id="template-9" class="template-card">
+            <div class="template-header">
+                <div class="template-title">
+                    🌊 Template 9: Aurora Fluid
+                    <span class="rating">⭐⭐⭐⭐</span>
+                </div>
+                <div class="template-description">
+                    Design organique avec dégradés fluides et couleurs iridescentes. Apaisant et moderne.
+                </div>
+            </div>
+            <div class="template-preview">
+                <div class="swap-interface">
+                    <div class="mock-content">
+                        <div class="mock-title">SwapBack Interface</div>
+                        <div class="mock-input">SOL: 0.00</div>
+                        <div style="text-align: center; font-size: 2rem; margin: 15px 0;">↓</div>
+                        <div class="mock-input">USDC: 0.00</div>
+                        <button class="mock-button">Swap Tokens</button>
+                    </div>
+                </div>
+            </div>
+            <div class="colors-palette">
+                <div class="color-swatch" style="background: #8a2be2;">#8a2be2</div>
+                <div class="color-swatch" style="background: #00bfff;">#00bfff</div>
+                <div class="color-swatch" style="background: #ff69b4;">#ff69b4</div>
+                <div class="color-swatch" style="background: #9370db;">#9370db</div>
+            </div>
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-label">Difficulté</div>
+                    <div class="stat-value">Difficile</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Performance</div>
+                    <div class="stat-value">Moyenne</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Mobile</div>
+                    <div class="stat-value">Moyen</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Originalité</div>
+                    <div class="stat-value">9/10</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Template 10: Terminal Hacker -->
+        <div id="template-10" class="template-card">
+            <div class="template-header">
+                <div class="template-title">
+                    💻 Template 10: Terminal Hacker
+                    <span class="rating">⭐⭐⭐</span>
+                </div>
+                <div class="template-description">
+                    Design rétro type terminal avec esthétique hacker. Niche dev-focused.
+                </div>
+            </div>
+            <div class="template-preview">
+                <div class="swap-interface">
+                    <div class="mock-content" style="font-family: 'Courier New', monospace;">
+                        <div class="mock-title" style="color: #00ff00;">&gt; SwapBack_v1.0</div>
+                        <div class="mock-input">&gt; INPUT: SOL 0.00</div>
+                        <div style="text-align: center; font-size: 2rem; margin: 15px 0; color: #00ff00;">↓</div>
+                        <div class="mock-input">&gt; OUTPUT: USDC 0.00</div>
+                        <button class="mock-button">[EXECUTE_SWAP]</button>
+                    </div>
+                </div>
+            </div>
+            <div class="colors-palette">
+                <div class="color-swatch" style="background: #000000;">#000000</div>
+                <div class="color-swatch" style="background: #00ff00; color: #000;">#00ff00</div>
+                <div class="color-swatch" style="background: #00aa00;">#00aa00</div>
+                <div class="color-swatch" style="background: #003300;">#003300</div>
+            </div>
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-label">Difficulté</div>
+                    <div class="stat-value">Facile</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Performance</div>
+                    <div class="stat-value">Excellente</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Mobile</div>
+                    <div class="stat-value">Moyen</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Originalité</div>
+                    <div class="stat-value">8/10</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comparison Table -->
+        <div class="template-card">
+            <div class="template-header">
+                <div class="template-title">📊 Tableau Comparatif</div>
+                <div class="template-description">Comparaison détaillée des 10 templates</div>
+            </div>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Template</th>
+                        <th>Difficulté</th>
+                        <th>Performance</th>
+                        <th>Mobile</th>
+                        <th>Originalité</th>
+                        <th>Professionnel</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>🌟 Glassmorphism Premium</td>
+                        <td><span class="badge badge-medium">Moyenne</span></td>
+                        <td><span class="badge badge-excellent">Excellente</span></td>
+                        <td><span class="badge badge-excellent">Excellent</span></td>
+                        <td><span class="badge badge-good">8/10</span></td>
+                        <td><span class="badge badge-excellent">⭐⭐⭐⭐⭐</span></td>
+                    </tr>
+                    <tr>
+                        <td>🌑 Neomorphism Dark</td>
+                        <td><span class="badge badge-hard">Difficile</span></td>
+                        <td><span class="badge badge-good">Bonne</span></td>
+                        <td><span class="badge badge-good">Bon</span></td>
+                        <td><span class="badge badge-excellent">9/10</span></td>
+                        <td><span class="badge badge-good">⭐⭐⭐⭐</span></td>
+                    </tr>
+                    <tr>
+                        <td>🌈 Gradient Mesh Modern</td>
+                        <td><span class="badge badge-hard">Difficile</span></td>
+                        <td><span class="badge badge-average">Moyenne</span></td>
+                        <td><span class="badge badge-average">Moyen</span></td>
+                        <td><span class="badge badge-excellent">10/10</span></td>
+                        <td><span class="badge badge-good">⭐⭐⭐⭐</span></td>
+                    </tr>
+                    <tr>
+                        <td>🇨🇭 Minimalist Swiss</td>
+                        <td><span class="badge badge-easy">Facile</span></td>
+                        <td><span class="badge badge-excellent">Excellente</span></td>
+                        <td><span class="badge badge-excellent">Excellent</span></td>
+                        <td><span class="badge badge-good">7/10</span></td>
+                        <td><span class="badge badge-excellent">⭐⭐⭐⭐⭐</span></td>
+                    </tr>
+                    <tr>
+                        <td>⚡ Cyberpunk Neon</td>
+                        <td><span class="badge badge-medium">Moyenne</span></td>
+                        <td><span class="badge badge-good">Bonne</span></td>
+                        <td><span class="badge badge-good">Bon</span></td>
+                        <td><span class="badge badge-excellent">10/10</span></td>
+                        <td><span class="badge badge-excellent">⭐⭐⭐⭐⭐</span></td>
+                    </tr>
+                    <tr>
+                        <td>📱 Material Design 3</td>
+                        <td><span class="badge badge-easy">Facile</span></td>
+                        <td><span class="badge badge-excellent">Excellente</span></td>
+                        <td><span class="badge badge-excellent">Excellent</span></td>
+                        <td><span class="badge badge-average">6/10</span></td>
+                        <td><span class="badge badge-good">⭐⭐⭐⭐</span></td>
+                    </tr>
+                    <tr>
+                        <td>🍎 Apple Human Interface</td>
+                        <td><span class="badge badge-medium">Moyenne</span></td>
+                        <td><span class="badge badge-excellent">Excellente</span></td>
+                        <td><span class="badge badge-excellent">Excellent</span></td>
+                        <td><span class="badge badge-good">7/10</span></td>
+                        <td><span class="badge badge-excellent">⭐⭐⭐⭐⭐</span></td>
+                    </tr>
+                    <tr>
+                        <td>🔲 Brutalist Bold</td>
+                        <td><span class="badge badge-easy">Facile</span></td>
+                        <td><span class="badge badge-excellent">Excellente</span></td>
+                        <td><span class="badge badge-good">Bon</span></td>
+                        <td><span class="badge badge-excellent">10/10</span></td>
+                        <td><span class="badge badge-average">⭐⭐⭐</span></td>
+                    </tr>
+                    <tr>
+                        <td>🌊 Aurora Fluid</td>
+                        <td><span class="badge badge-hard">Difficile</span></td>
+                        <td><span class="badge badge-average">Moyenne</span></td>
+                        <td><span class="badge badge-average">Moyen</span></td>
+                        <td><span class="badge badge-excellent">9/10</span></td>
+                        <td><span class="badge badge-good">⭐⭐⭐⭐</span></td>
+                    </tr>
+                    <tr>
+                        <td>💻 Terminal Hacker</td>
+                        <td><span class="badge badge-easy">Facile</span></td>
+                        <td><span class="badge badge-excellent">Excellente</span></td>
+                        <td><span class="badge badge-average">Moyen</span></td>
+                        <td><span class="badge badge-good">8/10</span></td>
+                        <td><span class="badge badge-average">⭐⭐⭐</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Recommendations -->
+        <div class="template-card">
+            <div class="template-header">
+                <div class="template-title">🏆 Recommandations Finales</div>
+            </div>
+            <div style="padding: 30px;">
+                <h3 style="margin-bottom: 20px; color: #667eea;">Top 3 pour SwapBack:</h3>
+                
+                <div style="background: #2a2a2a; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+                    <h4 style="color: #00ffff; margin-bottom: 10px;">1️⃣ GLASSMORPHISM PREMIUM</h4>
+                    <p style="color: #aaa;">Meilleur équilibre entre modernité, professionnalisme et performance. Idéal pour attirer un large public tout en restant premium.</p>
+                </div>
+
+                <div style="background: #2a2a2a; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+                    <h4 style="color: #ff00ff; margin-bottom: 10px;">2️⃣ CYBERPUNK NEON</h4>
+                    <p style="color: #aaa;">Identité crypto ultra-forte et très mémorable. Parfait pour se démarquer dans l'écosystème DeFi et créer une marque distinctive.</p>
+                </div>
+
+                <div style="background: #2a2a2a; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+                    <h4 style="color: #0a84ff; margin-bottom: 10px;">3️⃣ APPLE HUMAN INTERFACE</h4>
+                    <p style="color: #aaa;">Premium et raffiné avec performance optimale. Excellent pour cibler les utilisateurs iOS et ceux qui apprécient l'élégance.</p>
+                </div>
+
+                <div style="background: #1a1a1a; padding: 20px; border-radius: 12px; margin-top: 30px; border: 2px solid #667eea;">
+                    <h4 style="color: #667eea; margin-bottom: 10px;">💡 Conseil Final</h4>
+                    <p style="color: #aaa; line-height: 1.6;">
+                        Pour un lancement réussi, je recommande <strong style="color: #fff;">Glassmorphism Premium</strong> pour sa polyvalence et son appeal universel. 
+                        Si vous voulez une identité crypto forte et unique, optez pour <strong style="color: #fff;">Cyberpunk Neon</strong>.
+                        Les deux peuvent être implémentés avec un système de thèmes pour permettre aux utilisateurs de choisir !
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function scrollToTemplate(number) {
+            const element = document.getElementById(`template-${number}`);
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    </script>
+</body>
+</html>
