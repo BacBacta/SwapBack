@@ -52,6 +52,15 @@ $BACK (SwapBack) est un routeur d'exécution pour Solana qui maximise le prix ne
 - ⚡ Accès à des fonctionnalités avancées
 - 🚫 Pénalités en cas de retrait anticipé
 
+### Dollar Cost Averaging (DCA)
+
+- 📈 **Automatisation des investissements** : Achats réguliers à intervalles prédéfinis
+- ⏰ **Fréquences flexibles** : Horaire, Quotidienne, Hebdomadaire, Mensuelle
+- 🎯 **Stratégie d'investissement** : Réduction de l'impact de la volatilité
+- 📊 **Simulateur intégré** : Projection des résultats avant création
+- 🔄 **Gestion complète** : Pause, Resume, Cancel des ordres actifs
+- 📈 **Suivi détaillé** : Prix moyen, total investi, progression en temps réel
+
 ### SDK & Intégrations
 
 - 📦 SDK TypeScript/React

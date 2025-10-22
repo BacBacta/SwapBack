@@ -4,6 +4,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useState } from "react";
 import { CNFTCard } from "./CNFTCard";
 import { LockUnlock } from "./LockUnlock";
+import { DCA } from "./DCA";
 import { useCNFT } from "../hooks/useCNFT";
 import { useRealtimeStats } from "../hooks/useRealtimeStats";
 import { VolumeChart, ActivityChart } from "./Charts";
@@ -13,7 +14,7 @@ import { NoActivityState, NoConnectionState } from "./EmptyState";
 export const Dashboard = () => {
   const { connected, publicKey } = useWallet();
   const [activeTab, setActiveTab] = useState<
-    "overview" | "analytics" | "lockunlock"
+    "overview" | "analytics" | "lockunlock" | "dca"
   >("overview");
 
   const { cnftData, levelName } = useCNFT();
@@ -175,6 +176,16 @@ export const Dashboard = () => {
           }`}
         >
           <span className="terminal-prefix">&gt;</span>[LOCK/UNLOCK]
+        </button>
+        <button
+          onClick={() => setActiveTab("dca")}
+          className={`flex-1 px-6 py-3 font-bold transition-all terminal-text ${
+            activeTab === "dca"
+              ? "bg-[var(--primary)]/20 border-2 border-[var(--primary)]"
+              : "border-2 border-transparent hover:border-[var(--primary)]/50"
+          }`}
+        >
+          <span className="terminal-prefix">&gt;</span>[DCA]
         </button>
       </div>
 
@@ -375,6 +386,11 @@ export const Dashboard = () => {
         <div className="space-y-6">
           <LockUnlock />
         </div>
+      )}
+
+      {/* DCA Tab */}
+      {activeTab === "dca" && (
+        <DCA />
       )}
     </div>
   );
