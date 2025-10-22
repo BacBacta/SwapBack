@@ -3,6 +3,7 @@
 ## ✅ Fonctionnalités implémentées
 
 ### 1. Composant DCA principal (`/app/src/components/DCA.tsx`)
+
 - **Création d'ordres DCA** avec configuration complète :
   - Sélection des tokens (input/output)
   - Montant par ordre
@@ -27,6 +28,7 @@
   - Restauration des dates (conversion string → Date)
 
 ### 2. Simulateur DCA (`/app/src/components/DCASimulator.tsx`)
+
 - **Paramètres de simulation** :
   - Montant par achat
   - Fréquence (Daily, Weekly, Monthly)
@@ -47,11 +49,13 @@
   - Visualisation instantanée des résultats
 
 ### 3. Intégration au Dashboard (`/app/src/components/Dashboard.tsx`)
+
 - Ajout d'un quatrième onglet **[DCA]**
 - Import et intégration du composant DCA
 - Type mis à jour pour inclure "dca" dans activeTab
 
 ### 4. Documentation (`/docs/DCA.md`)
+
 - Guide complet de la fonctionnalité
 - Description des états et actions
 - Architecture technique
@@ -62,7 +66,9 @@
 ## 🎨 Harmonisation UI - Style Terminal Hacker
 
 ### Composants harmonisés
+
 ✅ **DCA.tsx**
+
 - Fond noir #000000
 - Texte vert terminal #00ff00
 - Police Courier New monospace
@@ -74,6 +80,7 @@
 - Border-2 border-[var(--primary)] pour les sections importantes
 
 ✅ **DCASimulator.tsx**
+
 - Style identique au composant principal
 - Stat-cards avec bordures carrées
 - Résultats avec couleurs conditionnelles (vert pour profit, rouge pour perte)
@@ -81,6 +88,7 @@
 - Messages d'avertissement avec préfixes >
 
 ✅ **Dashboard.tsx**
+
 - Nouvel onglet [DCA] avec le même style que les autres
 - Transitions uniformes
 - Hover states cohérents
@@ -88,11 +96,13 @@
 ## 📁 Fichiers créés/modifiés
 
 ### Nouveaux fichiers
+
 1. `/app/src/components/DCA.tsx` (644 lignes)
 2. `/app/src/components/DCASimulator.tsx` (273 lignes)
 3. `/docs/DCA.md` (documentation complète)
 
 ### Fichiers modifiés
+
 1. `/app/src/components/Dashboard.tsx`
    - Ligne 7 : Import DCA
    - Ligne 16 : Type activeTab étendu avec "dca"
@@ -102,12 +112,14 @@
 ## 🔧 Fonctionnalités techniques
 
 ### Hooks utilisés
+
 - `useWallet` : Connexion wallet Solana
 - `useTokenData` : Balance et données des tokens
 - `useState` : États locaux (ordres, formulaire, onglets)
 - `useEffect` : Chargement depuis localStorage
 
 ### Types TypeScript
+
 ```typescript
 interface DCAOrder {
   id: string;
@@ -126,13 +138,15 @@ interface DCAOrder {
 ```
 
 ### Fonctions helpers
+
 ```typescript
-getFrequencyDuration(freq, count) // "X HOURS/DAYS/WEEKS/MONTHS"
-getNextExecutionTime(freq)         // "~1 HOUR/DAY/7 DAYS/30 DAYS"
-calculateNextExecution(freq)       // Date de prochaine exécution
+getFrequencyDuration(freq, count); // "X HOURS/DAYS/WEEKS/MONTHS"
+getNextExecutionTime(freq); // "~1 HOUR/DAY/7 DAYS/30 DAYS"
+calculateNextExecution(freq); // Date de prochaine exécution
 ```
 
 ### Gestion d'état
+
 - **Type safety** : Cast explicite pour status lors du toggle
 - **Validation** : Vérification des montants et nombres avant création
 - **Persistance** : Sérialisation/désérialisation JSON avec conversion de dates
@@ -141,23 +155,27 @@ calculateNextExecution(freq)       // Date de prochaine exécution
 ## 🎯 États de l'UI
 
 ### États des ordres
+
 - **Active** : Bordure verte, texte vert
 - **Paused** : Bordure jaune, texte jaune
 - **Completed** : Bordure bleue, texte bleu
 - **Cancelled** : Bordure rouge, texte rouge
 
 ### États vides
+
 - **Pas de wallet** : Icône 👛, message, pas de contenu
 - **Pas d'ordres** : Icône 📊, message, bouton [CREATE_FIRST_ORDER]
 
 ## 📊 Statistiques affichées
 
 ### Globales (header)
+
 - Nombre d'ordres actifs
 - Total investi (tous ordres)
 - Nombre d'ordres complétés
 
 ### Par ordre
+
 - Progression (X/Y ordres)
 - Total investi
 - Prix moyen d'achat
@@ -165,6 +183,7 @@ calculateNextExecution(freq)       // Date de prochaine exécution
 - Date de création
 
 ### Simulateur
+
 - Total investi
 - Prix moyen
 - Total tokens
@@ -176,19 +195,15 @@ calculateNextExecution(freq)       // Date de prochaine exécution
 1. **Exécution on-chain**
    - Intégration smart contracts
    - Automatisation (Clockwork/Gelato)
-   
 2. **Optimisation des prix**
    - Jupiter aggregator
    - Calcul du meilleur timing
-   
 3. **Historique détaillé**
    - Liste des exécutions
    - Graphiques de performance
-   
 4. **Notifications**
    - Alertes d'exécution
    - Rappels
-   
 5. **Stratégies avancées**
    - DCA inversé
    - DCA conditionnel
@@ -280,6 +295,7 @@ Ces warnings n'affectent pas le fonctionnement et peuvent être résolus lors d'
 ## 🎉 Conclusion
 
 La fonctionnalité DCA est **complètement développée** et **harmonisée** avec l'UI Terminal Hacker de l'application. Elle est prête pour :
+
 - ✅ Utilisation en mode démo (localStorage)
 - ✅ Tests utilisateurs
 - ✅ Documentation complète

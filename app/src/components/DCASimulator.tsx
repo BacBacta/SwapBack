@@ -13,7 +13,9 @@ interface SimulationResult {
 
 export const DCASimulator = () => {
   const [amount, setAmount] = useState("100");
-  const [frequency, setFrequency] = useState<"daily" | "weekly" | "monthly">("weekly");
+  const [frequency, setFrequency] = useState<"daily" | "weekly" | "monthly">(
+    "weekly"
+  );
   const [duration, setDuration] = useState("12"); // in months
   const [initialPrice, setInitialPrice] = useState("50");
   const [volatility, setVolatility] = useState("20"); // percent
@@ -32,28 +34,28 @@ export const DCASimulator = () => {
     else purchases = durationMonths;
 
     const totalInvested = amountNum * purchases;
-    
+
     // Simulate price movements with volatility
     let totalTokens = 0;
     let totalCost = 0;
-    
+
     for (let i = 0; i < purchases; i++) {
       // Generate random price with trend and volatility
       const trend = 1 + (i / purchases) * 0.2; // 20% upward trend over time
       const randomFactor = 1 + (Math.random() - 0.5) * 2 * vol;
       const price = initPrice * trend * randomFactor;
-      
+
       const tokens = amountNum / price;
       totalTokens += tokens;
       totalCost += amountNum;
     }
 
     const averagePrice = totalCost / totalTokens;
-    
+
     // Current price (assume final price from simulation)
     const finalTrend = 1.2; // 20% up from initial
     const currentPrice = initPrice * finalTrend;
-    
+
     const currentValue = totalTokens * currentPrice;
     const profitLoss = currentValue - totalInvested;
     const profitLossPercent = (profitLoss / totalInvested) * 100;
@@ -82,7 +84,8 @@ export const DCASimulator = () => {
           {/* Amount per purchase */}
           <div>
             <label className="block text-sm terminal-text mb-2">
-              <span className="terminal-prefix">&gt;</span> AMOUNT_PER_PURCHASE ($)
+              <span className="terminal-prefix">&gt;</span> AMOUNT_PER_PURCHASE
+              ($)
             </label>
             <input
               type="number"
@@ -161,7 +164,7 @@ export const DCASimulator = () => {
           <div className="text-lg terminal-text mb-4 font-bold">
             <span className="terminal-prefix">&gt;</span> [SIMULATION_RESULTS]
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Total Invested */}
             <div className="stat-card p-4">
@@ -211,14 +214,19 @@ export const DCASimulator = () => {
               <div className="flex items-center justify-between">
                 <div
                   className={`text-2xl font-bold terminal-text ${
-                    result.profitLoss >= 0 ? "text-[var(--primary)]" : "text-red-500"
+                    result.profitLoss >= 0
+                      ? "text-[var(--primary)]"
+                      : "text-red-500"
                   }`}
                 >
-                  {result.profitLoss >= 0 ? "+" : ""}${result.profitLoss.toFixed(2)}
+                  {result.profitLoss >= 0 ? "+" : ""}$
+                  {result.profitLoss.toFixed(2)}
                 </div>
                 <div
                   className={`text-xl font-bold terminal-text ${
-                    result.profitLossPercent >= 0 ? "text-[var(--primary)]" : "text-red-500"
+                    result.profitLossPercent >= 0
+                      ? "text-[var(--primary)]"
+                      : "text-red-500"
                   }`}
                 >
                   {result.profitLossPercent >= 0 ? "+" : ""}
@@ -233,13 +241,16 @@ export const DCASimulator = () => {
         <div className="stat-card p-4 bg-black/30 border-2 border-[var(--primary)]/30">
           <div className="text-xs terminal-text opacity-70 space-y-2">
             <div>
-              <span className="terminal-prefix">&gt;</span> This is a simulated projection based on random price movements
+              <span className="terminal-prefix">&gt;</span> This is a simulated
+              projection based on random price movements
             </div>
             <div>
-              <span className="terminal-prefix">&gt;</span> Actual results may vary significantly
+              <span className="terminal-prefix">&gt;</span> Actual results may
+              vary significantly
             </div>
             <div>
-              <span className="terminal-prefix">&gt;</span> Past performance does not guarantee future results
+              <span className="terminal-prefix">&gt;</span> Past performance
+              does not guarantee future results
             </div>
           </div>
         </div>

@@ -389,9 +389,7 @@ export const Dashboard = () => {
       )}
 
       {/* DCA Tab */}
-      {activeTab === "dca" && (
-        <DCA />
-      )}
+      {activeTab === "dca" && <DCA />}
     </div>
   );
 };

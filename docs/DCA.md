@@ -23,18 +23,21 @@ Les utilisateurs peuvent créer des ordres DCA avec les paramètres suivants :
 ### 2. Gestion des ordres
 
 #### États des ordres
+
 - **Active** : L'ordre est en cours d'exécution
 - **Paused** : L'ordre est temporairement suspendu
 - **Completed** : Tous les ordres ont été exécutés
 - **Cancelled** : L'ordre a été annulé par l'utilisateur
 
 #### Actions disponibles
+
 - **Pause/Resume** : Suspendre ou reprendre un ordre actif
 - **Cancel** : Annuler définitivement un ordre
 
 ### 3. Suivi des performances
 
 Pour chaque ordre, les utilisateurs peuvent suivre :
+
 - **Progression** : Nombre d'ordres exécutés / total
 - **Total investi** : Montant total déjà dépensé
 - **Prix moyen** : Prix d'achat moyen obtenu
@@ -44,6 +47,7 @@ Pour chaque ordre, les utilisateurs peuvent suivre :
 ### 4. Statistiques globales
 
 Le dashboard affiche :
+
 - **Ordres actifs** : Nombre d'ordres en cours
 - **Total investi** : Montant total investi dans tous les ordres
 - **Ordres complétés** : Nombre d'ordres terminés
@@ -53,6 +57,7 @@ Le dashboard affiche :
 ### Design Terminal Hacker
 
 L'interface DCA suit le thème Terminal Hacker avec :
+
 - Fond noir (#000000)
 - Texte vert terminal (#00ff00)
 - Police monospace (Courier New)
@@ -75,21 +80,26 @@ L'interface est organisée en deux onglets :
 ## Architecture technique
 
 ### Composant principal
+
 `/app/src/components/DCA.tsx`
 
 ### Hooks utilisés
+
 - `useWallet` : Gestion de la connexion wallet
 - `useTokenData` : Récupération des données de tokens (balance, etc.)
 - `useState` : Gestion de l'état local
 - `useEffect` : Chargement des ordres depuis localStorage
 
 ### Stockage
+
 Les ordres DCA sont stockés dans localStorage avec la clé :
+
 ```
 swapback_dca_${publicKey.toString()}
 ```
 
 Format des données :
+
 ```typescript
 interface DCAOrder {
   id: string;
@@ -113,10 +123,14 @@ interface DCAOrder {
 const calculateNextExecution = (freq: string): Date => {
   const now = new Date();
   switch (freq) {
-    case "hourly": return new Date(now.getTime() + 60 * 60 * 1000);
-    case "daily": return new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    case "weekly": return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    case "monthly": return new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    case "hourly":
+      return new Date(now.getTime() + 60 * 60 * 1000);
+    case "daily":
+      return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    case "weekly":
+      return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    case "monthly":
+      return new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   }
 };
 ```
@@ -124,6 +138,7 @@ const calculateNextExecution = (freq: string): Date => {
 ## Intégration avec le Dashboard
 
 Le composant DCA est intégré dans le Dashboard comme quatrième onglet :
+
 - Overview
 - Analytics
 - Lock/Unlock
@@ -172,7 +187,8 @@ Le composant DCA est intégré dans le Dashboard comme quatrième onglet :
 6. Définir le nombre d'ordres : 30
 7. Cliquer sur [CREATE_DCA_ORDER]
 
-Résultat : 
+Résultat :
+
 - 30 ordres de 0.1 SOL → USDC
 - Exécution quotidienne
 - Investment total : 3 SOL
@@ -205,6 +221,7 @@ Résultat :
 ## Support
 
 Pour toute question ou problème :
+
 - Consulter la documentation technique dans `/docs/TECHNICAL.md`
 - Ouvrir une issue sur GitHub
 - Contacter l'équipe SwapBack

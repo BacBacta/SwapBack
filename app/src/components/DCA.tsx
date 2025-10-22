@@ -22,13 +22,17 @@ interface DCAOrder {
 
 export const DCA = () => {
   const { connected, publicKey } = useWallet();
-  const [activeTab, setActiveTab] = useState<"create" | "orders" | "simulator">("create");
+  const [activeTab, setActiveTab] = useState<"create" | "orders" | "simulator">(
+    "create"
+  );
 
   // Create DCA Form States
   const [inputToken, setInputToken] = useState("SOL");
   const [outputToken, setOutputToken] = useState("USDC");
   const [amountPerOrder, setAmountPerOrder] = useState("");
-  const [frequency, setFrequency] = useState<"hourly" | "daily" | "weekly" | "monthly">("daily");
+  const [frequency, setFrequency] = useState<
+    "hourly" | "daily" | "weekly" | "monthly"
+  >("daily");
   const [totalOrders, setTotalOrders] = useState("10");
   const [loading, setLoading] = useState(false);
 
@@ -41,10 +45,10 @@ export const DCA = () => {
   // Helper functions
   const getFrequencyDuration = (freq: string, count = 1): string => {
     const map: Record<string, string> = {
-      hourly: `${count} HOUR${count > 1 ? 'S' : ''}`,
-      daily: `${count} DAY${count > 1 ? 'S' : ''}`,
-      weekly: `${count} WEEK${count > 1 ? 'S' : ''}`,
-      monthly: `${count} MONTH${count > 1 ? 'S' : ''}`,
+      hourly: `${count} HOUR${count > 1 ? "S" : ""}`,
+      daily: `${count} DAY${count > 1 ? "S" : ""}`,
+      weekly: `${count} WEEK${count > 1 ? "S" : ""}`,
+      monthly: `${count} MONTH${count > 1 ? "S" : ""}`,
     };
     return map[freq] || `${count} DAYS`;
   };
@@ -99,7 +103,9 @@ export const DCA = () => {
   };
 
   // Calculate total investment
-  const totalInvestment = Number.parseFloat(amountPerOrder || "0") * Number.parseInt(totalOrders || "0");
+  const totalInvestment =
+    Number.parseFloat(amountPerOrder || "0") *
+    Number.parseInt(totalOrders || "0");
 
   // Handle Create DCA
   const handleCreateDCA = async () => {
@@ -169,7 +175,9 @@ export const DCA = () => {
       setActiveTab("orders");
     } catch (error) {
       console.error("❌ DCA creation error:", error);
-      alert(`❌ DCA creation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      alert(
+        `❌ DCA creation failed: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
     } finally {
       setLoading(false);
     }
@@ -181,7 +189,9 @@ export const DCA = () => {
       if (order.id === orderId) {
         return {
           ...order,
-          status: (order.status === "active" ? "paused" : "active") as DCAOrder["status"],
+          status: (order.status === "active"
+            ? "paused"
+            : "active") as DCAOrder["status"],
         };
       }
       return order;
@@ -266,8 +276,8 @@ export const DCA = () => {
             <span className="terminal-prefix">&gt;</span> DOLLAR_COST_AVERAGING
           </h2>
           <p className="body-regular terminal-text">
-            <span className="terminal-prefix">&gt;</span> AUTOMATE_YOUR_INVESTMENTS
-            | BUY_REGULARLY_AT_OPTIMAL_PRICES
+            <span className="terminal-prefix">&gt;</span>{" "}
+            AUTOMATE_YOUR_INVESTMENTS | BUY_REGULARLY_AT_OPTIMAL_PRICES
           </p>
         </div>
 
@@ -286,7 +296,10 @@ export const DCA = () => {
               <span className="terminal-prefix">&gt;</span> TOTAL_INVESTED
             </div>
             <div className="text-2xl font-bold text-[var(--primary)] terminal-text">
-              ${dcaOrders.reduce((sum, o) => sum + o.totalInvested, 0).toFixed(2)}
+              $
+              {dcaOrders
+                .reduce((sum, o) => sum + o.totalInvested, 0)
+                .toFixed(2)}
             </div>
           </div>
           <div className="stat-card p-4 border-2 border-[var(--primary)]">
@@ -407,20 +420,22 @@ export const DCA = () => {
                 <span className="terminal-prefix">&gt;</span> FREQUENCY
               </label>
               <div className="grid grid-cols-4 gap-2">
-                {(["hourly", "daily", "weekly", "monthly"] as const).map((freq) => (
-                  <button
-                    key={freq}
-                    onClick={() => setFrequency(freq)}
-                    disabled={loading}
-                    className={`px-4 py-3 font-bold terminal-text transition-all ${
-                      frequency === freq
-                        ? "bg-[var(--primary)]/20 border-2 border-[var(--primary)]"
-                        : "border-2 border-[var(--primary)]/30 hover:border-[var(--primary)]"
-                    }`}
-                  >
-                    [{freq.toUpperCase()}]
-                  </button>
-                ))}
+                {(["hourly", "daily", "weekly", "monthly"] as const).map(
+                  (freq) => (
+                    <button
+                      key={freq}
+                      onClick={() => setFrequency(freq)}
+                      disabled={loading}
+                      className={`px-4 py-3 font-bold terminal-text transition-all ${
+                        frequency === freq
+                          ? "bg-[var(--primary)]/20 border-2 border-[var(--primary)]"
+                          : "border-2 border-[var(--primary)]/30 hover:border-[var(--primary)]"
+                      }`}
+                    >
+                      [{freq.toUpperCase()}]
+                    </button>
+                  )
+                )}
               </div>
             </div>
 
@@ -454,7 +469,10 @@ export const DCA = () => {
                 <div className="flex justify-between">
                   <span className="opacity-70">ESTIMATED_DURATION:</span>
                   <span className="font-bold">
-                    {getFrequencyDuration(frequency, Number.parseInt(totalOrders || "0"))}
+                    {getFrequencyDuration(
+                      frequency,
+                      Number.parseInt(totalOrders || "0")
+                    )}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -505,7 +523,8 @@ export const DCA = () => {
                 </span>
               ) : (
                 <span>
-                  <span className="terminal-prefix">&gt;</span> [CREATE_DCA_ORDER]
+                  <span className="terminal-prefix">&gt;</span>{" "}
+                  [CREATE_DCA_ORDER]
                 </span>
               )}
             </button>
@@ -531,7 +550,8 @@ export const DCA = () => {
                 onClick={() => setActiveTab("create")}
                 className="btn-primary px-8 py-3 terminal-text"
               >
-                <span className="terminal-prefix">&gt;</span> [CREATE_FIRST_ORDER]
+                <span className="terminal-prefix">&gt;</span>{" "}
+                [CREATE_FIRST_ORDER]
               </button>
             </div>
           ) : (
@@ -547,7 +567,8 @@ export const DCA = () => {
                         {order.inputToken} → {order.outputToken}
                       </div>
                       <div className="text-sm terminal-text opacity-70">
-                        {order.amountPerOrder} {order.inputToken} | {formatFrequency(order.frequency)}
+                        {order.amountPerOrder} {order.inputToken} |{" "}
+                        {formatFrequency(order.frequency)}
                       </div>
                     </div>
                   </div>
@@ -579,19 +600,25 @@ export const DCA = () => {
                 {/* Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                   <div className="stat-card p-3">
-                    <div className="text-xs terminal-text opacity-70 mb-1">TOTAL_INVESTED</div>
+                    <div className="text-xs terminal-text opacity-70 mb-1">
+                      TOTAL_INVESTED
+                    </div>
                     <div className="text-sm font-bold terminal-text">
                       ${order.totalInvested.toFixed(2)}
                     </div>
                   </div>
                   <div className="stat-card p-3">
-                    <div className="text-xs terminal-text opacity-70 mb-1">AVG_PRICE</div>
+                    <div className="text-xs terminal-text opacity-70 mb-1">
+                      AVG_PRICE
+                    </div>
                     <div className="text-sm font-bold terminal-text">
                       ${order.averagePrice.toFixed(4)}
                     </div>
                   </div>
                   <div className="stat-card p-3">
-                    <div className="text-xs terminal-text opacity-70 mb-1">NEXT_EXECUTION</div>
+                    <div className="text-xs terminal-text opacity-70 mb-1">
+                      NEXT_EXECUTION
+                    </div>
                     <div className="text-sm font-bold terminal-text">
                       {order.nextExecution.toLocaleDateString("en-US", {
                         month: "short",
@@ -600,7 +627,9 @@ export const DCA = () => {
                     </div>
                   </div>
                   <div className="stat-card p-3">
-                    <div className="text-xs terminal-text opacity-70 mb-1">CREATED</div>
+                    <div className="text-xs terminal-text opacity-70 mb-1">
+                      CREATED
+                    </div>
                     <div className="text-sm font-bold terminal-text">
                       {order.createdAt.toLocaleDateString("en-US", {
                         month: "short",
@@ -611,23 +640,24 @@ export const DCA = () => {
                 </div>
 
                 {/* Actions */}
-                {order.status !== "completed" && order.status !== "cancelled" && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleToggleDCA(order.id)}
-                      className="flex-1 px-4 py-2 border-2 border-[var(--primary)] terminal-text font-bold hover:bg-[var(--primary)]/20 transition-all"
-                    >
-                      <span className="terminal-prefix">&gt;</span>{" "}
-                      [{order.status === "active" ? "PAUSE" : "RESUME"}]
-                    </button>
-                    <button
-                      onClick={() => handleCancelDCA(order.id)}
-                      className="flex-1 px-4 py-2 border-2 border-red-500 text-red-500 terminal-text font-bold hover:bg-red-500/20 transition-all"
-                    >
-                      <span className="terminal-prefix">&gt;</span> [CANCEL]
-                    </button>
-                  </div>
-                )}
+                {order.status !== "completed" &&
+                  order.status !== "cancelled" && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleToggleDCA(order.id)}
+                        className="flex-1 px-4 py-2 border-2 border-[var(--primary)] terminal-text font-bold hover:bg-[var(--primary)]/20 transition-all"
+                      >
+                        <span className="terminal-prefix">&gt;</span> [
+                        {order.status === "active" ? "PAUSE" : "RESUME"}]
+                      </button>
+                      <button
+                        onClick={() => handleCancelDCA(order.id)}
+                        className="flex-1 px-4 py-2 border-2 border-red-500 text-red-500 terminal-text font-bold hover:bg-red-500/20 transition-all"
+                      >
+                        <span className="terminal-prefix">&gt;</span> [CANCEL]
+                      </button>
+                    </div>
+                  )}
               </div>
             ))
           )}
@@ -635,9 +665,7 @@ export const DCA = () => {
       )}
 
       {/* Simulator Tab */}
-      {activeTab === "simulator" && (
-        <DCASimulator />
-      )}
+      {activeTab === "simulator" && <DCASimulator />}
     </div>
   );
 };
