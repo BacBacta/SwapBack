@@ -10,7 +10,8 @@
   "[typescriptreact]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
-  "rust-analyzer.checkOnSave.command": "clippy",
+  "rust-analyzer.checkOnSave": true,
+  "rust-analyzer.check.command": "clippy",
   "files.exclude": {
     "**/.git": true,
     "**/.DS_Store": true,
