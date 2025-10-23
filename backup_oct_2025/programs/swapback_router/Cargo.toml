@@ -1,0 +1,37 @@
+[package]
+name = "swapback_router"
+version = "0.1.0"
+description = "Programme de routage de swap avancé avec oracle et TWAP"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "swapback_router"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+custom-heap = []
+custom-panic = []
+anchor-debug = []
+default = []
+devnet = []
+switchboard = ["switchboard-solana"]
+pyth = []
+
+[dependencies]
+anchor-lang = { workspace = true, features = ["init-if-needed"] }
+anchor-spl = { workspace = true }
+solana-program = { workspace = true }
+# Ne pas ajouter solana-program/solana-sdk directement - utiliser les exports d'anchor-lang
+# use anchor_lang::solana_program au lieu de use solana_program
+switchboard-solana = { version = "0.30.4", optional = true }
+
+# Pyth SDK - DÉSACTIVÉ pour éviter conflit de versions Solana
+# pyth-sdk-solana = "0.10.6"
+
+# getrandom avec custom feature pour notre stub BPF
+getrandom = { version = "0.2", default-features = false, features = ["custom"] }
