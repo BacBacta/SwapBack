@@ -12,6 +12,38 @@
   },
   "rust-analyzer.checkOnSave": true,
   "rust-analyzer.check.command": "clippy",
+  
+  // FIX: Variables gRPC pour nouvelle infrastructure Codespaces
+  "terminal.integrated.env.linux": {
+    "GRPC_VERBOSITY": "error",
+    "GRPC_DNS_RESOLVER": "native",
+    "GRPC_TRACE": "",
+    "NO_PROXY": "localhost,127.0.0.1"
+  },
+  
+  // Optimisations pour Codespaces - prévention des déconnexions
+  "remote.SSH.connectTimeout": 300,
+  "remote.autoForwardPorts": false,
+  "remote.restoreForwardedPorts": true,
+  "extensions.autoCheckUpdates": false,
+  "extensions.autoUpdate": false,
+  "update.mode": "none",
+  "telemetry.telemetryLevel": "off",
+  
+  // Optimisation mémoire rust-analyzer
+  "rust-analyzer.server.extraEnv": {
+    "RA_LOG": "error"
+  },
+  "rust-analyzer.cachePriming.enable": false,
+  "rust-analyzer.cargo.buildScripts.enable": false,
+  
+  // Optimisation TypeScript
+  "typescript.tsserver.maxTsServerMemory": 2048,
+  "typescript.disableAutomaticTypeAcquisition": true,
+  
+  // Désactiver SonarLint si non critique
+  "sonarlint.disableTelemetry": true,
+  
   "files.exclude": {
     "**/.git": true,
     "**/.DS_Store": true,
