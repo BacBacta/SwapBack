@@ -1,0 +1,110 @@
+{
+  "name": "SwapBack Development",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": true,
+      "upgradePackages": true
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20",
+      "nodeGypDependencies": true
+    },
+    "ghcr.io/devcontainers/features/rust:1": {
+      "version": "latest",
+      "profile": "default"
+    }
+  },
+  
+  "customizations": {
+    "vscode": {
+      "settings": {
+        // FIX: Paramètres réseau pour nouvelle infrastructure Codespaces
+        "remote.SSH.connectTimeout": 300,
+        "remote.SSH.serverPickPortsFromRange": {"22": 22},
+        "remote.autoForwardPorts": false,
+        "remote.autoForwardPortsSource": "process",
+        "remote.restoreForwardedPorts": true,
+        "terminal.integrated.enablePersistentSessions": true,
+        "terminal.integrated.persistentSessionReviveProcess": "onExit",
+        
+        // FIX: Variables réseau gRPC
+        "terminal.integrated.env.linux": {
+          "GRPC_VERBOSITY": "error",
+          "GRPC_TRACE": "",
+          "GRPC_DNS_RESOLVER": "native"
+        },
+        
+        // Optimisations mémoire
+        "extensions.experimental.affinity": {
+          "rust-lang.rust-analyzer": 1,
+          "sonarsource.sonarlint-vscode": 2
+        },
+        
+        // Désactiver features gourmandes
+        "files.autoSave": "onFocusChange",
+        "extensions.autoUpdate": false,
+        "extensions.autoCheckUpdates": false,
+        "search.followSymlinks": false,
+        
+        // Optimisation rust-analyzer
+        "rust-analyzer.checkOnSave": true,
+        "rust-analyzer.check.command": "clippy",
+        "rust-analyzer.cargo.buildScripts.enable": false,
+        "rust-analyzer.procMacro.enable": false,
+        
+        // Exclusions
+        "files.watcherExclude": {
+          "**/target/**": true,
+          "**/node_modules/**": true,
+          "**/.git/objects/**": true
+        }
+      },
+      
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "serayuzgur.crates",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "bradlc.vscode-tailwindcss"
+      ]
+    }
+  },
+  
+  // FIX: Variables d'environnement réseau gRPC
+  "remoteEnv": {
+    "GRPC_VERBOSITY": "error",
+    "GRPC_TRACE": "",
+    "GRPC_DNS_RESOLVER": "native",
+    "NO_PROXY": "localhost,127.0.0.1",
+    "RUST_LOG": "error",
+    "NODE_OPTIONS": "--max-old-space-size=4096"
+  },
+  
+  // Prévention de l'auto-shutdown
+  "shutdownAction": "none",
+  "remoteUser": "codespace",
+  
+  // Post-création : configurer Solana CLI
+  "postCreateCommand": "bash -c 'sh -c \"$(curl -sSfL https://release.anza.xyz/stable/install)\" || true'",
+  
+  // Ports à exposer
+  "forwardPorts": [3000, 8080, 8899],
+  "portsAttributes": {
+    "3000": {
+      "label": "Next.js App",
+      "onAutoForward": "notify"
+    },
+    "8080": {
+      "label": "Oracle API",
+      "onAutoForward": "silent"
+    },
+    "8899": {
+      "label": "Solana Test Validator",
+      "onAutoForward": "silent"
+    }
+  }
+}
