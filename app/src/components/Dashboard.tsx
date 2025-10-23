@@ -3,36 +3,27 @@
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useState } from "react";
 import { CNFTCard } from "./CNFTCard";
-import { LockUnlock } from "./LockUnlock";
-import { DCA } from "./DCA";
 import { useCNFT } from "../hooks/useCNFT";
 import { useRealtimeStats } from "../hooks/useRealtimeStats";
 import { VolumeChart, ActivityChart } from "./Charts";
-import { SkeletonLoader } from "./Skeletons";
+import { SkeletonLoader, ChartSkeleton } from "./Skeletons";
 import { NoActivityState, NoConnectionState } from "./EmptyState";
 
 export const Dashboard = () => {
   const { connected, publicKey } = useWallet();
-  const [activeTab, setActiveTab] = useState<
-    "overview" | "analytics" | "strategies"
-  >("strategies");
-  const [strategyTab, setStrategyTab] = useState<"dca" | "lockunlock">(
-    "lockunlock"
-  );
+  const [activeTab, setActiveTab] = useState<"overview" | "analytics">("overview");
 
   const { cnftData, levelName } = useCNFT();
-  const { userStats, globalStats, loading } = useRealtimeStats(
-    publicKey?.toString()
-  );
+  const { userStats, globalStats, loading } = useRealtimeStats(publicKey?.toString());
 
   // Mock chart data
   const volumeData = {
-    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     volumes: [1200, 1900, 1500, 2100, 1800, 2400, 2200],
   };
 
   const activityData = {
-    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     swaps: [5, 8, 6, 10, 7, 12, 9],
   };
 
@@ -61,76 +52,52 @@ export const Dashboard = () => {
         className="sr-only"
         role="status"
       >
-        {loading
-          ? "Loading dashboard data..."
-          : `Dashboard updated. Total volume: $${globalStats.totalVolume.toLocaleString()}`}
+        {loading ? "Loading dashboard data..." : `Dashboard updated. Total volume: $${globalStats.totalVolume.toLocaleString()}`}
       </div>
 
       {/* Global Stats avec animation */}
       <div className="swap-card">
         <div className="flex items-center justify-between mb-8">
-          <h2
-            className="text-2xl font-bold terminal-text"
-            id="protocol-stats-heading"
-          >
-            <span className="terminal-prefix">&gt;</span> PROTOCOL_STATISTICS
-          </h2>
-          <div className="flex items-center gap-2 px-3 py-1 bg-[var(--primary)]/10 border-2 border-[var(--primary)]">
-            <span
-              className="w-2 h-2 bg-[var(--primary)] animate-pulse"
-              aria-hidden="true"
-            ></span>
-            <span className="text-xs font-bold text-[var(--primary)] terminal-text">
-              [LIVE_DATA]
-            </span>
-            <span className="terminal-cursor"></span>
+          <h2 className="text-2xl font-bold" id="protocol-stats-heading">Protocol Statistics</h2>
+          <div className="flex items-center gap-2 px-3 py-1 bg-[var(--secondary)]/10 rounded-full border border-[var(--secondary)]/20">
+            <span className="w-2 h-2 bg-[var(--secondary)] rounded-full animate-pulse" aria-hidden="true"></span>
+            <span className="text-xs font-semibold text-[var(--secondary)]">Live</span>
           </div>
         </div>
-        <div
+        <div 
           className="grid grid-cols-1 md:grid-cols-3 gap-6"
+          role="group"
           aria-labelledby="protocol-stats-heading"
         >
-          <div className="stat-card text-center group">
-            <div className="text-sm terminal-text mb-2" id="total-volume-label">
-              <span className="terminal-prefix">&gt;</span> TOTAL_VOLUME
-            </div>
-            <div
-              className="text-3xl font-bold text-[var(--primary)] terminal-text"
+          <div className="stat-card text-center group hover:scale-105 transition-transform">
+            <div className="text-sm text-gray-400 mb-2" id="total-volume-label">Total Volume</div>
+            <div 
+              className="text-3xl font-bold text-[var(--primary)]"
               aria-labelledby="total-volume-label"
               aria-live="polite"
             >
-              $
-              {globalStats.totalVolume.toLocaleString("en-US", {
-                maximumFractionDigits: 0,
-              })}
+              ${globalStats.totalVolume.toLocaleString('en-US', { maximumFractionDigits: 0 })}
             </div>
-            <div className="text-xs terminal-text mt-2">
-              [+{globalStats.swapsLast24h} SWAPS_24H]
+            <div className="text-xs text-gray-500 mt-2">
+              +{globalStats.swapsLast24h} swaps (24h)
             </div>
           </div>
-          <div className="stat-card text-center group">
-            <div className="text-sm terminal-text mb-2">
-              <span className="terminal-prefix">&gt;</span> $BACK_BURNED
+          <div className="stat-card text-center group hover:scale-105 transition-transform">
+            <div className="text-sm text-gray-400 mb-2">$BACK Burned</div>
+            <div className="text-3xl font-bold text-orange-400">
+              {globalStats.totalBurned.toLocaleString('en-US')}
             </div>
-            <div className="text-3xl font-bold text-[var(--primary)] terminal-text">
-              {globalStats.totalBurned.toLocaleString("en-US")}
-            </div>
-            <div className="text-xs terminal-text mt-2">
-              [MODE: DEFLATIONARY]
+            <div className="text-xs text-gray-500 mt-2">
+              🔥 Deflationary
             </div>
           </div>
-          <div className="stat-card text-center group">
-            <div className="text-sm terminal-text mb-2">
-              <span className="terminal-prefix">&gt;</span> REBATES_DISTRIBUTED
+          <div className="stat-card text-center group hover:scale-105 transition-transform">
+            <div className="text-sm text-gray-400 mb-2">Rebates Distributed</div>
+            <div className="text-3xl font-bold text-[var(--secondary)]">
+              ${globalStats.totalRebates.toLocaleString('en-US', { maximumFractionDigits: 0 })}
             </div>
-            <div className="text-3xl font-bold text-[var(--primary)] terminal-text">
-              $
-              {globalStats.totalRebates.toLocaleString("en-US", {
-                maximumFractionDigits: 0,
-              })}
-            </div>
-            <div className="text-xs terminal-text mt-2">
-              [{globalStats.activeUsers.toLocaleString()} ACTIVE_USERS]
+            <div className="text-xs text-gray-500 mt-2">
+              {globalStats.activeUsers.toLocaleString()} active users
             </div>
           </div>
         </div>
@@ -149,114 +116,74 @@ export const Dashboard = () => {
       )}
 
       {/* Tabs Navigation */}
-      <div className="flex gap-2 p-1 bg-black/30 border-2 border-[var(--primary)]">
+      <div className="flex gap-2 p-1 bg-black/30 rounded-xl border border-white/5">
         <button
           onClick={() => setActiveTab("overview")}
-          className={`flex-1 px-6 py-3 font-bold transition-all terminal-text ${
+          className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
             activeTab === "overview"
-              ? "bg-[var(--primary)]/20 border-2 border-[var(--primary)]"
-              : "border-2 border-transparent hover:border-[var(--primary)]/50"
+              ? "bg-[var(--primary)] text-white shadow-[0_0_20px_rgba(153,69,255,0.3)]"
+              : "text-gray-400 hover:text-white hover:bg-white/5"
           }`}
         >
-          <span className="terminal-prefix">&gt;</span>[OVERVIEW]
+          📊 Overview
         </button>
         <button
           onClick={() => setActiveTab("analytics")}
-          className={`flex-1 px-6 py-3 font-bold transition-all terminal-text ${
+          className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
             activeTab === "analytics"
-              ? "bg-[var(--primary)]/20 border-2 border-[var(--primary)]"
-              : "border-2 border-transparent hover:border-[var(--primary)]/50"
+              ? "bg-[var(--primary)] text-white shadow-[0_0_20px_rgba(153,69,255,0.3)]"
+              : "text-gray-400 hover:text-white hover:bg-white/5"
           }`}
         >
-          <span className="terminal-prefix">&gt;</span>[ANALYTICS]
-        </button>
-        <button
-          onClick={() => setActiveTab("strategies")}
-          className={`flex-1 px-6 py-3 font-bold transition-all terminal-text ${
-            activeTab === "strategies"
-              ? "bg-[var(--primary)]/20 border-2 border-[var(--primary)]"
-              : "border-2 border-transparent hover:border-[var(--primary)]/50"
-          }`}
-        >
-          <span className="terminal-prefix">&gt;</span>[STRATEGIES]
+          📈 Analytics
         </button>
       </div>
-
-      {/* Strategies Sub-tabs */}
-      {activeTab === "strategies" && (
-        <div className="flex gap-2 p-1 bg-black/20 border-2 border-[var(--primary)]/50">
-          <button
-            onClick={() => setStrategyTab("lockunlock")}
-            className={`flex-1 px-4 py-2 font-bold transition-all terminal-text text-sm ${
-              strategyTab === "lockunlock"
-                ? "bg-[var(--primary)]/10 border-2 border-[var(--primary)]"
-                : "border-2 border-transparent hover:border-[var(--primary)]/30"
-            }`}
-          >
-            <span className="terminal-prefix">&gt;</span>[LOCK_UNLOCK]
-          </button>
-          <button
-            onClick={() => setStrategyTab("dca")}
-            className={`flex-1 px-4 py-2 font-bold transition-all terminal-text text-sm ${
-              strategyTab === "dca"
-                ? "bg-[var(--primary)]/10 border-2 border-[var(--primary)]"
-                : "border-2 border-transparent hover:border-[var(--primary)]/30"
-            }`}
-          >
-            <span className="terminal-prefix">&gt;</span>[DCA_STRATEGY]
-          </button>
-        </div>
-      )}
 
       {/* Content based on active tab */}
       {activeTab === "overview" && userStats && (
         <div className="space-y-6">
           {/* Quick Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="stat-card p-5 border-2 border-[var(--primary)] transition-all group">
+            <div className="glass-effect rounded-xl p-5 border border-gray-700/50 hover:border-[var(--primary)]/30 transition-all group">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-transparent border-2 border-[var(--primary)] flex items-center justify-center">
-                  <span className="text-lg terminal-text">&gt;</span>
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)]/20 to-[var(--primary)]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <span className="text-lg">🔄</span>
                 </div>
-                <span className="terminal-text text-sm">SWAPS</span>
+                <span className="text-gray-400 text-sm">Swaps</span>
               </div>
-              <div className="text-2xl font-bold terminal-text">
-                {userStats.totalSwaps}
-              </div>
+              <div className="text-2xl font-bold">{userStats.totalSwaps}</div>
             </div>
 
-            <div className="stat-card p-5 border-2 border-[var(--primary)] transition-all group">
+            <div className="glass-effect rounded-xl p-5 border border-gray-700/50 hover:border-[var(--secondary)]/30 transition-all group">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-transparent border-2 border-[var(--primary)] flex items-center justify-center">
-                  <span className="text-lg terminal-text">$</span>
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--secondary)]/20 to-[var(--secondary)]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <span className="text-lg">💰</span>
                 </div>
-                <span className="terminal-text text-sm">VOLUME</span>
+                <span className="text-gray-400 text-sm">Volume</span>
               </div>
-              <div className="text-2xl font-bold terminal-text">
-                ${userStats.totalVolume.toLocaleString()}
-              </div>
+              <div className="text-2xl font-bold">${userStats.totalVolume.toLocaleString()}</div>
             </div>
 
-            <div className="stat-card p-5 border-2 border-[var(--primary)] transition-all group">
+            <div className="glass-effect rounded-xl p-5 border border-gray-700/50 hover:border-[var(--secondary)]/30 transition-all group">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-transparent border-2 border-[var(--primary)] flex items-center justify-center">
-                  <span className="text-lg terminal-text">+</span>
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--secondary)]/20 to-[var(--secondary)]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <span className="text-lg">📈</span>
                 </div>
-                <span className="terminal-text text-sm">NPI</span>
+                <span className="text-gray-400 text-sm">NPI</span>
               </div>
-              <div className="text-2xl font-bold text-[var(--primary)] terminal-text">
+              <div className="text-2xl font-bold text-[var(--secondary)]">
                 +${userStats.totalNPI.toFixed(2)}
               </div>
             </div>
 
-            <div className="stat-card p-5 border-2 border-[var(--primary)] transition-all group">
+            <div className="glass-effect rounded-xl p-5 border border-gray-700/50 hover:border-[var(--secondary)]/30 transition-all group">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-transparent border-2 border-[var(--primary)] flex items-center justify-center">
-                  <span className="text-lg terminal-text">✓</span>
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--secondary)]/20 to-[var(--secondary)]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <span className="text-lg">✅</span>
                 </div>
-                <span className="terminal-text text-sm">REBATES</span>
+                <span className="text-gray-400 text-sm">Rebates</span>
               </div>
-              <div className="text-2xl font-bold text-[var(--primary)] terminal-text">
+              <div className="text-2xl font-bold text-[var(--secondary)]">
                 ${userStats.totalRebates.toFixed(2)}
               </div>
             </div>
@@ -264,27 +191,22 @@ export const Dashboard = () => {
 
           {/* Pending Rebates Card */}
           {userStats.pendingRebates > 0 && (
-            <div className="swap-card p-6 border-2 border-[var(--primary)] bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 transition-all relative overflow-hidden">
-              <div className="absolute inset-0 opacity-20">
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--primary)]/20 to-transparent animate-shimmer"></div>
-              </div>
+            <div className="glass-effect rounded-xl p-6 border border-[var(--primary)]/30 bg-gradient-to-r from-[var(--primary)]/10 to-[var(--accent)]/5 hover:scale-[1.02] transition-all relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-[var(--primary)]/5 via-[var(--accent)]/5 to-transparent animate-shimmer"></div>
               <div className="relative flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-transparent border-2 border-[var(--primary)] flex items-center justify-center">
+                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[var(--primary)]/30 to-[var(--accent)]/30 flex items-center justify-center animate-pulse-glow">
                     <span className="text-2xl">💎</span>
                   </div>
                   <div>
-                    <div className="font-bold text-lg mb-1 terminal-text">
-                      <span className="terminal-prefix">&gt;</span>{" "}
-                      PENDING_REBATES
-                    </div>
-                    <div className="text-3xl font-bold text-[var(--primary)] terminal-text">
+                    <div className="font-bold text-lg mb-1">Pending Rebates</div>
+                    <div className="text-3xl font-bold bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] bg-clip-text text-transparent">
                       ${userStats.pendingRebates.toFixed(2)}
                     </div>
                   </div>
                 </div>
-                <button className="btn-primary px-8 py-3 text-lg font-bold terminal-text">
-                  <span className="terminal-prefix">&gt;</span> [CLAIM_NOW]
+                <button className="btn-primary px-8 py-3 text-lg font-bold">
+                  🎁 Claim Now
                 </button>
               </div>
             </div>
@@ -297,9 +219,9 @@ export const Dashboard = () => {
         <div className="space-y-6">
           {/* Volume Chart */}
           <div className="swap-card">
-            <h3 className="text-xl font-bold mb-6 flex items-center gap-2 terminal-text">
-              <span className="terminal-prefix">&gt;</span>
-              <span>[VOLUME_TREND] - 7_DAYS</span>
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <span>📊</span>
+              <span>Volume Trend (7 Days)</span>
             </h3>
             <div className="h-64">
               <VolumeChart data={volumeData} />
@@ -308,9 +230,9 @@ export const Dashboard = () => {
 
           {/* Activity Chart */}
           <div className="swap-card">
-            <h3 className="text-xl font-bold mb-6 flex items-center gap-2 terminal-text">
-              <span className="terminal-prefix">&gt;</span>
-              <span>[TRADING_ACTIVITY] - 7_DAYS</span>
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <span>📈</span>
+              <span>Trading Activity (7 Days)</span>
             </h3>
             <div className="h-64">
               <ActivityChart data={activityData} />
@@ -320,91 +242,49 @@ export const Dashboard = () => {
           {/* Stats Summary */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="swap-card">
-              <h4 className="font-bold mb-4 terminal-text">
-                <span className="terminal-prefix">&gt;</span>{" "}
-                [PERFORMANCE_METRICS]
-              </h4>
+              <h4 className="font-bold mb-4 text-[var(--primary)]">Performance</h4>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="terminal-text opacity-70">
-                    AVG_SWAP_SIZE:
-                  </span>
-                  <span className="font-semibold terminal-text">
-                    $
-                    {(
-                      userStats?.totalVolume || 0 / (userStats?.totalSwaps || 1)
-                    ).toFixed(2)}
+                  <span className="text-gray-400">Avg. Swap Size</span>
+                  <span className="font-semibold">${(userStats?.totalVolume || 0 / (userStats?.totalSwaps || 1)).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Avg. NPI per Swap</span>
+                  <span className="font-semibold text-[var(--secondary)]">
+                    ${(userStats?.totalNPI || 0 / (userStats?.totalSwaps || 1)).toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="terminal-text opacity-70">
-                    AVG_NPI_PER_SWAP:
-                  </span>
-                  <span className="font-semibold text-[var(--primary)] terminal-text">
-                    $
-                    {(
-                      userStats?.totalNPI || 0 / (userStats?.totalSwaps || 1)
-                    ).toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="terminal-text opacity-70">REBATE_RATE:</span>
-                  <span className="font-semibold text-[var(--primary)] terminal-text">
-                    {(
-                      ((userStats?.totalRebates || 0) /
-                        (userStats?.totalVolume || 1)) *
-                      100
-                    ).toFixed(2)}
-                    %
+                  <span className="text-gray-400">Rebate Rate</span>
+                  <span className="font-semibold text-[var(--secondary)]">
+                    {(((userStats?.totalRebates || 0) / (userStats?.totalVolume || 1)) * 100).toFixed(2)}%
                   </span>
                 </div>
               </div>
             </div>
 
             <div className="swap-card">
-              <h4 className="font-bold mb-4 terminal-text">
-                <span className="terminal-prefix">&gt;</span> [REWARDS_SUMMARY]
-              </h4>
+              <h4 className="font-bold mb-4 text-[var(--secondary)]">Rewards</h4>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="terminal-text opacity-70">
-                    TOTAL_EARNED:
-                  </span>
-                  <span className="font-semibold text-[var(--primary)] terminal-text">
-                    $
-                    {(
-                      (userStats?.totalNPI || 0) +
-                      (userStats?.totalRebates || 0)
-                    ).toFixed(2)}
+                  <span className="text-gray-400">Total Earned</span>
+                  <span className="font-semibold text-[var(--secondary)]">
+                    ${((userStats?.totalNPI || 0) + (userStats?.totalRebates || 0)).toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="terminal-text opacity-70">
-                    REBATE_BOOST:
-                  </span>
-                  <span className="font-semibold terminal-text">
-                    +{userStats?.rebateBoost || 0}%
-                  </span>
+                  <span className="text-gray-400">Rebate Boost</span>
+                  <span className="font-semibold">+{userStats?.rebateBoost || 0}%</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="terminal-text opacity-70">
-                    LOCKED_AMOUNT:
-                  </span>
-                  <span className="font-semibold terminal-text">
+                  <span className="text-gray-400">Locked Amount</span>
+                  <span className="font-semibold">
                     {(userStats?.lockedAmount || 0).toLocaleString()} $BACK
                   </span>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Strategies Tab with Sub-tabs */}
-      {activeTab === "strategies" && (
-        <div className="space-y-6">
-          {strategyTab === "lockunlock" && <LockUnlock />}
-          {strategyTab === "dca" && <DCA />}
         </div>
       )}
     </div>

@@ -28,21 +28,60 @@ export const Navigation = () => {
 
   return (
     <>
-      <nav className="border-b-2 border-[#00ff00] bg-black sticky top-0 z-50">
+      <nav className="border-b border-white/10 bg-gradient-to-r from-black/80 via-black/70 to-black/80 backdrop-blur-xl sticky top-0 z-50 shadow-lg">
         <div className="container mx-auto px-4 md:px-6 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-8">
               <Link
                 href="/"
-                className="text-2xl font-bold transition-all duration-300 flex items-center gap-3"
+                className="text-2xl font-bold hover:scale-105 transition-transform duration-300 flex items-center gap-3"
               >
-                <div className="w-10 h-10 bg-transparent border-2 border-[#00ff00] flex items-center justify-center">
-                  <span className="text-[#00ff00] font-bold text-xl terminal-text">
-                    &gt;
-                  </span>
-                </div>
-                <span className="terminal-text text-[#00ff00]">
-                  SWAPBACK_v1.0
+                <svg
+                  viewBox="0 0 40 40"
+                  className="w-10 h-10"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  {/* Lightning bolt with gradient */}
+                  <defs>
+                    <linearGradient
+                      id="swapback-gradient"
+                      x1="0%"
+                      y1="0%"
+                      x2="100%"
+                      y2="100%"
+                    >
+                      <stop
+                        offset="0%"
+                        style={{ stopColor: "var(--primary)", stopOpacity: 1 }}
+                      />
+                      <stop
+                        offset="50%"
+                        style={{ stopColor: "var(--accent)", stopOpacity: 1 }}
+                      />
+                      <stop
+                        offset="100%"
+                        style={{
+                          stopColor: "var(--secondary)",
+                          stopOpacity: 1,
+                        }}
+                      />
+                    </linearGradient>
+                    <filter id="glow">
+                      <feGaussianBlur stdDeviation="2" result="coloredBlur" />
+                      <feMerge>
+                        <feMergeNode in="coloredBlur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
+                  </defs>
+                  <path
+                    d="M24 2L10 22h10l-4 16L30 18H20l4-16z"
+                    fill="url(#swapback-gradient)"
+                    filter="url(#glow)"
+                  />
+                </svg>
+                <span className="bg-gradient-to-r from-[var(--primary)] via-[var(--primary-light)] to-[var(--secondary)] bg-clip-text text-transparent">
+                  SwapBack
                 </span>
               </Link>
 
@@ -52,14 +91,13 @@ export const Navigation = () => {
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`px-4 py-2 transition-all duration-300 font-bold terminal-text relative ${
+                    className={`px-4 py-2 rounded-lg transition-all duration-300 font-medium relative ${
                       isActive(link.href)
-                        ? "text-[#00ff00] bg-[#00ff00]/10 border-2 border-[#00ff00]"
-                        : "text-[#006600] hover:text-[#00ff00] border-2 border-transparent hover:border-[#00ff00]/50"
+                        ? "text-white bg-white/10"
+                        : "text-gray-300 hover:text-white hover:bg-white/5"
                     }`}
                   >
-                    <span className="terminal-prefix">&gt;</span>
-                    {link.label.toUpperCase()}
+                    {link.label}
                     {isActive(link.href) && (
                       <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-gradient-to-r from-[var(--primary)] via-[var(--accent)] to-[var(--secondary)] rounded-full shadow-[0_0_8px_var(--primary)]" />
                     )}

@@ -1,0 +1,228 @@
+cat > docs/COMPARAISON_DEX_SOLANA_VS_SWAPBACK.md << 'EOF'
+# 🔍 Comparaison : Quel DEX sur Solana opère comme SwapBack ?
+
+## 🎯 Caractéristiques Uniques de SwapBack
+
+SwapBack se distingue par **5 caractéristiques clés** :
+
+1. ✅ **Routing multi-DEX intelligent** (agrégation)
+2. ✅ **Frais ultra-réduits** (0.10%)
+3. ✅ **Système de rebates** (30% redistribué aux utilisateurs)
+4. ✅ **Protection MEV** via Jito
+5. ✅ **Token natif avec utilitaire** ($BACK pour boosts)
+
+---
+
+## 📊 Comparaison avec les DEX Majeurs
+
+### 1. **Jupiter Aggregator** 🪐
+
+**Similitudes** :
+- ✅ Agrégateur multi-DEX (comme SwapBack)
+- ✅ Route intelligente pour meilleur prix
+- ✅ Intègre plusieurs sources de liquidité
+- ✅ Protection MEV disponible (via Jito)
+- ✅ Interface utilisateur simple
+
+**Différences** :
+- ❌ Frais plus élevés (0.50% vs 0.10%)
+- ❌ **Pas de système de rebates**
+- ❌ **Pas de token natif avec utilitaire**
+- ❌ Pas de redistribution aux utilisateurs
+- ❌ Modèle business traditionnel
+
+**Verdict** : Jupiter est le **plus proche** en termes de fonctionnalité d'agrégation, mais **sans les avantages économiques** de SwapBack.
+
+---
+
+### 2. **Raydium** ⚡
+
+**Similitudes** :
+- ✅ DEX majeur sur Solana
+- ✅ Liquidité importante
+- ✅ AMM (Automated Market Maker)
+
+**Différences** :
+- ❌ **Pas d'agrégation** (DEX unique)
+- ❌ Frais standard (0.25%)
+- ❌ Pas de rebates
+- ❌ Pas de protection MEV native
+- ❌ Token RAY purement gouvernance/staking
+
+**Verdict** : Raydium est un **DEX traditionnel**, très différent de SwapBack.
+
+---
+
+### 3. **Orca** 🐋
+
+**Similitudes** :
+- ✅ AMM sur Solana
+- ✅ Pools concentrés (Whirlpools)
+- ✅ Interface user-friendly
+
+**Différences** :
+- ❌ **Pas d'agrégation**
+- ❌ Frais standard (0.30%)
+- ❌ Pas de système de rebates
+- ❌ Token ORCA pour gouvernance uniquement
+- ❌ Pas de protection MEV intégrée
+
+**Verdict** : Orca est un **AMM classique**, pas un agrégateur.
+
+---
+
+### 4. **Phoenix** 🔥
+
+**Similitudes** :
+- ✅ Order book hybride (CLOB + AMM)
+- ✅ Liquidité on-chain
+- ✅ Frais compétitifs
+
+**Différences** :
+- ❌ **Pas d'agrégation** multi-DEX
+- ❌ Frais maker/taker variables
+- ❌ Pas de rebates utilisateur
+- ❌ Complexité plus élevée
+
+**Verdict** : Phoenix est un **order book**, modèle différent.
+
+---
+
+### 5. **Meteora** 🌊
+
+**Similitudes** :
+- ✅ Pools dynamiques avec frais adaptatifs
+- ✅ Optimisation de liquidité
+
+**Différences** :
+- ❌ **Pas d'agrégation**
+- ❌ AMM spécialisé (pas d'agrégation multi-sources)
+- ❌ Pas de système de rebates
+- ❌ Focus sur efficacité capital, pas routing
+
+**Verdict** : Meteora est un **AMM innovant**, mais pas un agrégateur.
+
+---
+
+### 6. **Lifinity** 💎
+
+**Similitudes** :
+- ✅ Proactive Market Maker (PMM)
+- ✅ Liquidité concentrée
+- ✅ Token LFNTY avec revenus
+
+**Différences** :
+- ❌ **Pas d'agrégation** (PMM propriétaire)
+- ❌ Modèle différent (pas de LP externes)
+- ❌ Pas de rebates utilisateur
+- ❌ Token donne part des profits, pas des rebates de frais
+
+**Verdict** : Lifinity a un modèle unique mais **ne redistribue pas aux traders**.
+
+---
+
+### 7. **1inch (sur Solana)** 1️⃣
+
+**Similitudes** :
+- ✅ **Agrégateur multi-DEX** ⭐
+- ✅ Routing intelligent
+- ✅ Protection MEV
+
+**Différences** :
+- ❌ Frais similaires aux autres agrégateurs
+- ❌ **Pas de système de rebates**
+- ❌ Token 1INCH pour gouvernance, pas de rebates aux utilisateurs
+- ❌ Focus multi-chaînes (moins optimisé Solana-only)
+
+**Verdict** : 1inch est le **2ème plus proche** après Jupiter, mais sans redistribution.
+
+---
+
+### 8. **Mango Markets** 🥭
+
+**Similitudes** :
+- ✅ Plateforme DeFi complète
+- ✅ Trading, lending, perps
+
+**Différences** :
+- ❌ **Pas un agrégateur de swap**
+- ❌ Focus sur trading avancé/perps
+- ❌ Complexité élevée
+- ❌ Pas de système de rebates sur swaps
+
+**Verdict** : Mango est une **plateforme DeFi complète**, pas un swap optimizer.
+
+---
+
+## 🏆 Classement : Similarité avec SwapBack
+
+| Rang | DEX | Score | Raison |
+|------|-----|-------|--------|
+| 🥇 | **Jupiter** | 70% | Agrégateur multi-DEX + protection MEV, mais **pas de rebates** |
+| 🥈 | **1inch** | 60% | Agrégateur + MEV, mais moins optimisé Solana |
+| 🥉 | **Raydium** | 30% | Liquidité importante, mais DEX unique |
+| 4️⃣ | **Orca** | 25% | AMM solide, mais pas d'agrégation |
+| 5️⃣ | **Phoenix** | 20% | Order book, modèle différent |
+| 6️⃣ | **Meteora** | 20% | AMM dynamique, pas d'agrégation |
+| 7️⃣ | **Lifinity** | 15% | PMM unique, pas de rebates traders |
+| 8️⃣ | **Mango** | 10% | Plateforme complète, pas focus swap |
+
+---
+
+## 🎯 Caractéristiques UNIQUES à SwapBack
+
+Aucun DEX sur Solana ne combine **TOUTES** ces caractéristiques :
+
+| Fonctionnalité | Jupiter | 1inch | Raydium | Orca | SwapBack |
+|----------------|---------|-------|---------|------|----------|
+| Agrégation multi-DEX | ✅ | ✅ | ❌ | ❌ | ✅ |
+| Frais ultra-bas (0.10%) | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **Rebates 30%** | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Protection MEV | ✅ | ✅ | ❌ | ❌ | ✅ |
+| Token avec utilité boost | ❌ | ❌ | ❌ | ❌ | ✅ |
+| cNFT pour lock/unlock | ❌ | ❌ | ❌ | ❌ | ✅ |
+| DCA intégré | ✅ | ❌ | ❌ | ❌ | ✅ |
+
+---
+
+## 💡 Conclusion
+
+### Réponse Courte :
+**Jupiter Aggregator** est le DEX qui opère le plus similairement à SwapBack (agrégation + routing intelligent).
+
+### Réponse Complète :
+**AUCUN DEX existant sur Solana n'opère exactement comme SwapBack**, car SwapBack combine :
+
+1. ✅ Agrégation (comme Jupiter/1inch)
+2. ✅ Frais ultra-réduits (0.10%)
+3. ✅ **Système de rebates unique** (30% redistribué)
+4. ✅ Protection MEV (comme Jupiter)
+5. ✅ Token avec utilitaire réel ($BACK pour boosts)
+6. ✅ Fonctionnalités avancées (cNFT, DCA)
+
+**SwapBack est un hybride innovant** qui prend le meilleur de l'agrégation (Jupiter) et y ajoute un **modèle économique redistributif unique** où les utilisateurs deviennent les bénéficiaires directs du protocole via les rebates.
+
+---
+
+## 📈 Positionnement de SwapBack
+```
+This is the code block that represents the suggested code change:
+````ini
+cat > docs/PRODUCTION_ENVIRONMENT_VARIABLES.md << 'EOF'
+# 🚀 Variables d'Environnement - Déploiement Production
+
+## 📋 Liste Complète des Variables
+
+### 1. **Configuration Next.js / Application**
+
+```bash
+# Mode de déploiement
+NODE_ENV=production
+
+# URL de l'application
+NEXT_PUBLIC_APP_URL=https://swapback.io
+NEXT_PUBLIC_API_URL=https://api.swapback.io
+
+# Version de l'application
+NEXT_PUBLIC_APP_VERSION=1.0.0
+````

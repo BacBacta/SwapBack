@@ -1,36 +1,30 @@
-[provider]
-cluster = "devnet"
-wallet = "~/.config/solana/id.json"
-
 [toolchain]
-anchor_version = "0.30.1"
+anchor_version = "0.32.1"
 
 [features]
 resolution = true
 skip-lint = false
 
 [programs.localnet]
-swapback_buyback = "Fx6yfXhqq1i3CJjocwnLXMw3VMLFt5mfoLtWPJzSRQvn"
-swapback_cnft = "CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH"
-swapback_router = "Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa"
-swapback_transfer_hook = "5vgpMPVKRxk3k7e5arcZSoayp6iKJ3mkNu9MbayGBJ4X"
-common_swap = "EtqKmwUHhaBJbmDzb3BrMf2iZ4RyGYPos9U78Xjpe3Ug"
+swapback_buyback = "71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW"
+swapback_cnft = "HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf"
 
 [programs.devnet]
-swapback_router = "3Z295H9QHByYn9sHm3tH7ASHitwd2Y4AEaXUddfhQKap"
-swapback_buyback = "46UWFYdksvkGhTPy9cTSJGa3d5nqzpY766rtJeuxtMgU"
-swapback_transfer_hook = "5vgpMPVKRxk3k7e5arcZSoayp6iKJ3mkNu9MbayGBJ4X"
-swapback_cnft = "ENbA46Rq9yFdp63WwmVm4tykcjmaukWs6T2ScGr9x7zB"
-common_swap = "D4Hz5ZBPWrLvnjNheQa7FYLVpzuGmPGRqFGWNqg5jRg6"
+swapback_buyback = "71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW"
+swapback_cnft = "HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf"
 
 [programs.mainnet]
-swapback_buyback = "Fx6yfXhqq1i3CJjocwnLXMw3VMLFt5mfoLtWPJzSRQvn"
-swapback_cnft = "CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH"
-swapback_router = "Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa"
-common_swap = "EtqKmwUHhaBJbmDzb3BrMf2iZ4RyGYPos9U78Xjpe3Ug"
+swapback_buyback = "71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW"
+swapback_cnft = "HAtZ7hJt2YFZSYnAaVwRg3jGTAbr8u6nze3KkSHfwFrf"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Localnet"
+wallet = "~/.config/solana/id.json"
 
 [scripts]
-build = "export TMPDIR=/tmp && export CARGO_TARGET_DIR=/tmp/cargo-target && export RUSTFLAGS='-C target-cpu=generic -C opt-level=1' && anchor build --program-name swapback_router"
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
 
 [test]

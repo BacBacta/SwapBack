@@ -52,15 +52,6 @@ $BACK (SwapBack) est un routeur d'exécution pour Solana qui maximise le prix ne
 - ⚡ Accès à des fonctionnalités avancées
 - 🚫 Pénalités en cas de retrait anticipé
 
-### Dollar Cost Averaging (DCA)
-
-- 📈 **Automatisation des investissements** : Achats réguliers à intervalles prédéfinis
-- ⏰ **Fréquences flexibles** : Horaire, Quotidienne, Hebdomadaire, Mensuelle
-- 🎯 **Stratégie d'investissement** : Réduction de l'impact de la volatilité
-- 📊 **Simulateur intégré** : Projection des résultats avant création
-- 🔄 **Gestion complète** : Pause, Resume, Cancel des ordres actifs
-- 📈 **Suivi détaillé** : Prix moyen, total investi, progression en temps réel
-
 ### SDK & Intégrations
 
 - 📦 SDK TypeScript/React
@@ -202,20 +193,16 @@ L'application sera accessible sur `http://localhost:3000`
 ### Exemple SDK
 
 ```typescript
-import { SwapBackClient } from "@swapback/sdk";
-import { Connection, PublicKey } from "@solana/web3.js";
+import { SwapBackClient } from '@swapback/sdk';
+import { Connection, PublicKey } from '@solana/web3.js';
 
 // Initialisation
-const connection = new Connection("https://api.devnet.solana.com");
+const connection = new Connection('https://api.devnet.solana.com');
 const client = new SwapBackClient({
   connection,
   wallet: yourWallet,
-  routerProgramId: new PublicKey(
-    "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
-  ),
-  buybackProgramId: new PublicKey(
-    "Hn7cLGf4hYNd8F1RqYNdqxqLKxqVMiEUPPbRKZJd3zKx"
-  ),
+  routerProgramId: new PublicKey('Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS'),
+  buybackProgramId: new PublicKey('Hn7cLGf4hYNd8F1RqYNdqxqLKxqVMiEUPPbRKZJd3zKx'),
 });
 
 // Simuler une route
@@ -223,11 +210,11 @@ const route = await client.simulateRoute(
   usdcMint,
   solMint,
   500, // 500 USDC
-  0.5 // 0.5% slippage
+  0.5  // 0.5% slippage
 );
 
-console.log("NPI:", route.npi);
-console.log("Remise:", route.rebateAmount);
+console.log('NPI:', route.npi);
+console.log('Remise:', route.rebateAmount);
 
 // Exécuter le swap
 const result = await client.executeSwap(
@@ -238,23 +225,23 @@ const result = await client.executeSwap(
   route
 );
 
-console.log("Signature:", result.signature);
+console.log('Signature:', result.signature);
 ```
 
 ### Exemple Intégration React
 
 ```tsx
-import { useSwapBack } from "@swapback/react";
+import { useSwapBack } from '@swapback/react';
 
 function SwapButton() {
   const { simulateSwap, executeSwap } = useSwapBack();
-
+  
   const handleSwap = async () => {
-    const route = await simulateSwap("USDC", "SOL", 100);
+    const route = await simulateSwap('USDC', 'SOL', 100);
     const result = await executeSwap(route);
-    console.log("Swap réussi!", result);
+    console.log('Swap réussi!', result);
   };
-
+  
   return <button onClick={handleSwap}>Swap avec SwapBack</button>;
 }
 ```
@@ -265,12 +252,12 @@ function SwapButton() {
 
 - **Supply fixe** : 1 000 000 000 $BACK
 
-| Allocation                   | %   | Montant     | Vesting      |
-| ---------------------------- | --- | ----------- | ------------ |
-| Trésorerie communautaire     | 40% | 400 000 000 | DAO contrôlé |
-| Airdrop d'usage              | 30% | 300 000 000 | Basé volume  |
-| Liquidité & Équipe           | 20% | 200 000 000 | 24 mois      |
-| Partenariats & Market Makers | 10% | 100 000 000 | 12 mois      |
+| Allocation                    | %   | Montant       | Vesting      |
+|-------------------------------|-----|---------------|--------------|
+| Trésorerie communautaire      | 40% | 400 000 000   | DAO contrôlé |
+| Airdrop d'usage               | 30% | 300 000 000   | Basé volume  |
+| Liquidité & Équipe            | 20% | 200 000 000   | 24 mois      |
+| Partenariats & Market Makers  | 10% | 100 000 000   | 12 mois      |
 
 ### Utilité du Token
 
@@ -291,11 +278,11 @@ Le système de verrouillage utilise des **compressed NFTs (cNFTs)** pour représ
 
 #### Niveaux de Boost
 
-| Niveau | Seuil de Lock $BACK | Durée Min | Boost Remise | Couleur |
-| ------ | ------------------- | --------- | ------------ | ------- |
-| Bronze | 100 $BACK           | 90 jours  | +10%         | 🟫      |
-| Silver | 1,000 $BACK         | 180 jours | +30%         | 🟦      |
-| Gold   | 10,000 $BACK        | 365 jours | +50%         | 🟨      |
+| Niveau   | Seuil de Lock $BACK | Durée Min | Boost Remise | Couleur  |
+|----------|---------------------|-----------|--------------|----------|
+| Bronze   | 100 $BACK          | 90 jours  | +10%        | 🟫       |
+| Silver   | 1,000 $BACK        | 180 jours | +30%        | 🟦       |
+| Gold     | 10,000 $BACK       | 365 jours | +50%        | 🟨       |
 
 #### Fonctionnement cNFT
 
