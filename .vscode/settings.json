@@ -41,8 +41,9 @@
   "typescript.tsserver.maxTsServerMemory": 2048,
   "typescript.disableAutomaticTypeAcquisition": true,
   
-  // Désactiver SonarLint si non critique
+  // Configuration SonarLint
   "sonarlint.disableTelemetry": true,
+  "sonarlint.ls.javaHome": "/usr/lib/jvm/java-21-openjdk-amd64",
   
   "files.exclude": {
     "**/.git": true,
