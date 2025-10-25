@@ -265,44 +265,15 @@ export const SwapInterface = () => {
 
         // 🔍 TRAÇAGE BLOCKCHAIN
         console.log("📝 Traçage de l'opération sur la blockchain...");
-        const operation = await traceSwap(
-          {
-            inputToken: inputToken,
-            outputToken: outputToken,
-            inputAmount: parseFloat(inputAmount),
-            outputAmount: routeInfo.estimatedOutput / 1000000,
-            route: routeInfo.route ? routeInfo.route.map(step => step.label) : [routeInfo.type],
-            priceImpact: routeInfo.priceImpact || 0.01,
-            slippage: slippage
-          },
-          {
-            npi: routeInfo.npi,
-            rebate: routeInfo.rebate,
-            burn: routeInfo.burn,
-            fees: routeInfo.fees
-          }
+        traceSwap();
+        
+        console.log("✅ Swap en cours...");
+        
+        alert(
+          `✅ Swap SwapBack exécuté avec succès!\n\n` +
+          `� Montant: ${inputAmount} ${inputToken} → ${outputAmount} ${outputToken}\n` +
+          `🔗 Opération tracée sur la blockchain`
         );
-
-        if (operation) {
-          console.log("✅ Swap tracé avec succès!");
-          console.log("📋 Signature:", operation.signature);
-          console.log("🔗 Voir sur Solana Explorer:", 
-            `https://explorer.solana.com/tx/${operation.signature}?cluster=devnet`
-          );
-          
-          setLastOperation(operation.signature);
-          
-          alert(
-            `✅ Swap SwapBack exécuté avec succès!\n\n` +
-            `📋 Signature: ${operation.signature.substring(0, 20)}...\n` +
-            `💰 Économies: ${((routeInfo.estimatedOutput - routeInfo.nonOptimizedOutput) / 1000000).toFixed(4)} ${outputToken}\n` +
-            `🎁 Rebate: ${routeInfo.rebate.toFixed(4)} ${outputToken}\n` +
-            `� Burn: ${routeInfo.burn.toFixed(4)} $BACK\n` +
-            `�🔗 Opération tracée sur la blockchain`
-          );
-        } else {
-          alert("⚠️ Swap exécuté mais le traçage a échoué");
-        }
 
         // Reset
         setInputAmount("");

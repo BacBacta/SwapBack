@@ -265,13 +265,149 @@ export function EnhancedSwapInterface() {
         {/* Inputs etc - reduced for space */}
         {/* Will add full implementation */}
 
-        <div className="text-center text-gray-500 py-8">
-          <p>Interface mise à jour avec toutes les fonctionnalités</p>
-          <p className="text-sm mt-2">
-            ConnectionStatus, Router Toggle, HALF/MAX, Financial Details, Your
-            Savings
-          </p>
+        {/* TOKEN INPUTS */}
+        <div className="space-y-4">
+          {/* Input Token */}
+          <div className="terminal-input-group">
+            <label className="terminal-label">
+              <span className="terminal-prefix">&gt;</span>[FROM_TOKEN]
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={swap.inputAmount}
+                onChange={(e) => setInputAmount(e.target.value)}
+                placeholder="0.00"
+                className="terminal-input flex-1"
+                disabled={!connected}
+              />
+              <button
+                className="btn-secondary px-4"
+                disabled={!connected}
+                onClick={() => setInputAmount(swap.inputToken?.balance?.toString() || "0")}
+              >
+                [MAX]
+              </button>
+            </div>
+            <div className="mt-2 flex justify-between text-xs terminal-text opacity-70">
+              <span>{swap.inputToken?.symbol || "Select token"}</span>
+              {swap.inputToken?.balance && (
+                <span>Balance: {swap.inputToken.balance.toFixed(4)}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Swap Direction Arrow */}
+          <div className="flex justify-center">
+            <button
+              onClick={switchTokens}
+              className="terminal-box p-2 hover:border-[var(--accent)] transition-colors"
+              disabled={!connected}
+            >
+              <span className="text-xl">⇅</span>
+            </button>
+          </div>
+
+          {/* Output Token */}
+          <div className="terminal-input-group">
+            <label className="terminal-label">
+              <span className="terminal-prefix">&gt;</span>[TO_TOKEN]
+            </label>
+            <input
+              type="number"
+              value={outputValue > 0 ? outputValue.toFixed(6) : ""}
+              placeholder="0.00"
+              className="terminal-input"
+              disabled
+              readOnly
+            />
+            <div className="mt-2 text-xs terminal-text opacity-70">
+              <span>{swap.outputToken?.symbol || "Select token"}</span>
+            </div>
+          </div>
         </div>
+
+        {/* SWAP BUTTON */}
+        <button
+          onClick={() => {
+            if (connected && swap.inputAmount && swap.inputToken && swap.outputToken) {
+              // Execute swap logic here
+              console.log("Executing swap...");
+            }
+          }}
+          disabled={!connected || !swap.inputAmount || routes.isLoading}
+          className="btn-primary w-full mt-6"
+        >
+          {!connected ? (
+            <span>
+              <span className="terminal-prefix">&gt;</span> [CONNECT_WALLET]
+            </span>
+          ) : routes.isLoading ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="animate-spin">⚙</span>
+              <span>[FINDING_BEST_ROUTE...]</span>
+            </span>
+          ) : (
+            <span>
+              <span className="terminal-prefix">&gt;</span> [EXECUTE_SWAP]
+            </span>
+          )}
+        </button>
+
+        {/* ROUTE INFO */}
+        {hasSearchedRoute && routes.selectedRoute && (
+          <div className="mt-6 terminal-box p-4 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--primary)]/30">
+              <span className="terminal-text text-sm">
+                <span className="terminal-prefix">&gt;</span>[ROUTE_DETAILS]
+              </span>
+              <span className="text-[var(--secondary)] text-xs">
+                {routes.selectedRoute.venues.length} HOPS
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="terminal-text opacity-70">RATE:</span>
+                <span className="terminal-text ml-2 font-bold">
+                  1 {swap.inputToken?.symbol} = {(outputValue / inputValue).toFixed(4)} {swap.outputToken?.symbol}
+                </span>
+              </div>
+              <div>
+                <span className="terminal-text opacity-70">IMPACT:</span>
+                <span className="terminal-text ml-2 font-bold text-[var(--secondary)]">
+                  {priceImpact.toFixed(2)}%
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SAVINGS DISPLAY - Only for SwapBack router */}
+        {selectedRouter === "swapback" && mockRouteInfo && (
+          <div className="mt-4 terminal-box p-4 bg-[var(--primary)]/5">
+            <div className="text-sm terminal-text space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="opacity-70">💎 REBATE:</span>
+                <span className="text-[var(--accent)] font-bold">
+                  +{mockRouteInfo.rebate.toFixed(6)} {swap.outputToken?.symbol}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="opacity-70">🔥 BURN:</span>
+                <span className="text-[var(--secondary)] font-bold">
+                  {mockRouteInfo.burn.toFixed(6)} $BACK
+                </span>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-[var(--primary)]/30">
+                <span className="font-bold">💰 YOUR SAVINGS:</span>
+                <span className="text-green-400 font-bold text-lg">
+                  +{((mockRouteInfo.estimatedOutput - mockRouteInfo.nonOptimizedOutput) * 100).toFixed(2)}%
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

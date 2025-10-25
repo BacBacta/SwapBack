@@ -7,7 +7,9 @@ import { Dashboard } from "@/components/Dashboard";
 import { DCA } from "@/components/DCA";
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<"swap" | "dashboard" | "dca">("swap");
+  const [activeTab, setActiveTab] = useState<"swap" | "dashboard" | "dca">(
+    "swap"
+  );
 
   return (
     <main className="min-h-screen terminal-scanline" id="main-content">
@@ -35,30 +37,44 @@ export default function Home() {
               </span>
             </div>
             <h1 className="text-5xl md:text-6xl font-bold terminal-text terminal-glow mb-4 uppercase tracking-wider">
-              ╔═══════════════════╗<br/>
-              ║ SWAPBACK v2.0.1  ║<br/>
+              ╔═══════════════════╗
+              <br />
+              ║ SWAPBACK v2.0.1 ║<br />
               ╚═══════════════════╝
             </h1>
             <p className="text-lg terminal-text max-w-3xl mx-auto mb-4">
-              <span className="terminal-prompt"></span>THE SMART ROUTER FOR SOLANA
+              <span className="terminal-prompt"></span>THE SMART ROUTER FOR
+              SOLANA
             </p>
             <p className="text-sm terminal-text text-[var(--muted)] max-w-3xl mx-auto">
               MAXIMIZE_PROFITS | MINIMIZE_FEES | EARN_REBATES
             </p>
-            
+
             {/* STATS - Terminal Style */}
             <div className="flex justify-center gap-8 mt-6 text-sm">
               <div className="terminal-box px-4 py-2">
-                <span className="terminal-text terminal-number font-bold text-lg">$1.2M+</span>
-                <span className="terminal-text text-[var(--muted)] ml-2">VOLUME</span>
+                <span className="terminal-text terminal-number font-bold text-lg">
+                  $1.2M+
+                </span>
+                <span className="terminal-text text-[var(--muted)] ml-2">
+                  VOLUME
+                </span>
               </div>
               <div className="terminal-box px-4 py-2">
-                <span className="terminal-text terminal-number font-bold text-lg">98%</span>
-                <span className="terminal-text text-[var(--muted)] ml-2">SUCCESS</span>
+                <span className="terminal-text terminal-number font-bold text-lg">
+                  98%
+                </span>
+                <span className="terminal-text text-[var(--muted)] ml-2">
+                  SUCCESS
+                </span>
               </div>
               <div className="terminal-box px-4 py-2">
-                <span className="terminal-text terminal-number font-bold text-lg">0.1s</span>
-                <span className="terminal-text text-[var(--muted)] ml-2">AVG_TIME</span>
+                <span className="terminal-text terminal-number font-bold text-lg">
+                  0.1s
+                </span>
+                <span className="terminal-text text-[var(--muted)] ml-2">
+                  AVG_TIME
+                </span>
               </div>
             </div>
           </div>
@@ -114,13 +130,13 @@ export default function Home() {
               <EnhancedSwapInterface />
             </div>
           )}
-          
+
           {activeTab === "dca" && (
             <div className="animate-fade-in">
               <DCA />
             </div>
           )}
-          
+
           {activeTab === "dashboard" && (
             <div className="animate-fade-in">
               <Dashboard />
@@ -136,28 +152,30 @@ export default function Home() {
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 terminal-text">
             <div className="text-sm">
               <span className="terminal-prompt"></span>
-              <span className="text-[var(--muted)]">© 2025 SWAPBACK. BUILT_ON_SOLANA.</span>
+              <span className="text-[var(--muted)]">
+                © 2025 SWAPBACK. BUILT_ON_SOLANA.
+              </span>
             </div>
             <div className="flex gap-6 text-sm">
-              <a 
-                href="https://docs.swapback.io" 
-                target="_blank" 
+              <a
+                href="https://docs.swapback.io"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="terminal-brackets hover:text-[var(--accent)] transition-colors"
               >
                 DOCS
               </a>
-              <a 
-                href="https://twitter.com/swapback" 
-                target="_blank" 
+              <a
+                href="https://twitter.com/swapback"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="terminal-brackets hover:text-[var(--accent)] transition-colors"
               >
                 TWITTER
               </a>
-              <a 
-                href="https://discord.gg/swapback" 
-                target="_blank" 
+              <a
+                href="https://discord.gg/swapback"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="terminal-brackets hover:text-[var(--accent)] transition-colors"
               >
@@ -167,7 +185,8 @@ export default function Home() {
           </div>
           <div className="terminal-border-bottom mt-4"></div>
           <div className="text-center mt-4 terminal-text text-xs text-[var(--muted)]">
-            <span className="terminal-prompt"></span>TYPE 'HELP' FOR COMMANDS | PRESS CTRL+C TO EXIT
+            <span className="terminal-prompt"></span>TYPE 'HELP' FOR COMMANDS |
+            PRESS CTRL+C TO EXIT
           </div>
         </div>
       </footer>

@@ -16,9 +16,8 @@ export const Navigation = () => {
 
   const navLinks = [
     { href: "/", label: "Swap" },
-    { href: "/lock", label: "Lock & Earn" },
-    { href: "/stats", label: "Stats" },
-    { href: "/docs", label: "Docs" },
+    { href: "/dca", label: "DCA" },
+    { href: "/dashboard", label: "Dashboard" },
   ];
 
   const isActive = (href: string) => {
