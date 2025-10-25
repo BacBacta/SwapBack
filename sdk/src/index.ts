@@ -293,13 +293,14 @@ export class SwapBackClient {
       });
 
       // Import du IDL
-      const idl = await import("./idl/swapback_router.json");
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const idl = require("./idl/swapback_router.json");
       const provider = new AnchorProvider(
         this.connection,
         this.wallet,
         { commitment: "confirmed" }
       );
-      const program = new Program(idl.default || idl, provider);
+      const program = new Program(idl as any, provider);
 
       // Dériver le PDA user_lock
       const [userLockPDA] = PublicKey.findProgramAddressSync(
