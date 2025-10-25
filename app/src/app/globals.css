@@ -3,33 +3,33 @@
 @tailwind utilities;
 
 :root {
-  /* Terminal Hacker Theme Colors */
+  /* Terminal Hacker Theme Colors - Reduced Intensity Green */
   --background: #0C0C0C; /* Noir terminal */
   --background-secondary: #000000;
-  --foreground: #00FF00; /* Vert terminal */
-  --primary: #00FF00; /* Vert phosphorescent */
-  --primary-hover: #33FF33;
-  --primary-light: #66FF66;
-  --primary-dark: #00CC00;
-  --secondary: #00FF00; /* Vert terminal */
-  --secondary-hover: #33FF33;
-  --accent: #FFFF00; /* Jaune highlight */
-  --accent-hover: #FFFF33;
-  --muted: #00AA00;
-  --border: rgba(0, 255, 0, 0.3);
-  --border-hover: rgba(0, 255, 0, 0.6);
-  --card-bg: rgba(0, 255, 0, 0.02);
-  --card-bg-hover: rgba(0, 255, 0, 0.05);
+  --foreground: #00DD00; /* Vert moins vif */
+  --primary: #00DD00; /* Vert modéré */
+  --primary-hover: #22DD22;
+  --primary-light: #44DD44;
+  --primary-dark: #00AA00;
+  --secondary: #00DD00; /* Vert modéré */
+  --secondary-hover: #22DD22;
+  --accent: #DDDD00; /* Jaune moins vif */
+  --accent-hover: #DDDD22;
+  --muted: #008800;
+  --border: rgba(0, 221, 0, 0.25);
+  --border-hover: rgba(0, 221, 0, 0.5);
+  --card-bg: rgba(0, 221, 0, 0.01);
+  --card-bg-hover: rgba(0, 221, 0, 0.04);
   
   /* Semantic Colors - Terminal Style */
-  --success: #00FF00;
-  --success-hover: #33FF33;
-  --warning: #FFFF00;
-  --warning-hover: #FFFF33;
-  --error: #FF0000;
-  --error-hover: #FF3333;
-  --info: #00FFFF;
-  --info-hover: #33FFFF;
+  --success: #00DD00;
+  --success-hover: #22DD22;
+  --warning: #DDDD00;
+  --warning-hover: #DDDD22;
+  --error: #CC0000;
+  --error-hover: #DD3333;
+  --info: #00CCCC;
+  --info-hover: #22DDDD;
   
   /* Spacing Scale */
   --space-1: 4px;
