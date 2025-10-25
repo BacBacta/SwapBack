@@ -59,8 +59,8 @@ export const Dashboard = () => {
       <div className="swap-card">
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-bold terminal-text terminal-glow uppercase tracking-wider" id="protocol-stats-heading">PROTOCOL STATISTICS</h2>
-          <div className="flex items-center gap-2 px-3 py-1 border-2 border-[var(--secondary)]">
-            <span className="w-2 h-2 bg-[var(--secondary)] animate-pulse" aria-hidden="true"></span>
+          <div className="flex items-center gap-2 px-3 py-1 border-2 border-[var(--primary)]">
+            <span className="w-2 h-2 bg-[var(--primary)] animate-pulse" aria-hidden="true"></span>
             <span className="text-xs terminal-text uppercase tracking-wider">[LIVE]</span>
           </div>
         </div>
@@ -122,17 +122,17 @@ export const Dashboard = () => {
           className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 border-[var(--primary)] ${
             activeTab === "overview"
               ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
-              : "text-[var(--primary)] border-[var(--primary)]/30 hover:bg-[var(--primary)]/10"
+              : "text-[var(--primary)] border-[var(--primary)] hover:bg-[var(--primary)]/10"
           }`}
         >
           📊 OVERVIEW
         </button>
         <button
           onClick={() => setActiveTab("analytics")}
-          className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider ${
+          className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 border-[var(--primary)] ${
             activeTab === "analytics"
               ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
-              : "text-[var(--primary)] hover:bg-[var(--primary)]/10"
+              : "text-[var(--primary)] border-[var(--primary)] hover:bg-[var(--primary)]/10"
           }`}
         >
           📈 ANALYTICS
@@ -154,9 +154,9 @@ export const Dashboard = () => {
               <div className="text-2xl font-bold terminal-text terminal-glow">{userStats.totalSwaps}</div>
             </div>
 
-            <div className="terminal-box p-5 border-2 border-[var(--secondary)]/30 hover:border-[var(--secondary)] transition-all group">
+            <div className="terminal-box p-5 border-2 border-[var(--primary)]/30 hover:border-[var(--primary)] transition-all group">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 border-2 border-[var(--secondary)] flex items-center justify-center group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 border-2 border-[var(--primary)] flex items-center justify-center group-hover:scale-110 transition-transform">
                   <span className="text-lg">💰</span>
                 </div>
                 <span className="terminal-text opacity-70 text-sm uppercase tracking-wider">[VOLUME]</span>
@@ -164,9 +164,9 @@ export const Dashboard = () => {
               <div className="text-2xl font-bold terminal-text terminal-glow">${userStats.totalVolume.toLocaleString()}</div>
             </div>
 
-            <div className="terminal-box p-5 border-2 border-[var(--secondary)]/30 hover:border-[var(--secondary)] transition-all group">
+            <div className="terminal-box p-5 border-2 border-[var(--primary)]/30 hover:border-[var(--primary)] transition-all group">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 border-2 border-[var(--secondary)] flex items-center justify-center group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 border-2 border-[var(--primary)] flex items-center justify-center group-hover:scale-110 transition-transform">
                   <span className="text-lg">📈</span>
                 </div>
                 <span className="terminal-text opacity-70 text-sm uppercase tracking-wider">[NPI]</span>
@@ -176,9 +176,9 @@ export const Dashboard = () => {
               </div>
             </div>
 
-            <div className="terminal-box p-5 border-2 border-[var(--secondary)]/30 hover:border-[var(--secondary)] transition-all group">
+            <div className="terminal-box p-5 border-2 border-[var(--primary)]/30 hover:border-[var(--primary)] transition-all group">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 border-2 border-[var(--secondary)] flex items-center justify-center group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 border-2 border-[var(--primary)] flex items-center justify-center group-hover:scale-110 transition-transform">
                   <span className="text-lg">✅</span>
                 </div>
                 <span className="terminal-text opacity-70 text-sm uppercase tracking-wider">[REBATES]</span>
