@@ -107,6 +107,13 @@ export function EnhancedSwapInterface() {
     setTimeout(() => setToast(null), 5000);
   };
   
+  // Safe number conversion for priceImpactPct
+  const getPriceImpact = (routeInfo: RouteInfo | null): number => {
+    if (!routeInfo) return 0;
+    const impact = routeInfo.priceImpactPct;
+    return typeof impact === 'string' ? parseFloat(impact) : (impact || 0);
+  };
+  
   // Simulate price trend (in real app, this would come from price feed)
   useEffect(() => {
     if (currentQuote) {
@@ -681,13 +688,13 @@ export function EnhancedSwapInterface() {
                   <div className="flex justify-between items-center">
                     <span className="opacity-70">Price Impact:</span>
                     <span className={`font-mono ${
-                      routeInfo && routeInfo.priceImpactPct > 1 
+                      routeInfo && getPriceImpact(routeInfo) > 1 
                         ? "text-red-400" 
-                        : routeInfo && routeInfo.priceImpactPct > 0.5 
+                        : routeInfo && getPriceImpact(routeInfo) > 0.5 
                         ? "text-yellow-400" 
                         : "text-green-400"
                     }`}>
-                      {routeInfo ? routeInfo.priceImpactPct.toFixed(3) : "0.000"}%
+                      {routeInfo ? getPriceImpact(routeInfo).toFixed(3) : "0.000"}%
                     </span>
                   </div>
                   
@@ -703,7 +710,7 @@ export function EnhancedSwapInterface() {
                     </span>
                   </div>
                   
-                  {routeInfo && routeInfo.priceImpactPct > 1 && (
+                  {routeInfo && getPriceImpact(routeInfo) > 1 && (
                     <div className="terminal-box bg-yellow-900/20 border-yellow-500 p-2 mt-2">
                       <div className="flex items-start gap-2">
                         <span className="text-yellow-400">⚠</span>
@@ -866,9 +873,9 @@ export function EnhancedSwapInterface() {
                 <div>
                   <div className="text-xs terminal-label">PRICE_IMPACT:</div>
                   <div className={`text-sm font-bold ${
-                    routeInfo.priceImpactPct > 1 ? "text-red-400" : "text-green-400"
+                    getPriceImpact(routeInfo) > 1 ? "text-red-400" : "text-green-400"
                   }`}>
-                    {routeInfo.priceImpactPct.toFixed(3)}%
+                    {getPriceImpact(routeInfo).toFixed(3)}%
                   </div>
                 </div>
                 

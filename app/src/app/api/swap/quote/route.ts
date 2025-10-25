@@ -64,7 +64,14 @@ export async function POST(request: NextRequest) {
     if (USE_MOCK_DATA) {
       console.log("🧪 Using MOCK data (network unavailable)");
       const mockQuote = generateMockQuote(inputMint, outputMint, parsedAmount, slippageBps);
-      return NextResponse.json(mockQuote);
+      const mockRouteInfo = parseRouteInfo(mockQuote);
+      
+      return NextResponse.json({
+        success: true,
+        quote: mockQuote,
+        routeInfo: mockRouteInfo,
+        timestamp: Date.now(),
+      });
     }
 
     // Fetch quote from Jupiter
@@ -150,11 +157,16 @@ function parseRouteInfo(quote: any) {
     };
   });
 
+  // Convert priceImpactPct to number if it's a string
+  const priceImpact = typeof quote.priceImpactPct === 'string' 
+    ? parseFloat(quote.priceImpactPct) 
+    : (quote.priceImpactPct || 0);
+
   return {
     totalSteps: routes.length,
     inputAmount: quote.inAmount,
     outputAmount: quote.outAmount,
-    priceImpactPct: quote.priceImpactPct || 0,
+    priceImpactPct: priceImpact,
     steps,
     otherAmountThreshold: quote.otherAmountThreshold,
     swapMode: quote.swapMode || "ExactIn",

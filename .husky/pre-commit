@@ -5,6 +5,13 @@
 # Run full integration tests only in CI to avoid flaky network-dependent tests
 # blocking local development.
 
+# Allow skipping tests with SKIP_PRECOMMIT_TESTS=1
+if [ "$SKIP_PRECOMMIT_TESTS" = "1" ]; then
+  echo "⏭️  Skipping pre-commit tests (SKIP_PRECOMMIT_TESTS=1)"
+  echo "⚠️  Tests will run in CI"
+  exit 0
+fi
+
 echo "Running linter (errors will abort commit)..."
 npm run lint --max-warnings=-1 || echo "⚠️  Linting completed with warnings"
 
@@ -19,7 +26,8 @@ else
   npm run test:unit || {
     echo "❌ Unit tests failed. Commit aborted.";
     echo "To run integration tests: npm run test:integration";
-    echo "To skip tests: git commit --no-verify";
+    echo "To skip tests: SKIP_PRECOMMIT_TESTS=1 git commit";
+    echo "Or use: git commit --no-verify";
     exit 1;
   }
   echo "✅ Unit tests passed. Integration tests will run in CI."
