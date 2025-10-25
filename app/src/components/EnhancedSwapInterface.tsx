@@ -28,6 +28,17 @@ interface QuoteResponse {
   error?: string;
 }
 
+interface Trade {
+  id: string;
+  timestamp: number;
+  inputToken: string;
+  outputToken: string;
+  inputAmount: number;
+  outputAmount: number;
+  signature?: string;
+  status: "success" | "failed";
+}
+
 export function EnhancedSwapInterface() {
   const { connected, publicKey } = useWallet();
   
@@ -54,6 +65,13 @@ export function EnhancedSwapInterface() {
   const [currentQuote, setCurrentQuote] = useState<QuoteResponse | null>(null);
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
   
+  // Recent trades history
+  const [recentTrades, setRecentTrades] = useState<Trade[]>([]);
+  const [showTradeHistory, setShowTradeHistory] = useState(false);
+  
+  // Price trend (mock: simulating price movement)
+  const [priceTrend, setPriceTrend] = useState<"up" | "down" | "stable">("stable");
+  
   // Settings
   const [showSettings, setShowSettings] = useState(false);
   const [slippage, setSlippage] = useState(0.5); // 0.5%
@@ -64,6 +82,38 @@ export function EnhancedSwapInterface() {
   const [txStatus, setTxStatus] = useState<"idle" | "preparing" | "signing" | "sending" | "confirming" | "confirmed" | "failed">("idle");
   const [txSignature, setTxSignature] = useState<string | null>(null);
   const [txError, setTxError] = useState<string | null>(null);
+  
+  // Toast notification
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
+  
+  // Load trades from localStorage on mount
+  useEffect(() => {
+    const savedTrades = localStorage.getItem("swapback_trades");
+    if (savedTrades) {
+      setRecentTrades(JSON.parse(savedTrades));
+    }
+  }, []);
+  
+  // Save trades to localStorage
+  const saveTrade = (trade: Trade) => {
+    const updatedTrades = [trade, ...recentTrades].slice(0, 10); // Keep last 10
+    setRecentTrades(updatedTrades);
+    localStorage.setItem("swapback_trades", JSON.stringify(updatedTrades));
+  };
+  
+  // Show toast notification
+  const showToast = (message: string, type: "success" | "error" | "info" = "info") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 5000);
+  };
+  
+  // Simulate price trend (in real app, this would come from price feed)
+  useEffect(() => {
+    if (currentQuote) {
+      const random = Math.random();
+      setPriceTrend(random > 0.6 ? "up" : random > 0.3 ? "down" : "stable");
+    }
+  }, [currentQuote]);
   
   const fetchQuote = async () => {
     try {
@@ -185,6 +235,24 @@ export function EnhancedSwapInterface() {
       setTxStatus("confirmed");
       setTxSignature(executeData.signature);
       
+      // Save trade to history
+      saveTrade({
+        id: executeData.signature || `trade-${Date.now()}`,
+        timestamp: Date.now(),
+        inputToken: inputToken.symbol,
+        outputToken: outputToken.symbol,
+        inputAmount: parseFloat(inputAmount),
+        outputAmount: parseFloat(outputAmount),
+        signature: executeData.signature,
+        status: "success",
+      });
+      
+      // Show success toast
+      showToast(
+        `✅ Swap successful! ${inputAmount} ${inputToken.symbol} → ${outputAmount} ${outputToken.symbol}`,
+        "success"
+      );
+      
       // Reset form
       setTimeout(() => {
         setInputAmount("");
@@ -198,6 +266,23 @@ export function EnhancedSwapInterface() {
       console.error("Swap error:", error);
       setTxStatus("failed");
       setTxError(error instanceof Error ? error.message : "Transaction failed");
+      
+      // Save failed trade to history
+      saveTrade({
+        id: `failed-${Date.now()}`,
+        timestamp: Date.now(),
+        inputToken: inputToken.symbol,
+        outputToken: outputToken.symbol,
+        inputAmount: parseFloat(inputAmount),
+        outputAmount: parseFloat(outputAmount),
+        status: "failed",
+      });
+      
+      // Show error toast
+      showToast(
+        `❌ Swap failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "error"
+      );
     }
   };
   
@@ -392,8 +477,18 @@ export function EnhancedSwapInterface() {
                 <div className="flex justify-between text-xs terminal-text opacity-70 mt-2">
                   <span>Exchange Rate:</span>
                   <div className="text-right">
-                    <div className="font-bold">
-                      1 {inputToken.symbol} ≈ {(parseFloat(outputAmount) / parseFloat(inputAmount)).toFixed(4)} {outputToken.symbol}
+                    <div className="font-bold flex items-center gap-1 justify-end">
+                      <span>
+                        1 {inputToken.symbol} ≈ {(parseFloat(outputAmount) / parseFloat(inputAmount)).toFixed(4)} {outputToken.symbol}
+                      </span>
+                      {/* Price Trend Indicator */}
+                      <span className={`text-xs ${
+                        priceTrend === "up" ? "text-green-400" : 
+                        priceTrend === "down" ? "text-red-400" : 
+                        "text-gray-400"
+                      }`}>
+                        {priceTrend === "up" ? "↑" : priceTrend === "down" ? "↓" : "—"}
+                      </span>
                     </div>
                     <div className="text-[10px] opacity-50">
                       1 {outputToken.symbol} ≈ {(parseFloat(inputAmount) / parseFloat(outputAmount)).toFixed(6)} {inputToken.symbol}
@@ -843,8 +938,107 @@ export function EnhancedSwapInterface() {
               </div>
             </div>
           </div>
+
+          {/* Recent Trades History */}
+          <div className="terminal-box p-4 mt-4">
+            <div className="flex justify-between items-center mb-3">
+              <div className="text-sm terminal-text font-bold">[RECENT TRADES]</div>
+              {recentTrades.length > 0 && (
+                <button
+                  onClick={() => setShowTradeHistory(!showTradeHistory)}
+                  className="text-[10px] terminal-text opacity-70 hover:opacity-100 transition-opacity"
+                >
+                  {showTradeHistory ? "Hide All" : "View All"}
+                </button>
+              )}
+            </div>
+            
+            {recentTrades.length === 0 ? (
+              <div className="text-xs opacity-50 text-center py-4">
+                No trades yet
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {(showTradeHistory ? recentTrades : recentTrades.slice(0, 3)).map((trade) => (
+                  <div
+                    key={trade.id}
+                    className="terminal-box p-2 text-xs space-y-1 hover:opacity-80 transition-opacity"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <span className={trade.status === "success" ? "text-green-400" : "text-red-400"}>
+                          {trade.status === "success" ? "✓" : "✗"}
+                        </span>
+                        <span className="font-mono">
+                          {trade.inputAmount.toFixed(4)} {trade.inputToken}
+                        </span>
+                        <span className="opacity-50">→</span>
+                        <span className="font-mono">
+                          {trade.outputAmount.toFixed(4)} {trade.outputToken}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center opacity-50 text-[10px]">
+                      <span>{new Date(trade.timestamp).toLocaleTimeString()}</span>
+                      {trade.signature && (
+                        <a
+                          href={`https://solscan.io/tx/${trade.signature}?cluster=devnet`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:text-green-400 transition-colors"
+                        >
+                          View →
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {/* Analytics Summary */}
+            {recentTrades.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-green-400/20">
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="flex flex-col">
+                    <span className="opacity-50 text-[10px]">Success Rate</span>
+                    <span className="font-bold terminal-text">
+                      {((recentTrades.filter(t => t.status === "success").length / recentTrades.length) * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="opacity-50 text-[10px]">Total Trades</span>
+                    <span className="font-bold terminal-text">{recentTrades.length}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <div
+          className={`fixed top-4 right-4 z-50 terminal-box p-4 max-w-md shadow-lg slide-in-up ${
+            toast.type === "success"
+              ? "border-green-400 bg-green-400/10"
+              : toast.type === "error"
+              ? "border-red-400 bg-red-400/10"
+              : "border-blue-400 bg-blue-400/10"
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex-1 text-sm terminal-text">{toast.message}</div>
+            <button
+              onClick={() => setToast(null)}
+              className="text-white/50 hover:text-white transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
