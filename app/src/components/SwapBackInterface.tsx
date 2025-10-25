@@ -243,7 +243,7 @@ export const SwapBackInterface = () => {
           Dollar-Cost Averaging automatisé sur Solana
         </p>
         {solPrice && (
-          <div className="mt-4 text-sm bg-white/20 rounded-lg px-4 py-2 inline-block">
+          <div className="mt-4 text-sm bg-[var(--primary)]/20 rounded-lg px-4 py-2 inline-block">
             📊 SOL/USD:{" "}
             <span className="font-bold">${solPrice.toFixed(2)}</span>
           </div>
@@ -252,7 +252,7 @@ export const SwapBackInterface = () => {
 
       {/* WALLET BUTTON */}
       {!connected && (
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-8 text-center">
+        <div className="bg-[var(--primary)] rounded-2xl shadow-xl p-8 mb-8 text-center">
           <h2 className="text-2xl font-bold text-gray-800 mb-4">
             Connectez votre wallet
           </h2>
@@ -266,7 +266,7 @@ export const SwapBackInterface = () => {
 
       {/* FORMULAIRE DCA */}
       {connected && (
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="bg-[var(--primary)] rounded-2xl shadow-xl p-8">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">
             Créer un plan DCA
           </h2>

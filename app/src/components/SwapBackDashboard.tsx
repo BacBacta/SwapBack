@@ -240,7 +240,7 @@ export const SwapBackDashboard = () => {
   if (!connected) {
     return (
       <div className="max-w-4xl mx-auto p-6">
-        <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
+        <div className="bg-[var(--primary)] rounded-2xl shadow-xl p-12 text-center">
           <div className="text-6xl mb-6">🔒</div>
           <h2 className="text-3xl font-bold text-gray-800 mb-4">
             Dashboard SwapBack
@@ -263,13 +263,13 @@ export const SwapBackDashboard = () => {
           Gérez vos stratégies de Dollar-Cost Averaging
         </p>
         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white/20 rounded-xl p-4">
+          <div className="bg-[var(--primary)]/20 rounded-xl p-4">
             <div className="text-sm text-purple-100 mb-1">Plans actifs</div>
             <div className="text-3xl font-bold">
               {plans.filter((p) => !p.account.isPaused).length}
             </div>
           </div>
-          <div className="bg-white/20 rounded-xl p-4">
+          <div className="bg-[var(--primary)]/20 rounded-xl p-4">
             <div className="text-sm text-purple-100 mb-1">Total investi</div>
             <div className="text-3xl font-bold">
               {plans
@@ -278,7 +278,7 @@ export const SwapBackDashboard = () => {
               SOL
             </div>
           </div>
-          <div className="bg-white/20 rounded-xl p-4">
+          <div className="bg-[var(--primary)]/20 rounded-xl p-4">
             <div className="text-sm text-purple-100 mb-1">Swaps exécutés</div>
             <div className="text-3xl font-bold">
               {plans.reduce(
@@ -292,7 +292,7 @@ export const SwapBackDashboard = () => {
 
       {/* LOADING */}
       {loading && (
-        <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
+        <div className="bg-[var(--primary)] rounded-2xl shadow-xl p-12 text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Chargement de vos plans DCA...</p>
         </div>
@@ -307,7 +307,7 @@ export const SwapBackDashboard = () => {
 
       {/* NO PLANS */}
       {!loading && plans.length === 0 && (
-        <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
+        <div className="bg-[var(--primary)] rounded-2xl shadow-xl p-12 text-center">
           <div className="text-6xl mb-6">📊</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-4">
             Aucun plan DCA actif
@@ -337,7 +337,7 @@ export const SwapBackDashboard = () => {
             return (
               <div
                 key={plan.publicKey.toString()}
-                className="bg-white rounded-2xl shadow-xl p-6 hover:shadow-2xl transition-shadow"
+                className="bg-[var(--primary)] rounded-2xl shadow-xl p-6 hover:shadow-2xl transition-shadow"
               >
                 {/* HEADER */}
                 <div className="flex items-start justify-between mb-6">

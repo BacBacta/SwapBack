@@ -34,7 +34,7 @@ export default function Home() {
             </div>
 
             {/* Wallet button - Solana style */}
-            <WalletMultiButton className="!bg-white !text-[#19162F] hover:!bg-gray-100 !rounded-lg !font-medium !px-5 !py-2.5 !text-sm !transition-all !shadow-md" />
+            <WalletMultiButton className="!bg-[var(--primary)] !text-[#19162F] hover:!bg-gray-100 !rounded-lg !font-medium !px-5 !py-2.5 !text-sm !transition-all !shadow-md" />
           </div>
         </div>
       </header>
@@ -45,18 +45,18 @@ export default function Home() {
           {activeTab === "swap" && (
             <div className="space-y-8">
               {/* Main card - Pure white like Solana Faucet */}
-              <div className="bg-white rounded-2xl shadow-2xl p-8">
+              <div className="bg-[var(--primary)] rounded-2xl shadow-2xl p-8">
                 <EnhancedSwapInterface />
               </div>
               
               {/* Secondary card for route comparison */}
-              <div className="bg-white rounded-2xl shadow-2xl p-8">
+              <div className="bg-[var(--primary)] rounded-2xl shadow-2xl p-8">
                 <RouteComparison />
               </div>
             </div>
           )}
           {activeTab === "dashboard" && (
-            <div className="bg-white rounded-2xl shadow-2xl p-8">
+            <div className="bg-[var(--primary)] rounded-2xl shadow-2xl p-8">
               <SwapBackDashboard />
             </div>
           )}

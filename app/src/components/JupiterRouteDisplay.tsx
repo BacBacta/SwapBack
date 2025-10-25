@@ -87,7 +87,7 @@ export const JupiterRouteDisplay: React.FC<JupiterRouteDisplayProps> = ({
             return (
               <div
                 key={`${market.id}-${index}`}
-                className="bg-white rounded p-2 text-xs"
+                className="bg-[var(--primary)] rounded p-2 text-xs"
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-medium text-gray-700">

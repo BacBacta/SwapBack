@@ -159,7 +159,7 @@ export const JupiterSwapWidget: React.FC = () => {
   }, [quote, inputAmount]);
 
   return (
-    <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg p-6 space-y-4">
+    <div className="max-w-md mx-auto bg-[var(--primary)] rounded-xl shadow-lg p-6 space-y-4">
       {/* En-tête */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-gray-800">Jupiter Swap</h2>
