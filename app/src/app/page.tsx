@@ -10,7 +10,7 @@ export default function Home() {
       <Navigation />
 
       {/* TERMINAL HEADER */}
-      <div className="border-b-2 border-[var(--primary)] bg-black">
+      <div className="border-b-2 border-white bg-black">
         <div className="max-w-7xl mx-auto px-6 py-3">
           <div className="terminal-text text-sm">
             <span className="text-[var(--muted)]">user@swapback:~$</span>{" "}
