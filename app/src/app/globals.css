@@ -31,6 +31,9 @@
   --info: #00CCCC;
   --info-hover: #22DDDD;
   
+  /* Header Border - White */
+  --header-border: #FFFFFF;
+  
   /* Spacing Scale */
   --space-1: 4px;
   --space-2: 8px;
