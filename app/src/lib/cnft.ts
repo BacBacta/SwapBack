@@ -4,7 +4,7 @@ import {
   Transaction,
   SystemProgram,
 } from "@solana/web3.js";
-import { AnchorProvider, Program, web3 } from "@project-serum/anchor";
+import { AnchorProvider, Program, web3 } from "@coral-xyz/anchor";
 import { WalletContextState } from "@solana/wallet-adapter-react";
 
 // Program ID du programme swapback_cnft déployé
