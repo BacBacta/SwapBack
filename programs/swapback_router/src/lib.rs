@@ -17,12 +17,19 @@ pub const ORCA_WHIRLPOOL_PROGRAM_ID: Pubkey =
     pubkey!("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc");
 pub const JUPITER_PROGRAM_ID: Pubkey = pubkey!("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4");
 
+// Buyback Program ID
+pub const BUYBACK_PROGRAM_ID: Pubkey = pubkey!("46UWFYdksvkGhTPy9cTSJGa3d5nqzpY766rtJeuxtMgU");
+
 // Oracle constants
 pub const MAX_STALENESS_SECS: i64 = 300; // 5 minutes max staleness
 
 // Security limits
 pub const MAX_VENUES: usize = 10;
 pub const MAX_FALLBACKS: usize = 5;
+
+// Fee configuration (in basis points, 10000 = 100%)
+pub const PLATFORM_FEE_BPS: u16 = 30; // 0.3% platform fee
+pub const BUYBACK_ALLOCATION_BPS: u16 = 4000; // 40% of (fees + routing profit) goes to buyback
 
 #[program]
 pub mod swapback_router {
@@ -120,7 +127,20 @@ pub struct SwapToC<'info> {
     /// CHECK: Optional swap plan account when using dynamic plans
     pub plan: Option<Account<'info, SwapPlan>>,
 
+    /// CHECK: Buyback program
+    #[account(address = BUYBACK_PROGRAM_ID)]
+    pub buyback_program: Option<AccountInfo<'info>>,
+
+    /// CHECK: Buyback USDC vault (validated in buyback program)
+    #[account(mut)]
+    pub buyback_usdc_vault: Option<Account<'info, token::TokenAccount>>,
+
+    /// CHECK: Buyback state account (validated in buyback program)
+    #[account(mut)]
+    pub buyback_state: Option<AccountInfo<'info>>,
+
     pub token_program: Program<'info, token::Token>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -209,6 +229,23 @@ pub struct BundleHint {
 pub struct PriorityFeeSet {
     pub compute_unit_limit: u32,
     pub compute_unit_price: u64,
+}
+
+#[event]
+pub struct SwapCompleted {
+    pub user: Pubkey,
+    pub amount_in: u64,
+    pub amount_out: u64,
+    pub platform_fee: u64,
+    pub routing_profit: u64,
+    pub buyback_deposit: u64,
+}
+
+#[event]
+pub struct BuybackDeposit {
+    pub amount: u64,
+    pub source: String, // "platform_fee" or "routing_profit"
+    pub timestamp: i64,
 }
 
 #[error_code]
@@ -480,6 +517,47 @@ pub mod swap_toc_processor {
             return err!(ErrorCode::SlippageExceeded);
         }
 
+        // Calculate platform fee (0.3% of amount_out)
+        let platform_fee = calculate_fee(total_amount_out, PLATFORM_FEE_BPS)?;
+        
+        // Calculate routing profit (amount_out - min_out - platform_fee)
+        let net_amount_out = total_amount_out
+            .checked_sub(platform_fee)
+            .ok_or(ErrorCode::InvalidOraclePrice)?;
+        
+        let routing_profit = if net_amount_out > min_out {
+            net_amount_out
+                .checked_sub(min_out)
+                .ok_or(ErrorCode::InvalidOraclePrice)?
+        } else {
+            0
+        };
+
+        // Calculate buyback deposit (40% of platform_fee + 40% of routing_profit)
+        let fee_for_buyback = calculate_fee(platform_fee, BUYBACK_ALLOCATION_BPS)?;
+        let profit_for_buyback = calculate_fee(routing_profit, BUYBACK_ALLOCATION_BPS)?;
+        let total_buyback_deposit = fee_for_buyback
+            .checked_add(profit_for_buyback)
+            .ok_or(ErrorCode::InvalidOraclePrice)?;
+
+        // Deposit to buyback if accounts are provided and amount > 0
+        if total_buyback_deposit > 0 
+            && ctx.accounts.buyback_program.is_some()
+            && ctx.accounts.buyback_usdc_vault.is_some()
+            && ctx.accounts.buyback_state.is_some()
+        {
+            deposit_to_buyback(ctx, total_buyback_deposit)?;
+
+            emit!(SwapCompleted {
+                user: ctx.accounts.user.key(),
+                amount_in: total_amount_in,
+                amount_out: total_amount_out,
+                platform_fee,
+                routing_profit,
+                buyback_deposit: total_buyback_deposit,
+            });
+        }
+
         Ok(total_amount_out)
     }
 
@@ -632,6 +710,75 @@ pub mod swap_toc_processor {
             process_single_swap(&ctx, slice_amount, slice_min_out)?;
         }
 
+        Ok(())
+    }
+
+    /// Calculate fee based on amount and basis points
+    fn calculate_fee(amount: u64, fee_bps: u16) -> Result<u64> {
+        let fee = (amount as u128)
+            .checked_mul(fee_bps as u128)
+            .ok_or(ErrorCode::InvalidOraclePrice)?
+            .checked_div(10_000)
+            .ok_or(ErrorCode::InvalidOraclePrice)? as u64;
+        Ok(fee)
+    }
+
+    /// Deposit USDC to buyback program via CPI
+    fn deposit_to_buyback(ctx: &Context<SwapToC>, amount: u64) -> Result<()> {
+        // Get required accounts
+        let buyback_program = ctx.accounts.buyback_program.as_ref()
+            .ok_or(ErrorCode::InvalidOraclePrice)?;
+        let buyback_vault = ctx.accounts.buyback_usdc_vault.as_ref()
+            .ok_or(ErrorCode::InvalidOraclePrice)?;
+        let buyback_state = ctx.accounts.buyback_state.as_ref()
+            .ok_or(ErrorCode::InvalidOraclePrice)?;
+
+        // Build CPI accounts for buyback deposit_usdc instruction
+        let cpi_accounts = vec![
+            buyback_state.to_account_info(),
+            ctx.accounts.vault_token_account_b.to_account_info(), // source (router's USDC)
+            buyback_vault.to_account_info(), // destination (buyback vault)
+            ctx.accounts.state.to_account_info(), // depositor (router authority)
+            ctx.accounts.token_program.to_account_info(),
+        ];
+
+        // Create instruction data: deposit_usdc discriminator + amount
+        let mut instruction_data = vec![242, 35, 198, 137, 82, 225, 242, 182]; // deposit_usdc discriminator
+        instruction_data.extend_from_slice(&amount.to_le_bytes());
+
+        let instruction = solana_program::instruction::Instruction {
+            program_id: *buyback_program.key,
+            accounts: cpi_accounts.iter().enumerate().map(|(i, acc)| {
+                solana_program::instruction::AccountMeta {
+                    pubkey: *acc.key,
+                    is_signer: i == 3, // router state is signer
+                    is_writable: i != 4, // all except token_program
+                }
+            }).collect(),
+            data: instruction_data,
+        };
+
+        // Create PDA signer seeds for router state
+        let seeds = &[
+            b"router_state".as_ref(),
+            &[ctx.accounts.state.bump],
+        ];
+        let signer_seeds = &[&seeds[..]];
+
+        // Invoke CPI
+        solana_program::program::invoke_signed(
+            &instruction,
+            &cpi_accounts,
+            signer_seeds,
+        )?;
+
+        emit!(BuybackDeposit {
+            amount,
+            source: "swap_fees_and_profit".to_string(),
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        msg!("Deposited {} USDC to buyback vault", amount);
         Ok(())
     }
 }

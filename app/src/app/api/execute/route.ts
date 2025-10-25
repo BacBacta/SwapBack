@@ -7,7 +7,6 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   Connection,
   VersionedTransaction,
-  TransactionConfirmationStrategy,
 } from "@solana/web3.js";
 
 const RPC_ENDPOINT =
@@ -17,7 +16,6 @@ export async function POST(request: NextRequest) {
   try {
     const {
       signedTransaction,
-      lastValidBlockHeight,
     } = await request.json();
 
     if (!signedTransaction) {
@@ -44,29 +42,36 @@ export async function POST(request: NextRequest) {
 
     console.log("✅ Transaction sent:", signature);
     console.log("⏳ Confirming transaction...");
+    
+    // Use polling instead of deprecated confirmTransaction
+    let confirmed = false;
+    let attempt = 0;
+    const maxAttempts = 30;
+    
+    while (!confirmed && attempt < maxAttempts) {
+      try {
+        const status = await connection.getSignatureStatus(signature);
+        if (status.value?.confirmationStatus === "confirmed" || 
+            status.value?.confirmationStatus === "finalized") {
+          confirmed = true;
+          break;
+        }
+      } catch (_error) {
+        console.log(`Confirmation check attempt ${attempt + 1}/${maxAttempts}`);
+      }
+      
+      attempt++;
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s between checks
+    }
 
-    const latestBlockhash = await connection.getLatestBlockhash("confirmed");
-    const confirmationStrategy: TransactionConfirmationStrategy = {
-      signature,
-      blockhash: latestBlockhash.blockhash,
-      lastValidBlockHeight:
-        lastValidBlockHeight || latestBlockhash.lastValidBlockHeight,
-    };
-
-    const confirmation = await connection.confirmTransaction(
-      confirmationStrategy,
-      "confirmed"
-    );
-
-    if (confirmation.value.err) {
-      console.error("❌ Transaction failed:", confirmation.value.err);
+    if (!confirmed) {
+      console.error("❌ Transaction failed: Timeout waiting for confirmation");
 
       return NextResponse.json(
         {
           success: false,
-          error: "Transaction failed",
+          error: "Transaction confirmation timeout",
           signature,
-          details: confirmation.value.err,
         },
         { status: 400 }
       );
@@ -78,7 +83,6 @@ export async function POST(request: NextRequest) {
       success: true,
       signature,
       confirmed: true,
-      slot: confirmation.context.slot,
       timestamp: Date.now(),
     });
   } catch (error) {
@@ -112,7 +116,7 @@ export async function GET() {
       blockHeight,
       timestamp: Date.now(),
     });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       {
         status: "error",

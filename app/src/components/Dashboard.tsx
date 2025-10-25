@@ -10,6 +10,7 @@ import { NoActivityState, NoConnectionState } from "./EmptyState";
 import { DCA } from "./DCA";
 import LockInterface from "./LockInterface";
 import UnlockInterface from "./UnlockInterface";
+import { BuybackStatsCard } from "./BuybackStatsCard";
 
 export const Dashboard = () => {
   const { connected, publicKey } = useWallet();
@@ -151,6 +152,9 @@ export const Dashboard = () => {
           unlockDate={cnftData.unlockDate}
         />
       )}
+
+      {/* Buyback & Burn Stats */}
+      <BuybackStatsCard />
 
       {/* Tabs Navigation */}
       <div className="flex gap-0 p-0 bg-black border-2 border-[var(--primary)]/30">

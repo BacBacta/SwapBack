@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, Burn, Mint, Token, TokenAccount, Transfer};
 
@@ -73,10 +74,8 @@ pub mod swapback_buyback {
 
         let actual_usdc = std::cmp::min(max_usdc_amount, ctx.accounts.usdc_vault.amount);
 
-        // TODO: Implémenter l'intégration avec Jupiter pour exécuter le swap USDC -> $BACK
-        // Pour le MVP, on simule le buyback
-
-        let back_bought = min_back_amount; // Sera remplacé par le montant réel du swap
+        // Execute Jupiter swap: USDC -> $BACK
+        let back_bought = execute_jupiter_swap(ctx, actual_usdc, min_back_amount)?;
 
         // Mise à jour des statistiques
         buyback_state.total_usdc_spent = buyback_state
@@ -98,6 +97,89 @@ pub mod swapback_buyback {
         );
 
         Ok(())
+    }
+
+    /// Execute Jupiter V6 swap via CPI
+    fn execute_jupiter_swap(
+        ctx: Context<ExecuteBuyback>,
+        usdc_amount: u64,
+        min_back_amount: u64,
+    ) -> Result<u64> {
+        let buyback_state = &ctx.accounts.buyback_state;
+
+        // Jupiter V6 uses a SharedAccountsRoute instruction
+        // We need to invoke Jupiter's swap instruction with our vault as authority
+
+        let jupiter_program = ctx.accounts.jupiter_program.as_ref()
+            .ok_or(ErrorCode::InvalidJupiterProgram)?;
+
+        // PDA seeds for signing
+        let seeds = &[
+            b"buyback_state".as_ref(),
+            &[buyback_state.bump],
+        ];
+        let signer_seeds = &[&seeds[..]];
+
+        // Build Jupiter swap instruction data
+        // Jupiter V6 discriminator for sharedAccountsRoute: [0xec, 0xd0, 0x6f, 0x55, 0x5d, 0x47, 0xc7, 0x3f]
+        let mut instruction_data = vec![0xec, 0xd0, 0x6f, 0x55, 0x5d, 0x47, 0xc7, 0x3f];
+        instruction_data.extend_from_slice(&usdc_amount.to_le_bytes()); // in_amount
+        instruction_data.extend_from_slice(&min_back_amount.to_le_bytes()); // quoted_out_amount
+        instruction_data.extend_from_slice(&50u16.to_le_bytes()); // slippage_bps (0.5%)
+        instruction_data.push(1); // platform_fee_bps (0.01%)
+
+        // Jupiter requires specific account ordering - this is a simplified version
+        // In production, you'd get this from Jupiter API quote response
+        let accounts = vec![
+            ctx.accounts.jupiter_program.as_ref().unwrap().to_account_info(),
+            ctx.accounts.usdc_vault.to_account_info(), // source
+            ctx.accounts.back_vault.as_ref().ok_or(ErrorCode::InvalidJupiterProgram)?.to_account_info(), // destination
+            buyback_state.to_account_info(), // user (authority - PDA)
+            ctx.accounts.token_program.to_account_info(),
+            // Additional accounts would be passed via remaining_accounts in a real implementation
+        ];
+
+        let instruction = solana_program::instruction::Instruction {
+            program_id: *jupiter_program.key,
+            accounts: accounts.iter().enumerate().map(|(i, acc)| {
+                solana_program::instruction::AccountMeta {
+                    pubkey: *acc.key,
+                    is_signer: i == 3, // buyback_state PDA signs
+                    is_writable: i == 1 || i == 2, // source and destination are writable
+                }
+            }).collect(),
+            data: instruction_data,
+        };
+
+        // Get initial BACK balance
+        let back_vault_account = ctx.accounts.back_vault.as_ref()
+            .ok_or(ErrorCode::InvalidJupiterProgram)?;
+        let initial_back_balance = back_vault_account.amount;
+
+        // Execute CPI to Jupiter
+        solana_program::program::invoke_signed(
+            &instruction,
+            &accounts,
+            signer_seeds,
+        ).map_err(|_| ErrorCode::JupiterSwapFailed)?;
+
+        // Reload and calculate BACK received
+        let back_vault_account = ctx.accounts.back_vault.as_mut()
+            .ok_or(ErrorCode::InvalidJupiterProgram)?;
+        back_vault_account.reload()?;
+        let final_back_balance = back_vault_account.amount;
+        
+        let back_received = final_back_balance
+            .checked_sub(initial_back_balance)
+            .ok_or(ErrorCode::InvalidAmount)?;
+
+        require!(
+            back_received >= min_back_amount,
+            ErrorCode::SlippageExceeded
+        );
+
+        msg!("Jupiter swap executed: {} USDC -> {} $BACK", usdc_amount, back_received);
+        Ok(back_received)
     }
 
     /// Brûle les tokens $BACK achetés
@@ -225,10 +307,14 @@ pub struct ExecuteBuyback<'info> {
     pub usdc_vault: Account<'info, TokenAccount>,
 
     #[account(mut)]
-    pub back_vault: Account<'info, TokenAccount>,
+    pub back_vault: Option<Account<'info, TokenAccount>>,
+
+    /// CHECK: Jupiter V6 program
+    pub jupiter_program: Option<AccountInfo<'info>>,
 
     pub authority: Signer<'info>,
     pub token_program: Program<'info, Token>,
+    // Jupiter requires additional accounts passed via remaining_accounts
 }
 
 #[derive(Accounts)]
@@ -302,4 +388,10 @@ pub enum ErrorCode {
     InsufficientFunds,
     #[msg("Non autorisé")]
     Unauthorized,
+    #[msg("Programme Jupiter invalide")]
+    InvalidJupiterProgram,
+    #[msg("Échec du swap Jupiter")]
+    JupiterSwapFailed,
+    #[msg("Slippage dépassé")]
+    SlippageExceeded,
 }

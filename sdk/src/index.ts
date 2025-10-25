@@ -14,6 +14,11 @@ import axios from "axios";
 export * from "./blockchain-tracer";
 
 /**
+ * Export Buyback & Burn Module
+ */
+export * from "./buyback";
+
+/**
  * Export Smart Router Services (Phase 6)
  */
 export { SwapExecutor } from "./services/SwapExecutor";
