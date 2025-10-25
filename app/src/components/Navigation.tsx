@@ -28,78 +28,33 @@ export const Navigation = () => {
 
   return (
     <>
-      <nav className="border-b border-white/10 bg-gradient-to-r from-black/80 via-black/70 to-black/80 backdrop-blur-xl sticky top-0 z-50 shadow-lg">
+      <nav className="border-b-2 border-[var(--primary)] bg-black sticky top-0 z-50">
         <div className="container mx-auto px-4 md:px-6 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-8">
               <Link
                 href="/"
-                className="text-2xl font-bold hover:scale-105 transition-transform duration-300 flex items-center gap-3"
+                className="text-2xl font-bold terminal-text terminal-glow hover:text-[var(--accent)] transition-colors flex items-center gap-3 uppercase tracking-wider"
               >
-                <svg
-                  viewBox="0 0 40 40"
-                  className="w-10 h-10"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  {/* Lightning bolt with gradient */}
-                  <defs>
-                    <linearGradient
-                      id="swapback-gradient"
-                      x1="0%"
-                      y1="0%"
-                      x2="100%"
-                      y2="100%"
-                    >
-                      <stop
-                        offset="0%"
-                        style={{ stopColor: "var(--primary)", stopOpacity: 1 }}
-                      />
-                      <stop
-                        offset="50%"
-                        style={{ stopColor: "var(--accent)", stopOpacity: 1 }}
-                      />
-                      <stop
-                        offset="100%"
-                        style={{
-                          stopColor: "var(--secondary)",
-                          stopOpacity: 1,
-                        }}
-                      />
-                    </linearGradient>
-                    <filter id="glow">
-                      <feGaussianBlur stdDeviation="2" result="coloredBlur" />
-                      <feMerge>
-                        <feMergeNode in="coloredBlur" />
-                        <feMergeNode in="SourceGraphic" />
-                      </feMerge>
-                    </filter>
-                  </defs>
-                  <path
-                    d="M24 2L10 22h10l-4 16L30 18H20l4-16z"
-                    fill="url(#swapback-gradient)"
-                    filter="url(#glow)"
-                  />
-                </svg>
-                <span className="bg-gradient-to-r from-[var(--primary)] via-[var(--primary-light)] to-[var(--secondary)] bg-clip-text text-transparent">
-                  SwapBack
-                </span>
+                <span className="text-3xl">⚡</span>
+                <span>SWAPBACK</span>
               </Link>
 
               {/* Desktop Navigation */}
-              <div className="hidden md:flex space-x-1">
+              <div className="hidden md:flex space-x-0">
                 {navLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`px-4 py-2 rounded-lg transition-all duration-300 font-medium relative ${
+                    className={`px-4 py-2 border-r-2 border-[var(--primary)]/30 transition-all font-bold terminal-text uppercase tracking-wider ${
                       isActive(link.href)
-                        ? "text-white bg-white/10"
-                        : "text-gray-300 hover:text-white hover:bg-white/5"
+                        ? "bg-[var(--primary)] text-black"
+                        : "text-[var(--primary)] hover:bg-[var(--primary)]/10"
                     }`}
                   >
                     {link.label}
                     {isActive(link.href) && (
-                      <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-gradient-to-r from-[var(--primary)] via-[var(--accent)] to-[var(--secondary)] rounded-full shadow-[0_0_8px_var(--primary)]" />
+                      <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-[var(--primary)]" />
                     )}
                   </Link>
                 ))}
@@ -108,10 +63,10 @@ export const Navigation = () => {
 
             <div className="flex items-center gap-4">
               {/* Network indicator */}
-              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-[var(--secondary)]/10 rounded-lg border border-[var(--secondary)]/20">
-                <span className="w-2 h-2 bg-[var(--secondary)] rounded-full animate-pulse"></span>
-                <span className="text-xs font-semibold text-[var(--secondary)]">
-                  Solana
+              <div className="hidden md:flex items-center gap-2 border-2 border-[var(--secondary)] px-3 py-1.5">
+                <span className="w-2 h-2 bg-[var(--secondary)] animate-pulse"></span>
+                <span className="text-xs font-bold terminal-text uppercase tracking-wider">
+                  SOLANA
                 </span>
               </div>
 
@@ -123,12 +78,12 @@ export const Navigation = () => {
               {/* Mobile menu button */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 rounded-lg hover:bg-white/5 transition-colors"
+                className="md:hidden p-2 border-2 border-[var(--primary)] hover:bg-[var(--primary)] hover:text-black transition-colors terminal-text"
                 aria-label="Toggle menu"
               >
                 {mobileMenuOpen ? (
                   <svg
-                    className="w-6 h-6 text-white"
+                    className="w-6 h-6"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -142,7 +97,7 @@ export const Navigation = () => {
                   </svg>
                 ) : (
                   <svg
-                    className="w-6 h-6 text-white"
+                    className="w-6 h-6"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -166,37 +121,37 @@ export const Navigation = () => {
         <>
           {/* Backdrop */}
           <button
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden cursor-default border-0 p-0"
+            className="fixed inset-0 bg-black/80 z-40 md:hidden cursor-default border-0 p-0"
             onClick={() => setMobileMenuOpen(false)}
             aria-label="Close menu"
           />
 
           {/* Menu Panel */}
-          <div className="fixed top-[73px] right-0 bottom-0 w-72 bg-[var(--glass-bg)] backdrop-blur-xl border-l border-white/10 z-50 md:hidden animate-slide-in-right shadow-2xl">
-            <div className="flex flex-col h-full p-6">
+          <div className="fixed top-[73px] right-0 bottom-0 w-72 bg-black border-l-2 border-[var(--primary)] z-50 md:hidden animate-slide-in-right">
+            <div className="flex flex-col h-full p-6 terminal-scanline">
               {/* Navigation Links */}
-              <div className="space-y-2 mb-6">
+              <div className="space-y-0 mb-6">
                 {navLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
                     onClick={() => setMobileMenuOpen(false)}
-                    className={`block px-4 py-3 rounded-lg transition-all duration-300 font-medium ${
+                    className={`block px-4 py-3 border-b-2 transition-all duration-300 terminal-text uppercase tracking-wider ${
                       isActive(link.href)
-                        ? "text-white bg-white/10 border-l-2 border-[var(--primary)] shadow-[0_0_20px_rgba(153,69,255,0.3)]"
-                        : "text-gray-300 hover:text-white hover:bg-white/5"
+                        ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
+                        : "text-[var(--primary)] border-[var(--primary)]/30 hover:bg-[var(--primary)]/10 hover:border-[var(--primary)]"
                     }`}
                   >
-                    {link.label}
+                    {'>'} {link.label}
                   </Link>
                 ))}
               </div>
 
               {/* Network indicator */}
-              <div className="flex items-center gap-2 px-4 py-3 bg-[var(--secondary)]/10 rounded-lg border border-[var(--secondary)]/20 mb-6">
-                <span className="w-2 h-2 bg-[var(--secondary)] rounded-full animate-pulse"></span>
-                <span className="text-xs font-semibold text-[var(--secondary)]">
-                  Solana Network
+              <div className="flex items-center gap-2 px-4 py-3 border-2 border-[var(--secondary)] mb-6">
+                <span className="w-2 h-2 bg-[var(--secondary)] animate-pulse"></span>
+                <span className="text-xs terminal-text uppercase tracking-wider">
+                  [SOLANA NETWORK]
                 </span>
               </div>
 

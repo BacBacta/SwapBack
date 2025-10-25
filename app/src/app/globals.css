@@ -156,20 +156,25 @@ body::before {
   color: var(--muted);
 }
 
-/* Wallet Adapter Styles */
+/* Wallet Adapter Styles - Terminal Hacker */
 .wallet-adapter-button {
-  background: var(--primary);
-  border: none;
-  border-radius: 8px;
-  padding: 12px 24px;
-  font-weight: 600;
-  transition: all 0.3s ease;
+  background: var(--primary) !important;
+  border: 2px solid var(--primary) !important;
+  border-radius: 0 !important;
+  padding: 12px 24px !important;
+  font-weight: 700 !important;
+  font-family: 'Courier New', monospace !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.1em !important;
+  transition: all 0.2s ease !important;
+  color: #000 !important;
 }
 
 .wallet-adapter-button:hover {
-  background: var(--secondary);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(153, 69, 255, 0.3);
+  background: transparent !important;
+  color: var(--primary) !important;
+  transform: none !important;
+  box-shadow: 0 0 15px var(--primary) !important;
 }
 
 /* Card Styles - Terminal Hacker */

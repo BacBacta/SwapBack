@@ -119,24 +119,24 @@ export const TokenSelector = ({
     <>
       {/* Backdrop */}
       <button
-        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50"
+        className="fixed inset-0 bg-black/90 z-50"
         onClick={onClose}
         aria-label="Close token selector"
       />
 
       {/* Modal */}
       <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md z-50 animate-fade-in">
-        <div className="swap-card m-4">
+        <div className="swap-card m-4 border-2 border-[var(--primary)]">
           {/* Header */}
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-bold text-white">Select Token</h3>
+            <h3 className="text-xl font-bold terminal-text terminal-glow uppercase tracking-wider">[SELECT TOKEN]</h3>
             <button
               onClick={onClose}
-              className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+              className="p-2 border-2 border-[var(--primary)] hover:bg-[var(--primary)] hover:text-black transition-colors terminal-text"
               aria-label="Close"
             >
               <svg
-                className="w-6 h-6 text-gray-400"
+                className="w-6 h-6"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -157,8 +157,8 @@ export const TokenSelector = ({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name, symbol or address..."
-              className="input-field w-full"
+              placeholder="SEARCH BY NAME, SYMBOL OR ADDRESS..."
+              className="input-field w-full uppercase"
               autoFocus
             />
           </div>
@@ -166,8 +166,8 @@ export const TokenSelector = ({
           {/* Popular Tokens */}
           {!search && (
             <div className="mb-4">
-              <p className="text-xs text-gray-400 mb-3 uppercase font-semibold">
-                Popular Tokens
+              <p className="text-xs terminal-text opacity-70 mb-3 uppercase font-semibold tracking-wider">
+                [POPULAR TOKENS]
               </p>
             </div>
           )}
@@ -176,12 +176,12 @@ export const TokenSelector = ({
           <div className="max-h-96 overflow-y-auto space-y-1 pr-2">
             {loading ? (
               <div className="text-center py-8">
-                <div className="inline-block w-8 h-8 border-4 border-[var(--primary)]/20 border-t-[var(--primary)] rounded-full animate-spin"></div>
-                <p className="text-gray-400 text-sm mt-4">Loading tokens...</p>
+                <div className="inline-block w-8 h-8 border-4 border-[var(--primary)]/20 border-t-[var(--primary)] animate-spin"></div>
+                <p className="terminal-text opacity-70 text-sm mt-4 uppercase tracking-wider">LOADING TOKENS...</p>
               </div>
             ) : filteredTokens.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-gray-400">No tokens found</p>
+                <p className="terminal-text opacity-70 uppercase tracking-wider">NO TOKENS FOUND</p>
               </div>
             ) : (
               filteredTokens.map((token) => (
@@ -191,14 +191,14 @@ export const TokenSelector = ({
                     onSelect(token);
                     onClose();
                   }}
-                  className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all hover:bg-white/5 ${
+                  className={`w-full flex items-center gap-3 p-3 border-2 transition-all terminal-text uppercase tracking-wider ${
                     selectedToken === token.symbol
-                      ? "bg-white/10 border border-[var(--primary)]/20"
-                      : ""
+                      ? "bg-[var(--primary)]/10 border-[var(--primary)] terminal-glow"
+                      : "border-[var(--primary)]/20 hover:bg-[var(--primary)]/5 hover:border-[var(--primary)]/50"
                   }`}
                 >
                   {/* Token Logo */}
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)]/20 to-[var(--secondary)]/20 flex items-center justify-center overflow-hidden">
+                  <div className="w-10 h-10 border-2 border-[var(--primary)] flex items-center justify-center overflow-hidden">
                     {token.logoURI ? (
                       <img
                         src={token.logoURI}
@@ -214,17 +214,17 @@ export const TokenSelector = ({
 
                   {/* Token Info */}
                   <div className="flex-1 text-left">
-                    <div className="font-semibold text-white">
+                    <div className="font-semibold terminal-text terminal-glow">
                       {token.symbol}
                     </div>
-                    <div className="text-xs text-gray-400">{token.name}</div>
+                    <div className="text-xs terminal-text opacity-60">{token.name}</div>
                   </div>
 
                   {/* Selected indicator */}
                   {selectedToken === token.symbol && (
-                    <div className="w-6 h-6 rounded-full bg-[var(--primary)] flex items-center justify-center">
+                    <div className="w-6 h-6 border-2 border-[var(--primary)] bg-[var(--primary)] flex items-center justify-center">
                       <svg
-                        className="w-4 h-4 text-white"
+                        className="w-4 h-4 text-black"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"

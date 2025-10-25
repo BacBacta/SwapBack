@@ -22,42 +22,42 @@ export const ConnectionStatus = () => {
 
   if (connected && isStable) {
     return (
-      <div className="flex items-center gap-2 text-green-400 text-sm">
-        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-        <span>Connecté</span>
+      <div className="flex items-center gap-2 terminal-text text-sm uppercase tracking-wider">
+        <div className="w-2 h-2 bg-[var(--secondary)] animate-pulse"></div>
+        <span>[CONNECTÉ]</span>
       </div>
     );
   }
 
   if (connecting || isReconnecting) {
     return (
-      <div className="flex items-center gap-2 text-yellow-400 text-sm">
-        <div className="w-2 h-2 bg-yellow-400 rounded-full animate-spin"></div>
-        <span>Reconnexion...</span>
+      <div className="flex items-center gap-2 text-[var(--accent)] text-sm uppercase tracking-wider">
+        <div className="w-2 h-2 bg-[var(--accent)] animate-spin"></div>
+        <span>[RECONNEXION...]</span>
       </div>
     );
   }
 
   if (connected && !isStable) {
     return (
-      <div className="flex items-center gap-2 text-orange-400 text-sm">
-        <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
-        <span>Connexion instable</span>
+      <div className="flex items-center gap-2 text-[var(--accent)] text-sm uppercase tracking-wider">
+        <div className="w-2 h-2 bg-[var(--accent)]"></div>
+        <span>[CONNEXION INSTABLE]</span>
         <button
           onClick={handleReconnect}
-          className="px-2 py-1 bg-orange-500 hover:bg-orange-600 text-white text-xs rounded transition-colors"
+          className="px-2 py-1 border-2 border-[var(--accent)] hover:bg-[var(--accent)] hover:text-black text-[var(--accent)] text-xs uppercase tracking-wider transition-colors"
           disabled={isReconnecting}
         >
-          {isReconnecting ? "Reconnexion..." : "Reconnecter"}
+          {isReconnecting ? "[RECONNEXION...]" : "[RECONNECTER]"}
         </button>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-2 text-red-400 text-sm">
-      <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-      <span>Déconnecté</span>
+    <div className="flex items-center gap-2 text-red-400 text-sm uppercase tracking-wider">
+      <div className="w-2 h-2 bg-red-400"></div>
+      <span>[DÉCONNECTÉ]</span>
     </div>
   );
 };

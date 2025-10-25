@@ -196,20 +196,20 @@ export function EnhancedSwapInterface() {
   return (
     <>
       <div className="swap-card max-w-2xl mx-auto relative">
-        {/* Decorative gradient */}
-        <div className="absolute -top-20 -right-20 w-40 h-40 bg-[var(--primary)]/10 rounded-full blur-3xl -z-10"></div>
-        <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-[var(--secondary)]/10 rounded-full blur-3xl -z-10"></div>
+        {/* Decorative terminal grid */}
+        <div className="absolute -top-20 -right-20 w-40 h-40 border-2 border-[var(--primary)]/20 terminal-grid -z-10"></div>
+        <div className="absolute -bottom-20 -left-20 w-40 h-40 border-2 border-[var(--secondary)]/20 terminal-grid -z-10"></div>
 
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-4 px-4 py-2 bg-[var(--primary)]/10 rounded-full border border-[var(--primary)]/20">
-            <span className="w-2 h-2 bg-[var(--primary)] rounded-full animate-pulse"></span>
-            <span className="text-xs font-semibold text-[var(--primary)]">
-              Smart Router Active
+          <div className="inline-flex items-center gap-2 mb-4 px-4 py-2 border-2 border-[var(--primary)]">
+            <span className="w-2 h-2 bg-[var(--primary)] animate-pulse"></span>
+            <span className="text-xs terminal-text uppercase tracking-wider">
+              [SMART ROUTER ACTIVE]
             </span>
           </div>
-          <h2 className="section-title mb-3">Swap Tokens</h2>
-          <p className="body-regular text-gray-400">
-            Get the best price across all Solana DEXs
+          <h2 className="section-title mb-3 terminal-text terminal-glow">SWAP TOKENS</h2>
+          <p className="body-regular terminal-text opacity-70">
+            {'>'} Get the best price across all Solana DEXs
           </p>
 
           {/* Connection Status */}
@@ -220,24 +220,24 @@ export function EnhancedSwapInterface() {
 
         {/* Router Selection Toggle */}
         <div className="mb-6">
-          <div className="flex gap-2 p-1 bg-black/30 rounded-xl border border-white/10">
+          <div className="flex gap-0 p-0 bg-black border-2 border-[var(--primary)]/30">
             <button
               onClick={() => {
                 setSelectedRouter("swapback");
                 setHasSearchedRoute(false);
               }}
-              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
+              className={`flex-1 py-3 px-4 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 ${
                 selectedRouter === "swapback"
-                  ? "bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] text-white shadow-lg"
-                  : "text-gray-400 hover:text-white hover:bg-white/5"
+                  ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
+                  : "text-[var(--primary)] border-[var(--primary)]/30 hover:bg-[var(--primary)]/10"
               }`}
             >
               <div className="flex items-center justify-center gap-2">
                 <span>⚡</span>
-                <span>SwapBack</span>
+                <span>SWAPBACK</span>
               </div>
               {selectedRouter === "swapback" && (
-                <div className="text-xs mt-1 opacity-90">+Rebates +Burn</div>
+                <div className="text-xs mt-1 opacity-90">[+REBATES +BURN]</div>
               )}
             </button>
             <button
@@ -245,18 +245,18 @@ export function EnhancedSwapInterface() {
                 setSelectedRouter("jupiter");
                 setHasSearchedRoute(false);
               }}
-              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
+              className={`flex-1 py-3 px-4 font-semibold transition-all terminal-text uppercase tracking-wider ${
                 selectedRouter === "jupiter"
-                  ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg"
-                  : "text-gray-400 hover:text-white hover:bg-white/5"
+                  ? "bg-[var(--secondary)] text-black border-[var(--secondary)] terminal-glow"
+                  : "text-[var(--secondary)] hover:bg-[var(--secondary)]/10"
               }`}
             >
               <div className="flex items-center justify-center gap-2">
                 <span>🪐</span>
-                <span>Jupiter V6</span>
+                <span>JUPITER V6</span>
               </div>
               {selectedRouter === "jupiter" && (
-                <div className="text-xs mt-1 opacity-90">Best Market Price</div>
+                <div className="text-xs mt-1 opacity-90">[BEST MARKET PRICE]</div>
               )}
             </button>
           </div>

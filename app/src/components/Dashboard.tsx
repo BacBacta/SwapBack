@@ -58,10 +58,10 @@ export const Dashboard = () => {
       {/* Global Stats avec animation */}
       <div className="swap-card">
         <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold" id="protocol-stats-heading">Protocol Statistics</h2>
-          <div className="flex items-center gap-2 px-3 py-1 bg-[var(--secondary)]/10 rounded-full border border-[var(--secondary)]/20">
-            <span className="w-2 h-2 bg-[var(--secondary)] rounded-full animate-pulse" aria-hidden="true"></span>
-            <span className="text-xs font-semibold text-[var(--secondary)]">Live</span>
+          <h2 className="text-2xl font-bold terminal-text terminal-glow uppercase tracking-wider" id="protocol-stats-heading">PROTOCOL STATISTICS</h2>
+          <div className="flex items-center gap-2 px-3 py-1 border-2 border-[var(--secondary)]">
+            <span className="w-2 h-2 bg-[var(--secondary)] animate-pulse" aria-hidden="true"></span>
+            <span className="text-xs terminal-text uppercase tracking-wider">[LIVE]</span>
           </div>
         </div>
         <div 
@@ -70,33 +70,33 @@ export const Dashboard = () => {
           aria-labelledby="protocol-stats-heading"
         >
           <div className="stat-card text-center group hover:scale-105 transition-transform">
-            <div className="text-sm text-gray-400 mb-2" id="total-volume-label">Total Volume</div>
+            <div className="text-sm terminal-text opacity-70 mb-2 uppercase tracking-wider" id="total-volume-label">[TOTAL VOLUME]</div>
             <div 
-              className="text-3xl font-bold text-[var(--primary)]"
+              className="text-3xl font-bold terminal-text terminal-glow"
               aria-labelledby="total-volume-label"
               aria-live="polite"
             >
               ${globalStats.totalVolume.toLocaleString('en-US', { maximumFractionDigits: 0 })}
             </div>
-            <div className="text-xs text-gray-500 mt-2">
+            <div className="text-xs terminal-text opacity-60 mt-2">
               +{globalStats.swapsLast24h} swaps (24h)
             </div>
           </div>
           <div className="stat-card text-center group hover:scale-105 transition-transform">
-            <div className="text-sm text-gray-400 mb-2">$BACK Burned</div>
-            <div className="text-3xl font-bold text-orange-400">
+            <div className="text-sm terminal-text opacity-70 mb-2 uppercase tracking-wider">[$BACK BURNED]</div>
+            <div className="text-3xl font-bold text-[var(--accent)] terminal-glow">
               {globalStats.totalBurned.toLocaleString('en-US')}
             </div>
-            <div className="text-xs text-gray-500 mt-2">
-              🔥 Deflationary
+            <div className="text-xs terminal-text opacity-60 mt-2">
+              🔥 DEFLATIONARY
             </div>
           </div>
           <div className="stat-card text-center group hover:scale-105 transition-transform">
-            <div className="text-sm text-gray-400 mb-2">Rebates Distributed</div>
-            <div className="text-3xl font-bold text-[var(--secondary)]">
+            <div className="text-sm terminal-text opacity-70 mb-2 uppercase tracking-wider">[REBATES DISTRIBUTED]</div>
+            <div className="text-3xl font-bold terminal-text terminal-glow">
               ${globalStats.totalRebates.toLocaleString('en-US', { maximumFractionDigits: 0 })}
             </div>
-            <div className="text-xs text-gray-500 mt-2">
+            <div className="text-xs terminal-text opacity-60 mt-2">
               {globalStats.activeUsers.toLocaleString()} active users
             </div>
           </div>
@@ -116,26 +116,26 @@ export const Dashboard = () => {
       )}
 
       {/* Tabs Navigation */}
-      <div className="flex gap-2 p-1 bg-black/30 rounded-xl border border-white/5">
+      <div className="flex gap-0 p-0 bg-black border-2 border-[var(--primary)]/30">
         <button
           onClick={() => setActiveTab("overview")}
-          className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+          className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 ${
             activeTab === "overview"
-              ? "bg-[var(--primary)] text-white shadow-[0_0_20px_rgba(153,69,255,0.3)]"
-              : "text-gray-400 hover:text-white hover:bg-white/5"
+              ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
+              : "text-[var(--primary)] border-[var(--primary)]/30 hover:bg-[var(--primary)]/10"
           }`}
         >
-          📊 Overview
+          📊 OVERVIEW
         </button>
         <button
           onClick={() => setActiveTab("analytics")}
-          className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+          className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider ${
             activeTab === "analytics"
-              ? "bg-[var(--primary)] text-white shadow-[0_0_20px_rgba(153,69,255,0.3)]"
-              : "text-gray-400 hover:text-white hover:bg-white/5"
+              ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
+              : "text-[var(--primary)] hover:bg-[var(--primary)]/10"
           }`}
         >
-          📈 Analytics
+          📈 ANALYTICS
         </button>
       </div>
 
@@ -144,46 +144,46 @@ export const Dashboard = () => {
         <div className="space-y-6">
           {/* Quick Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="glass-effect rounded-xl p-5 border border-gray-700/50 hover:border-[var(--primary)]/30 transition-all group">
+            <div className="terminal-box p-5 border-2 border-[var(--primary)]/30 hover:border-[var(--primary)] transition-all group">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)]/20 to-[var(--primary)]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 border-2 border-[var(--primary)] flex items-center justify-center group-hover:scale-110 transition-transform">
                   <span className="text-lg">🔄</span>
                 </div>
-                <span className="text-gray-400 text-sm">Swaps</span>
+                <span className="terminal-text opacity-70 text-sm uppercase tracking-wider">[SWAPS]</span>
               </div>
-              <div className="text-2xl font-bold">{userStats.totalSwaps}</div>
+              <div className="text-2xl font-bold terminal-text terminal-glow">{userStats.totalSwaps}</div>
             </div>
 
-            <div className="glass-effect rounded-xl p-5 border border-gray-700/50 hover:border-[var(--secondary)]/30 transition-all group">
+            <div className="terminal-box p-5 border-2 border-[var(--secondary)]/30 hover:border-[var(--secondary)] transition-all group">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--secondary)]/20 to-[var(--secondary)]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 border-2 border-[var(--secondary)] flex items-center justify-center group-hover:scale-110 transition-transform">
                   <span className="text-lg">💰</span>
                 </div>
-                <span className="text-gray-400 text-sm">Volume</span>
+                <span className="terminal-text opacity-70 text-sm uppercase tracking-wider">[VOLUME]</span>
               </div>
-              <div className="text-2xl font-bold">${userStats.totalVolume.toLocaleString()}</div>
+              <div className="text-2xl font-bold terminal-text terminal-glow">${userStats.totalVolume.toLocaleString()}</div>
             </div>
 
-            <div className="glass-effect rounded-xl p-5 border border-gray-700/50 hover:border-[var(--secondary)]/30 transition-all group">
+            <div className="terminal-box p-5 border-2 border-[var(--secondary)]/30 hover:border-[var(--secondary)] transition-all group">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--secondary)]/20 to-[var(--secondary)]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 border-2 border-[var(--secondary)] flex items-center justify-center group-hover:scale-110 transition-transform">
                   <span className="text-lg">📈</span>
                 </div>
-                <span className="text-gray-400 text-sm">NPI</span>
+                <span className="terminal-text opacity-70 text-sm uppercase tracking-wider">[NPI]</span>
               </div>
-              <div className="text-2xl font-bold text-[var(--secondary)]">
+              <div className="text-2xl font-bold terminal-text terminal-glow">
                 +${userStats.totalNPI.toFixed(2)}
               </div>
             </div>
 
-            <div className="glass-effect rounded-xl p-5 border border-gray-700/50 hover:border-[var(--secondary)]/30 transition-all group">
+            <div className="terminal-box p-5 border-2 border-[var(--secondary)]/30 hover:border-[var(--secondary)] transition-all group">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--secondary)]/20 to-[var(--secondary)]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 border-2 border-[var(--secondary)] flex items-center justify-center group-hover:scale-110 transition-transform">
                   <span className="text-lg">✅</span>
                 </div>
-                <span className="text-gray-400 text-sm">Rebates</span>
+                <span className="terminal-text opacity-70 text-sm uppercase tracking-wider">[REBATES]</span>
               </div>
-              <div className="text-2xl font-bold text-[var(--secondary)]">
+              <div className="text-2xl font-bold terminal-text terminal-glow">
                 ${userStats.totalRebates.toFixed(2)}
               </div>
             </div>
@@ -191,22 +191,21 @@ export const Dashboard = () => {
 
           {/* Pending Rebates Card */}
           {userStats.pendingRebates > 0 && (
-            <div className="glass-effect rounded-xl p-6 border border-[var(--primary)]/30 bg-gradient-to-r from-[var(--primary)]/10 to-[var(--accent)]/5 hover:scale-[1.02] transition-all relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-r from-[var(--primary)]/5 via-[var(--accent)]/5 to-transparent animate-shimmer"></div>
+            <div className="terminal-box p-6 border-2 border-[var(--primary)] hover:scale-[1.02] transition-all relative overflow-hidden terminal-scanline">
               <div className="relative flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[var(--primary)]/30 to-[var(--accent)]/30 flex items-center justify-center animate-pulse-glow">
+                  <div className="w-14 h-14 border-2 border-[var(--accent)] flex items-center justify-center animate-pulse">
                     <span className="text-2xl">💎</span>
                   </div>
                   <div>
-                    <div className="font-bold text-lg mb-1">Pending Rebates</div>
-                    <div className="text-3xl font-bold bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] bg-clip-text text-transparent">
+                    <div className="font-bold text-lg mb-1 terminal-text uppercase tracking-wider">[PENDING REBATES]</div>
+                    <div className="text-3xl font-bold terminal-text terminal-glow">
                       ${userStats.pendingRebates.toFixed(2)}
                     </div>
                   </div>
                 </div>
-                <button className="btn-primary px-8 py-3 text-lg font-bold">
-                  🎁 Claim Now
+                <button className="btn-primary px-8 py-3 text-lg font-bold uppercase tracking-wider">
+                  🎁 CLAIM NOW
                 </button>
               </div>
             </div>
