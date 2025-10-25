@@ -27,7 +27,7 @@ export const Navigation = () => {
 
   return (
     <>
-      <nav className="border-b-2 border-white bg-black sticky top-0 z-50">
+      <nav className="border-b-2 border-[var(--primary)] bg-black sticky top-0 z-50">
         <div className="container mx-auto px-4 md:px-6 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-8">
@@ -45,15 +45,15 @@ export const Navigation = () => {
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`px-4 py-2 border-r-2 border-white/30 transition-all font-bold terminal-text uppercase tracking-wider ${
+                    className={`px-4 py-2 border-r-2 border-[var(--primary)]/30 transition-all font-bold terminal-text uppercase tracking-wider ${
                       isActive(link.href)
-                        ? "bg-white text-black"
-                        : "text-white hover:bg-white/10"
+                        ? "bg-[var(--primary)] text-black"
+                        : "text-[var(--primary)] hover:bg-[var(--primary)]/10"
                     }`}
                   >
                     {link.label}
                     {isActive(link.href) && (
-                      <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-white" />
+                      <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-[var(--primary)]" />
                     )}
                   </Link>
                 ))}
@@ -62,9 +62,9 @@ export const Navigation = () => {
 
             <div className="flex items-center gap-4">
               {/* Network indicator */}
-              <div className="hidden md:flex items-center gap-2 border-2 border-white px-3 py-1.5">
-                <span className="w-2 h-2 bg-white animate-pulse"></span>
-                <span className="text-xs font-bold terminal-text uppercase tracking-wider text-white">
+              <div className="hidden md:flex items-center gap-2 border-2 border-[var(--primary)] px-3 py-1.5">
+                <span className="w-2 h-2 bg-[var(--primary)] animate-pulse"></span>
+                <span className="text-xs font-bold terminal-text uppercase tracking-wider text-[var(--primary)]">
                   SOLANA
                 </span>
               </div>
@@ -77,7 +77,7 @@ export const Navigation = () => {
               {/* Mobile menu button */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 border-2 border-white hover:bg-white hover:text-black transition-colors terminal-text"
+                className="md:hidden p-2 border-2 border-[var(--primary)] hover:bg-[var(--primary)] hover:text-black transition-colors terminal-text"
                 aria-label="Toggle menu"
               >
                 {mobileMenuOpen ? (
@@ -126,7 +126,7 @@ export const Navigation = () => {
           />
 
           {/* Menu Panel */}
-          <div className="fixed top-[73px] right-0 bottom-0 w-72 bg-black border-l-2 border-white z-50 md:hidden animate-slide-in-right">
+          <div className="fixed top-[73px] right-0 bottom-0 w-72 bg-black border-l-2 border-[var(--primary)] z-50 md:hidden animate-slide-in-right">
             <div className="flex flex-col h-full p-6 terminal-scanline">
               {/* Navigation Links */}
               <div className="space-y-0 mb-6">
@@ -137,8 +137,8 @@ export const Navigation = () => {
                     onClick={() => setMobileMenuOpen(false)}
                     className={`block px-4 py-3 border-b-2 transition-all duration-300 terminal-text uppercase tracking-wider ${
                       isActive(link.href)
-                        ? "bg-white text-black border-white"
-                        : "text-white border-white/30 hover:bg-white/10 hover:border-white"
+                        ? "bg-[var(--primary)] text-black border-[var(--primary)]"
+                        : "text-[var(--primary)] border-[var(--primary)]/30 hover:bg-[var(--primary)]/10 hover:border-[var(--primary)]"
                     }`}
                   >
                     {'>'} {link.label}
@@ -147,9 +147,9 @@ export const Navigation = () => {
               </div>
 
               {/* Network indicator */}
-              <div className="flex items-center gap-2 px-4 py-3 border-2 border-white mb-6">
-                <span className="w-2 h-2 bg-white animate-pulse"></span>
-                <span className="text-xs terminal-text uppercase tracking-wider text-white">
+              <div className="flex items-center gap-2 px-4 py-3 border-2 border-[var(--primary)] mb-6">
+                <span className="w-2 h-2 bg-[var(--primary)] animate-pulse"></span>
+                <span className="text-xs terminal-text uppercase tracking-wider text-[var(--primary)]">
                   [SOLANA NETWORK]
                 </span>
               </div>

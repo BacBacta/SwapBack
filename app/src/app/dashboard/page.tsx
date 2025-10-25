@@ -6,7 +6,7 @@ export default function DashboardPage() {
   return (
     <main className="min-h-screen terminal-scanline" id="dashboard-page">
       {/* TERMINAL HEADER */}
-      <div className="border-b-2 border-white bg-black">
+      <div className="border-b-2 border-[var(--primary)] bg-black">
         <div className="max-w-7xl mx-auto px-6 py-3">
           <div className="terminal-text text-sm">
             <span className="text-[var(--muted)]">user@swapback:~$</span>{" "}
@@ -16,18 +16,18 @@ export default function DashboardPage() {
       </div>
 
       {/* HERO SECTION */}
-      <div className="border-b-2 border-white/30 bg-black py-8 px-6">
+      <div className="border-b-2 border-[var(--primary)]/30 bg-black py-8 px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="inline-flex items-center gap-2 border-2 border-white px-4 py-2 mb-4">
-            <span className="w-2 h-2 bg-white animate-pulse"></span>
-            <span className="text-xs font-bold terminal-text uppercase tracking-wider text-white">
+          <div className="inline-flex items-center gap-2 border-2 border-[var(--primary)] px-4 py-2 mb-4">
+            <span className="w-2 h-2 bg-[var(--primary)] animate-pulse"></span>
+            <span className="text-xs font-bold terminal-text uppercase tracking-wider text-[var(--primary)]">
               [ANALYTICS_LIVE]
             </span>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold terminal-text terminal-glow mb-3 uppercase tracking-wider text-white">
+          <h1 className="text-4xl md:text-5xl font-bold terminal-text terminal-glow mb-3 uppercase tracking-wider text-[var(--primary)]">
             PERFORMANCE DASHBOARD
           </h1>
-          <p className="text-lg terminal-text text-white/70 max-w-3xl">
+          <p className="text-lg terminal-text text-[var(--primary)]/70 max-w-3xl">
             <span className="terminal-prompt">›</span> Real-time analytics and transaction history
           </p>
         </div>
@@ -37,7 +37,7 @@ export default function DashboardPage() {
       <div className="py-8 px-6 bg-black">
         <div className="max-w-7xl mx-auto">
           <div className="animate-fade-in">
-            <div className="border-2 border-white/20 bg-black p-8">
+            <div className="border-2 border-[var(--primary)]/20 bg-black p-8">
               <Dashboard />
             </div>
           </div>
@@ -45,9 +45,9 @@ export default function DashboardPage() {
       </div>
 
       {/* FOOTER */}
-      <footer className="border-t-2 border-white bg-black">
+      <footer className="border-t-2 border-[var(--primary)] bg-black">
         <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 terminal-text text-white/70">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 terminal-text text-[var(--primary)]/70">
             <div className="text-sm">
               <span className="terminal-prompt">›</span>
               <span className="ml-2">© 2025 SWAPBACK. ANALYTICS_MODULE.</span>
@@ -57,7 +57,7 @@ export default function DashboardPage() {
                 href="https://docs.swapback.io/dashboard"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-white hover:text-white/50 transition-colors"
+                className="text-[var(--primary)] hover:text-[var(--primary)]/50 transition-colors"
               >
                 [DOCS]
               </a>
@@ -65,7 +65,7 @@ export default function DashboardPage() {
                 href="https://discord.gg/swapback"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-white hover:text-white/50 transition-colors"
+                className="text-[var(--primary)] hover:text-[var(--primary)]/50 transition-colors"
               >
                 [SUPPORT]
               </a>
