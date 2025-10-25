@@ -226,7 +226,7 @@ export function EnhancedSwapInterface() {
                 setSelectedRouter("swapback");
                 setHasSearchedRoute(false);
               }}
-              className={`flex-1 py-3 px-4 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 ${
+              className={`flex-1 py-3 px-4 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 border-[var(--primary)] ${
                 selectedRouter === "swapback"
                   ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
                   : "text-[var(--primary)] border-[var(--primary)]/30 hover:bg-[var(--primary)]/10"
