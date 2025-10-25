@@ -41,6 +41,10 @@ export function EnhancedSwapInterface() {
   const [inputAmount, setInputAmount] = useState("");
   const [outputAmount, setOutputAmount] = useState("");
   
+  // Balances (mock for now - will be replaced with real wallet queries)
+  const [inputBalance, setInputBalance] = useState<number>(10.5); // Mock: 10.5 SOL
+  const [outputBalance, setOutputBalance] = useState<number>(150.25); // Mock: 150.25 USDC
+  
   // Quote & Route
   const [isLoadingQuote, setIsLoadingQuote] = useState(false);
   const [currentQuote, setCurrentQuote] = useState<QuoteResponse | null>(null);
@@ -290,7 +294,34 @@ export function EnhancedSwapInterface() {
             
             {/* Input Token */}
             <div className="terminal-input-group mb-4">
-              <label className="terminal-label">[FROM]</label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="terminal-label">[FROM]</label>
+                {connected && (
+                  <button 
+                    onClick={() => setInputAmount(inputBalance.toString())}
+                    className="text-xs terminal-text opacity-70 hover:opacity-100 hover:text-[var(--accent)] transition-all"
+                    title="Use maximum balance"
+                  >
+                    Balance: {inputBalance.toFixed(4)} {inputToken.symbol}
+                    <span className="ml-1 text-[var(--primary)] font-bold">[MAX]</span>
+                  </button>
+                )}
+              </div>
+              
+              {/* Preset amounts */}
+              <div className="flex gap-1 mb-2">
+                {[0.1, 0.5, 1, 5].map(amount => (
+                  <button
+                    key={amount}
+                    onClick={() => setInputAmount(amount.toString())}
+                    disabled={!connected}
+                    className="terminal-box px-2 py-1 text-xs hover:bg-[var(--primary)]/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                  >
+                    {amount}
+                  </button>
+                ))}
+              </div>
+              
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowInputSelector(!showInputSelector)}
@@ -309,6 +340,21 @@ export function EnhancedSwapInterface() {
                   disabled={!connected}
                 />
               </div>
+              
+              {/* Exchange rate display */}
+              {inputAmount && outputAmount && parseFloat(inputAmount) > 0 && parseFloat(outputAmount) > 0 && (
+                <div className="flex justify-between text-xs terminal-text opacity-70 mt-2">
+                  <span>Exchange Rate:</span>
+                  <div className="text-right">
+                    <div className="font-bold">
+                      1 {inputToken.symbol} ≈ {(parseFloat(outputAmount) / parseFloat(inputAmount)).toFixed(4)} {outputToken.symbol}
+                    </div>
+                    <div className="text-[10px] opacity-50">
+                      1 {outputToken.symbol} ≈ {(parseFloat(inputAmount) / parseFloat(outputAmount)).toFixed(6)} {inputToken.symbol}
+                    </div>
+                  </div>
+                </div>
+              )}
               
               {/* Token Selector */}
               {showInputSelector && (
@@ -345,15 +391,24 @@ export function EnhancedSwapInterface() {
             <div className="flex justify-center my-4">
               <button 
                 onClick={handleSwapTokens}
-                className="terminal-box p-3 hover:bg-[var(--primary)]/10 hover:rotate-180 transition-transform"
+                className="terminal-box p-3 hover:bg-[var(--primary)]/10 transition-all duration-300 hover:scale-110 active:scale-95 hover:rotate-180"
+                title="Swap input and output tokens"
               >
                 ⇅
               </button>
             </div>
             
             {/* Output Token */}
-            <div className="terminal-input-group mb-6">
-              <label className="terminal-label">[TO]</label>
+            <div className="terminal-input-group mb-4">
+              <div className="flex justify-between items-center mb-1">
+                <label className="terminal-label">[TO]</label>
+                {connected && (
+                  <div className="text-xs terminal-text opacity-70">
+                    Balance: {outputBalance.toFixed(4)} {outputToken.symbol}
+                  </div>
+                )}
+              </div>
+              
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowOutputSelector(!showOutputSelector)}
@@ -410,6 +465,96 @@ export function EnhancedSwapInterface() {
                 </div>
               )}
             </div>
+            
+            {/* Skeleton Loading State */}
+            {isLoadingQuote && !currentQuote && inputAmount && parseFloat(inputAmount) > 0 && (
+              <div className="terminal-box p-4 mb-4 animate-pulse">
+                <div className="space-y-2">
+                  <div className="h-3 bg-[var(--primary)]/20 w-3/4 mb-2"></div>
+                  <div className="h-3 bg-[var(--primary)]/20 w-1/2 mb-2"></div>
+                  <div className="h-3 bg-[var(--primary)]/20 w-2/3"></div>
+                </div>
+                <div className="text-xs terminal-text opacity-50 text-center mt-3">
+                  [FETCHING_BEST_ROUTE...]
+                </div>
+              </div>
+            )}
+            
+            {/* Fee Summary Card */}
+            {currentQuote && !isLoadingQuote && (
+              <div className="terminal-box p-4 mb-4 space-y-2 text-sm animate-slide-in">
+                <div className="text-xs terminal-text font-bold mb-3 flex items-center gap-2">
+                  <span className="text-[var(--secondary)]">💰</span>
+                  [TRANSACTION_SUMMARY]
+                </div>
+                
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="opacity-70">Network Fee:</span>
+                    <span className="font-mono">
+                      ~{priorityLevel === "high" ? "0.0001" : priorityLevel === "medium" ? "0.00005" : "0.00001"} SOL
+                    </span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="opacity-70">Platform Fee:</span>
+                    <span className="text-[var(--secondary)] font-bold">0% (FREE)</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="opacity-70">Price Impact:</span>
+                    <span className={`font-mono ${
+                      routeInfo && routeInfo.priceImpactPct > 1 
+                        ? "text-red-400" 
+                        : routeInfo && routeInfo.priceImpactPct > 0.5 
+                        ? "text-yellow-400" 
+                        : "text-green-400"
+                    }`}>
+                      {routeInfo ? routeInfo.priceImpactPct.toFixed(3) : "0.000"}%
+                    </span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="opacity-70">Max Slippage:</span>
+                    <span className="font-mono">{slippage}%</span>
+                  </div>
+                  
+                  <div className="border-t border-[var(--primary)]/30 pt-2 mt-2 flex justify-between font-bold">
+                    <span className="text-[var(--primary)]">You Receive:</span>
+                    <span className="text-[var(--primary)] font-mono text-base">
+                      {parseFloat(outputAmount).toFixed(6)} {outputToken.symbol}
+                    </span>
+                  </div>
+                  
+                  {routeInfo && routeInfo.priceImpactPct > 1 && (
+                    <div className="terminal-box bg-yellow-900/20 border-yellow-500 p-2 mt-2">
+                      <div className="flex items-start gap-2">
+                        <span className="text-yellow-400">⚠</span>
+                        <div className="text-yellow-400 text-[10px]">
+                          <div className="font-bold">HIGH_PRICE_IMPACT_WARNING</div>
+                          <div className="opacity-70">Consider reducing trade size to minimize impact</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* Slippage Warning */}
+            {slippage > 1 && !isLoadingQuote && (
+              <div className="terminal-box bg-yellow-900/20 border-yellow-500 p-3 mb-4">
+                <div className="flex items-start gap-2 text-xs">
+                  <span className="text-yellow-400 text-base">⚠</span>
+                  <div className="text-yellow-400">
+                    <div className="font-bold">HIGH_SLIPPAGE_WARNING</div>
+                    <div className="opacity-70 mt-1">
+                      Slippage &gt; 1% may result in frontrunning. Consider enabling MEV protection.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             
             {/* Execute Button */}
             <button 

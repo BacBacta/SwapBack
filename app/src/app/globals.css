@@ -734,3 +734,48 @@ html {
     width: 0%;
   }
 }
+
+/* Slide in animation */
+@keyframes slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in-up 0.3s ease-out;
+}
+
+/* Highlight flash animation */
+@keyframes highlight-flash {
+  0%, 100% { 
+    border-color: var(--primary); 
+    box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+  }
+  50% { 
+    border-color: var(--secondary); 
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+  }
+}
+
+.animate-highlight {
+  animation: highlight-flash 0.5s ease-in-out;
+}
+
+/* Screen reader only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
