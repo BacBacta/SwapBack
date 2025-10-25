@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { SOLANA_TOKENS, getPopularTokens, type TokenInfo } from "@/constants/tokens";
 
@@ -36,10 +36,14 @@ export function EnhancedSwapInterface() {
   const [outputToken, setOutputToken] = useState<TokenInfo>(SOLANA_TOKENS[1]); // USDC
   const [showInputSelector, setShowInputSelector] = useState(false);
   const [showOutputSelector, setShowOutputSelector] = useState(false);
+  const [tokenSearch, setTokenSearch] = useState("");
   
   // Amounts
   const [inputAmount, setInputAmount] = useState("");
   const [outputAmount, setOutputAmount] = useState("");
+  
+  // Refs for keyboard shortcuts
+  const inputRef = useRef<HTMLInputElement>(null);
   
   // Balances (mock for now - will be replaced with real wallet queries)
   const [inputBalance, setInputBalance] = useState<number>(10.5); // Mock: 10.5 SOL
@@ -197,7 +201,48 @@ export function EnhancedSwapInterface() {
     }
   };
   
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + K = Focus input
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+      
+      // Ctrl/Cmd + S = Swap tokens
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleSwapTokens();
+      }
+      
+      // Ctrl/Cmd + Enter = Execute swap
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        if (connected && currentQuote && txStatus === "idle") {
+          handleExecuteSwap();
+        }
+      }
+      
+      // Escape = Close selectors
+      if (e.key === 'Escape') {
+        setShowInputSelector(false);
+        setShowOutputSelector(false);
+        setTokenSearch("");
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [connected, currentQuote, txStatus]); // eslint-disable-line react-hooks/exhaustive-deps
+  
   const popularTokens = getPopularTokens();
+  
+  // Filter tokens based on search
+  const filteredTokens = popularTokens.filter(token =>
+    token.symbol.toLowerCase().includes(tokenSearch.toLowerCase()) ||
+    token.name.toLowerCase().includes(tokenSearch.toLowerCase())
+  );
   
   return (
     <div className="max-w-4xl mx-auto">
@@ -332,6 +377,7 @@ export function EnhancedSwapInterface() {
                   <span className="text-xs">▼</span>
                 </button>
                 <input
+                  ref={inputRef}
                   type="number"
                   value={inputAmount}
                   onChange={(e) => setInputAmount(e.target.value)}
@@ -360,29 +406,47 @@ export function EnhancedSwapInterface() {
               {showInputSelector && (
                 <div className="terminal-box mt-2 p-2 max-h-64 overflow-y-auto">
                   <div className="text-xs terminal-text font-bold mb-2">[SELECT_TOKEN]</div>
-                  {popularTokens.map(token => (
-                    <button
-                      key={token.mint}
-                      onClick={() => {
-                        setInputToken(token);
-                        setShowInputSelector(false);
-                      }}
-                      disabled={token.mint === outputToken.mint}
-                      className={`w-full text-left px-3 py-2 mb-1 hover:bg-[var(--primary)]/10 ${
-                        token.mint === inputToken.mint ? "bg-[var(--primary)]/20" : ""
-                      } ${token.mint === outputToken.mint ? "opacity-50 cursor-not-allowed" : ""}`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">{token.symbol === "SOL" ? "◎" : "◉"}</span>
-                          <div>
-                            <div className="font-bold text-sm">{token.symbol}</div>
-                            <div className="text-xs opacity-70">{token.name}</div>
+                  
+                  {/* Search input */}
+                  <input
+                    type="text"
+                    placeholder="Search token..."
+                    value={tokenSearch}
+                    onChange={(e) => setTokenSearch(e.target.value)}
+                    className="terminal-input text-sm w-full mb-2"
+                    autoFocus
+                  />
+                  
+                  {filteredTokens.length > 0 ? (
+                    filteredTokens.map(token => (
+                      <button
+                        key={token.mint}
+                        onClick={() => {
+                          setInputToken(token);
+                          setShowInputSelector(false);
+                          setTokenSearch("");
+                        }}
+                        disabled={token.mint === outputToken.mint}
+                        className={`w-full text-left px-3 py-2 mb-1 hover:bg-[var(--primary)]/10 transition-all ${
+                          token.mint === inputToken.mint ? "bg-[var(--primary)]/20" : ""
+                        } ${token.mint === outputToken.mint ? "opacity-50 cursor-not-allowed" : ""}`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">{token.symbol === "SOL" ? "◎" : "◉"}</span>
+                            <div>
+                              <div className="font-bold text-sm">{token.symbol}</div>
+                              <div className="text-xs opacity-70">{token.name}</div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="text-xs terminal-text opacity-50 text-center py-4">
+                      No tokens found
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -439,29 +503,47 @@ export function EnhancedSwapInterface() {
               {showOutputSelector && (
                 <div className="terminal-box mt-2 p-2 max-h-64 overflow-y-auto">
                   <div className="text-xs terminal-text font-bold mb-2">[SELECT_TOKEN]</div>
-                  {popularTokens.map(token => (
-                    <button
-                      key={token.mint}
-                      onClick={() => {
-                        setOutputToken(token);
-                        setShowOutputSelector(false);
-                      }}
-                      disabled={token.mint === inputToken.mint}
-                      className={`w-full text-left px-3 py-2 mb-1 hover:bg-[var(--primary)]/10 ${
-                        token.mint === outputToken.mint ? "bg-[var(--primary)]/20" : ""
-                      } ${token.mint === inputToken.mint ? "opacity-50 cursor-not-allowed" : ""}`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">{token.symbol === "SOL" ? "◎" : "◉"}</span>
-                          <div>
-                            <div className="font-bold text-sm">{token.symbol}</div>
-                            <div className="text-xs opacity-70">{token.name}</div>
+                  
+                  {/* Search input */}
+                  <input
+                    type="text"
+                    placeholder="Search token..."
+                    value={tokenSearch}
+                    onChange={(e) => setTokenSearch(e.target.value)}
+                    className="terminal-input text-sm w-full mb-2"
+                    autoFocus
+                  />
+                  
+                  {filteredTokens.length > 0 ? (
+                    filteredTokens.map(token => (
+                      <button
+                        key={token.mint}
+                        onClick={() => {
+                          setOutputToken(token);
+                          setShowOutputSelector(false);
+                          setTokenSearch("");
+                        }}
+                        disabled={token.mint === inputToken.mint}
+                        className={`w-full text-left px-3 py-2 mb-1 hover:bg-[var(--primary)]/10 transition-all ${
+                          token.mint === outputToken.mint ? "bg-[var(--primary)]/20" : ""
+                        } ${token.mint === inputToken.mint ? "opacity-50 cursor-not-allowed" : ""}`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">{token.symbol === "SOL" ? "◎" : "◉"}</span>
+                            <div>
+                              <div className="font-bold text-sm">{token.symbol}</div>
+                              <div className="text-xs opacity-70">{token.name}</div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="text-xs terminal-text opacity-50 text-center py-4">
+                      No tokens found
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -537,6 +619,52 @@ export function EnhancedSwapInterface() {
                       </div>
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+            
+            {/* DEX Comparison */}
+            {currentQuote && !isLoadingQuote && outputAmount && (
+              <div className="terminal-box p-4 mb-4 animate-slide-in">
+                <div className="text-xs terminal-text font-bold mb-3 flex items-center gap-2">
+                  <span className="text-[var(--secondary)]">📊</span>
+                  [DEX_COMPARISON]
+                </div>
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex justify-between items-center bg-[var(--primary)]/10 px-2 py-1.5 border-l-2 border-[var(--secondary)]">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[var(--secondary)]">✓</span>
+                      <span className="font-bold">SwapBack (Best)</span>
+                    </div>
+                    <span className="font-bold text-[var(--primary)] font-mono">{parseFloat(outputAmount).toFixed(4)}</span>
+                  </div>
+                  <div className="flex justify-between items-center px-2 py-1 opacity-60">
+                    <span className="pl-5">Jupiter</span>
+                    <div className="text-right">
+                      <div className="font-mono">{(parseFloat(outputAmount) * 0.997).toFixed(4)}</div>
+                      <div className="text-[10px] text-red-400">-0.3%</div>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center px-2 py-1 opacity-60">
+                    <span className="pl-5">Raydium</span>
+                    <div className="text-right">
+                      <div className="font-mono">{(parseFloat(outputAmount) * 0.995).toFixed(4)}</div>
+                      <div className="text-[10px] text-red-400">-0.5%</div>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center px-2 py-1 opacity-60">
+                    <span className="pl-5">Orca</span>
+                    <div className="text-right">
+                      <div className="font-mono">{(parseFloat(outputAmount) * 0.994).toFixed(4)}</div>
+                      <div className="text-[10px] text-red-400">-0.6%</div>
+                    </div>
+                  </div>
+                  <div className="border-t border-[var(--primary)]/30 mt-2 pt-2 flex justify-between items-center">
+                    <span className="opacity-70">Your Savings:</span>
+                    <span className="text-[var(--secondary)] font-bold">
+                      +{(parseFloat(outputAmount) * 0.003).toFixed(4)} {outputToken.symbol}
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
@@ -689,6 +817,29 @@ export function EnhancedSwapInterface() {
               <div className="flex justify-between">
                 <span className="opacity-70">Oracle:</span>
                 <span className="font-bold">Pyth + Switchboard</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Keyboard Shortcuts */}
+          <div className="terminal-box p-4 mt-4">
+            <div className="text-sm terminal-text font-bold mb-3">[SHORTCUTS]</div>
+            <div className="space-y-1.5 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="opacity-70">Focus Input:</span>
+                <kbd className="terminal-box px-2 py-0.5 text-[10px] font-mono">Ctrl+K</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="opacity-70">Swap Tokens:</span>
+                <kbd className="terminal-box px-2 py-0.5 text-[10px] font-mono">Ctrl+S</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="opacity-70">Execute:</span>
+                <kbd className="terminal-box px-2 py-0.5 text-[10px] font-mono">Ctrl+Enter</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="opacity-70">Close Menu:</span>
+                <kbd className="terminal-box px-2 py-0.5 text-[10px] font-mono">Esc</kbd>
               </div>
             </div>
           </div>
