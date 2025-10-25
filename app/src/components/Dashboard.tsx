@@ -5,30 +5,36 @@ import { useState } from "react";
 import { CNFTCard } from "./CNFTCard";
 import { useCNFT } from "../hooks/useCNFT";
 import { useRealtimeStats } from "../hooks/useRealtimeStats";
-import { VolumeChart, ActivityChart } from "./Charts";
-import { SkeletonLoader, ChartSkeleton } from "./Skeletons";
+import { SkeletonLoader } from "./Skeletons";
 import { NoActivityState, NoConnectionState } from "./EmptyState";
+import { DCA } from "./DCA";
+import LockInterface from "./LockInterface";
+import UnlockInterface from "./UnlockInterface";
 
 export const Dashboard = () => {
   const { connected, publicKey } = useWallet();
-  const [activeTab, setActiveTab] = useState<"overview" | "analytics">(
+  const [activeTab, setActiveTab] = useState<"overview" | "dca" | "lock">(
     "overview"
   );
+  const [lockSubTab, setLockSubTab] = useState<"lock" | "unlock">("lock");
 
-  const { cnftData, levelName } = useCNFT();
+  const { cnftData, levelName, lockData, refresh } = useCNFT();
   const { userStats, globalStats, loading } = useRealtimeStats(
     publicKey?.toString()
   );
 
-  // Mock chart data
-  const volumeData = {
-    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-    volumes: [1200, 1900, 1500, 2100, 1800, 2400, 2200],
-  };
+  // Auto-switch to unlock tab if tokens are already locked
+  useState(() => {
+    if (lockData?.isActive && cnftData?.isActive) {
+      setLockSubTab("unlock");
+    }
+  });
 
-  const activityData = {
-    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-    swaps: [5, 8, 6, 10, 7, 12, 9],
+  const handleLockSuccess = () => {
+    setTimeout(() => {
+      refresh();
+      setLockSubTab("unlock");
+    }, 2000);
   };
 
   if (!connected) {
@@ -159,14 +165,24 @@ export const Dashboard = () => {
           📊 OVERVIEW
         </button>
         <button
-          onClick={() => setActiveTab("analytics")}
+          onClick={() => setActiveTab("dca")}
+          className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 ${
+            activeTab === "dca"
+              ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
+              : "text-[var(--primary)] border-[var(--primary)]/30 hover:bg-[var(--primary)]/10"
+          }`}
+        >
+          💰 DCA
+        </button>
+        <button
+          onClick={() => setActiveTab("lock")}
           className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider ${
-            activeTab === "analytics"
+            activeTab === "lock"
               ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
               : "text-[var(--primary)] hover:bg-[var(--primary)]/10"
           }`}
         >
-          📈 ANALYTICS
+          � LOCK/UNLOCK
         </button>
       </div>
 
@@ -258,102 +274,57 @@ export const Dashboard = () => {
         </div>
       )}
 
-      {/* Analytics Tab avec Charts */}
-      {activeTab === "analytics" && (
+      {/* DCA Tab */}
+      {activeTab === "dca" && (
         <div className="space-y-6">
-          {/* Volume Chart */}
-          <div className="swap-card">
-            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-              <span>📊</span>
-              <span>Volume Trend (7 Days)</span>
-            </h3>
-            <div className="h-64">
-              <VolumeChart data={volumeData} />
-            </div>
-          </div>
-
-          {/* Activity Chart */}
-          <div className="swap-card">
-            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-              <span>📈</span>
-              <span>Trading Activity (7 Days)</span>
-            </h3>
-            <div className="h-64">
-              <ActivityChart data={activityData} />
-            </div>
-          </div>
-
-          {/* Stats Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="swap-card">
-              <h4 className="font-bold mb-4 text-[var(--primary)]">
-                Performance
-              </h4>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Avg. Swap Size</span>
-                  <span className="font-semibold">
-                    $
-                    {(
-                      userStats?.totalVolume || 0 / (userStats?.totalSwaps || 1)
-                    ).toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Avg. NPI per Swap</span>
-                  <span className="font-semibold text-[var(--secondary)]">
-                    $
-                    {(
-                      userStats?.totalNPI || 0 / (userStats?.totalSwaps || 1)
-                    ).toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Rebate Rate</span>
-                  <span className="font-semibold text-[var(--secondary)]">
-                    {(
-                      ((userStats?.totalRebates || 0) /
-                        (userStats?.totalVolume || 1)) *
-                      100
-                    ).toFixed(2)}
-                    %
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="swap-card">
-              <h4 className="font-bold mb-4 text-[var(--secondary)]">
-                Rewards
-              </h4>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Total Earned</span>
-                  <span className="font-semibold text-[var(--secondary)]">
-                    $
-                    {(
-                      (userStats?.totalNPI || 0) +
-                      (userStats?.totalRebates || 0)
-                    ).toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Rebate Boost</span>
-                  <span className="font-semibold">
-                    +{userStats?.rebateBoost || 0}%
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Locked Amount</span>
-                  <span className="font-semibold">
-                    {(userStats?.lockedAmount || 0).toLocaleString()} $BACK
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+          <DCA />
         </div>
       )}
+
+      {/* Lock/Unlock Tab */}
+      {activeTab === "lock" && (
+        <div className="space-y-6">
+          {/* Sub-tabs for Lock/Unlock */}
+          <div className="flex gap-0 p-0 bg-black border-2 border-[var(--primary)]/30">
+            <button
+              onClick={() => setLockSubTab("lock")}
+              disabled={lockData?.isActive && cnftData?.isActive}
+              className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 ${
+                lockSubTab === "lock"
+                  ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
+                  : "text-[var(--primary)] border-[var(--primary)]/30 hover:bg-[var(--primary)]/10"
+              } ${
+                lockData?.isActive && cnftData?.isActive
+                  ? "opacity-50 cursor-not-allowed"
+                  : ""
+              }`}
+            >
+              🔒 LOCK
+            </button>
+            <button
+              onClick={() => setLockSubTab("unlock")}
+              disabled={!lockData?.isActive || !cnftData?.isActive}
+              className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider ${
+                lockSubTab === "unlock"
+                  ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
+                  : "text-[var(--primary)] hover:bg-[var(--primary)]/10"
+              } ${
+                !lockData?.isActive || !cnftData?.isActive
+                  ? "opacity-50 cursor-not-allowed"
+                  : ""
+              }`}
+            >
+              🔓 UNLOCK
+            </button>
+          </div>
+
+          {/* Lock/Unlock Content */}
+          {lockSubTab === "lock" && <LockInterface onLockSuccess={handleLockSuccess} />}
+          {lockSubTab === "unlock" && <UnlockInterface onUnlockSuccess={refresh} />}
+        </div>
+      )}
+
+      {/* Analytics Section removed - replaced by DCA and Lock */}
     </div>
   );
 };
