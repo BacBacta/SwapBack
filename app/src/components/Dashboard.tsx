@@ -119,7 +119,7 @@ export const Dashboard = () => {
       <div className="flex gap-0 p-0 bg-black border-2 border-[var(--primary)]/30">
         <button
           onClick={() => setActiveTab("overview")}
-          className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 ${
+          className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 border-[var(--primary)] ${
             activeTab === "overview"
               ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
               : "text-[var(--primary)] border-[var(--primary)]/30 hover:bg-[var(--primary)]/10"
