@@ -3,37 +3,34 @@
 @tailwind utilities;
 
 :root {
-  /* Terminal Hacker Theme Colors - Reduced Intensity Green */
-  --background: #0C0C0C; /* Noir terminal */
+  /* Terminal Hacker Theme Colors */
+  --background: #0c0c0c; /* Noir terminal */
   --background-secondary: #000000;
-  --foreground: #00DD00; /* Vert moins vif */
-  --primary: #00DD00; /* Vert modéré */
-  --primary-hover: #22DD22;
-  --primary-light: #44DD44;
-  --primary-dark: #00AA00;
-  --secondary: #00DD00; /* Vert modéré */
-  --secondary-hover: #22DD22;
-  --accent: #DDDD00; /* Jaune moins vif */
-  --accent-hover: #DDDD22;
-  --muted: #008800;
-  --border: rgba(0, 221, 0, 0.25);
-  --border-hover: rgba(0, 221, 0, 0.5);
-  --card-bg: rgba(0, 221, 0, 0.01);
-  --card-bg-hover: rgba(0, 221, 0, 0.04);
-  
+  --foreground: #00ff00; /* Vert terminal */
+  --primary: #00ff00; /* Vert phosphorescent */
+  --primary-hover: #33ff33;
+  --primary-light: #66ff66;
+  --primary-dark: #00cc00;
+  --secondary: #00ff00; /* Vert terminal */
+  --secondary-hover: #33ff33;
+  --accent: #ffff00; /* Jaune highlight */
+  --accent-hover: #ffff33;
+  --muted: #00aa00;
+  --border: rgba(0, 255, 0, 0.3);
+  --border-hover: rgba(0, 255, 0, 0.6);
+  --card-bg: rgba(0, 255, 0, 0.02);
+  --card-bg-hover: rgba(0, 255, 0, 0.05);
+
   /* Semantic Colors - Terminal Style */
-  --success: #00DD00;
-  --success-hover: #22DD22;
-  --warning: #DDDD00;
-  --warning-hover: #DDDD22;
-  --error: #CC0000;
-  --error-hover: #DD3333;
-  --info: #00CCCC;
-  --info-hover: #22DDDD;
-  
-  /* Header Border - Green */
-  --header-border: var(--primary);
-  
+  --success: #00ff00;
+  --success-hover: #33ff33;
+  --warning: #ffff00;
+  --warning-hover: #ffff33;
+  --error: #ff0000;
+  --error-hover: #ff3333;
+  --info: #00ffff;
+  --info-hover: #33ffff;
+
   /* Spacing Scale */
   --space-1: 4px;
   --space-2: 8px;
@@ -45,7 +42,7 @@
   --space-10: 40px;
   --space-12: 48px;
   --space-16: 64px;
-  
+
   /* Border Radius Scale - Terminal Style (Sharp Corners) */
   --radius-sm: 0px;
   --radius-md: 0px;
@@ -53,7 +50,7 @@
   --radius-xl: 0px;
   --radius-2xl: 0px;
   --radius-full: 0px;
-  
+
   /* Typography Scale */
   --text-xs: 12px;
   --text-sm: 14px;
@@ -64,22 +61,22 @@
   --text-3xl: 30px;
   --text-4xl: 36px;
   --text-5xl: 48px;
-  
+
   /* Animation Duration */
   --duration-fast: 150ms;
   --duration-base: 250ms;
   --duration-slow: 350ms;
-  
+
   /* Easing */
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
   --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  
+
   /* Shadows - Terminal Glow */
   --shadow-sm: 0 0 5px rgba(0, 255, 0, 0.3);
   --shadow-md: 0 0 10px rgba(0, 255, 0, 0.5);
   --shadow-lg: 0 0 20px rgba(0, 255, 0, 0.7);
-  
+
   /* Glass effect - Terminal Style */
   --glass-bg: rgba(0, 0, 0, 0.8);
   --glass-border: rgba(0, 255, 0, 0.3);
@@ -87,21 +84,21 @@
 
 body {
   color: var(--foreground);
-  background: #0C0C0C; /* Noir terminal pur */
-  font-family: 'Courier New', 'Fira Code', 'JetBrains Mono', monospace;
+  background: #0c0c0c; /* Noir terminal pur */
+  font-family: "Courier New", "Fira Code", "JetBrains Mono", monospace;
   min-height: 100vh;
   background-attachment: fixed;
 }
 
 /* Terminal grid pattern */
 body::before {
-  content: '';
+  content: "";
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background-image: 
+  background-image:
     linear-gradient(rgba(0, 255, 0, 0.03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0, 255, 0, 0.03) 1px, transparent 1px);
   background-size: 20px 20px;
@@ -166,7 +163,7 @@ body::before {
   border-radius: 0 !important;
   padding: 12px 24px !important;
   font-weight: 700 !important;
-  font-family: 'Courier New', monospace !important;
+  font-family: "Courier New", monospace !important;
   text-transform: uppercase !important;
   letter-spacing: 0.1em !important;
   transition: all 0.2s ease !important;
@@ -195,7 +192,7 @@ body::before {
 }
 
 .swap-card::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
@@ -234,7 +231,7 @@ body::before {
   padding: 14px 28px;
   font-weight: 700;
   font-size: 1rem;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   text-transform: uppercase;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -245,7 +242,7 @@ body::before {
 }
 
 .btn-primary::before {
-  content: '>';
+  content: ">";
   position: absolute;
   left: 10px;
   opacity: 0;
@@ -283,7 +280,7 @@ body::before {
   padding: 14px 18px;
   color: var(--primary);
   font-size: 1rem;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   width: 100%;
   transition: all 0.2s ease;
 }
@@ -332,7 +329,7 @@ input[type="range"] {
 }
 
 input[type="range"]::-webkit-slider-track {
-  background: rgba(0, 221, 0, 0.1);
+  background: rgba(255, 255, 255, 0.1);
   height: 6px;
   border-radius: 3px;
 }
@@ -349,7 +346,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 input[type="range"]::-moz-range-track {
-  background: rgba(0, 221, 0, 0.1);
+  background: rgba(255, 255, 255, 0.1);
   height: 6px;
   border-radius: 3px;
   border: none;
@@ -377,7 +374,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .stat-card::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
@@ -428,7 +425,8 @@ input[type="range"]::-moz-range-thumb {
 }
 
 @keyframes pulse-glow {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.5;
     box-shadow: 0 0 5px var(--primary);
   }
@@ -454,9 +452,9 @@ input[type="range"]::-moz-range-thumb {
 .loading-shimmer {
   background: linear-gradient(
     90deg,
-    rgba(0, 221, 0, 0.03) 25%,
-    rgba(0, 221, 0, 0.08) 50%,
-    rgba(0, 221, 0, 0.03) 75%
+    rgba(255, 255, 255, 0.03) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.03) 75%
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
@@ -472,7 +470,8 @@ input[type="range"]::-moz-range-thumb {
 }
 
 @keyframes bounce-slow {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0);
   }
   50% {
@@ -495,7 +494,7 @@ input[type="range"]::-moz-range-thumb {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(0, 221, 0, 0.1) 50%,
+    rgba(255, 255, 255, 0.1) 50%,
     transparent 100%
   );
   background-size: 200% 100%;
@@ -575,7 +574,7 @@ html {
   top: -40px;
   left: 0;
   background: var(--primary);
-  color: black;
+  color: white;
   padding: 8px 16px;
   text-decoration: none;
   border-radius: 0 0 var(--radius-md) 0;
@@ -602,13 +601,13 @@ html {
 
 /* Terminal Hacker Specific Styles */
 .terminal-text {
-  font-family: 'Courier New', 'Fira Code', monospace;
+  font-family: "Courier New", "Fira Code", monospace;
   color: var(--primary);
   text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
 }
 
 .terminal-prompt::before {
-  content: '> ';
+  content: "> ";
   color: var(--primary);
 }
 
@@ -617,33 +616,43 @@ html {
 }
 
 .terminal-brackets::before {
-  content: '[';
+  content: "[";
 }
 
 .terminal-brackets::after {
-  content: ']';
+  content: "]";
 }
 
 /* Terminal blink cursor */
 @keyframes blink {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
 }
 
 .terminal-cursor::after {
-  content: '█';
+  content: "█";
   animation: blink 1s infinite;
   color: var(--primary);
 }
 
 /* Terminal scanline effect */
 @keyframes scanline {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100vh); }
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
 }
 
 .terminal-scanline::after {
-  content: '';
+  content: "";
   position: fixed;
   top: 0;
   left: 0;
@@ -657,26 +666,26 @@ html {
 
 /* ASCII Art Border */
 .terminal-border-top::before {
-  content: '═══════════════════════════════════════════';
+  content: "═══════════════════════════════════════════";
   display: block;
   color: var(--primary);
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   overflow: hidden;
   white-space: nowrap;
 }
 
 .terminal-border-bottom::after {
-  content: '═══════════════════════════════════════════';
+  content: "═══════════════════════════════════════════";
   display: block;
   color: var(--primary);
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   overflow: hidden;
   white-space: nowrap;
 }
 
 /* Glowing text effect */
 .terminal-glow {
-  text-shadow: 
+  text-shadow:
     0 0 5px rgba(0, 255, 0, 0.8),
     0 0 10px rgba(0, 255, 0, 0.6),
     0 0 15px rgba(0, 255, 0, 0.4);
@@ -686,14 +695,14 @@ html {
 .terminal-box {
   border: 2px solid var(--primary);
   border-radius: 0;
-  box-shadow: 
+  box-shadow:
     0 0 10px rgba(0, 255, 0, 0.3),
     inset 0 0 10px rgba(0, 255, 0, 0.1);
 }
 
 /* Monospace number display */
 .terminal-number {
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.1em;
 }
@@ -707,7 +716,7 @@ html {
 }
 
 .terminal-loading::before {
-  content: '';
+  content: "";
   display: block;
   height: 100%;
   background: var(--primary);
@@ -715,7 +724,13 @@ html {
 }
 
 @keyframes loading {
-  0% { width: 0%; }
-  50% { width: 100%; }
-  100% { width: 0%; }
+  0% {
+    width: 0%;
+  }
+  50% {
+    width: 100%;
+  }
+  100% {
+    width: 0%;
+  }
 }

@@ -62,9 +62,9 @@ export const Navigation = () => {
 
             <div className="flex items-center gap-4">
               {/* Network indicator */}
-              <div className="hidden md:flex items-center gap-2 border-2 border-[var(--primary)] px-3 py-1.5">
-                <span className="w-2 h-2 bg-[var(--primary)] animate-pulse"></span>
-                <span className="text-xs font-bold terminal-text uppercase tracking-wider text-[var(--primary)]">
+              <div className="hidden md:flex items-center gap-2 border-2 border-[var(--secondary)] px-3 py-1.5">
+                <span className="w-2 h-2 bg-[var(--secondary)] animate-pulse"></span>
+                <span className="text-xs font-bold terminal-text uppercase tracking-wider">
                   SOLANA
                 </span>
               </div>
@@ -137,19 +137,19 @@ export const Navigation = () => {
                     onClick={() => setMobileMenuOpen(false)}
                     className={`block px-4 py-3 border-b-2 transition-all duration-300 terminal-text uppercase tracking-wider ${
                       isActive(link.href)
-                        ? "bg-[var(--primary)] text-black border-[var(--primary)]"
+                        ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
                         : "text-[var(--primary)] border-[var(--primary)]/30 hover:bg-[var(--primary)]/10 hover:border-[var(--primary)]"
                     }`}
                   >
-                    {'>'} {link.label}
+                    {">"} {link.label}
                   </Link>
                 ))}
               </div>
 
               {/* Network indicator */}
-              <div className="flex items-center gap-2 px-4 py-3 border-2 border-[var(--primary)] mb-6">
-                <span className="w-2 h-2 bg-[var(--primary)] animate-pulse"></span>
-                <span className="text-xs terminal-text uppercase tracking-wider text-[var(--primary)]">
+              <div className="flex items-center gap-2 px-4 py-3 border-2 border-[var(--secondary)] mb-6">
+                <span className="w-2 h-2 bg-[var(--secondary)] animate-pulse"></span>
+                <span className="text-xs terminal-text uppercase tracking-wider">
                   [SOLANA NETWORK]
                 </span>
               </div>

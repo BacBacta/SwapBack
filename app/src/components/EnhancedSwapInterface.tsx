@@ -207,9 +207,11 @@ export function EnhancedSwapInterface() {
               [SMART ROUTER ACTIVE]
             </span>
           </div>
-          <h2 className="section-title mb-3 terminal-text terminal-glow">SWAP TOKENS</h2>
+          <h2 className="section-title mb-3 terminal-text terminal-glow">
+            SWAP TOKENS
+          </h2>
           <p className="body-regular terminal-text opacity-70">
-            {'>'} Get the best price across all Solana DEXs
+            {">"} Get the best price across all Solana DEXs
           </p>
 
           {/* Connection Status */}
@@ -226,7 +228,7 @@ export function EnhancedSwapInterface() {
                 setSelectedRouter("swapback");
                 setHasSearchedRoute(false);
               }}
-              className={`flex-1 py-3 px-4 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 border-[var(--primary)] ${
+              className={`flex-1 py-3 px-4 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 ${
                 selectedRouter === "swapback"
                   ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
                   : "text-[var(--primary)] border-[var(--primary)]/30 hover:bg-[var(--primary)]/10"
@@ -256,7 +258,9 @@ export function EnhancedSwapInterface() {
                 <span>JUPITER V6</span>
               </div>
               {selectedRouter === "jupiter" && (
-                <div className="text-xs mt-1 opacity-90">[BEST MARKET PRICE]</div>
+                <div className="text-xs mt-1 opacity-90">
+                  [BEST MARKET PRICE]
+                </div>
               )}
             </button>
           </div>
@@ -284,7 +288,9 @@ export function EnhancedSwapInterface() {
               <button
                 className="btn-secondary px-4"
                 disabled={!connected}
-                onClick={() => setInputAmount(swap.inputToken?.balance?.toString() || "0")}
+                onClick={() =>
+                  setInputAmount(swap.inputToken?.balance?.toString() || "0")
+                }
               >
                 [MAX]
               </button>
@@ -330,7 +336,12 @@ export function EnhancedSwapInterface() {
         {/* SWAP BUTTON */}
         <button
           onClick={() => {
-            if (connected && swap.inputAmount && swap.inputToken && swap.outputToken) {
+            if (
+              connected &&
+              swap.inputAmount &&
+              swap.inputToken &&
+              swap.outputToken
+            ) {
               // Execute swap logic here
               console.log("Executing swap...");
             }
@@ -365,12 +376,14 @@ export function EnhancedSwapInterface() {
                 {routes.selectedRoute.venues.length} HOPS
               </span>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="terminal-text opacity-70">RATE:</span>
                 <span className="terminal-text ml-2 font-bold">
-                  1 {swap.inputToken?.symbol} = {(outputValue / inputValue).toFixed(4)} {swap.outputToken?.symbol}
+                  1 {swap.inputToken?.symbol} ={" "}
+                  {(outputValue / inputValue).toFixed(4)}{" "}
+                  {swap.outputToken?.symbol}
                 </span>
               </div>
               <div>
@@ -402,7 +415,13 @@ export function EnhancedSwapInterface() {
               <div className="flex items-center justify-between pt-2 border-t border-[var(--primary)]/30">
                 <span className="font-bold">💰 YOUR SAVINGS:</span>
                 <span className="text-green-400 font-bold text-lg">
-                  +{((mockRouteInfo.estimatedOutput - mockRouteInfo.nonOptimizedOutput) * 100).toFixed(2)}%
+                  +
+                  {(
+                    (mockRouteInfo.estimatedOutput -
+                      mockRouteInfo.nonOptimizedOutput) *
+                    100
+                  ).toFixed(2)}
+                  %
                 </span>
               </div>
             </div>

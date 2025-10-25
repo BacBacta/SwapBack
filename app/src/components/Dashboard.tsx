@@ -11,19 +11,23 @@ import { NoActivityState, NoConnectionState } from "./EmptyState";
 
 export const Dashboard = () => {
   const { connected, publicKey } = useWallet();
-  const [activeTab, setActiveTab] = useState<"overview" | "analytics">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "analytics">(
+    "overview"
+  );
 
   const { cnftData, levelName } = useCNFT();
-  const { userStats, globalStats, loading } = useRealtimeStats(publicKey?.toString());
+  const { userStats, globalStats, loading } = useRealtimeStats(
+    publicKey?.toString()
+  );
 
   // Mock chart data
   const volumeData = {
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     volumes: [1200, 1900, 1500, 2100, 1800, 2400, 2200],
   };
 
   const activityData = {
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     swaps: [5, 8, 6, 10, 7, 12, 9],
   };
 
@@ -52,49 +56,76 @@ export const Dashboard = () => {
         className="sr-only"
         role="status"
       >
-        {loading ? "Loading dashboard data..." : `Dashboard updated. Total volume: $${globalStats.totalVolume.toLocaleString()}`}
+        {loading
+          ? "Loading dashboard data..."
+          : `Dashboard updated. Total volume: $${globalStats.totalVolume.toLocaleString()}`}
       </div>
 
       {/* Global Stats avec animation */}
       <div className="swap-card">
         <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold terminal-text terminal-glow uppercase tracking-wider" id="protocol-stats-heading">PROTOCOL STATISTICS</h2>
-          <div className="flex items-center gap-2 px-3 py-1 border-2 border-[var(--primary)]">
-            <span className="w-2 h-2 bg-[var(--primary)] animate-pulse" aria-hidden="true"></span>
-            <span className="text-xs terminal-text uppercase tracking-wider">[LIVE]</span>
+          <h2
+            className="text-2xl font-bold terminal-text terminal-glow uppercase tracking-wider"
+            id="protocol-stats-heading"
+          >
+            PROTOCOL STATISTICS
+          </h2>
+          <div className="flex items-center gap-2 px-3 py-1 border-2 border-[var(--secondary)]">
+            <span
+              className="w-2 h-2 bg-[var(--secondary)] animate-pulse"
+              aria-hidden="true"
+            ></span>
+            <span className="text-xs terminal-text uppercase tracking-wider">
+              [LIVE]
+            </span>
           </div>
         </div>
-        <div 
+        <div
           className="grid grid-cols-1 md:grid-cols-3 gap-6"
           role="group"
           aria-labelledby="protocol-stats-heading"
         >
           <div className="stat-card text-center group hover:scale-105 transition-transform">
-            <div className="text-sm terminal-text opacity-70 mb-2 uppercase tracking-wider" id="total-volume-label">[TOTAL VOLUME]</div>
-            <div 
+            <div
+              className="text-sm terminal-text opacity-70 mb-2 uppercase tracking-wider"
+              id="total-volume-label"
+            >
+              [TOTAL VOLUME]
+            </div>
+            <div
               className="text-3xl font-bold terminal-text terminal-glow"
               aria-labelledby="total-volume-label"
               aria-live="polite"
             >
-              ${globalStats.totalVolume.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+              $
+              {globalStats.totalVolume.toLocaleString("en-US", {
+                maximumFractionDigits: 0,
+              })}
             </div>
             <div className="text-xs terminal-text opacity-60 mt-2">
               +{globalStats.swapsLast24h} swaps (24h)
             </div>
           </div>
           <div className="stat-card text-center group hover:scale-105 transition-transform">
-            <div className="text-sm terminal-text opacity-70 mb-2 uppercase tracking-wider">[$BACK BURNED]</div>
+            <div className="text-sm terminal-text opacity-70 mb-2 uppercase tracking-wider">
+              [$BACK BURNED]
+            </div>
             <div className="text-3xl font-bold text-[var(--accent)] terminal-glow">
-              {globalStats.totalBurned.toLocaleString('en-US')}
+              {globalStats.totalBurned.toLocaleString("en-US")}
             </div>
             <div className="text-xs terminal-text opacity-60 mt-2">
               🔥 DEFLATIONARY
             </div>
           </div>
           <div className="stat-card text-center group hover:scale-105 transition-transform">
-            <div className="text-sm terminal-text opacity-70 mb-2 uppercase tracking-wider">[REBATES DISTRIBUTED]</div>
+            <div className="text-sm terminal-text opacity-70 mb-2 uppercase tracking-wider">
+              [REBATES DISTRIBUTED]
+            </div>
             <div className="text-3xl font-bold terminal-text terminal-glow">
-              ${globalStats.totalRebates.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+              $
+              {globalStats.totalRebates.toLocaleString("en-US", {
+                maximumFractionDigits: 0,
+              })}
             </div>
             <div className="text-xs terminal-text opacity-60 mt-2">
               {globalStats.activeUsers.toLocaleString()} active users
@@ -119,20 +150,20 @@ export const Dashboard = () => {
       <div className="flex gap-0 p-0 bg-black border-2 border-[var(--primary)]/30">
         <button
           onClick={() => setActiveTab("overview")}
-          className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 border-[var(--primary)] ${
+          className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 ${
             activeTab === "overview"
               ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
-              : "text-[var(--primary)] border-[var(--primary)] hover:bg-[var(--primary)]/10"
+              : "text-[var(--primary)] border-[var(--primary)]/30 hover:bg-[var(--primary)]/10"
           }`}
         >
           📊 OVERVIEW
         </button>
         <button
           onClick={() => setActiveTab("analytics")}
-          className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 border-[var(--primary)] ${
+          className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider ${
             activeTab === "analytics"
               ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
-              : "text-[var(--primary)] border-[var(--primary)] hover:bg-[var(--primary)]/10"
+              : "text-[var(--primary)] hover:bg-[var(--primary)]/10"
           }`}
         >
           📈 ANALYTICS
@@ -149,39 +180,51 @@ export const Dashboard = () => {
                 <div className="w-10 h-10 border-2 border-[var(--primary)] flex items-center justify-center group-hover:scale-110 transition-transform">
                   <span className="text-lg">🔄</span>
                 </div>
-                <span className="terminal-text opacity-70 text-sm uppercase tracking-wider">[SWAPS]</span>
+                <span className="terminal-text opacity-70 text-sm uppercase tracking-wider">
+                  [SWAPS]
+                </span>
               </div>
-              <div className="text-2xl font-bold terminal-text terminal-glow">{userStats.totalSwaps}</div>
+              <div className="text-2xl font-bold terminal-text terminal-glow">
+                {userStats.totalSwaps}
+              </div>
             </div>
 
-            <div className="terminal-box p-5 border-2 border-[var(--primary)]/30 hover:border-[var(--primary)] transition-all group">
+            <div className="terminal-box p-5 border-2 border-[var(--secondary)]/30 hover:border-[var(--secondary)] transition-all group">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 border-2 border-[var(--primary)] flex items-center justify-center group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 border-2 border-[var(--secondary)] flex items-center justify-center group-hover:scale-110 transition-transform">
                   <span className="text-lg">💰</span>
                 </div>
-                <span className="terminal-text opacity-70 text-sm uppercase tracking-wider">[VOLUME]</span>
+                <span className="terminal-text opacity-70 text-sm uppercase tracking-wider">
+                  [VOLUME]
+                </span>
               </div>
-              <div className="text-2xl font-bold terminal-text terminal-glow">${userStats.totalVolume.toLocaleString()}</div>
+              <div className="text-2xl font-bold terminal-text terminal-glow">
+                ${userStats.totalVolume.toLocaleString()}
+              </div>
             </div>
 
-            <div className="terminal-box p-5 border-2 border-[var(--primary)]/30 hover:border-[var(--primary)] transition-all group">
+            <div className="terminal-box p-5 border-2 border-[var(--secondary)]/30 hover:border-[var(--secondary)] transition-all group">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 border-2 border-[var(--primary)] flex items-center justify-center group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 border-2 border-[var(--secondary)] flex items-center justify-center group-hover:scale-110 transition-transform">
                   <span className="text-lg">📈</span>
                 </div>
-                <span className="terminal-text opacity-70 text-sm uppercase tracking-wider">[NPI]</span>
+                <span className="terminal-text opacity-70 text-sm uppercase tracking-wider">
+                  [NPI]
+                </span>
               </div>
               <div className="text-2xl font-bold terminal-text terminal-glow">
                 +${userStats.totalNPI.toFixed(2)}
               </div>
             </div>
 
-            <div className="terminal-box p-5 border-2 border-[var(--primary)]/30 hover:border-[var(--primary)] transition-all group">
+            <div className="terminal-box p-5 border-2 border-[var(--secondary)]/30 hover:border-[var(--secondary)] transition-all group">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 border-2 border-[var(--primary)] flex items-center justify-center group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 border-2 border-[var(--secondary)] flex items-center justify-center group-hover:scale-110 transition-transform">
                   <span className="text-lg">✅</span>
                 </div>
-                <span className="terminal-text opacity-70 text-sm uppercase tracking-wider">[REBATES]</span>
+                <span className="terminal-text opacity-70 text-sm uppercase tracking-wider">
+                  [REBATES]
+                </span>
               </div>
               <div className="text-2xl font-bold terminal-text terminal-glow">
                 ${userStats.totalRebates.toFixed(2)}
@@ -198,7 +241,9 @@ export const Dashboard = () => {
                     <span className="text-2xl">💎</span>
                   </div>
                   <div>
-                    <div className="font-bold text-lg mb-1 terminal-text uppercase tracking-wider">[PENDING REBATES]</div>
+                    <div className="font-bold text-lg mb-1 terminal-text uppercase tracking-wider">
+                      [PENDING REBATES]
+                    </div>
                     <div className="text-3xl font-bold terminal-text terminal-glow">
                       ${userStats.pendingRebates.toFixed(2)}
                     </div>
@@ -241,39 +286,62 @@ export const Dashboard = () => {
           {/* Stats Summary */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="swap-card">
-              <h4 className="font-bold mb-4 text-[var(--primary)]">Performance</h4>
+              <h4 className="font-bold mb-4 text-[var(--primary)]">
+                Performance
+              </h4>
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-400">Avg. Swap Size</span>
-                  <span className="font-semibold">${(userStats?.totalVolume || 0 / (userStats?.totalSwaps || 1)).toFixed(2)}</span>
+                  <span className="font-semibold">
+                    $
+                    {(
+                      userStats?.totalVolume || 0 / (userStats?.totalSwaps || 1)
+                    ).toFixed(2)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Avg. NPI per Swap</span>
                   <span className="font-semibold text-[var(--secondary)]">
-                    ${(userStats?.totalNPI || 0 / (userStats?.totalSwaps || 1)).toFixed(2)}
+                    $
+                    {(
+                      userStats?.totalNPI || 0 / (userStats?.totalSwaps || 1)
+                    ).toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Rebate Rate</span>
                   <span className="font-semibold text-[var(--secondary)]">
-                    {(((userStats?.totalRebates || 0) / (userStats?.totalVolume || 1)) * 100).toFixed(2)}%
+                    {(
+                      ((userStats?.totalRebates || 0) /
+                        (userStats?.totalVolume || 1)) *
+                      100
+                    ).toFixed(2)}
+                    %
                   </span>
                 </div>
               </div>
             </div>
 
             <div className="swap-card">
-              <h4 className="font-bold mb-4 text-[var(--secondary)]">Rewards</h4>
+              <h4 className="font-bold mb-4 text-[var(--secondary)]">
+                Rewards
+              </h4>
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-400">Total Earned</span>
                   <span className="font-semibold text-[var(--secondary)]">
-                    ${((userStats?.totalNPI || 0) + (userStats?.totalRebates || 0)).toFixed(2)}
+                    $
+                    {(
+                      (userStats?.totalNPI || 0) +
+                      (userStats?.totalRebates || 0)
+                    ).toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Rebate Boost</span>
-                  <span className="font-semibold">+{userStats?.rebateBoost || 0}%</span>
+                  <span className="font-semibold">
+                    +{userStats?.rebateBoost || 0}%
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Locked Amount</span>

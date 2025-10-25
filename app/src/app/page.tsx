@@ -1,9 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { Navigation } from "@/components/Navigation";
 import { EnhancedSwapInterface } from "@/components/EnhancedSwapInterface";
+import { Dashboard } from "@/components/Dashboard";
+import { DCA } from "@/components/DCA";
 
 export default function Home() {
+  const [activeTab, setActiveTab] = useState<"swap" | "dashboard" | "dca">(
+    "swap"
+  );
+
   return (
     <main className="min-h-screen terminal-scanline" id="main-content">
       {/* NAVIGATION - Using existing Navigation component */}
@@ -74,12 +81,67 @@ export default function Home() {
         </div>
       </div>
 
+      {/* TAB NAVIGATION - Terminal Style */}
+      <div className="border-b-2 border-[var(--primary)]/30 bg-black sticky top-[73px] z-40">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex gap-0">
+            <button
+              onClick={() => setActiveTab("swap")}
+              className={`px-6 py-3 font-bold terminal-text uppercase tracking-wider border-r-2 border-[var(--primary)]/30 transition-all ${
+                activeTab === "swap"
+                  ? "bg-[var(--primary)] text-black"
+                  : "text-[var(--primary)] hover:bg-[var(--primary)]/10"
+              }`}
+              aria-label="Swap tab"
+            >
+              [SWAP]
+            </button>
+            <button
+              onClick={() => setActiveTab("dca")}
+              className={`px-6 py-3 font-bold terminal-text uppercase tracking-wider border-r-2 border-[var(--primary)]/30 transition-all ${
+                activeTab === "dca"
+                  ? "bg-[var(--primary)] text-black"
+                  : "text-[var(--primary)] hover:bg-[var(--primary)]/10"
+              }`}
+              aria-label="DCA tab"
+            >
+              [DCA]
+            </button>
+            <button
+              onClick={() => setActiveTab("dashboard")}
+              className={`px-6 py-3 font-bold terminal-text uppercase tracking-wider transition-all ${
+                activeTab === "dashboard"
+                  ? "bg-[var(--primary)] text-black"
+                  : "text-[var(--primary)] hover:bg-[var(--primary)]/10"
+              }`}
+              aria-label="Dashboard tab"
+            >
+              [DASHBOARD]
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* MAIN CONTENT */}
       <div className="py-8 px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="animate-fade-in">
-            <EnhancedSwapInterface />
-          </div>
+          {activeTab === "swap" && (
+            <div className="animate-fade-in">
+              <EnhancedSwapInterface />
+            </div>
+          )}
+
+          {activeTab === "dca" && (
+            <div className="animate-fade-in">
+              <DCA />
+            </div>
+          )}
+
+          {activeTab === "dashboard" && (
+            <div className="animate-fade-in">
+              <Dashboard />
+            </div>
+          )}
         </div>
       </div>
 
