@@ -83,8 +83,8 @@ export default function LockPage() {
               disabled={lockData?.isActive && cnftData?.isActive}
               className={`flex-1 py-4 px-6 rounded-lg font-bold transition-all duration-300 relative overflow-hidden group ${
                 activeTab === 'lock'
-                  ? 'bg-gradient-to-r from-primary to-primary-dark text-white shadow-glow'
-                  : 'text-gray-300 hover:text-white hover:bg-white/5'
+                  ? 'bg-gradient-to-r from-primary to-primary-dark text-[var(--primary)] shadow-glow'
+                  : 'text-gray-300 hover:text-[var(--primary)] hover:bg-[var(--primary)]/5'
               } ${
                 lockData?.isActive && cnftData?.isActive
                   ? 'opacity-50 cursor-not-allowed'
@@ -105,7 +105,7 @@ export default function LockPage() {
               className={`flex-1 py-4 px-6 rounded-lg font-bold transition-all duration-300 relative overflow-hidden group ${
                 activeTab === 'unlock'
                   ? 'bg-gradient-to-r from-secondary to-green-400 text-gray-900 shadow-glow-green'
-                  : 'text-gray-300 hover:text-white hover:bg-white/5'
+                  : 'text-gray-300 hover:text-[var(--primary)] hover:bg-[var(--primary)]/5'
               } ${
                 !lockData?.isActive || !cnftData?.isActive
                   ? 'opacity-50 cursor-not-allowed'

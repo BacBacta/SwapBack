@@ -330,7 +330,7 @@ export const SwapInterface = () => {
 
       {/* Router Selection Toggle */}
       <div className="mb-6">
-        <div className="flex gap-2 p-1 bg-black/30 rounded-xl border border-white/10">
+        <div className="flex gap-2 p-1 bg-black/30 rounded-xl border border-[var(--primary)]/10">
           <button
             onClick={() => {
               setSelectedRouter("swapback");
@@ -340,8 +340,8 @@ export const SwapInterface = () => {
             }}
             className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
               selectedRouter === "swapback"
-                ? "bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] text-white shadow-lg"
-                : "text-gray-400 hover:text-white hover:bg-white/5"
+                ? "bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] text-[var(--primary)] shadow-lg"
+                : "text-gray-400 hover:text-[var(--primary)] hover:bg-[var(--primary)]/5"
             }`}
           >
             <div className="flex items-center justify-center gap-2">
@@ -361,8 +361,8 @@ export const SwapInterface = () => {
             }}
             className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
               selectedRouter === "jupiter"
-                ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg"
-                : "text-gray-400 hover:text-white hover:bg-white/5"
+                ? "bg-gradient-to-r from-blue-500 to-purple-500 text-[var(--primary)] shadow-lg"
+                : "text-gray-400 hover:text-[var(--primary)] hover:bg-[var(--primary)]/5"
             }`}
           >
             <div className="flex items-center justify-center gap-2">
@@ -382,7 +382,7 @@ export const SwapInterface = () => {
           <label className="label-text">You pay</label>
           {connected && (
             <div className="text-sm text-gray-400">
-              Balance: <span className="font-semibold text-white">
+              Balance: <span className="font-semibold text-[var(--primary)]">
                 {inputTokenData.loading ? "..." : inputTokenData.balance.toFixed(4)}
               </span> {inputToken}
             </div>
@@ -409,7 +409,7 @@ export const SwapInterface = () => {
           </div>
           <button
             onClick={() => setShowInputTokenSelector(true)}
-            className="px-4 py-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 hover:border-white/20 transition-all flex items-center gap-2 min-w-[120px]"
+            className="px-4 py-3 bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 rounded-xl border border-[var(--primary)]/10 hover:border-[var(--primary)]/20 transition-all flex items-center gap-2 min-w-[120px]"
             disabled={!connected}
           >
             <span className="font-semibold">{inputToken}</span>
@@ -422,7 +422,7 @@ export const SwapInterface = () => {
           <div className="flex gap-2 mt-3">
             <button
               onClick={setHalfBalance}
-              className="px-3 py-1.5 text-xs font-semibold bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+              className="px-3 py-1.5 text-xs font-semibold bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 rounded-lg transition-colors"
             >
               HALF
             </button>
@@ -439,7 +439,7 @@ export const SwapInterface = () => {
       {/* Swap Icon */}
       <div className="flex justify-center my-6">
         <button
-          className="p-3 rounded-full bg-white/10 hover:bg-white/20 transition-all border border-white/20 hover:scale-110"
+          className="p-3 rounded-full bg-[var(--primary)]/10 hover:bg-[var(--primary)]/20 transition-all border border-[var(--primary)]/20 hover:scale-110"
           onClick={swapTokens}
           disabled={!connected}
         >
@@ -455,7 +455,7 @@ export const SwapInterface = () => {
           <label className="label-text">You receive</label>
           {connected && (
             <div className="text-sm text-gray-400">
-              Balance: <span className="font-semibold text-white">
+              Balance: <span className="font-semibold text-[var(--primary)]">
                 {outputTokenData.loading ? "..." : outputTokenData.balance.toFixed(4)}
               </span> {outputToken}
             </div>
@@ -478,7 +478,7 @@ export const SwapInterface = () => {
           </div>
           <button
             onClick={() => setShowOutputTokenSelector(true)}
-            className="px-4 py-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 hover:border-white/20 transition-all flex items-center gap-2 min-w-[120px]"
+            className="px-4 py-3 bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 rounded-xl border border-[var(--primary)]/10 hover:border-[var(--primary)]/20 transition-all flex items-center gap-2 min-w-[120px]"
             disabled={!connected}
           >
             <span className="font-semibold">{outputToken}</span>
@@ -548,7 +548,7 @@ export const SwapInterface = () => {
                         <div className="flex items-center gap-3">
                           <div className="flex-1 bg-gray-900/50 rounded p-2">
                             <div className="text-xs text-gray-500 mb-1">Entrée</div>
-                            <div className="font-semibold text-white">
+                            <div className="font-semibold text-[var(--primary)]">
                               {(parseFloat(step.inAmount) / 1000000).toFixed(4)} {inputSymbol}
                             </div>
                           </div>
@@ -578,8 +578,8 @@ export const SwapInterface = () => {
           )}
 
           {/* Détails Financiers */}
-          <div className="p-6 bg-black/20 rounded-lg border border-white/10">
-            <h3 className="card-title mb-4 text-center text-white">Financial Details</h3>
+          <div className="p-6 bg-black/20 rounded-lg border border-[var(--primary)]/10">
+            <h3 className="card-title mb-4 text-center text-[var(--primary)]">Financial Details</h3>
             <div className="space-y-3 text-sm">
               {routeInfo.priceImpact !== undefined && (
                 <div className="flex justify-between items-center">
@@ -611,14 +611,14 @@ export const SwapInterface = () => {
                 <span className="text-gray-400">Network fees</span>
                 <span>{routeInfo.fees.toFixed(4)} USDC</span>
               </div>
-              <div className="pt-3 mt-3 border-t border-white/10 flex justify-between items-center font-semibold">
-                <span className="text-white">Estimated total</span>
+              <div className="pt-3 mt-3 border-t border-[var(--primary)]/10 flex justify-between items-center font-semibold">
+                <span className="text-[var(--primary)]">Estimated total</span>
                 <span className="text-green-400">
                   {routeInfo.estimatedOutput.toFixed(6)} {outputToken}
                 </span>
               </div>
               {/* Vérification de cohérence */}
-              <div className="pt-2 mt-2 border-t border-white/10 flex justify-between text-xs">
+              <div className="pt-2 mt-2 border-t border-[var(--primary)]/10 flex justify-between text-xs">
                 <span className="text-gray-500">Consistency check</span>
                 <span className={(routeInfo.npi + routeInfo.rebate + routeInfo.burn).toFixed(4) === (routeInfo.estimatedOutput - routeInfo.nonOptimizedOutput).toFixed(4) ? "text-green-400" : "text-red-400"}>
                   {(routeInfo.npi + routeInfo.rebate + routeInfo.burn).toFixed(4)} = {(routeInfo.estimatedOutput - routeInfo.nonOptimizedOutput).toFixed(4)}
@@ -635,7 +635,7 @@ export const SwapInterface = () => {
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <span className="text-2xl">🎯</span>
-              <span className="font-bold text-white">Route Optimisée Sélectionnée</span>
+              <span className="font-bold text-[var(--primary)]">Route Optimisée Sélectionnée</span>
             </div>
             <span className={`px-3 py-1 rounded-full text-xs font-bold ${
               routeInfo.type === "Direct" 
@@ -675,7 +675,7 @@ export const SwapInterface = () => {
         <div className="mb-6 p-6 bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-lg border-2 border-green-500/30">
           <div className="text-center mb-4">
             <span className="text-2xl mb-2 block">💰</span>
-            <span className="font-bold text-white text-lg">Your Savings</span>
+            <span className="font-bold text-[var(--primary)] text-lg">Your Savings</span>
           </div>
           
           <div className="space-y-3">

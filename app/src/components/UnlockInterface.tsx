@@ -229,7 +229,7 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
       <div className="bg-gray-800 rounded-lg p-6 max-w-lg mx-auto">
         <div className="text-center py-12">
           <div className="text-6xl mb-4">🔓</div>
-          <h3 className="text-xl font-bold text-white mb-2">
+          <h3 className="text-xl font-bold text-[var(--primary)] mb-2">
             Aucun verrouillage actif
           </h3>
           <p className="text-gray-400">
@@ -258,7 +258,7 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
         <div className="relative space-y-4">
           <div className="flex justify-between items-center">
             <span className="text-gray-400 font-medium">Montant verrouillé</span>
-            <span className="text-white font-bold text-lg">
+            <span className="text-[var(--primary)] font-bold text-lg">
               {lockData.amount ? (Number(lockData.amount) / 1_000_000_000).toLocaleString() : '0'} <span className="text-primary">$BACK</span>
             </span>
           </div>
@@ -342,7 +342,7 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
       <button
         onClick={handleUnlock}
         disabled={isUnlocking || !publicKey || !timeRemaining?.canUnlock}
-        className={`w-full py-4 rounded-lg font-bold text-white transition-all duration-300 relative overflow-hidden group ${
+        className={`w-full py-4 rounded-lg font-bold text-[var(--primary)] transition-all duration-300 relative overflow-hidden group ${
           isUnlocking || !publicKey || !timeRemaining?.canUnlock
             ? 'bg-gray-700 cursor-not-allowed opacity-50'
             : 'bg-gradient-to-r from-secondary to-green-400 hover:scale-[1.02] shadow-glow-green'

@@ -237,7 +237,7 @@ export const SwapBackInterface = () => {
   return (
     <div className="max-w-2xl mx-auto p-6">
       {/* HEADER */}
-      <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-8 mb-8 text-white">
+      <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-8 mb-8 text-[var(--primary)]">
         <h1 className="text-4xl font-bold mb-2">SwapBack DCA</h1>
         <p className="text-purple-100 text-lg">
           Dollar-Cost Averaging automatisé sur Solana
@@ -409,7 +409,7 @@ export const SwapBackInterface = () => {
           <button
             onClick={handleCreatePlan}
             disabled={loading || !inputAmount || !numberOfSwaps}
-            className={`w-full py-4 rounded-lg font-semibold text-white transition-all ${
+            className={`w-full py-4 rounded-lg font-semibold text-[var(--primary)] transition-all ${
               loading || !inputAmount || !numberOfSwaps
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg hover:shadow-xl"

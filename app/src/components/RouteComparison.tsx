@@ -78,7 +78,7 @@ export function RouteComparison() {
           >
             <div className="flex justify-between items-center">
               <div>
-                <div className="text-sm font-semibold text-white">
+                <div className="text-sm font-semibold text-[var(--primary)]">
                   Route {index + 1}: {route.venues.join(" → ")}
                 </div>
                 <div className="text-xs text-gray-400 mt-1">

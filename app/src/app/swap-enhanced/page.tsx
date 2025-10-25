@@ -18,7 +18,7 @@ export default function EnhancedSwapPage() {
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-5xl font-bold text-white mb-2">
+            <h1 className="text-5xl font-bold text-[var(--primary)] mb-2">
               SwapBack <span className="text-blue-400">Enhanced</span>
             </h1>
             <p className="text-gray-400 text-lg">

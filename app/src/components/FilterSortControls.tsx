@@ -37,7 +37,7 @@ export const FilterSortControls = ({
   ];
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-black/20 rounded-xl border border-white/5">
+    <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-black/20 rounded-xl border border-[var(--primary)]/5">
       {/* Filter Pills */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-gray-400 mr-2">Filter:</span>
@@ -47,8 +47,8 @@ export const FilterSortControls = ({
             onClick={() => onFilterChange(filter.value)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
               currentFilter === filter.value
-                ? "bg-[var(--primary)] text-white shadow-[0_0_20px_rgba(153,69,255,0.3)]"
-                : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white"
+                ? "bg-[var(--primary)] text-[var(--primary)] shadow-[0_0_20px_rgba(153,69,255,0.3)]"
+                : "bg-[var(--primary)]/5 text-gray-400 hover:bg-[var(--primary)]/10 hover:text-[var(--primary)]"
             }`}
           >
             <span className="mr-2">{filter.icon}</span>
@@ -68,7 +68,7 @@ export const FilterSortControls = ({
         <div className="relative">
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm font-medium transition-all border border-white/10"
+            className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 rounded-lg text-sm font-medium transition-all border border-[var(--primary)]/10"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
@@ -86,7 +86,7 @@ export const FilterSortControls = ({
                 onClick={() => setShowFilters(false)}
                 aria-label="Close sort menu"
               />
-              <div className="absolute right-0 mt-2 w-48 bg-[var(--glass-bg)] backdrop-blur-xl border border-white/10 rounded-lg shadow-xl z-20 overflow-hidden">
+              <div className="absolute right-0 mt-2 w-48 bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--primary)]/10 rounded-lg shadow-xl z-20 overflow-hidden">
                 {sorts.map((sort) => (
                   <button
                     key={sort.value}
@@ -97,7 +97,7 @@ export const FilterSortControls = ({
                     className={`w-full px-4 py-3 text-left text-sm transition-all ${
                       currentSort === sort.value
                         ? "bg-[var(--primary)]/20 text-[var(--primary)] font-semibold"
-                        : "text-gray-300 hover:bg-white/5"
+                        : "text-gray-300 hover:bg-[var(--primary)]/5"
                     }`}
                   >
                     {sort.label}

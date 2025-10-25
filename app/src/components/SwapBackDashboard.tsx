@@ -257,7 +257,7 @@ export const SwapBackDashboard = () => {
   return (
     <div className="max-w-6xl mx-auto p-6">
       {/* HEADER */}
-      <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-8 mb-8 text-white">
+      <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-8 mb-8 text-[var(--primary)]">
         <h1 className="text-4xl font-bold mb-2">Mes Plans DCA</h1>
         <p className="text-purple-100 text-lg">
           Gérez vos stratégies de Dollar-Cost Averaging
@@ -317,7 +317,7 @@ export const SwapBackDashboard = () => {
           </p>
           <a
             href="/"
-            className="inline-block bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all"
+            className="inline-block bg-gradient-to-r from-purple-600 to-blue-600 text-[var(--primary)] px-8 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all"
           >
             Créer un plan DCA
           </a>

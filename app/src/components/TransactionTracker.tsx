@@ -45,7 +45,7 @@ export function TransactionTracker() {
       {/* Current Transaction */}
       {transaction.status !== "idle" && (
         <div className="mb-6">
-          <h3 className="text-xl font-bold text-white mb-4">
+          <h3 className="text-xl font-bold text-[var(--primary)] mb-4">
             Transaction Status
           </h3>
 
@@ -60,7 +60,7 @@ export function TransactionTracker() {
                   <div
                     className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${
                       index <= currentStepIndex
-                        ? "bg-blue-600 text-white"
+                        ? "bg-blue-600 text-[var(--primary)]"
                         : "bg-gray-700 text-gray-400"
                     }`}
                   >
@@ -74,7 +74,7 @@ export function TransactionTracker() {
                   </div>
                   <span
                     className={`text-xs mt-2 ${
-                      index <= currentStepIndex ? "text-white" : "text-gray-500"
+                      index <= currentStepIndex ? "text-[var(--primary)]" : "text-gray-500"
                     }`}
                   >
                     {step.label}
@@ -111,7 +111,7 @@ export function TransactionTracker() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-400">Confirmations</span>
-                <span className="text-sm text-white">
+                <span className="text-sm text-[var(--primary)]">
                   {transaction.confirmations}
                 </span>
               </div>
@@ -132,7 +132,7 @@ export function TransactionTracker() {
               </div>
               <button
                 onClick={resetTransaction}
-                className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm w-full"
+                className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-[var(--primary)] rounded-lg text-sm w-full"
               >
                 Retry
               </button>
@@ -155,7 +155,7 @@ export function TransactionTracker() {
               </div>
               <button
                 onClick={resetTransaction}
-                className="mt-3 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm w-full"
+                className="mt-3 px-4 py-2 bg-green-600 hover:bg-green-700 text-[var(--primary)] rounded-lg text-sm w-full"
               >
                 New Swap
               </button>
@@ -167,7 +167,7 @@ export function TransactionTracker() {
       {/* Transaction History */}
       {transactionHistory.length > 0 && (
         <div>
-          <h3 className="text-lg font-bold text-white mb-3">Recent Swaps</h3>
+          <h3 className="text-lg font-bold text-[var(--primary)] mb-3">Recent Swaps</h3>
           <div className="space-y-2">
             {transactionHistory.slice(0, 10).map((tx, index) => (
               <div
@@ -186,7 +186,7 @@ export function TransactionTracker() {
                       {tx.status === "confirmed" ? "✓" : "✗"}
                     </span>
                     <div>
-                      <div className="text-sm text-white">
+                      <div className="text-sm text-[var(--primary)]">
                         {tx.inputAmount} {tx.inputToken.symbol} →{" "}
                         {tx.outputAmount} {tx.outputToken.symbol}
                       </div>

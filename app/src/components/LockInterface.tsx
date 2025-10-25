@@ -263,7 +263,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
       <div className="mb-6 p-4 glass-effect rounded-lg border border-primary/10">
         <div className="flex justify-between items-center">
           <span className="text-gray-400">Solde disponible</span>
-          <span className="text-white font-bold text-lg">
+          <span className="text-[var(--primary)] font-bold text-lg">
             {balance.toLocaleString()} <span className="text-primary">$BACK</span>
           </span>
         </div>
@@ -280,7 +280,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
-            className={`w-full px-4 py-3 glass-effect text-white rounded-lg focus:outline-none focus:ring-2 transition-all ${
+            className={`w-full px-4 py-3 glass-effect text-[var(--primary)] rounded-lg focus:outline-none focus:ring-2 transition-all ${
               amountError
                 ? 'border border-red-500/50 focus:ring-red-500/50 focus:border-red-500'
                 : 'border border-gray-700/50 focus:ring-primary/50 focus:border-primary'
@@ -304,7 +304,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
             <button
               key={amt}
               onClick={() => setAmount(amt.toString())}
-              className="flex-1 px-3 py-2 glass-effect border border-gray-700/50 hover:border-primary/30 text-white rounded-lg text-sm transition-all hover:scale-105"
+              className="flex-1 px-3 py-2 glass-effect border border-gray-700/50 hover:border-primary/30 text-[var(--primary)] rounded-lg text-sm transition-all hover:scale-105"
               disabled={isLoading}
             >
               {amt.toLocaleString()}
@@ -312,7 +312,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
           ))}
           <button
             onClick={() => setAmount(balance.toString())}
-            className="px-4 py-2 bg-gradient-to-r from-primary to-primary-dark text-white rounded-lg text-sm font-semibold transition-all hover:scale-105 hover:shadow-glow"
+            className="px-4 py-2 bg-gradient-to-r from-primary to-primary-dark text-[var(--primary)] rounded-lg text-sm font-semibold transition-all hover:scale-105 hover:shadow-glow"
             disabled={isLoading}
           >
             Max
@@ -331,7 +331,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
             value={duration}
             onChange={(e) => setDuration(e.target.value)}
             placeholder="30"
-            className={`w-full px-4 py-3 glass-effect text-white rounded-lg focus:outline-none focus:ring-2 transition-all ${
+            className={`w-full px-4 py-3 glass-effect text-[var(--primary)] rounded-lg focus:outline-none focus:ring-2 transition-all ${
               durationError
                 ? 'border border-red-500/50 focus:ring-red-500/50 focus:border-red-500'
                 : 'border border-gray-700/50 focus:ring-primary/50 focus:border-primary'
@@ -440,7 +440,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
           !amount ||
           !duration
         }
-        className={`w-full py-4 rounded-lg font-bold text-white transition-all duration-300 relative overflow-hidden group ${
+        className={`w-full py-4 rounded-lg font-bold text-[var(--primary)] transition-all duration-300 relative overflow-hidden group ${
           isLoading ||
           !publicKey ||
           !!amountError ||

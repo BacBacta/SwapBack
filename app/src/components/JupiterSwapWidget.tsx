@@ -281,7 +281,7 @@ export const JupiterSwapWidget: React.FC = () => {
         disabled={
           !inputAmount || parseFloat(inputAmount) <= 0 || isLoadingQuote
         }
-        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-semibold py-3 rounded-lg transition-colors"
+        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-[var(--primary)] font-semibold py-3 rounded-lg transition-colors"
       >
         {isLoadingQuote ? "Chargement..." : "Obtenir un Quote"}
       </button>
@@ -310,7 +310,7 @@ export const JupiterSwapWidget: React.FC = () => {
         <button
           onClick={handleSwap}
           disabled={isSwapping}
-          className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-semibold py-3 rounded-lg transition-colors"
+          className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-[var(--primary)] font-semibold py-3 rounded-lg transition-colors"
         >
           {isSwapping ? "Swap en cours..." : "Exécuter le Swap"}
         </button>

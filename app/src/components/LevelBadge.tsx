@@ -68,7 +68,7 @@ export const LevelBadge = ({ level, boost, isActive = true, size = "md" }: Level
         ${isActive ? `shadow-lg ${config.glow} animate-pulse-glow` : "opacity-50 grayscale"}
         font-bold ${config.color}
         transition-all duration-300 hover:scale-105 hover:shadow-xl
-        border-2 border-white/20
+        border-2 border-[var(--primary)]/20
       `}
     >
       <span className={`${getIconSize()} animate-bounce-slow`}>
@@ -81,7 +81,7 @@ export const LevelBadge = ({ level, boost, isActive = true, size = "md" }: Level
         </span>
       </div>
       {!isActive && (
-        <span className="absolute top-0 right-0 bg-red-500 text-white text-xs px-2 py-0.5 rounded-bl-lg rounded-tr-xl font-bold border border-red-400">
+        <span className="absolute top-0 right-0 bg-red-500 text-[var(--primary)] text-xs px-2 py-0.5 rounded-bl-lg rounded-tr-xl font-bold border border-red-400">
           Inactif
         </span>
       )}

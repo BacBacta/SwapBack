@@ -47,7 +47,7 @@ export function DashboardAnalytics() {
     <div className="space-y-6">
       {/* Volume Chart */}
       <div className="bg-gray-900 rounded-2xl p-6 shadow-xl">
-        <h3 className="text-xl font-bold text-white mb-4">7-Day Volume</h3>
+        <h3 className="text-xl font-bold text-[var(--primary)] mb-4">7-Day Volume</h3>
         <ResponsiveContainer width="100%" height={250}>
           <AreaChart data={volumeData}>
             <defs>
@@ -85,7 +85,7 @@ export function DashboardAnalytics() {
             <h3 className="text-lg text-green-100 mb-1">
               Total MEV Protection Savings
             </h3>
-            <p className="text-4xl font-bold text-white">
+            <p className="text-4xl font-bold text-[var(--primary)]">
               ${totalMEVSavings.toFixed(2)}
             </p>
             <p className="text-sm text-green-200 mt-2">
@@ -98,7 +98,7 @@ export function DashboardAnalytics() {
 
       {/* Route Performance Table */}
       <div className="bg-gray-900 rounded-2xl p-6 shadow-xl">
-        <h3 className="text-xl font-bold text-white mb-4">Route Performance</h3>
+        <h3 className="text-xl font-bold text-[var(--primary)] mb-4">Route Performance</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -115,7 +115,7 @@ export function DashboardAnalytics() {
             <tbody>
               {performanceData.map((venue) => (
                 <tr key={venue.venue} className="border-b border-gray-800">
-                  <td className="py-3 text-white">{venue.venue}</td>
+                  <td className="py-3 text-[var(--primary)]">{venue.venue}</td>
                   <td className="py-3 text-right">
                     <span
                       className={`${
@@ -141,25 +141,25 @@ export function DashboardAnalytics() {
 
       {/* Popular Pairs */}
       <div className="bg-gray-900 rounded-2xl p-6 shadow-xl">
-        <h3 className="text-xl font-bold text-white mb-4">
+        <h3 className="text-xl font-bold text-[var(--primary)] mb-4">
           Popular Pairs (24h)
         </h3>
         <div className="space-y-3">
           {popularPairs.map((pair, index) => (
             <div key={pair.pair} className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-[var(--primary)] font-bold text-sm">
                   {index + 1}
                 </div>
                 <div>
-                  <div className="text-white font-semibold">{pair.pair}</div>
+                  <div className="text-[var(--primary)] font-semibold">{pair.pair}</div>
                   <div className="text-xs text-gray-400">
                     {pair.count} swaps
                   </div>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-white font-semibold">
+                <div className="text-[var(--primary)] font-semibold">
                   ${pair.volume.toLocaleString()}
                 </div>
                 <div className="text-xs text-gray-400">volume</div>

@@ -30,7 +30,7 @@ export default function Home() {
                   </linearGradient>
                 </defs>
               </svg>
-              <span className="text-xl font-semibold text-white ml-2">SwapBack</span>
+              <span className="text-xl font-semibold text-[var(--primary)] ml-2">SwapBack</span>
             </div>
 
             {/* Wallet button - Solana style */}
@@ -64,43 +64,43 @@ export default function Home() {
           {/* Features grid - Clean cards like Solana Faucet */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
             {/* Feature 1 */}
-            <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10 hover:bg-white/10 transition-all group cursor-pointer">
+            <div className="bg-[var(--primary)]/5 backdrop-blur-sm rounded-2xl p-8 border border-[var(--primary)]/10 hover:bg-[var(--primary)]/10 transition-all group cursor-pointer">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500/20 to-purple-600/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <span className="text-3xl">🚀</span>
               </div>
-              <h3 className="text-xl font-bold text-white mb-3">Best Execution</h3>
+              <h3 className="text-xl font-bold text-[var(--primary)] mb-3">Best Execution</h3>
               <p className="text-gray-400 leading-relaxed text-sm">
                 Intelligent routing across multiple DEXs for optimal pricing
               </p>
-              <div className="mt-6 pt-4 border-t border-white/10">
+              <div className="mt-6 pt-4 border-t border-[var(--primary)]/10">
                 <span className="text-xs font-bold text-purple-400">Up to 2.5% Better</span>
               </div>
             </div>
 
             {/* Feature 2 */}
-            <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10 hover:bg-white/10 transition-all group cursor-pointer">
+            <div className="bg-[var(--primary)]/5 backdrop-blur-sm rounded-2xl p-8 border border-[var(--primary)]/10 hover:bg-[var(--primary)]/10 transition-all group cursor-pointer">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <span className="text-3xl">💰</span>
               </div>
-              <h3 className="text-xl font-bold text-white mb-3">70-80% Cashback</h3>
+              <h3 className="text-xl font-bold text-[var(--primary)] mb-3">70-80% Cashback</h3>
               <p className="text-gray-400 leading-relaxed text-sm">
                 Earn instant rewards from surplus generated on your swaps
               </p>
-              <div className="mt-6 pt-4 border-t border-white/10">
+              <div className="mt-6 pt-4 border-t border-[var(--primary)]/10">
                 <span className="text-xs font-bold text-cyan-400">Instant Rewards</span>
               </div>
             </div>
 
             {/* Feature 3 */}
-            <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10 hover:bg-white/10 transition-all group cursor-pointer">
+            <div className="bg-[var(--primary)]/5 backdrop-blur-sm rounded-2xl p-8 border border-[var(--primary)]/10 hover:bg-[var(--primary)]/10 transition-all group cursor-pointer">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-green-500/20 to-green-600/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <span className="text-3xl">🔥</span>
               </div>
-              <h3 className="text-xl font-bold text-white mb-3">Automatic Burn</h3>
+              <h3 className="text-xl font-bold text-[var(--primary)] mb-3">Automatic Burn</h3>
               <p className="text-gray-400 leading-relaxed text-sm">
                 20-30% of surplus automatically buys & burns $BACK tokens
               </p>
-              <div className="mt-6 pt-4 border-t border-white/10">
+              <div className="mt-6 pt-4 border-t border-[var(--primary)]/10">
                 <span className="text-xs font-bold text-green-400">Deflationary</span>
               </div>
             </div>
@@ -112,16 +112,16 @@ export default function Home() {
       </div>
 
       {/* Footer - Simple like Solana Faucet */}
-      <footer className="relative z-10 py-8 border-t border-white/5">
+      <footer className="relative z-10 py-8 border-t border-[var(--primary)]/5">
         <div className="max-w-5xl mx-auto px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-gray-500 text-sm">
               © 2025 SwapBack. Built on Solana.
             </p>
             <div className="flex items-center gap-6">
-              <button className="text-gray-500 hover:text-white transition-colors text-sm">Docs</button>
-              <button className="text-gray-500 hover:text-white transition-colors text-sm">GitHub</button>
-              <button className="text-gray-500 hover:text-white transition-colors text-sm">Discord</button>
+              <button className="text-gray-500 hover:text-[var(--primary)] transition-colors text-sm">Docs</button>
+              <button className="text-gray-500 hover:text-[var(--primary)] transition-colors text-sm">GitHub</button>
+              <button className="text-gray-500 hover:text-[var(--primary)] transition-colors text-sm">Discord</button>
             </div>
           </div>
         </div>
