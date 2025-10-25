@@ -6,12 +6,21 @@ import { SOLANA_TOKENS, getPopularTokens, type TokenInfo } from "@/constants/tok
 interface RouteInfo {
   totalSteps: number;
   steps: Array<{
-    venue: string;
-    inputAmount: number;
-    outputAmount: number;
-    feeAmount: number;
+    stepNumber: number;
+    ammKey: string;
+    label: string;
+    inputMint: string;
+    outputMint: string;
+    inAmount: string;
+    outAmount: string;
+    feeAmount: string;
+    feeMint: string;
   }>;
   priceImpactPct: number;
+  inputAmount: string;
+  outputAmount: string;
+  otherAmountThreshold?: string;
+  swapMode?: string;
 }
 
 interface QuoteData {
@@ -854,16 +863,16 @@ export function EnhancedSwapInterface() {
                   {routeInfo.steps.map((step, idx) => (
                     <div key={idx} className="text-xs terminal-text mb-2 pl-2 border-l-2 border-[var(--primary)]/30">
                       <div className="font-bold text-[var(--secondary)]">
-                        {idx + 1}. {step.venue.toUpperCase()}
+                        {idx + 1}. {step.label.toUpperCase()}
                       </div>
                       <div className="opacity-70">
-                        In: {(step.inputAmount / 1e6).toFixed(4)} {inputToken.symbol}
+                        In: {(parseFloat(step.inAmount) / 1e9).toFixed(6)} {inputToken.symbol}
                       </div>
                       <div className="opacity-70">
-                        Out: {(step.outputAmount / 1e6).toFixed(4)} {outputToken.symbol}
+                        Out: {(parseFloat(step.outAmount) / 1e9).toFixed(6)} {outputToken.symbol}
                       </div>
                       <div className="opacity-70">
-                        Fee: {(step.feeAmount / 1e6).toFixed(4)}
+                        Fee: {(parseFloat(step.feeAmount) / 1e9).toFixed(6)}
                       </div>
                     </div>
                   ))}
