@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { Connection, Transaction, VersionedTransaction } from "@solana/web3.js";
+import { Connection, VersionedTransaction } from "@solana/web3.js";
 
 // ============================================================================
 // CONFIGURATION
@@ -23,7 +23,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       signedTransaction, // Base64 encoded signed transaction
-      useMEVProtection = false,
     } = body;
 
     if (!signedTransaction) {
@@ -47,13 +46,9 @@ export async function POST(request: NextRequest) {
         skipPreflight: false,
         maxRetries: 3,
       });
-    } catch {
-      // Fallback to legacy Transaction
-      const tx = Transaction.from(txBuffer);
-      signature = await connection.sendRawTransaction(tx.serialize(), {
-        skipPreflight: false,
-        maxRetries: 3,
-      });
+    } catch (error) {
+      console.error("Failed to send transaction:", error);
+      throw new Error("Invalid transaction format");
     }
 
     // Wait for confirmation (initial)
