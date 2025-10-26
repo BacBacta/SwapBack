@@ -931,29 +931,6 @@ export function EnhancedSwapInterface() {
               </div>
             </div>
           </div>
-          
-          {/* Keyboard Shortcuts */}
-          <div className="terminal-box p-4 mt-4">
-            <div className="text-sm terminal-text font-bold mb-3">[SHORTCUTS]</div>
-            <div className="space-y-1.5 text-xs">
-              <div className="flex justify-between items-center">
-                <span className="opacity-70">Focus Input:</span>
-                <kbd className="terminal-box px-2 py-0.5 text-[10px] font-mono">Ctrl+K</kbd>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="opacity-70">Swap Tokens:</span>
-                <kbd className="terminal-box px-2 py-0.5 text-[10px] font-mono">Ctrl+S</kbd>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="opacity-70">Execute:</span>
-                <kbd className="terminal-box px-2 py-0.5 text-[10px] font-mono">Ctrl+Enter</kbd>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="opacity-70">Close Menu:</span>
-                <kbd className="terminal-box px-2 py-0.5 text-[10px] font-mono">Esc</kbd>
-              </div>
-            </div>
-          </div>
 
           {/* Recent Trades History */}
           <div className="terminal-box p-4 mt-4">
