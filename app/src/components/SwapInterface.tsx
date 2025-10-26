@@ -30,6 +30,15 @@ interface RouteInfo {
   priceImpact?: number;
 }
 
+interface RouteOption {
+  name: string;
+  output: number;
+  rebate: number;
+  gas: number;
+  timeEstimate: string;
+  badge?: "Best Price" | "Fastest" | "Lowest Gas";
+}
+
 export const SwapInterface = () => {
   const { connected, publicKey } = useWallet();
   const { connection } = useConnection();
@@ -56,6 +65,12 @@ export const SwapInterface = () => {
   const [showInputTokenSelector, setShowInputTokenSelector] = useState(false);
   const [showOutputTokenSelector, setShowOutputTokenSelector] = useState(false);
   const [showRouteDetails, setShowRouteDetails] = useState(false);
+  const [exchangeRate, setExchangeRate] = useState<number>(0);
+  const [priceChange24h, setPriceChange24h] = useState<number>(0);
+  const [routeOptions, setRouteOptions] = useState<RouteOption[]>([]);
+  const [showRouteComparison, setShowRouteComparison] = useState(false);
+  const [showPriceImpactModal, setShowPriceImpactModal] = useState(false);
+  const [pendingSwap, setPendingSwap] = useState(false);
 
   const tokenAddresses: { [key: string]: string } = {
     SOL: "So11111111111111111111111111111111111111112",
@@ -97,9 +112,47 @@ export const SwapInterface = () => {
     try {
       await new Promise(resolve => setTimeout(resolve, 800));
       
+      // Calculate exchange rate
+      const rate = parseFloat(inputAmount) > 0 ? (parseFloat(inputAmount) * 0.005) / parseFloat(inputAmount) : 0;
+      setExchangeRate(rate);
+      
+      // Simulate 24h price change (-5% to +5%)
+      const change24h = (Math.random() - 0.5) * 10;
+      setPriceChange24h(change24h);
+      
+      // Generate 3 route options
+      const baseOutput = parseFloat(inputAmount) * 0.005;
+      const routes: RouteOption[] = [
+        {
+          name: "SwapBack Optimized",
+          output: baseOutput * 1.02,
+          rebate: baseOutput * 0.015,
+          gas: 0.000012,
+          timeEstimate: "~5s",
+          badge: "Best Price"
+        },
+        {
+          name: "Jupiter Aggregator",
+          output: baseOutput * 0.98,
+          rebate: 0,
+          gas: 0.000008,
+          timeEstimate: "~3s",
+          badge: "Fastest"
+        },
+        {
+          name: "Direct Route",
+          output: baseOutput * 0.95,
+          rebate: 0,
+          gas: 0.000005,
+          timeEstimate: "~4s",
+          badge: "Lowest Gas"
+        }
+      ];
+      setRouteOptions(routes);
+      
       const mockRoute: RouteInfo = {
         type: "Aggregator",
-        estimatedOutput: parseFloat(inputAmount) * 0.005,
+        estimatedOutput: baseOutput,
         nonOptimizedOutput: parseFloat(inputAmount) * 0.0045,
         npi: parseFloat(inputAmount) * 0.002,
         rebate: parseFloat(inputAmount) * 0.0015,
@@ -136,6 +189,17 @@ export const SwapInterface = () => {
   const handleExecuteSwap = async () => {
     if (!connected || !publicKey) return;
     
+    // Check price impact and show warning modal if > 3%
+    if (routeInfo && routeInfo.priceImpact && routeInfo.priceImpact > 3) {
+      setShowPriceImpactModal(true);
+      setPendingSwap(true);
+      return;
+    }
+    
+    await executeSwap();
+  };
+
+  const executeSwap = async () => {
     setLoading(true);
     try {
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -148,6 +212,8 @@ export const SwapInterface = () => {
       setInputAmount("");
       setOutputAmount("");
       setRouteInfo(null);
+      setShowPriceImpactModal(false);
+      setPendingSwap(false);
     } catch (error) {
       console.error("Error:", error);
     } finally {
@@ -281,7 +347,7 @@ export const SwapInterface = () => {
                 value={inputAmount}
                 onChange={(e) => setInputAmount(e.target.value)}
                 placeholder="0.0"
-                className="flex-1 bg-transparent text-3xl font-bold terminal-text text-[var(--primary)] placeholder-[var(--primary)]/30 outline-none"
+                className="flex-1 bg-transparent text-3xl font-bold terminal-text text-[var(--primary)] placeholder-[var(--primary)]/30 outline-none input-glow-pulse"
                 disabled={!connected}
               />
               <button
@@ -303,13 +369,31 @@ export const SwapInterface = () => {
 
           {/* Swap Direction Button - Style 1inch */}
           <div className="flex justify-center -my-3 relative z-10">
-            <button
-              onClick={handleSwapTokens}
-              className="p-3 bg-black border-2 border-[var(--primary)] hover:bg-[var(--primary)] hover:text-black transition-all group"
-              disabled={!connected}
-            >
-              <ArrowDownUp className="w-5 h-5 group-hover:rotate-180 transition-transform duration-300" />
-            </button>
+            <div className="flex flex-col items-center gap-1">
+              <button
+                onClick={handleSwapTokens}
+                className="p-3 bg-black border-2 border-[var(--primary)] hover:bg-[var(--primary)] hover:text-black transition-all group"
+                disabled={!connected}
+              >
+                <ArrowDownUp className="w-5 h-5 group-hover:rotate-180 transition-transform duration-300" />
+              </button>
+              
+              {/* Exchange Rate Display */}
+              {exchangeRate > 0 && (
+                <div className="bg-black/80 backdrop-blur-sm border-2 border-[var(--primary)]/30 px-4 py-2 mt-1 animate-fade-in">
+                  <div className="text-center">
+                    <div className="text-xs font-bold terminal-text text-[var(--primary)] whitespace-nowrap">
+                      1 {inputToken} = {exchangeRate.toFixed(6)} {outputToken}
+                    </div>
+                    <div className={`text-xs font-semibold terminal-text flex items-center justify-center gap-1 ${
+                      priceChange24h >= 0 ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      {priceChange24h >= 0 ? '↗' : '↘'} {Math.abs(priceChange24h).toFixed(2)}% (24h)
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Output Token Section */}
@@ -331,7 +415,7 @@ export const SwapInterface = () => {
                 value={loading ? "..." : outputAmount}
                 readOnly
                 placeholder="0.0"
-                className="flex-1 bg-transparent text-3xl font-bold terminal-text text-[var(--primary)] placeholder-[var(--primary)]/30 outline-none"
+                className="flex-1 bg-transparent text-3xl font-bold terminal-text text-[var(--primary)] placeholder-[var(--primary)]/30 outline-none animate-count-up"
               />
               <button
                 onClick={() => setShowOutputTokenSelector(true)}
@@ -411,16 +495,116 @@ export const SwapInterface = () => {
             </div>
           )}
 
+          {/* Route Comparison Table - Modern Visual */}
+          {routeOptions.length > 0 && (
+            <div className="mt-3 space-y-2">
+              <button
+                onClick={() => setShowRouteComparison(!showRouteComparison)}
+                className="w-full flex items-center justify-between p-3 bg-black/40 border-2 border-[var(--secondary)]/20 hover:border-[var(--secondary)]/40 transition-all"
+              >
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-[var(--secondary)]" />
+                  <span className="text-sm font-bold terminal-text uppercase tracking-wider text-[var(--secondary)]">
+                    Compare Routes ({routeOptions.length})
+                  </span>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-[var(--secondary)] transition-transform ${showRouteComparison ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showRouteComparison && (
+                <div className="p-3 bg-black/60 border-2 border-[var(--secondary)]/30 space-y-2 animate-fade-in">
+                  {routeOptions.map((route, index) => (
+                    <div 
+                      key={index} 
+                      className="p-3 bg-black/40 border-2 border-[var(--primary)]/20 hover:border-[var(--primary)]/40 transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold terminal-text text-[var(--primary)]">
+                            {route.name}
+                          </span>
+                          {route.badge && (
+                            <span className={`text-xs px-2 py-0.5 font-bold terminal-text uppercase ${
+                              route.badge === "Best Price" 
+                                ? "bg-green-500/20 text-green-400 border border-green-500/40"
+                                : route.badge === "Fastest"
+                                ? "bg-blue-500/20 text-blue-400 border border-blue-500/40"
+                                : "bg-yellow-500/20 text-yellow-400 border border-yellow-500/40"
+                            }`}>
+                              {route.badge}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs font-semibold terminal-text text-[var(--primary)]/70">
+                          {route.timeEstimate}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div>
+                          <div className="text-[var(--primary)]/70 font-semibold uppercase tracking-wider mb-1">
+                            Output
+                          </div>
+                          <div className="font-bold terminal-text text-[var(--primary)]">
+                            {route.output.toFixed(6)}
+                          </div>
+                          <div className="mt-1 h-1 bg-black/60 border border-[var(--primary)]/30">
+                            <div 
+                              className="h-full bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] transition-all"
+                              style={{ width: `${(route.output / Math.max(...routeOptions.map(r => r.output))) * 100}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <div className="text-[var(--primary)]/70 font-semibold uppercase tracking-wider mb-1">
+                            Rebate
+                          </div>
+                          <div className="font-bold terminal-text text-green-400">
+                            {route.rebate > 0 ? `+${route.rebate.toFixed(6)}` : '--'}
+                          </div>
+                          {route.rebate > 0 && (
+                            <div className="mt-1 h-1 bg-black/60 border border-green-500/30">
+                              <div 
+                                className="h-full bg-green-500 transition-all"
+                                style={{ width: `${(route.rebate / Math.max(...routeOptions.map(r => r.rebate))) * 100}%` }}
+                              ></div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div>
+                          <div className="text-[var(--primary)]/70 font-semibold uppercase tracking-wider mb-1">
+                            Gas
+                          </div>
+                          <div className="font-bold terminal-text text-yellow-400">
+                            {route.gas.toFixed(8)} SOL
+                          </div>
+                          <div className="mt-1 h-1 bg-black/60 border border-yellow-500/30">
+                            <div 
+                              className="h-full bg-yellow-500 transition-all"
+                              style={{ width: `${(1 - (route.gas / Math.max(...routeOptions.map(r => r.gas)))) * 100}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Swap Button - Style moderne avec gradient */}
           <button
             onClick={handleExecuteSwap}
             disabled={!connected || !inputAmount || !outputAmount || loading}
-            className={`w-full mt-6 py-4 font-bold terminal-text uppercase tracking-wider text-lg transition-all ${
+            className={`w-full mt-6 py-4 font-bold terminal-text uppercase tracking-wider text-lg transition-all hover-scale ${
               !connected
                 ? "bg-yellow-500/20 border-2 border-yellow-500 text-yellow-500 cursor-not-allowed"
                 : !inputAmount || !outputAmount || loading
                 ? "bg-[var(--primary)]/20 border-2 border-[var(--primary)]/50 text-[var(--primary)]/50 cursor-not-allowed"
-                : "bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] text-black border-2 border-transparent hover:shadow-[0_0_30px_rgba(0,255,0,0.5)] hover:scale-[1.02]"
+                : "bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] text-black border-2 border-transparent hover:shadow-[0_0_30px_rgba(0,255,0,0.5)]"
             }`}
           >
             {!connected ? (
@@ -474,7 +658,7 @@ export const SwapInterface = () => {
         <TokenSelector
           selectedToken={inputToken}
           onSelect={(token) => {
-            setInputToken(token);
+            setInputToken(token.symbol);
             setShowInputTokenSelector(false);
           }}
           onClose={() => setShowInputTokenSelector(false)}
@@ -485,11 +669,102 @@ export const SwapInterface = () => {
         <TokenSelector
           selectedToken={outputToken}
           onSelect={(token) => {
-            setOutputToken(token);
+            setOutputToken(token.symbol);
             setShowOutputTokenSelector(false);
           }}
           onClose={() => setShowOutputTokenSelector(false)}
         />
+      )}
+
+      {/* Price Impact Warning Modal */}
+      {showPriceImpactModal && routeInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="max-w-md w-full bg-black border-4 border-red-500 p-6 animate-slide-in-up">
+            <div className="text-center mb-6">
+              <div className="text-6xl mb-4">⚠️</div>
+              <h3 className="text-2xl font-bold terminal-text text-red-500 uppercase tracking-wider mb-2">
+                High Price Impact Warning
+              </h3>
+              <p className="text-sm terminal-text text-[var(--primary)]/70">
+                This swap has an unusually high price impact
+              </p>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div className="p-4 bg-red-500/10 border-2 border-red-500/30">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm font-bold terminal-text text-red-400 uppercase">
+                    Price Impact
+                  </span>
+                  <span className="text-2xl font-bold terminal-text text-red-500">
+                    {routeInfo.priceImpact?.toFixed(2)}%
+                  </span>
+                </div>
+                {routeInfo.priceImpact && routeInfo.priceImpact > 10 && (
+                  <div className="text-xs terminal-text text-red-400 mt-2 border-t-2 border-red-500/30 pt-2">
+                    ❌ <strong>EXTREMELY HIGH!</strong> Consider reducing your swap amount.
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 bg-black/40 border-2 border-[var(--primary)]/30 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="terminal-text text-[var(--primary)]/70">You pay:</span>
+                  <span className="font-bold terminal-text text-[var(--primary)]">
+                    {inputAmount} {inputToken}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="terminal-text text-[var(--primary)]/70">You receive:</span>
+                  <span className="font-bold terminal-text text-[var(--primary)]">
+                    {outputAmount} {outputToken}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm pt-2 border-t-2 border-[var(--primary)]/20">
+                  <span className="terminal-text text-[var(--primary)]/70">Expected loss:</span>
+                  <span className="font-bold terminal-text text-red-400">
+                    ~${((parseFloat(inputAmount) * (inputTokenData.usdPrice || 1)) * ((routeInfo.priceImpact || 0) / 100)).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowPriceImpactModal(false);
+                  setPendingSwap(false);
+                }}
+                className="flex-1 py-3 px-4 bg-black border-2 border-[var(--primary)] text-[var(--primary)] font-bold terminal-text uppercase tracking-wider hover:bg-[var(--primary)] hover:text-black transition-all"
+              >
+                Cancel
+              </button>
+              {routeInfo.priceImpact && routeInfo.priceImpact <= 10 ? (
+                <button
+                  onClick={executeSwap}
+                  disabled={loading}
+                  className="flex-1 py-3 px-4 bg-red-500/20 border-2 border-red-500 text-red-500 font-bold terminal-text uppercase tracking-wider hover:bg-red-500 hover:text-white transition-all disabled:opacity-50"
+                >
+                  {loading ? 'Swapping...' : 'Swap Anyway'}
+                </button>
+              ) : (
+                <button
+                  disabled
+                  className="flex-1 py-3 px-4 bg-red-500/10 border-2 border-red-500/50 text-red-500/50 font-bold terminal-text uppercase tracking-wider cursor-not-allowed"
+                  title="Price impact too high. Reduce your amount."
+                >
+                  Impact Too High
+                </button>
+              )}
+            </div>
+
+            {routeInfo.priceImpact && routeInfo.priceImpact > 5 && routeInfo.priceImpact <= 10 && (
+              <div className="mt-4 p-3 bg-yellow-500/10 border-2 border-yellow-500/30 text-xs terminal-text text-yellow-400">
+                💡 <strong>Tip:</strong> Try splitting your swap into smaller amounts to reduce price impact.
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </>
   );
