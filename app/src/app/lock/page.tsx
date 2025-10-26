@@ -5,6 +5,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import LockInterface from '@/components/LockInterface';
 import UnlockInterface from '@/components/UnlockInterface';
 import { useCNFT } from '@/hooks/useCNFT';
+import { PageHeader } from '@/components/BackButton';
 
 export default function LockPage() {
   const { publicKey } = useWallet();
@@ -30,31 +31,16 @@ export default function LockPage() {
   return (
     <div className="min-h-screen py-12 px-4">
       <div className="max-w-4xl mx-auto">
-        {/* En-tête avec effet de glow */}
-        <div className="text-center mb-12 relative">
-          <div className="absolute inset-0 blur-[100px] opacity-30 pointer-events-none">
-            <div className="absolute top-0 left-1/4 w-64 h-64 bg-gradient-radial from-primary to-transparent rounded-full"></div>
-            <div className="absolute top-0 right-1/4 w-64 h-64 bg-gradient-radial from-accent to-transparent rounded-full"></div>
-          </div>
-          
-          <div className="relative">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-effect border border-primary/20 mb-6">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-              </span>
-              <span className="text-sm font-semibold text-primary">Verrouillage $BACK</span>
-            </div>
-            
-            <h1 className="hero-title mb-4 animate-fade-in">
-              💎 Verrouillez & Gagnez
-            </h1>
-            <p className="text-gray-300 text-lg max-w-2xl mx-auto animate-fade-in" style={{ animationDelay: '0.1s' }}>
-              Verrouillez vos tokens $BACK pour recevoir un cNFT et bénéficier de
-              boosts exceptionnels sur vos swaps
-            </p>
-          </div>
-        </div>
+        {/* Page Header with Back Button */}
+        <PageHeader
+          title="💎 Verrouillez & Gagnez"
+          description="Verrouillez vos tokens $BACK pour recevoir un cNFT et bénéficier de boosts exceptionnels sur vos swaps"
+          breadcrumbItems={[
+            { label: "Accueil", href: "/" },
+            { label: "Lock", href: "/lock" }
+          ]}
+          showBackButton={true}
+        />
 
         {/* Connexion wallet requise */}
         {!publicKey && (
