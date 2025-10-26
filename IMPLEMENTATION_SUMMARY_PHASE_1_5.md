@@ -9,6 +9,7 @@
 ## 📊 Vue d'Ensemble
 
 Le **système de boost complet** a été implémenté avec succès sur les 3 programmes Solana :
+
 - ✅ `swapback_cnft` - Gestion des NFTs de niveau avec boost dynamique
 - ✅ `swapback_router` - Routing avec rebates boostés
 - ✅ `swapback_buyback` - Distribution proportionnelle + burn 50/50
@@ -18,10 +19,12 @@ Le **système de boost complet** a été implémenté avec succès sur les 3 pro
 ## ✅ Phases Complétées
 
 ### **Phase 1: cNFT avec Boost Dynamique** ✅
+
 **Commit:** `71a6de3`  
 **Fichier:** `programs/swapback_cnft/src/lib.rs` (331 → 429 lignes)
 
 **Fonctionnalités implémentées:**
+
 - ✅ `mint_level_nft()` - Création NFT avec calcul de boost
 - ✅ `update_nft_status()` - Activation/désactivation du boost
 - ✅ Calcul de boost: `min((amount/1000)×50 + (days/10)×100, 10000)` BP
@@ -30,6 +33,7 @@ Le **système de boost complet** a été implémenté avec succès sur les 3 pro
 - ✅ 10 unit tests passant
 
 **Exemples de boost:**
+
 ```rust
 1k BACK × 30j   =   350 BP (3.5%)
 10k BACK × 180j = 2,300 BP (23%)
@@ -40,10 +44,12 @@ Le **système de boost complet** a été implémenté avec succès sur les 3 pro
 ---
 
 ### **Phase 2: Router avec Rebates Boostés** ✅
+
 **Commit:** `0c3b863`  
 **Fichier:** `programs/swapback_router/src/lib.rs` (785 → 896 lignes)
 
 **Fonctionnalités implémentées:**
+
 - ✅ Ajout constante `CNFT_PROGRAM_ID`
 - ✅ Ajout constante `BASE_REBATE_USDC = 3_000_000` (3 USDC)
 - ✅ Extension contexte `SwapToC` avec `user_nft` et `user_rebate_account` (optionnels)
@@ -53,6 +59,7 @@ Le **système de boost complet** a été implémenté avec succès sur les 3 pro
 - ✅ 7 unit tests passant
 
 **Exemples de rebates:**
+
 ```rust
 Base 3 USDC, boost 0%    = 3.00 USDC (1.00x)
 Base 3 USDC, boost 23%   = 3.69 USDC (1.23x)
@@ -63,10 +70,12 @@ Base 3 USDC, boost 100%  = 6.00 USDC (2.00x)
 ---
 
 ### **Phase 3: GlobalState Tracking** ✅
+
 **Commit:** `0c3b863`  
 **Fichier:** `programs/swapback_cnft/src/lib.rs` (inclus dans Phase 1)
 
 **Fonctionnalités implémentées:**
+
 - ✅ Instruction `initialize_global_state()`
 - ✅ Structure `GlobalState` avec 4 champs:
   - `authority: Pubkey`
@@ -81,10 +90,12 @@ Base 3 USDC, boost 100%  = 6.00 USDC (2.00x)
 ---
 
 ### **Phase 4: Distribution Buyback 50/50** ✅
+
 **Commit:** `b111624`  
 **Fichier:** `programs/swapback_buyback/src/lib.rs` (306 → 473 lignes)
 
 **Fonctionnalités implémentées:**
+
 - ✅ Ajout constante `CNFT_PROGRAM_ID`
 - ✅ Ajout constantes `BURN_RATIO_BPS = 5000` et `DISTRIBUTION_RATIO_BPS = 5000`
 - ✅ Instruction `distribute_buyback()` avec formule:
@@ -100,6 +111,7 @@ Base 3 USDC, boost 100%  = 6.00 USDC (2.00x)
 - ✅ 7 unit tests passant (validation ratio 50/50)
 
 **Exemple de distribution:**
+
 ```rust
 Buyback: 100,000 BACK
 ├─ Distributable (50%): 50,000 BACK
@@ -116,6 +128,7 @@ Utilisateurs:
 ### **Phase 5: Build et Documentation** ✅
 
 **Build en Release Mode:**
+
 ```bash
 ✅ swapback_cnft:    9.70s (0 errors, 0 warnings)
 ✅ swapback_router:  4.88s (0 errors, 3 warnings*)
@@ -125,6 +138,7 @@ Utilisateurs:
 ```
 
 **Documentation créée:**
+
 1. ✅ **BOOST_SYSTEM_DEPLOYMENT_GUIDE.md** (1,047 lignes)
    - Vue d'ensemble du système
    - Architecture complète
@@ -196,6 +210,7 @@ programs/
 ### Tests Unitaires (24 total)
 
 **swapback_cnft:** 10/10 ✅
+
 ```bash
 ✓ Test boost calculation: 1k × 30d = 350 BP
 ✓ Test boost calculation: 10k × 180d = 2300 BP
@@ -210,6 +225,7 @@ programs/
 ```
 
 **swapback_router:** 7/7 ✅
+
 ```bash
 ✓ Test rebate calculation: boost 0% → 3.00 USDC
 ✓ Test rebate calculation: boost 2300 BP → 3.69 USDC
@@ -221,6 +237,7 @@ programs/
 ```
 
 **swapback_buyback:** 7/7 ✅
+
 ```bash
 ✓ Test 50/50 distribution: 100k tokens
 ✓ Test user share calculation: Alice 76.4%
@@ -289,19 +306,19 @@ back_vault: ["back_vault"]
   activeLocks: 487,
   totalValueLocked: "15,234,000 BACK (~$320k)",
   averageLockDuration: "243 days",
-  
+
   totalCommunityBoost: "245,780 BP",
   averageUserBoost: "504 BP (5.04%)",
-  
+
   totalSwapVolume: "2,450,000 USDC",
   rebatesPaid: "87,450 USDC",
   averageBoostMultiplier: "1.23x",
-  
+
   buybacksExecuted: 4,
   totalBackBought: "195,400 BACK",
   totalDistributed: "97,700 BACK",
   totalBurned: "97,700 BACK 🔥",
-  
+
   estimatedAPY: "21.4%",
   topUserAPY: "28.9%", // Diamond avec lock max
   averageUserAPY: "15.2%"
@@ -313,9 +330,11 @@ back_vault: ["back_vault"]
 ## 🚀 Prochaines Étapes
 
 ### Phase 6: Tests d'Intégration TypeScript
+
 **Fichier à créer:** `tests/integration/boost-system.test.ts`
 
 **Tests à implémenter:**
+
 ```typescript
 ✓ Test 1: Lock tokens and mint NFT
 ✓ Test 2: Execute swap with boosted rebate
@@ -331,6 +350,7 @@ back_vault: ["back_vault"]
 ### Phase 7: Déploiement Devnet
 
 **Actions requises:**
+
 1. Configurer Solana CLI pour devnet
 2. Airdrop SOL pour frais de déploiement
 3. Déployer les 3 programmes:
@@ -351,11 +371,13 @@ back_vault: ["back_vault"]
 ### Phase 8: Intégration Frontend
 
 **Fichiers frontend existants:**
+
 - Frontend déjà déployé sur port 3001
 - UI de boost implémentée
 - Documentation frontend créée (7 fichiers .md)
 
 **Actions requises:**
+
 1. Connecter aux program IDs devnet
 2. Implémenter les hooks React:
    - `useLockTokens()` → `mint_level_nft()`
@@ -388,13 +410,13 @@ back_vault: ["back_vault"]
 
 ## 📚 Documentation Complète
 
-| Document | Lignes | Description |
-|----------|--------|-------------|
-| BOOST_SYSTEM_DEPLOYMENT_GUIDE.md | 1,047 | Guide complet de déploiement |
-| END_TO_END_FLOW.md | 780 | Parcours utilisateur détaillé |
-| swapback_cnft/src/lib.rs | 429 | Code source cNFT |
-| swapback_router/src/lib.rs | 896 | Code source Router |
-| swapback_buyback/src/lib.rs | 473 | Code source Buyback |
+| Document                         | Lignes | Description                   |
+| -------------------------------- | ------ | ----------------------------- |
+| BOOST_SYSTEM_DEPLOYMENT_GUIDE.md | 1,047  | Guide complet de déploiement  |
+| END_TO_END_FLOW.md               | 780    | Parcours utilisateur détaillé |
+| swapback_cnft/src/lib.rs         | 429    | Code source cNFT              |
+| swapback_router/src/lib.rs       | 896    | Code source Router            |
+| swapback_buyback/src/lib.rs      | 473    | Code source Buyback           |
 
 **Total:** 3,625 lignes de code et documentation
 

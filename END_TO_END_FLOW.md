@@ -45,7 +45,7 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
       └─── INTERACTION 1: LOCK TOKENS ───┐
                                           │
                                           ▼
-      
+
       📝 Transaction Details:
       ┌─────────────────────────────────────────┐
       │ Instruction: mint_level_nft             │
@@ -58,9 +58,9 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
       │ - global_state: [PDA]                   │
       │ - collection_config: [PDA]              │
       └─────────────────────────────────────────┘
-      
+
       ⚙️ Backend Processing:
-      
+
       1. swapback_cnft::mint_level_nft()
          ├─ Validate inputs
          ├─ Calculate boost:
@@ -84,12 +84,12 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
             ├─ total_community_boost += 8650
             ├─ active_locks_count += 1
             └─ total_value_locked += 100,000,000,000,000
-      
+
       🎉 Result:
       ├─ Alice reçoit un NFT Diamond avec 86.5% boost
       ├─ Toast: "Lock réussi ! Boost: 86.5% 🚀"
       └─ Dashboard mis à jour avec les stats
-      
+
 09:35 │ Alice voit son dashboard:
       │ ┌─────────────────────────────────────┐
       │ │ 💎 DIAMOND NFT                      │
@@ -123,7 +123,7 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
       └─── INTERACTION 2: SWAP WITH REBATE ───┐
                                                │
                                                ▼
-      
+
       📝 Transaction Details:
       ┌──────────────────────────────────────────────┐
       │ Instruction: swap_toc                        │
@@ -139,9 +139,9 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
       │ - user_rebate_account: Alice USDC account    │
       │ - router_state: [PDA]                        │
       └──────────────────────────────────────────────┘
-      
+
       ⚙️ Backend Processing:
-      
+
       1. swapback_router::swap_toc()
          ├─ Read UserNft.boost (if provided):
          │  └─ boost = 8650 BP
@@ -177,13 +177,13 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
                  user_boost: 8650,
                  rebate_amount: 5.595 USDC
                }
-      
+
       🎉 Result:
       ├─ Alice reçoit 952.3 BACK
       ├─ Alice reçoit 5.595 USDC de rebate (au lieu de 3 USDC)
       ├─ Économies: +2.595 USDC (+86.5%) 💰
       └─ Toast: "Swap réussi ! Rebate boosté: 5.59 USDC"
-      
+
 10:15 │ Alice voit son historique:
       │ ┌────────────────────────────────────────────┐
       │ │ Recent Swaps                               │
@@ -204,7 +204,7 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
       └─── ADMIN ACTION: EXECUTE BUYBACK ───┐
                                              │
                                              ▼
-      
+
       📝 Transaction Details:
       ┌──────────────────────────────────────────────┐
       │ Instruction: execute_buyback                 │
@@ -218,9 +218,9 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
       │ - back_vault: Protocol BACK vault            │
       │ - jupiter_program: Jupiter aggregator        │
       └──────────────────────────────────────────────┘
-      
+
       ⚙️ Backend Processing:
-      
+
       1. swapback_buyback::execute_buyback()
          ├─ Validate amount: 10,000 USDC ≥ min_buyback_amount ✓
          │
@@ -239,12 +239,12 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
                  back_amount: 48,500 BACK,
                  timestamp: 1730041200
                }
-      
+
       🎉 Result:
       ├─ 48,500 $BACK achetés sur le marché
       ├─ Pression acheteuse créée (price impact positif)
       └─ Tokens prêts pour distribution + burn
-      
+
 14:30 │ Alice voit la notification:
       │ ┌────────────────────────────────────────────┐
       │ │ 🔔 New Buyback Available!                  │
@@ -266,7 +266,7 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
       └─── INTERACTION 3: CLAIM BUYBACK ───┐
                                             │
                                             ▼
-      
+
       📝 Transaction Details:
       ┌──────────────────────────────────────────────┐
       │ Instruction: distribute_buyback              │
@@ -282,9 +282,9 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
       │ - back_vault: Protocol BACK vault            │
       │ - user_back_account: Alice BACK account      │
       └──────────────────────────────────────────────┘
-      
+
       ⚙️ Backend Processing:
-      
+
       1. swapback_buyback::distribute_buyback()
          ├─ Read user_nft (from swapback_cnft program):
          │  ├─ Validate is_active = true ✓
@@ -328,13 +328,13 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
                  total_burned: 24,250 BACK,
                  timestamp: now
                }
-      
+
       🎉 Result:
       ├─ Alice reçoit 20,070 $BACK (82.8% de la distribution)
       ├─ 24,250 $BACK brûlés (réduction supply)
       ├─ Toast: "Distribution claimed! +20,070 BACK 🎉"
       └─ Portfolio Alice: 120,070 BACK (100k locked + 20,070 gained)
-      
+
 14:40 │ Alice voit ses stats mises à jour:
       │ ┌────────────────────────────────────────────┐
       │ │ 💰 Your Earnings                           │
@@ -354,12 +354,12 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
 └─────────────────────────────────────────────────────────────────────┘
 
       📊 Alice's Activity Summary (30 days):
-      
+
       LOCKS:
       ├─ Initial: 100k BACK × 365 days
       ├─ Boost: 86.5%
       └─ Status: Active 💎
-      
+
       SWAPS:
       ├─ Total volume: 15,000 USDC → ~14,250 BACK
       ├─ Transactions: 15 swaps
@@ -369,7 +369,7 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
       │  └─ Extra gain: +38.92 USDC (+86.5%)
       │
       └─ Average rebate: 5.59 USDC per swap
-      
+
       BUYBACKS (4 weekly distributions):
       ├─ Week 1: 20,070 BACK (from 48,500)
       ├─ Week 2: 18,945 BACK (from 45,800)
@@ -377,7 +377,7 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
       ├─ Week 4: 19,823 BACK (from 47,900)
       │
       └─ Total received: 80,994 BACK
-      
+
       TOTAL EARNINGS (30 days):
       ├─ Rebates: 83.92 USDC
       ├─ Distributions: 80,994 BACK (~$1,700 @ $0.021/BACK)
@@ -385,7 +385,7 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
       │
       └─ Monthly ROI: ~1.78% on 100k locked
           Annualized: ~21.4% APY 📈
-      
+
       DEFLATION IMPACT:
       └─ Total burned (50% of distributions): 80,994 BACK 🔥
 
@@ -406,7 +406,7 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
       └─── INTERACTION 4: RELOCK TOKENS ───┐
                                             │
                                             ▼
-      
+
       📝 Transaction Details:
       ┌──────────────────────────────────────────────┐
       │ Instruction: update_nft_status               │
@@ -417,9 +417,9 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
       │ - user_nft: Alice's NFT PDA                  │
       │ - global_state: [PDA]                        │
       └──────────────────────────────────────────────┘
-      
+
       ⚙️ Backend Processing:
-      
+
       1. swapback_cnft::update_nft_status()
          ├─ Validate user owns NFT ✓
          │
@@ -434,27 +434,27 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
          │  └─ is_active = true (remains active)
          │
          └─ GlobalState unchanged (boost already counted)
-      
+
       🎉 Result:
       ├─ Lock extended for 365 more days
       ├─ Boost maintained: 86.5%
       └─ Toast: "Lock extended! Unlock date: Oct 26, 2027"
-      
-      
+
+
       📊 Alice's Year-End Stats:
-      
+
       TOTAL EARNINGS (365 days):
       ├─ Boosted rebates: ~1,100 USDC
       ├─ Buyback distributions: ~1,050,000 BACK
       ├─ Total value: ~$23,150 (@ $0.021/BACK)
       │
       └─ Annual ROI: 23.15% 🎉
-      
+
       COMMUNITY IMPACT:
       ├─ Total BACK burned: ~525,000 BACK 🔥
       ├─ Supply reduction: ~0.525%
       └─ Protocol health: Excellent ✅
-      
+
 09:30 │ Alice's decision:
       │ "The boost system works perfectly!
       │  I'll keep my lock active and continue
@@ -466,13 +466,13 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
 └─────────────────────────────────────────────────────────────────────┘
 
       Si Alice avait choisi d'unlock:
-      
+
       09:20 │ Alice clique sur "Unlock Tokens"
             │
             └─── ALTERNATIVE: UNLOCK ───┐
                                          │
                                          ▼
-            
+
             📝 Transaction Details:
             ┌──────────────────────────────────────────────┐
             │ Instruction: update_nft_status               │
@@ -484,9 +484,9 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
             │ - global_state: [PDA]                        │
             │ - user_back_account: Alice BACK account      │
             └──────────────────────────────────────────────┘
-            
+
             ⚙️ Backend Processing:
-            
+
             1. swapback_cnft::update_nft_status(false)
                ├─ Validate unlock period passed ✓
                │
@@ -500,7 +500,7 @@ Ce document décrit le **parcours complet d'un utilisateur** dans le système de
                │
                └─ Transfer locked tokens:
                   └─ 100,000 BACK → Alice's account
-            
+
             🎉 Result:
             ├─ Alice récupère 100k BACK
             ├─ NFT désactivé (boost = 0)
@@ -520,7 +520,7 @@ interface SystemMetrics {
   activeLocks: 487,
   totalValueLocked: 15_234_000 BACK, // ~$320k
   averageLockDuration: 243 days,
-  
+
   // Boosts
   totalCommunityBoost: 245_780 BP,
   averageUserBoost: 504 BP (5.04%),
@@ -528,18 +528,18 @@ interface SystemMetrics {
   goldUsers: 87 (17.8%),
   silverUsers: 156 (32.0%),
   bronzeUsers: 221 (45.5%),
-  
+
   // Swaps
   totalSwapVolume: 2_450_000 USDC,
   rebatesPaid: 87_450 USDC,
   averageBoostMultiplier: 1.23x,
-  
+
   // Buybacks
   buybacksExecuted: 4,
   totalBackBought: 195_400 BACK,
   totalDistributed: 97_700 BACK,
   totalBurned: 97_700 BACK, // 🔥 -0.097% supply
-  
+
   // APY
   estimatedAPY: 21.4%,
   topUserAPY: 28.9%, // Diamond avec lock max

@@ -24,12 +24,12 @@
 
 Le système de boost SwapBack comprend **4 programmes Solana interconnectés** :
 
-| Programme | ID Devnet | Fonctionnalité |
-|-----------|-----------|----------------|
-| `swapback_cnft` | `CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH` | Gestion des NFTs de niveau et calcul du boost |
-| `swapback_router` | `3Z295H9QHByYn9sHm3tH7ASHitwd2Y4AEaXUddfhQKap` | Routing des swaps avec rebates boostés |
-| `swapback_buyback` | `71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW` | Buyback et distribution proportionnelle |
-| `swapback_transfer_hook` | À définir | Token extension avec hooks (optionnel) |
+| Programme                | ID Devnet                                      | Fonctionnalité                                |
+| ------------------------ | ---------------------------------------------- | --------------------------------------------- |
+| `swapback_cnft`          | `CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH` | Gestion des NFTs de niveau et calcul du boost |
+| `swapback_router`        | `3Z295H9QHByYn9sHm3tH7ASHitwd2Y4AEaXUddfhQKap` | Routing des swaps avec rebates boostés        |
+| `swapback_buyback`       | `71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW` | Buyback et distribution proportionnelle       |
+| `swapback_transfer_hook` | À définir                                      | Token extension avec hooks (optionnel)        |
 
 ### Flux Complet
 
@@ -131,6 +131,7 @@ solana balance
 ### Structures de Données Clés
 
 #### 1. GlobalState (swapback_cnft)
+
 ```rust
 pub struct GlobalState {
     pub authority: Pubkey,              // Admin du programme
@@ -141,6 +142,7 @@ pub struct GlobalState {
 ```
 
 #### 2. UserNft (swapback_cnft)
+
 ```rust
 pub struct UserNft {
     pub user: Pubkey,                   // Propriétaire
@@ -155,6 +157,7 @@ pub struct UserNft {
 ```
 
 #### 3. BuybackState (swapback_buyback)
+
 ```rust
 pub struct BuybackState {
     pub authority: Pubkey,              // Admin du buyback
@@ -171,29 +174,32 @@ pub struct BuybackState {
 ### Formules de Calcul
 
 #### Calcul du Boost
+
 ```rust
 fn calculate_boost(amount: u64, duration: i64) -> u16 {
     let days = (duration / 86400) as u64;
     let amount_tokens = amount / 1_000_000_000; // Lamports → Tokens
-    
+
     // Score montant: max 50%
     let amount_score = min((amount_tokens / 1000) * 50, 5000);
-    
+
     // Score durée: max 50%
     let duration_score = min((days / 10) * 100, 5000);
-    
+
     // Total: max 100%
     min(amount_score + duration_score, 10000) as u16
 }
 ```
 
 **Exemples:**
+
 - 1k BACK × 30j = 350 BP (3.5%)
 - 10k BACK × 180j = 2300 BP (23%)
 - 100k BACK × 365j = 8600 BP (86%)
 - 100k BACK × 730j = 10000 BP (100% max)
 
 #### Calcul du Rebate Boosté
+
 ```rust
 fn calculate_boosted_rebate(base_rebate: u64, boost_bp: u16) -> u64 {
     let multiplier = 10_000 + boost_bp; // Ex: 10000 + 2300 = 12300 (123%)
@@ -202,12 +208,14 @@ fn calculate_boosted_rebate(base_rebate: u64, boost_bp: u16) -> u64 {
 ```
 
 **Exemples:**
+
 - Base 3 USDC, boost 0% = 3.00 USDC
 - Base 3 USDC, boost 23% = 3.69 USDC
 - Base 3 USDC, boost 86% = 5.58 USDC
 - Base 3 USDC, boost 100% = 6.00 USDC
 
 #### Distribution Buyback (50/50)
+
 ```rust
 fn calculate_user_share(
     buyback_tokens: u64,
@@ -217,15 +225,16 @@ fn calculate_user_share(
     // 50% distribution, 50% burn
     let distributable = buyback_tokens / 2;
     let burn_amount = buyback_tokens / 2;
-    
+
     // Part utilisateur proportionnelle
     let user_share = (distributable * user_boost as u64) / total_community_boost;
-    
+
     (user_share, burn_amount)
 }
 ```
 
 **Exemple: 100k BACK buyback**
+
 - Distributable: 50k BACK
 - Burn: 50k BACK
 - Alice (8600 BP / 11250 total): 38,222 BACK
@@ -288,6 +297,7 @@ anchor run initialize-global-state --provider.cluster devnet
 ```
 
 **Ou via TypeScript:**
+
 ```typescript
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
@@ -317,7 +327,9 @@ console.log("✅ GlobalState initialized:", globalState.toString());
 
 ```typescript
 const backMint = new anchor.web3.PublicKey("YOUR_BACK_MINT_ADDRESS");
-const usdcMint = new anchor.web3.PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"); // USDC devnet
+const usdcMint = new anchor.web3.PublicKey(
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+); // USDC devnet
 
 const [buybackState] = anchor.web3.PublicKey.findProgramAddressSync(
   [Buffer.from("buyback_state")],
@@ -380,7 +392,6 @@ import * as anchor from "@coral-xyz/anchor";
 import { expect } from "chai";
 
 describe("Boost System Integration Tests", () => {
-  
   let alice: anchor.web3.Keypair;
   let bob: anchor.web3.Keypair;
   let charlie: anchor.web3.Keypair;
@@ -390,12 +401,21 @@ describe("Boost System Integration Tests", () => {
     alice = anchor.web3.Keypair.generate();
     bob = anchor.web3.Keypair.generate();
     charlie = anchor.web3.Keypair.generate();
-    
+
     // Airdrop SOL
     await Promise.all([
-      provider.connection.requestAirdrop(alice.publicKey, 2 * anchor.web3.LAMPORTS_PER_SOL),
-      provider.connection.requestAirdrop(bob.publicKey, 2 * anchor.web3.LAMPORTS_PER_SOL),
-      provider.connection.requestAirdrop(charlie.publicKey, 2 * anchor.web3.LAMPORTS_PER_SOL),
+      provider.connection.requestAirdrop(
+        alice.publicKey,
+        2 * anchor.web3.LAMPORTS_PER_SOL
+      ),
+      provider.connection.requestAirdrop(
+        bob.publicKey,
+        2 * anchor.web3.LAMPORTS_PER_SOL
+      ),
+      provider.connection.requestAirdrop(
+        charlie.publicKey,
+        2 * anchor.web3.LAMPORTS_PER_SOL
+      ),
     ]);
   });
 
@@ -421,17 +441,17 @@ describe("Boost System Integration Tests", () => {
       .rpc();
 
     const nftAccount = await cnftProgram.account.userNft.fetch(userNft);
-    
+
     expect(nftAccount.boost).to.equal(8600); // 86% boost
     expect(nftAccount.level).to.deep.equal({ diamond: {} });
     expect(nftAccount.isActive).to.be.true;
-    
+
     console.log("✅ Alice locked 100k BACK × 365 days → Boost: 86%");
   });
 
   it("Test 2: Execute swap with boosted rebate", async () => {
     const amountIn = new anchor.BN(1000 * 1e6); // 1000 USDC
-    
+
     const [userNft] = anchor.web3.PublicKey.findProgramAddressSync(
       [Buffer.from("user_nft"), alice.publicKey.toBuffer()],
       cnftProgram.programId
@@ -470,12 +490,12 @@ describe("Boost System Integration Tests", () => {
 
     // Vérifier l'événement RebatePaid
     const events = await routerProgram.account.events();
-    const rebatePaid = events.find(e => e.name === "RebatePaid");
-    
+    const rebatePaid = events.find((e) => e.name === "RebatePaid");
+
     expect(rebatePaid.data.baseRebate).to.equal(3_000_000); // 3 USDC
     expect(rebatePaid.data.boost).to.equal(8600); // 86%
     expect(rebatePaid.data.totalRebate).to.equal(5_580_000); // 5.58 USDC
-    
+
     console.log("✅ Alice swap → Rebate: 5.58 USDC (base 3 USDC × 1.86)");
   });
 
@@ -502,9 +522,10 @@ describe("Boost System Integration Tests", () => {
       .rpc();
 
     // Vérifier l'état
-    const buybackStateAccount = await buybackProgram.account.buybackState.fetch(buybackState);
+    const buybackStateAccount =
+      await buybackProgram.account.buybackState.fetch(buybackState);
     expect(buybackStateAccount.buybackCount).to.equal(1);
-    
+
     console.log("✅ Buyback executed: 10k USDC → 50k BACK");
   });
 
@@ -532,13 +553,13 @@ describe("Boost System Integration Tests", () => {
 
     // Vérifier la distribution
     const events = await buybackProgram.account.events();
-    const distributed = events.find(e => e.name === "BuybackDistributed");
-    
+    const distributed = events.find((e) => e.name === "BuybackDistributed");
+
     expect(distributed.data.userBoost).to.equal(8600);
     expect(distributed.data.totalBoost).to.equal(11250);
     expect(distributed.data.distributableAmount).to.equal(25_000 * 1e9); // 50% de 50k
     expect(distributed.data.tokensReceived).to.equal(19_111 * 1e9); // 76.4% de 25k
-    
+
     console.log("✅ Alice received: 19,111 BACK (76.4% of distribution)");
   });
 
@@ -548,7 +569,8 @@ describe("Boost System Integration Tests", () => {
       cnftProgram.programId
     );
 
-    const globalStateBefore = await cnftProgram.account.globalState.fetch(globalState);
+    const globalStateBefore =
+      await cnftProgram.account.globalState.fetch(globalState);
     const boostBefore = globalStateBefore.totalCommunityBoost;
 
     await cnftProgram.methods
@@ -561,12 +583,15 @@ describe("Boost System Integration Tests", () => {
       .signers([alice])
       .rpc();
 
-    const globalStateAfter = await cnftProgram.account.globalState.fetch(globalState);
+    const globalStateAfter =
+      await cnftProgram.account.globalState.fetch(globalState);
     const boostAfter = globalStateAfter.totalCommunityBoost;
-    
+
     expect(boostAfter).to.equal(boostBefore - 8600);
-    
-    console.log("✅ Alice unlocked → GlobalState.total_community_boost decreased");
+
+    console.log(
+      "✅ Alice unlocked → GlobalState.total_community_boost decreased"
+    );
   });
 });
 ```
@@ -598,22 +623,22 @@ const scenarios = [
     amount: 100_000 * 1e9,
     duration: 365 * 86400,
     expectedBoost: 8600,
-    expectedShare: 0.764 // 76.4%
+    expectedShare: 0.764, // 76.4%
   },
   {
     user: "Bob",
     amount: 10_000 * 1e9,
     duration: 180 * 86400,
     expectedBoost: 2300,
-    expectedShare: 0.204 // 20.4%
+    expectedShare: 0.204, // 20.4%
   },
   {
     user: "Charlie",
     amount: 1_000 * 1e9,
     duration: 30 * 86400,
     expectedBoost: 350,
-    expectedShare: 0.031 // 3.1%
-  }
+    expectedShare: 0.031, // 3.1%
+  },
 ];
 
 // Total boost: 11,250 BP
@@ -716,17 +741,17 @@ interface SystemMetrics {
   totalCommunityBoost: number;
   activeLocksCount: number;
   totalValueLocked: BN;
-  
+
   // Buyback
   totalUsdcSpent: BN;
   totalBackBurned: BN;
   buybackCount: number;
-  
+
   // Distribution
   totalDistributed: BN;
   uniqueClaimers: number;
   averageUserShare: number;
-  
+
   // APY estimé
   estimatedAPY: number; // Basé sur distributions historiques
 }
@@ -737,30 +762,35 @@ interface SystemMetrics {
 ## 🐛 Troubleshooting
 
 ### Erreur: "InsufficientFunds"
+
 ```
 Cause: Pas assez de tokens dans le vault
 Solution: Vérifier les soldes avant distribution
 ```
 
 ### Erreur: "InactiveNft"
+
 ```
 Cause: NFT désactivé (après unlock)
 Solution: Re-lock les tokens pour réactiver
 ```
 
 ### Erreur: "NoBoostInCommunity"
+
 ```
 Cause: Aucun lock actif dans le système
 Solution: Au moins un utilisateur doit avoir un lock actif
 ```
 
 ### Erreur: "ShareTooSmall"
+
 ```
 Cause: Part calculée = 0 (boost trop faible)
 Solution: Augmenter le montant ou la durée du lock
 ```
 
 ### Erreur: "MathOverflow"
+
 ```
 Cause: Dépassement arithmétique dans les calculs
 Solution: Vérifier les montants max (ne devrait pas arriver)
