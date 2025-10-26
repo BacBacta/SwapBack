@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token;
+use anchor_spl::token::{self, Token, TokenAccount};
 
 mod cpi_orca;
 mod oracle;
@@ -119,16 +119,16 @@ pub struct SwapToC<'info> {
     pub oracle: AccountInfo<'info>,
 
     #[account(mut)]
-    pub user_token_account_a: Account<'info, token::TokenAccount>,
+    pub user_token_account_a: Account<'info, TokenAccount>,
 
     #[account(mut)]
-    pub user_token_account_b: Account<'info, token::TokenAccount>,
+    pub user_token_account_b: Account<'info, TokenAccount>,
 
     #[account(mut)]
-    pub vault_token_account_a: Account<'info, token::TokenAccount>,
+    pub vault_token_account_a: Account<'info, TokenAccount>,
 
     #[account(mut)]
-    pub vault_token_account_b: Account<'info, token::TokenAccount>,
+    pub vault_token_account_b: Account<'info, TokenAccount>,
 
     /// CHECK: Optional swap plan account when using dynamic plans
     pub plan: Option<Account<'info, SwapPlan>>,
@@ -147,7 +147,7 @@ pub struct SwapToC<'info> {
 
     /// CHECK: Buyback USDC vault (validated in buyback program)
     #[account(mut)]
-    pub buyback_usdc_vault: Option<Account<'info, token::TokenAccount>>,
+    pub buyback_usdc_vault: Option<Account<'info, TokenAccount>>,
 
     /// CHECK: Buyback state account (validated in buyback program)
     #[account(mut)]
@@ -155,9 +155,9 @@ pub struct SwapToC<'info> {
 
     /// CHECK: User's rebate USDC account (for receiving boosted rebates)
     #[account(mut)]
-    pub user_rebate_account: Option<Account<'info, token::TokenAccount>>,
+    pub user_rebate_account: Option<Account<'info, TokenAccount>>,
 
-    pub token_program: Program<'info, token::Token>,
+    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
 
