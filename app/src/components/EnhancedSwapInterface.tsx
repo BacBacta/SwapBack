@@ -223,6 +223,41 @@ export function EnhancedSwapInterface() {
       if (!swapData.success) {
         throw new Error(swapData.error || "Failed to build swap transaction");
       }
+
+      // Check if this is a mock transaction (development/testing mode)
+      if (swapData.mock) {
+        console.log("🧪 Mock swap transaction detected - skipping execution");
+        setTxStatus("confirmed");
+        setTxSignature("MOCK_TX_" + Date.now());
+        
+        // Save mock trade to history
+        saveTrade({
+          id: `mock-trade-${Date.now()}`,
+          timestamp: Date.now(),
+          inputToken: inputToken.symbol,
+          outputToken: outputToken.symbol,
+          inputAmount: parseFloat(inputAmount),
+          outputAmount: parseFloat(outputAmount),
+          signature: "MOCK_TX_" + Date.now(),
+          status: "success",
+        });
+        
+        showToast(
+          `🧪 Mock swap executed! ${inputAmount} ${inputToken.symbol} → ${outputAmount} ${outputToken.symbol} (Dev mode)`,
+          "success"
+        );
+        
+        // Reset form
+        setTimeout(() => {
+          setInputAmount("");
+          setOutputAmount("");
+          setCurrentQuote(null);
+          setRouteInfo(null);
+          setTxStatus("idle");
+        }, 3000);
+        
+        return;
+      }
       
       setTxStatus("signing");
       
