@@ -89,8 +89,11 @@ pub mod swapback_buyback {
         buyback_state.total_usdc_spent = buyback_state
             .total_usdc_spent
             .checked_add(actual_usdc)
-            .unwrap();
-        buyback_state.buyback_count = buyback_state.buyback_count.checked_add(1).unwrap();
+            .ok_or(ErrorCode::MathOverflow)?;
+        buyback_state.buyback_count = buyback_state
+            .buyback_count
+            .checked_add(1)
+            .ok_or(ErrorCode::MathOverflow)?;
 
         emit!(BuybackExecuted {
             usdc_amount: actual_usdc,
@@ -213,8 +216,10 @@ pub mod swapback_buyback {
         token::burn(cpi_ctx, amount)?;
 
         // Mise à jour des statistiques
-        buyback_state.total_back_burned =
-            buyback_state.total_back_burned.checked_add(amount).unwrap();
+        buyback_state.total_back_burned = buyback_state
+            .total_back_burned
+            .checked_add(amount)
+            .ok_or(ErrorCode::MathOverflow)?;
 
         emit!(BackBurned {
             amount,

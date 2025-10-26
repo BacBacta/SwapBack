@@ -326,6 +326,10 @@ pub enum ErrorCode {
     DexNotImplemented,
     #[msg("DEX execution failed")]
     DexExecutionFailed,
+    #[msg("Invalid amount - must be greater than 0")]
+    InvalidAmount,
+    #[msg("Slippage tolerance too high - max 10%")]
+    SlippageTooHigh,
 }
 
 pub mod create_plan_processor {
@@ -368,6 +372,15 @@ pub mod swap_toc_processor {
     use crate::oracle::{self, OracleObservation};
 
     pub fn process_swap_toc(ctx: Context<SwapToC>, args: SwapArgs) -> Result<()> {
+        // ✅ SECURITY: Validate input parameters
+        require!(args.amount_in > 0, ErrorCode::InvalidAmount);
+        require!(args.min_out > 0, ErrorCode::InvalidAmount);
+        
+        // ✅ SECURITY: Validate slippage is reasonable (max 10%)
+        if let Some(slippage) = args.slippage_tolerance {
+            require!(slippage <= 1000, ErrorCode::SlippageTooHigh); // 10% max
+        }
+        
         let clock = Clock::get()?;
 
         if ctx.accounts.oracle.key() != args.oracle_account {
