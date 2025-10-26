@@ -17,6 +17,7 @@ export const Navigation = () => {
 
   const navLinks = [
     { href: "/", label: "Swap" },
+    { href: "/swap-modern", label: "Swap Modern" },
     { href: "/dashboard", label: "Dashboard" },
   ];
 
