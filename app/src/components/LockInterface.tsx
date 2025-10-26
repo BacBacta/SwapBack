@@ -37,7 +37,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
   const { connection } = useConnection();
 
   const [amount, setAmount] = useState<string>('');
-  const [duration, setDuration] = useState<string>('30'); // Jours
+  const [duration, setDuration] = useState<string>('30'); // Days
   const [balance, setBalance] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -91,34 +91,34 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
     fetchBalance();
   }, [publicKey, connection]);
 
-  // Validation du montant
+  // Amount validation
   const amountError = useMemo(() => {
     const amt = parseFloat(amount);
     if (!amount || isNaN(amt)) return null;
-    if (amt <= 0) return 'Le montant doit être supérieur à 0';
-    if (amt > balance) return 'Solde insuffisant';
+    if (amt <= 0) return 'Amount must be greater than 0';
+    if (amt > balance) return 'Insufficient balance';
     return null;
   }, [amount, balance]);
 
-  // Validation de la durée
+  // Duration validation
   const durationError = useMemo(() => {
     const days = parseInt(duration);
     if (!duration || isNaN(days)) return null;
     if (days < LEVEL_THRESHOLDS.Bronze)
-      return `La durée minimale est de ${LEVEL_THRESHOLDS.Bronze} jours`;
-    if (days > 365) return 'La durée maximale est de 365 jours';
+      return `Minimum duration is ${LEVEL_THRESHOLDS.Bronze} days`;
+    if (days > 365) return 'Maximum duration is 365 days';
     return null;
   }, [duration]);
 
-  // Fonction pour verrouiller les tokens
+  // Function to lock tokens
   const handleLock = async () => {
     if (!publicKey) {
-      setError('Veuillez connecter votre wallet');
+      setError('Please connect your wallet');
       return;
     }
 
     if (amountError || durationError) {
-      setError('Veuillez corriger les erreurs du formulaire');
+      setError('Please correct form errors');
       return;
     }
 
@@ -126,7 +126,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
     const days = parseInt(duration);
 
     if (!amt || !days) {
-      setError('Veuillez remplir tous les champs');
+      setError('Please fill all fields');
       return;
     }
 
@@ -218,7 +218,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
       }, 'confirmed');
 
       setSuccess(
-        `✅ Verrouillage réussi ! Signature : ${signature.slice(0, 8)}...`
+        `✅ Lock successful! Signature: ${signature.slice(0, 8)}...`
       );
       setAmount('');
 
@@ -236,9 +236,9 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         setBalance(bal);
       }, 2000);
     } catch (err: any) {
-      console.error('Erreur lors du verrouillage:', err);
+      console.error('Error during lock:', err);
       setError(
-        err.message || 'Échec du verrouillage. Veuillez réessayer.'
+        err.message || 'Lock failed. Please try again.'
       );
     } finally {
       setIsLoading(false);
@@ -255,24 +255,24 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
           <span className="text-xl">🔒</span>
         </div>
         <h2 className="card-title">
-          Verrouiller $BACK
+          Lock $BACK
         </h2>
       </div>
 
-      {/* Affichage du solde */}
+      {/* Balance display */}
       <div className="mb-6 p-4 glass-effect rounded-lg border border-primary/10">
         <div className="flex justify-between items-center">
-          <span className="text-gray-400">Solde disponible</span>
+          <span className="text-gray-400">Available Balance</span>
           <span className="text-[var(--primary)] font-bold text-lg">
             {balance.toLocaleString()} <span className="text-primary">$BACK</span>
           </span>
         </div>
       </div>
 
-      {/* Champ de montant */}
+      {/* Amount field */}
       <div className="mb-6">
         <label className="block text-gray-300 mb-2 font-medium">
-          Montant à verrouiller
+          Amount to Lock
         </label>
         <div className="relative">
           <input
@@ -320,10 +320,10 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         </div>
       </div>
 
-      {/* Champ de durée */}
+      {/* Duration field */}
       <div className="mb-6">
         <label className="block text-gray-300 mb-2 font-medium">
-          Durée de verrouillage (jours)
+          Lock Duration (days)
         </label>
         <div className="relative">
           <input
@@ -339,7 +339,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
             disabled={isLoading}
           />
           <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">
-            jours
+            days
           </div>
         </div>
         {durationError && (
@@ -382,13 +382,13 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         </div>
       </div>
 
-      {/* Prévisualisation du niveau et du boost */}
+      {/* Tier and boost preview */}
       <div className="mb-6 p-5 glass-effect rounded-lg border border-primary/20 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-radial from-primary/10 to-transparent rounded-full blur-2xl"></div>
         
         <div className="relative">
           <div className="flex justify-between items-center mb-4">
-            <span className="text-gray-400 font-medium">Niveau prédit</span>
+            <span className="text-gray-400 font-medium">Predicted Tier</span>
             <span
               className={`px-4 py-1.5 rounded-full border font-bold ${levelColor} transition-all hover:scale-105`}
             >
@@ -396,7 +396,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
             </span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-gray-400 font-medium">Boost prédit</span>
+            <span className="text-gray-400 font-medium">Predicted Boost</span>
             <div className="flex items-baseline gap-1">
               <span className="text-3xl font-bold bg-gradient-to-r from-secondary to-green-400 bg-clip-text text-transparent">
                 +{predictedBoost}%
@@ -406,7 +406,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         </div>
       </div>
 
-      {/* Messages d'erreur et de succès */}
+      {/* Error and success messages */}
       {error && (
         <div className="mb-4 p-4 glass-effect border border-red-500/30 rounded-lg text-red-300 animate-slide-up">
           <div className="flex items-start gap-3">
@@ -482,46 +482,46 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               />
             </svg>
-            Verrouillage en cours...
+            Locking in progress...
           </span>
         ) : !publicKey ? (
-          <span className="relative">Connecter le wallet</span>
+          <span className="relative">Connect Wallet</span>
         ) : (
           <span className="relative flex items-center justify-center gap-2">
             <span>🔒</span>
-            <span>Verrouiller $BACK</span>
+            <span>Lock $BACK</span>
           </span>
         )}
       </button>
 
-      {/* Informations supplémentaires */}
+      {/* Additional information */}
       <div className="mt-6 p-5 glass-effect border border-primary/20 rounded-lg">
         <div className="flex items-center gap-2 mb-3">
           <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 border border-primary/30">
             <span className="text-sm">ℹ️</span>
           </div>
-          <h4 className="text-primary font-bold">Informations importantes</h4>
+          <h4 className="text-primary font-bold">Important Information</h4>
         </div>
         <ul className="text-gray-400 text-sm space-y-2">
           <li className="flex items-start gap-2">
             <span className="text-orange-400 mt-0.5">🥉</span>
-            <span>Bronze (7-29j) : +5% de boost sur vos rebates</span>
+            <span>Bronze (7-29d): +5% boost on your rebates</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-gray-400 mt-0.5">🥈</span>
-            <span>Silver (30-89j) : +10% de boost sur vos rebates</span>
+            <span>Silver (30-89d): +10% boost on your rebates</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-yellow-400 mt-0.5">🥇</span>
-            <span>Gold (90j+) : +20% de boost sur vos rebates</span>
+            <span>Gold (90d+): +20% boost on your rebates</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary mt-0.5">🔒</span>
-            <span>Les tokens seront verrouillés jusqu&apos;à la fin de la période</span>
+            <span>Tokens will be locked until the end of the period</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-secondary mt-0.5">💎</span>
-            <span>Vous recevrez un cNFT représentant votre verrouillage</span>
+            <span>You will receive a cNFT representing your lock</span>
           </li>
         </ul>
       </div>

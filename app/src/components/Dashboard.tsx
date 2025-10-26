@@ -162,7 +162,7 @@ export const Dashboard = () => {
           onClick={() => setActiveTab("overview")}
           className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 ${
             activeTab === "overview"
-              ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
+              ? "bg-[var(--primary)] text-gray-900 border-[var(--primary)] terminal-glow font-bold"
               : "text-[var(--primary)] border-[var(--primary)]/30 hover:bg-[var(--primary)]/10"
           }`}
         >
@@ -172,7 +172,7 @@ export const Dashboard = () => {
           onClick={() => setActiveTab("dca")}
           className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 ${
             activeTab === "dca"
-              ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
+              ? "bg-[var(--primary)] text-gray-900 border-[var(--primary)] terminal-glow font-bold"
               : "text-[var(--primary)] border-[var(--primary)]/30 hover:bg-[var(--primary)]/10"
           }`}
         >
@@ -182,7 +182,7 @@ export const Dashboard = () => {
           onClick={() => setActiveTab("lock")}
           className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider ${
             activeTab === "lock"
-              ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
+              ? "bg-[var(--primary)] text-gray-900 border-[var(--primary)] terminal-glow font-bold"
               : "text-[var(--primary)] hover:bg-[var(--primary)]/10"
           }`}
         >

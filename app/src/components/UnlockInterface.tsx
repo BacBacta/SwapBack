@@ -47,7 +47,7 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
     const secondsRemaining = unlockTimestamp - now;
 
     if (secondsRemaining <= 0) {
-      return { canUnlock: true, display: 'Déverrouillage disponible !' };
+      return { canUnlock: true, display: 'Unlock available!' };
     }
 
     const days = Math.floor(secondsRemaining / 86400);
@@ -86,15 +86,15 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
     return Math.round(progress);
   }, [lockData]);
 
-  // Fonction pour déverrouiller les tokens
+  // Function to unlock tokens
   const handleUnlock = async () => {
     if (!publicKey) {
-      setError('Veuillez connecter votre wallet');
+      setError('Please connect your wallet');
       return;
     }
 
     if (!timeRemaining?.canUnlock) {
-      setError('La période de verrouillage n\'est pas encore terminée');
+      setError('Lock period is not over yet');
       return;
     }
 
@@ -173,7 +173,7 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
       }, 'confirmed');
 
       const unlockedAmount = lockData?.amount ? Number(lockData.amount) / 1_000_000_000 : 0;
-      const successMessage = `✅ Déverrouillage réussi ! ${unlockedAmount > 0 ? unlockedAmount + ' $BACK' : 'Tokens'} récupérés. Signature : ${signature.slice(0, 8)}...`;
+      const successMessage = `✅ Unlock successful! ${unlockedAmount > 0 ? unlockedAmount + ' $BACK' : 'Tokens'} recovered. Signature: ${signature.slice(0, 8)}...`;
       setSuccess(successMessage);
 
       // Callback de succès
@@ -186,9 +186,9 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
         refresh();
       }, 2000);
     } catch (err: any) {
-      console.error('Erreur lors du déverrouillage:', err);
+      console.error('Error during unlock:', err);
       setError(
-        err.message || 'Échec du déverrouillage. Veuillez réessayer.'
+        err.message || 'Unlock failed. Please try again.'
       );
     } finally {
       setIsUnlocking(false);
@@ -230,10 +230,10 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
         <div className="text-center py-12">
           <div className="text-6xl mb-4">🔓</div>
           <h3 className="text-xl font-bold text-[var(--primary)] mb-2">
-            Aucun verrouillage actif
+            No Active Lock
           </h3>
           <p className="text-gray-400">
-            Vous n&apos;avez pas de tokens $BACK verrouillés actuellement.
+            You don&apos;t have any $BACK tokens locked currently.
           </p>
         </div>
       </div>
@@ -247,23 +247,23 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
           <span className="text-xl">🔓</span>
         </div>
         <h2 className="card-title">
-          Déverrouiller $BACK
+          Unlock $BACK
         </h2>
       </div>
 
-      {/* Informations du lock */}
+      {/* Lock information */}
       <div className="mb-6 p-5 glass-effect rounded-lg border border-secondary/10 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-radial from-secondary/10 to-transparent rounded-full blur-2xl"></div>
         
         <div className="relative space-y-4">
           <div className="flex justify-between items-center">
-            <span className="text-gray-400 font-medium">Montant verrouillé</span>
+            <span className="text-gray-400 font-medium">Locked Amount</span>
             <span className="text-[var(--primary)] font-bold text-lg">
               {lockData.amount ? (Number(lockData.amount) / 1_000_000_000).toLocaleString() : '0'} <span className="text-primary">$BACK</span>
             </span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-gray-400 font-medium">Niveau du cNFT</span>
+            <span className="text-gray-400 font-medium">cNFT Tier</span>
             <span
               className={`px-4 py-1.5 rounded-full border font-bold ${levelColor} transition-all hover:scale-105`}
             >
@@ -271,7 +271,7 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
             </span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-gray-400 font-medium">Boost actif</span>
+            <span className="text-gray-400 font-medium">Active Boost</span>
             <div className="flex items-baseline gap-1">
               <span className="text-3xl font-bold bg-gradient-to-r from-secondary to-green-400 bg-clip-text text-transparent">
                 +{lockData.boost || 0}%
@@ -281,7 +281,7 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
         </div>
       </div>
 
-      {/* Compte à rebours avec animation */}
+      {/* Countdown with animation */}
       <div className="mb-6 p-6 glass-effect rounded-lg border border-gray-700/50 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5"></div>
         
@@ -289,7 +289,7 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
           <div className="text-center mb-4">
             <div className="flex items-center justify-center gap-2 mb-3">
               <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
-              <div className="text-gray-400 text-sm font-medium">Temps restant</div>
+              <div className="text-gray-400 text-sm font-medium">Time Remaining</div>
             </div>
             <div
               className={`text-4xl font-bold ${
@@ -308,9 +308,9 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
             />
           </div>
           <div className="flex justify-between items-center text-gray-400 text-xs mt-2">
-            <span>Début</span>
-            <span className="font-bold">{lockProgress}% écoulé</span>
-            <span>Fin</span>
+            <span>Start</span>
+            <span className="font-bold">{lockProgress}% elapsed</span>
+            <span>End</span>
           </div>
         </div>
       </div>
@@ -375,50 +375,50 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   />
                 </svg>
-                Déverrouillage en cours...
+                Unlocking in progress...
               </span>
             );
           }
           if (!publicKey) {
-            return <span className="relative">Connecter le wallet</span>;
+            return <span className="relative">Connect Wallet</span>;
           }
           if (!timeRemaining?.canUnlock) {
             return <span className="relative flex items-center justify-center gap-2">
               <span>⏳</span>
-              <span>Disponible dans {timeRemaining?.display}</span>
+              <span>Available in {timeRemaining?.display}</span>
             </span>;
           }
           return <span className="relative flex items-center justify-center gap-2">
             <span>🔓</span>
-            <span>Déverrouiller maintenant</span>
-          </span>;
+            <span>Unlock Now</span>
+          </span>
         })()}
       </button>
 
-      {/* Informations supplémentaires */}
+      {/* Additional information */}
       <div className="mt-6 p-5 glass-effect border border-secondary/20 rounded-lg">
         <div className="flex items-center gap-2 mb-3">
           <div className="flex items-center justify-center w-8 h-8 rounded-full bg-secondary/10 border border-secondary/30">
             <span className="text-sm">ℹ️</span>
           </div>
-          <h4 className="text-secondary font-bold">Informations importantes</h4>
+          <h4 className="text-secondary font-bold">Important Information</h4>
         </div>
         <ul className="text-gray-400 text-sm space-y-2">
           <li className="flex items-start gap-2">
             <span className="text-secondary mt-0.5">💰</span>
-            <span>Le déverrouillage rendra vos tokens $BACK disponibles</span>
+            <span>Unlocking will make your $BACK tokens available</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-accent mt-0.5">💎</span>
-            <span>Votre cNFT sera désactivé après le déverrouillage</span>
+            <span>Your cNFT will be deactivated after unlocking</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary mt-0.5">🔒</span>
-            <span>Vous pourrez reverrouiller des tokens à tout moment</span>
+            <span>You can lock tokens again at any time</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-yellow-400 mt-0.5">📉</span>
-            <span>Le boost ne sera plus actif après le déverrouillage</span>
+            <span>Boost will no longer be active after unlocking</span>
           </li>
         </ul>
       </div>
