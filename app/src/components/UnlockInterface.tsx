@@ -6,10 +6,25 @@ import { PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token';
 import { useCNFT } from '../hooks/useCNFT';
 
+// CNFTLevel type with extended tiers
+type CNFTLevel = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond';
+
 // Configuration
 const BACK_TOKEN_MINT = new PublicKey('nKnrana1TdBHZGmVbNkpN1Dazj8285VftqCnkHCG8sh');
 const ROUTER_PROGRAM_ID = new PublicKey('FPK46poe53iX6Bcv3q8cgmc1jm7dJKQ9Qs9oESFxGN55');
 const CNFT_PROGRAM_ID = new PublicKey('FPNibu4RhrTt9yLDxcc8nQuHiVkFCfLVJ7DZUn6yn8K8');
+
+// Dynamic boost calculation function
+const calculateDynamicBoost = (amount: number, durationDays: number): number => {
+  // Amount score: max 50% (100,000 tokens = 50%)
+  const amountScore = Math.min((amount / 1000) * 0.5, 50);
+  
+  // Duration score: max 50% (500 days = 50%)
+  const durationScore = Math.min((durationDays / 10) * 1, 50);
+  
+  // Total boost: max 100%
+  return Math.min(amountScore + durationScore, 100);
+};
 
 interface UnlockInterfaceProps {
   onUnlockSuccess?: () => void;
@@ -24,9 +39,36 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Calculate current boost details from lock data
+  const boostDetails = useMemo(() => {
+    if (!lockData?.amount || !lockData?.unlockTime) {
+      return { amountScore: 0, durationScore: 0, totalBoost: 0 };
+    }
+
+    const amount = Number(lockData.amount) / 1_000_000_000;
+    const now = Math.floor(Date.now() / 1000);
+    const unlockTimestamp = Number(lockData.unlockTime);
+    
+    // Calculate original duration (approximate if we don't have lockTime)
+    // We'll estimate based on common durations: 7, 30, 90, 180, 365 days
+    const timeRemaining = Math.max(0, unlockTimestamp - now);
+    const estimatedTotalDuration = timeRemaining > 0 ? timeRemaining : 30 * 24 * 60 * 60;
+    const durationDays = estimatedTotalDuration / (24 * 60 * 60);
+
+    const amountScore = Math.min((amount / 1000) * 0.5, 50);
+    const durationScore = Math.min((durationDays / 10) * 1, 50);
+    const totalBoost = Math.min(amountScore + durationScore, 100);
+
+    return { amountScore, durationScore, totalBoost };
+  }, [lockData]);
+
   // Couleur du badge selon le niveau
   const levelColor = useMemo(() => {
     switch (levelName) {
+      case 'Diamond':
+        return 'text-cyan-400 border-cyan-400 bg-cyan-400/10';
+      case 'Platinum':
+        return 'text-purple-400 border-purple-400 bg-purple-400/10';
       case 'Gold':
         return 'text-yellow-400 border-yellow-400 bg-yellow-400/10';
       case 'Silver':
@@ -251,7 +293,7 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
         </h2>
       </div>
 
-      {/* Lock information */}
+      {/* Lock information with boost details */}
       <div className="mb-6 p-5 glass-effect rounded-lg border border-secondary/10 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-radial from-secondary/10 to-transparent rounded-full blur-2xl"></div>
         
@@ -270,14 +312,50 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
               {levelName || 'Unknown'}
             </span>
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-gray-400 font-medium">Active Boost</span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-bold bg-gradient-to-r from-secondary to-green-400 bg-clip-text text-transparent">
-                +{lockData.boost || 0}%
-              </span>
+          
+          {/* Boost Details Section */}
+          <div className="pt-3 border-t border-gray-700/30">
+            <div className="text-sm font-bold text-orange-400 mb-2">⚠️ You Will Lose This Boost</div>
+            <div className="space-y-1 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Amount Score:</span>
+                <span className="text-gray-300">+{boostDetails.amountScore.toFixed(1)}%</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Duration Score:</span>
+                <span className="text-gray-300">+{boostDetails.durationScore.toFixed(1)}%</span>
+              </div>
+              <div className="h-px bg-orange-500/20 my-2"></div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-300 font-medium">Total Boost Lost:</span>
+                <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
+                  -{boostDetails.totalBoost.toFixed(1)}%
+                </span>
+              </div>
             </div>
           </div>
+          
+          {/* Rebate Multiplier Impact */}
+          {boostDetails.totalBoost > 0 && (
+            <div className="p-3 rounded-lg bg-gradient-to-r from-orange-500/5 to-transparent border border-orange-500/10">
+              <div className="text-sm font-bold text-orange-400 mb-1">💔 Lost Benefits</div>
+              <div className="text-xs text-gray-400 mb-1">
+                Your rebate multiplier will drop from:
+              </div>
+              <div className="flex items-center gap-2 justify-between">
+                <span className="text-lg font-bold text-orange-400">
+                  {(1 + boostDetails.totalBoost / 100).toFixed(2)}x
+                </span>
+                <span className="text-gray-500">→</span>
+                <span className="text-lg font-bold text-gray-500">
+                  1.00x
+                </span>
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Example: {(3 * (1 + boostDetails.totalBoost / 100)).toFixed(2)} USDC → 3.00 USDC per rebate
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

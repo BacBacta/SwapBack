@@ -16,6 +16,8 @@ export enum LockLevel {
   Bronze = "Bronze",
   Silver = "Silver",
   Gold = "Gold",
+  Platinum = "Platinum",
+  Diamond = "Diamond",
 }
 
 export interface CNFTData {
@@ -35,6 +37,7 @@ export interface CNFTLockParams {
 
 /**
  * Calcule le niveau de cNFT basé sur le montant et la durée
+ * Nouveau système: 5 tiers (Bronze, Silver, Gold, Platinum, Diamond)
  */
 export function calculateLevel(
   amount: number,
@@ -42,12 +45,25 @@ export function calculateLevel(
 ): LockLevel {
   const amountLamports = amount * 1e9; // Convertir en lamports
 
-  if (amountLamports >= 10_000_000_000 && durationDays >= 365) {
-    return LockLevel.Gold; // 10,000 $BACK, 1 an → Gold (50% boost)
-  } else if (amountLamports >= 1_000_000_000 && durationDays >= 180) {
-    return LockLevel.Silver; // 1,000 $BACK, 6 mois → Silver (30% boost)
-  } else if (amountLamports >= 100_000_000 && durationDays >= 90) {
-    return LockLevel.Bronze; // 100 $BACK, 3 mois → Bronze (10% boost)
+  // Diamond: 100,000+ $BACK AND 365+ days
+  if (amountLamports >= 100_000_000_000_000 && durationDays >= 365) {
+    return LockLevel.Diamond;
+  }
+  // Platinum: 50,000+ $BACK AND 180+ days
+  else if (amountLamports >= 50_000_000_000_000 && durationDays >= 180) {
+    return LockLevel.Platinum;
+  }
+  // Gold: 10,000+ $BACK AND 90+ days
+  else if (amountLamports >= 10_000_000_000_000 && durationDays >= 90) {
+    return LockLevel.Gold;
+  }
+  // Silver: 1,000+ $BACK AND 30+ days
+  else if (amountLamports >= 1_000_000_000_000 && durationDays >= 30) {
+    return LockLevel.Silver;
+  }
+  // Bronze: 100+ $BACK AND 7+ days
+  else if (amountLamports >= 100_000_000_000 && durationDays >= 7) {
+    return LockLevel.Bronze;
   }
 
   return LockLevel.Bronze; // Par défaut
@@ -55,20 +71,17 @@ export function calculateLevel(
 
 /**
  * Calcule le boost basé sur le montant et la durée
+ * Nouveau système dynamique: amount_score (max 50%) + duration_score (max 50%)
  */
 export function calculateBoost(amount: number, durationDays: number): number {
-  const level = calculateLevel(amount, durationDays);
-
-  switch (level) {
-    case LockLevel.Gold:
-      return 50;
-    case LockLevel.Silver:
-      return 30;
-    case LockLevel.Bronze:
-      return 10;
-    default:
-      return 0;
-  }
+  // Amount score: (amount / 1,000) * 0.5, max 50%
+  const amountScore = Math.min((amount / 1000) * 0.5, 50);
+  
+  // Duration score: (days / 10) * 1, max 50%
+  const durationScore = Math.min((durationDays / 10) * 1, 50);
+  
+  // Total boost: max 100%
+  return Math.min(amountScore + durationScore, 100);
 }
 
 /**
