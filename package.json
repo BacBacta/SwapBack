@@ -21,6 +21,8 @@
     "test": "vitest run",
     "test:unit": "vitest run --exclude='**/*{integration,e2e,dex-integration}*.test.ts' --exclude='**/router-e2e-*.test.ts' --exclude='**/router-onchain.test.ts' --exclude='**/oracle-switchboard.test.ts'",
     "test:integration": "vitest run tests/*{integration,e2e,dex-integration}*.test.ts tests/router-e2e-*.test.ts tests/router-onchain.test.ts tests/oracle-switchboard.test.ts",
+    "test:boost": "anchor test --skip-build tests/integration/boost-system.test.ts",
+    "test:boost-full": "anchor build && anchor test tests/integration/boost-system.test.ts",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
