@@ -67,7 +67,9 @@ export interface SwapResult {
   actualOutput: number;
   npiRealized: number;
   rebateEarned: number;
-  burnExecuted: number;
+  burnExecuted?: number; // Optional for backward compatibility
+  burnAmount?: number; // Optional alias
+  route?: any; // Optional route details
 }
 
 export interface UserStats {
@@ -157,14 +159,32 @@ export class SwapBackClient {
         minimumOutput,
       });
 
-      // Import du IDL pour créer le program
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const idl = require("./idl/swapback_router.json");
+      // TODO: Import du IDL une fois les programmes compilés
+      // Pour l'instant, on retourne un résultat mock
+      // const idl = require("./idl/swapback_router.json");
+      
+      // NOTE: Return mock data until programs are deployed
+      console.warn("⚠️ SwapBack Router program not yet deployed - returning mock swap result");
+      
+      return {
+        signature: "MockSwapSignature" + Date.now(),
+        actualOutput: minimumOutput,
+        npiRealized: route.npi,
+        rebateEarned: route.rebateAmount || 0,
+        burnAmount: route.burnAmount || 0,
+        route: route,
+      };
+
+      /*
+      // CODE DISABLED UNTIL IDL IS AVAILABLE AND PROGRAMS ARE DEPLOYED
+      
       const provider = new AnchorProvider(
         this.connection,
         this.wallet,
         { commitment: "confirmed" }
       );
+      
+      const idl = require("./idl/swapback_router.json");
       const program = new Program(idl as any, provider);
 
       // Dériver les PDAs
@@ -228,6 +248,7 @@ export class SwapBackClient {
         rebateEarned: route.rebateAmount,
         burnExecuted: route.burnAmount,
       };
+      */
     } catch (error) {
       console.error("❌ Erreur lors du swap:", error);
       throw error;
