@@ -3,7 +3,9 @@ members = [
     "programs/swapback_buyback",
     "programs/swapback_cnft",
     "programs/swapback_router",
-    # "programs/swapback_transfer_hook",  # Temporairement désactivé (TODO #10)
+]
+exclude = [
+    "programs/swapback_transfer_hook",
     "programs/common_swap",
 ]
 resolver = "2"

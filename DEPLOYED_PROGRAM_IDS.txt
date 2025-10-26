@@ -1,0 +1,74 @@
+# SwapBack - Program IDs Devnet
+# Déployé le: 26 Octobre 2025
+# Wallet: 3PiZ1xdHbPbj1UaPS8pfzKnHpmQQLfR8zrhy5RcksqAt
+
+# ============================================================================
+# PROGRAM IDs - DEVNET
+# ============================================================================
+
+swapback_cnft=9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw
+swapback_router=GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt
+swapback_buyback=EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf
+
+# ============================================================================
+# DEPLOYMENT SIGNATURES
+# ============================================================================
+
+cnft_signature=5EbyAELiTK1pP6Adom3vkymCN4VRzmCUTyLk8Bk9uPgKuR7NVvNQkQHneWUutwaJ4qUxxtyJ5cpyhhiU2YK634Vj
+router_signature=2fk1pfLTJHxi5hYwWTscy9y9ExrZcrAz1vN7DtYmsF83tDz8aCmoTm8Ne3MXweYrNQaZxu1Qmbu925GFoum6vGkP
+buyback_signature=59Ujm5Ps4iHsHxb1hmFTwaRy7huJFMDn8exKPGLKRCVXdpDtzWQ25WibWVJH8BcBk7sZhh9BMLKQrVAj36VeNL9q
+
+# ============================================================================
+# EXPLORER LINKS
+# ============================================================================
+
+cnft_explorer=https://explorer.solana.com/address/9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw?cluster=devnet
+router_explorer=https://explorer.solana.com/address/GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt?cluster=devnet
+buyback_explorer=https://explorer.solana.com/address/EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf?cluster=devnet
+
+# ============================================================================
+# DEPLOYMENT COSTS
+# ============================================================================
+
+cnft_cost=~1.8 SOL (255 KB)
+router_cost=~2.1 SOL (296 KB)
+buyback_cost=~2.4 SOL (356 KB)
+total_cost=~4.65 SOL
+
+initial_balance=5.18496272 SOL
+final_balance=0.53784612 SOL
+actual_cost=4.6471166 SOL
+
+# ============================================================================
+# CONFIGURATION FOR ANCHOR.TOML
+# ============================================================================
+
+[programs.devnet]
+swapback_cnft = "9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw"
+swapback_router = "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
+swapback_buyback = "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"
+
+# ============================================================================
+# CONFIGURATION FOR app/config/programIds.ts
+# ============================================================================
+
+export const PROGRAM_IDS = {
+  devnet: {
+    cnft: new PublicKey("9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw"),
+    router: new PublicKey("GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"),
+    buyback: new PublicKey("EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"),
+  }
+};
+
+# ============================================================================
+# NEXT STEPS
+# ============================================================================
+
+# 1. Update Anchor.toml with the Program IDs above
+# 2. Update app/config/programIds.ts with the Program IDs
+# 3. Upload IDL files:
+#    anchor idl init --filepath target/idl/swapback_cnft.json 9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw
+#    anchor idl init --filepath target/idl/swapback_router.json GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt
+#    anchor idl init --filepath target/idl/swapback_buyback.json EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf
+# 4. Initialize program states
+# 5. Run integration tests

@@ -13,21 +13,16 @@ skip-lint = false
 swapback_buyback = "Fx6yfXhqq1i3CJjocwnLXMw3VMLFt5mfoLtWPJzSRQvn"
 swapback_cnft = "CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH"
 swapback_router = "Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa"
-swapback_transfer_hook = "5vgpMPVKRxk3k7e5arcZSoayp6iKJ3mkNu9MbayGBJ4X"
-common_swap = "EtqKmwUHhaBJbmDzb3BrMf2iZ4RyGYPos9U78Xjpe3Ug"
 
 [programs.devnet]
-swapback_router = "3Z295H9QHByYn9sHm3tH7ASHitwd2Y4AEaXUddfhQKap"
-swapback_buyback = "46UWFYdksvkGhTPy9cTSJGa3d5nqzpY766rtJeuxtMgU"
-swapback_transfer_hook = "5vgpMPVKRxk3k7e5arcZSoayp6iKJ3mkNu9MbayGBJ4X"
-swapback_cnft = "ENbA46Rq9yFdp63WwmVm4tykcjmaukWs6T2ScGr9x7zB"
-common_swap = "D4Hz5ZBPWrLvnjNheQa7FYLVpzuGmPGRqFGWNqg5jRg6"
+swapback_cnft = "9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw"
+swapback_router = "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
+swapback_buyback = "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"
 
 [programs.mainnet]
 swapback_buyback = "Fx6yfXhqq1i3CJjocwnLXMw3VMLFt5mfoLtWPJzSRQvn"
 swapback_cnft = "CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH"
 swapback_router = "Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa"
-common_swap = "EtqKmwUHhaBJbmDzb3BrMf2iZ4RyGYPos9U78Xjpe3Ug"
 
 [scripts]
 build = "export TMPDIR=/tmp && export CARGO_TARGET_DIR=/tmp/cargo-target && export RUSTFLAGS='-C target-cpu=generic -C opt-level=1' && anchor build --program-name swapback_router"

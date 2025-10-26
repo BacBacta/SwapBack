@@ -34,13 +34,13 @@ export const RPC_ENDPOINTS: Record<NetworkEnvironment, string> = {
 /**
  * Program IDs - DEVNET
  * 
- * ⚠️ Ces IDs sont à jour après le dernier déploiement
- * Pour les mettre à jour: ./deploy-devnet.sh
+ * ✅ Déployé le 26 Octobre 2025
+ * Wallet: 3PiZ1xdHbPbj1UaPS8pfzKnHpmQQLfR8zrhy5RcksqAt
  */
 const DEVNET_PROGRAM_IDS: ProgramIds = {
-  cnftProgram: new PublicKey('11111111111111111111111111111111'), // À remplacer après deploy
-  routerProgram: new PublicKey('11111111111111111111111111111111'), // À remplacer après deploy
-  buybackProgram: new PublicKey('11111111111111111111111111111111'), // À remplacer après deploy
+  cnftProgram: new PublicKey('9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw'),
+  routerProgram: new PublicKey('GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt'),
+  buybackProgram: new PublicKey('EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf'),
 };
 
 /**
