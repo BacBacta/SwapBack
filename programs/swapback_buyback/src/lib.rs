@@ -5,6 +5,9 @@ use anchor_spl::token::{self, Burn, Mint, Token, TokenAccount, Transfer};
 
 declare_id!("71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW");
 
+// Program ID du cNFT pour lire GlobalState et UserNft
+pub const CNFT_PROGRAM_ID: Pubkey = pubkey!("CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH");
+
 #[program]
 pub mod swapback_buyback {
     use super::*;
@@ -52,14 +55,12 @@ pub mod swapback_buyback {
 
     /// Exécute un buyback de $BACK avec les USDC accumulés
     pub fn execute_buyback(
-        ctx: Context<ExecuteBuyback>,
+        mut ctx: Context<ExecuteBuyback>,
         max_usdc_amount: u64,
         min_back_amount: u64,
     ) -> Result<()> {
-        let buyback_state = &mut ctx.accounts.buyback_state;
-
         require!(
-            ctx.accounts.usdc_vault.amount >= buyback_state.min_buyback_amount,
+            ctx.accounts.usdc_vault.amount >= ctx.accounts.buyback_state.min_buyback_amount,
             ErrorCode::InsufficientFunds
         );
 
@@ -68,16 +69,17 @@ pub mod swapback_buyback {
 
         // Vérification de l'autorité
         require!(
-            ctx.accounts.authority.key() == buyback_state.authority,
+            ctx.accounts.authority.key() == ctx.accounts.buyback_state.authority,
             ErrorCode::Unauthorized
         );
 
         let actual_usdc = std::cmp::min(max_usdc_amount, ctx.accounts.usdc_vault.amount);
 
         // Execute Jupiter swap: USDC -> $BACK
-        let back_bought = execute_jupiter_swap(ctx, actual_usdc, min_back_amount)?;
+        let back_bought = execute_jupiter_swap(&mut ctx, actual_usdc, min_back_amount)?;
 
         // Mise à jour des statistiques
+        let buyback_state = &mut ctx.accounts.buyback_state;
         buyback_state.total_usdc_spent = buyback_state
             .total_usdc_spent
             .checked_add(actual_usdc)
@@ -99,12 +101,146 @@ pub mod swapback_buyback {
         Ok(())
     }
 
-    /// Execute Jupiter V6 swap via CPI
-    fn execute_jupiter_swap(
-        ctx: Context<ExecuteBuyback>,
-        usdc_amount: u64,
-        min_back_amount: u64,
-    ) -> Result<u64> {
+    /// Distribue une portion des tokens buyback à un utilisateur proportionnellement à son boost
+    /// Formula: user_share = (user_boost / total_community_boost) * buyback_tokens
+    pub fn distribute_buyback(
+        ctx: Context<DistributeBuyback>,
+        max_tokens: u64,
+    ) -> Result<()> {
+        require!(max_tokens > 0, ErrorCode::InvalidAmount);
+
+        let global_state = &ctx.accounts.global_state;
+        let user_nft = &ctx.accounts.user_nft;
+        let buyback_state = &ctx.accounts.buyback_state;
+
+        // Vérifier que le NFT est actif
+        require!(user_nft.is_active, ErrorCode::InactiveNft);
+
+        // Vérifier qu'il y a du boost dans la communauté
+        require!(
+            global_state.total_community_boost > 0,
+            ErrorCode::NoBoostInCommunity
+        );
+
+        // Calculer la part de l'utilisateur
+        // user_share = (user_boost / total_boost) * max_tokens
+        let user_share = (max_tokens as u128)
+            .checked_mul(user_nft.boost as u128)
+            .ok_or(ErrorCode::MathOverflow)?
+            .checked_div(global_state.total_community_boost as u128)
+            .ok_or(ErrorCode::MathOverflow)? as u64;
+
+        require!(user_share > 0, ErrorCode::ShareTooSmall);
+
+        // Vérifier qu'il y a assez de tokens dans le vault
+        require!(
+            ctx.accounts.back_vault.amount >= user_share,
+            ErrorCode::InsufficientFunds
+        );
+
+        // Transférer les tokens $BACK vers le compte utilisateur
+        let seeds = &[b"buyback_state".as_ref(), &[buyback_state.bump]];
+        let signer = &[&seeds[..]];
+
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.back_vault.to_account_info(),
+            to: ctx.accounts.user_back_account.to_account_info(),
+            authority: buyback_state.to_account_info(),
+        };
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
+        token::transfer(cpi_ctx, user_share)?;
+
+        emit!(BuybackDistributed {
+            user: ctx.accounts.user.key(),
+            user_boost: user_nft.boost,
+            total_boost: global_state.total_community_boost,
+            tokens_received: user_share,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        msg!(
+            "Distribution buyback: {} $BACK pour {} (boost: {} / {}) = {:.2}% de part",
+            user_share,
+            ctx.accounts.user.key(),
+            user_nft.boost,
+            global_state.total_community_boost,
+            (user_nft.boost as f64 / global_state.total_community_boost as f64) * 100.0
+        );
+
+        Ok(())
+    }
+
+    /// Brûle les tokens $BACK achetés
+    pub fn burn_back(ctx: Context<BurnBack>, amount: u64) -> Result<()> {
+        require!(amount > 0, ErrorCode::InvalidAmount);
+
+        let buyback_state = &mut ctx.accounts.buyback_state;
+
+        // Vérification de l'autorité
+        require!(
+            ctx.accounts.authority.key() == buyback_state.authority,
+            ErrorCode::Unauthorized
+        );
+
+        // Brûlage des tokens avec signature PDA
+        // seeds must be slices of bytes; utiliser .as_ref() pour forcer les types
+        let seeds = &[b"buyback_state".as_ref(), &[buyback_state.bump]];
+        let signer = &[&seeds[..]];
+
+        let cpi_accounts = Burn {
+            mint: ctx.accounts.back_mint.to_account_info(),
+            from: ctx.accounts.back_vault.to_account_info(),
+            authority: buyback_state.to_account_info(),
+        };
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
+        token::burn(cpi_ctx, amount)?;
+
+        // Mise à jour des statistiques
+        buyback_state.total_back_burned =
+            buyback_state.total_back_burned.checked_add(amount).unwrap();
+
+        emit!(BackBurned {
+            amount,
+            total_burned: buyback_state.total_back_burned,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        msg!(
+            "Brûlage de {} $BACK (total brûlé: {})",
+            amount,
+            buyback_state.total_back_burned
+        );
+        Ok(())
+    }
+
+    /// Met à jour les paramètres du buyback
+    pub fn update_params(ctx: Context<UpdateParams>, new_min_buyback: Option<u64>) -> Result<()> {
+        let buyback_state = &mut ctx.accounts.buyback_state;
+
+        require!(
+            ctx.accounts.authority.key() == buyback_state.authority,
+            ErrorCode::Unauthorized
+        );
+
+        if let Some(min_buyback) = new_min_buyback {
+            buyback_state.min_buyback_amount = min_buyback;
+            msg!("Nouveau montant minimum de buyback: {}", min_buyback);
+        }
+
+        Ok(())
+    }
+}
+
+// === FONCTIONS UTILITAIRES ===
+
+/// Execute Jupiter V6 swap via CPI
+fn execute_jupiter_swap(
+    ctx: &mut Context<ExecuteBuyback>,
+    usdc_amount: u64,
+    min_back_amount: u64,
+) -> Result<u64> {
         let buyback_state = &ctx.accounts.buyback_state;
 
         // Jupiter V6 uses a SharedAccountsRoute instruction
@@ -182,6 +318,76 @@ pub mod swapback_buyback {
         Ok(back_received)
     }
 
+    /// Distribue une portion des tokens buyback à un utilisateur proportionnellement à son boost
+    /// Formula: user_share = (user_boost / total_community_boost) * buyback_tokens
+    pub fn distribute_buyback(
+        ctx: Context<DistributeBuyback>,
+        max_tokens: u64,
+    ) -> Result<()> {
+        require!(max_tokens > 0, ErrorCode::InvalidAmount);
+
+        let global_state = &ctx.accounts.global_state;
+        let user_nft = &ctx.accounts.user_nft;
+        let buyback_state = &ctx.accounts.buyback_state;
+
+        // Vérifier que le NFT est actif
+        require!(user_nft.is_active, ErrorCode::InactiveNft);
+
+        // Vérifier qu'il y a du boost dans la communauté
+        require!(
+            global_state.total_community_boost > 0,
+            ErrorCode::NoBoostInCommunity
+        );
+
+        // Calculer la part de l'utilisateur
+        // user_share = (user_boost / total_boost) * max_tokens
+        let user_share = (max_tokens as u128)
+            .checked_mul(user_nft.boost as u128)
+            .ok_or(ErrorCode::MathOverflow)?
+            .checked_div(global_state.total_community_boost as u128)
+            .ok_or(ErrorCode::MathOverflow)? as u64;
+
+        require!(user_share > 0, ErrorCode::ShareTooSmall);
+
+        // Vérifier qu'il y a assez de tokens dans le vault
+        require!(
+            ctx.accounts.back_vault.amount >= user_share,
+            ErrorCode::InsufficientFunds
+        );
+
+        // Transférer les tokens $BACK vers le compte utilisateur
+        let seeds = &[b"buyback_state".as_ref(), &[buyback_state.bump]];
+        let signer = &[&seeds[..]];
+
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.back_vault.to_account_info(),
+            to: ctx.accounts.user_back_account.to_account_info(),
+            authority: buyback_state.to_account_info(),
+        };
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
+        token::transfer(cpi_ctx, user_share)?;
+
+        emit!(BuybackDistributed {
+            user: ctx.accounts.user.key(),
+            user_boost: user_nft.boost,
+            total_boost: global_state.total_community_boost,
+            tokens_received: user_share,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        msg!(
+            "Distribution buyback: {} $BACK pour {} (boost: {} / {}) = {:.2}% de part",
+            user_share,
+            ctx.accounts.user.key(),
+            user_nft.boost,
+            global_state.total_community_boost,
+            (user_nft.boost as f64 / global_state.total_community_boost as f64) * 100.0
+        );
+
+        Ok(())
+    }
+
     /// Brûle les tokens $BACK achetés
     pub fn burn_back(ctx: Context<BurnBack>, amount: u64) -> Result<()> {
         require!(amount > 0, ErrorCode::InvalidAmount);
@@ -225,26 +431,12 @@ pub mod swapback_buyback {
         );
         Ok(())
     }
-
-    /// Met à jour les paramètres du buyback
-    pub fn update_params(ctx: Context<UpdateParams>, new_min_buyback: Option<u64>) -> Result<()> {
-        let buyback_state = &mut ctx.accounts.buyback_state;
-
-        require!(
-            ctx.accounts.authority.key() == buyback_state.authority,
-            ErrorCode::Unauthorized
-        );
-
-        if let Some(min_buyback) = new_min_buyback {
-            buyback_state.min_buyback_amount = min_buyback;
-            msg!("Nouveau montant minimum de buyback: {}", min_buyback);
-        }
-
-        Ok(())
-    }
 }
 
-// === STRUCTS DE CONTEXTE ===
+// === FONCTIONS UTILITAIRES ===
+
+/// Execute Jupiter V6 swap via CPI
+fn execute_jupiter_swap(
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
@@ -340,6 +532,37 @@ pub struct UpdateParams<'info> {
     pub authority: Signer<'info>,
 }
 
+#[derive(Accounts)]
+pub struct DistributeBuyback<'info> {
+    #[account(seeds = [b"buyback_state"], bump = buyback_state.bump)]
+    pub buyback_state: Account<'info, BuybackState>,
+
+    /// CHECK: GlobalState du programme cNFT pour lire total_community_boost
+    #[account(
+        seeds = [b"global_state"],
+        bump,
+        seeds::program = CNFT_PROGRAM_ID
+    )]
+    pub global_state: Account<'info, GlobalState>,
+
+    /// CHECK: UserNft du programme cNFT pour lire le boost utilisateur
+    #[account(
+        seeds = [b"user_nft", user.key().as_ref()],
+        bump,
+        seeds::program = CNFT_PROGRAM_ID
+    )]
+    pub user_nft: Account<'info, UserNft>,
+
+    #[account(mut)]
+    pub back_vault: Account<'info, TokenAccount>,
+
+    #[account(mut)]
+    pub user_back_account: Account<'info, TokenAccount>,
+
+    pub user: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+}
+
 // === COMPTES ===
 
 #[account]
@@ -353,6 +576,36 @@ pub struct BuybackState {
     pub total_back_burned: u64,
     pub buyback_count: u64,
     pub bump: u8,
+}
+
+// Structures importées du programme cNFT
+#[account]
+pub struct GlobalState {
+    pub authority: Pubkey,
+    pub total_community_boost: u64,
+    pub active_locks_count: u64,
+    pub total_value_locked: u64,
+}
+
+#[account]
+pub struct UserNft {
+    pub user: Pubkey,
+    pub level: LockLevel,
+    pub amount_locked: u64,
+    pub lock_duration: i64,
+    pub boost: u16,
+    pub mint_time: i64,
+    pub is_active: bool,
+    pub bump: u8,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum LockLevel {
+    Bronze,
+    Silver,
+    Gold,
+    Platinum,
+    Diamond,
 }
 
 // === EVENTS ===
@@ -378,6 +631,15 @@ pub struct BackBurned {
     pub timestamp: i64,
 }
 
+#[event]
+pub struct BuybackDistributed {
+    pub user: Pubkey,
+    pub user_boost: u16,
+    pub total_boost: u64,
+    pub tokens_received: u64,
+    pub timestamp: i64,
+}
+
 // === ERREURS ===
 
 #[error_code]
@@ -394,4 +656,12 @@ pub enum ErrorCode {
     JupiterSwapFailed,
     #[msg("Slippage dépassé")]
     SlippageExceeded,
+    #[msg("NFT inactif")]
+    InactiveNft,
+    #[msg("Aucun boost dans la communauté")]
+    NoBoostInCommunity,
+    #[msg("Dépassement arithmétique")]
+    MathOverflow,
+    #[msg("Part trop petite")]
+    ShareTooSmall,
 }

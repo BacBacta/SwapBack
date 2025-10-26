@@ -7,6 +7,19 @@ declare_id!("CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH");
 pub mod swapback_cnft {
     use super::*;
 
+    /// Initialise le GlobalState pour tracker le boost total de la communauté
+    pub fn initialize_global_state(ctx: Context<InitializeGlobalState>) -> Result<()> {
+        let global_state = &mut ctx.accounts.global_state;
+        
+        global_state.authority = ctx.accounts.authority.key();
+        global_state.total_community_boost = 0;
+        global_state.active_locks_count = 0;
+        global_state.total_value_locked = 0;
+        
+        msg!("GlobalState initialisé - Tracking du boost communautaire actif");
+        Ok(())
+    }
+
     /// Initialise la collection cNFT pour les niveaux SwapBack
     pub fn initialize_collection(ctx: Context<InitializeCollection>) -> Result<()> {
         let collection_config = &mut ctx.accounts.collection_config;
@@ -28,6 +41,7 @@ pub mod swapback_cnft {
         lock_duration: i64,
     ) -> Result<()> {
         let collection_config = &mut ctx.accounts.collection_config;
+        let global_state = &mut ctx.accounts.global_state;
         let user_nft = &mut ctx.accounts.user_nft;
 
         // Calculer le boost dynamique
@@ -46,8 +60,17 @@ pub mod swapback_cnft {
         user_nft.mint_time = Clock::get()?.unix_timestamp;
         user_nft.is_active = true;
 
-        // Mettre à jour les statistiques
+        // Mettre à jour les statistiques globales
         collection_config.total_minted = collection_config.total_minted.checked_add(1).unwrap();
+        global_state.total_community_boost = global_state.total_community_boost
+            .checked_add(boost as u64)
+            .ok_or(ErrorCode::MathOverflow)?;
+        global_state.active_locks_count = global_state.active_locks_count
+            .checked_add(1)
+            .ok_or(ErrorCode::MathOverflow)?;
+        global_state.total_value_locked = global_state.total_value_locked
+            .checked_add(amount_locked)
+            .ok_or(ErrorCode::MathOverflow)?;
 
         emit!(LevelNftMinted {
             user: ctx.accounts.user.key(),
@@ -71,12 +94,38 @@ pub mod swapback_cnft {
     /// Met à jour le statut d'un NFT (lors du unlock)
     pub fn update_nft_status(ctx: Context<UpdateNftStatus>, is_active: bool) -> Result<()> {
         let user_nft = &mut ctx.accounts.user_nft;
+        let global_state = &mut ctx.accounts.global_state;
 
         // Vérifier que c'est bien le propriétaire
         require!(
             ctx.accounts.user.key() == user_nft.user,
             ErrorCode::Unauthorized
         );
+
+        // Si on désactive (unlock), décrémenter le boost total
+        if !is_active && user_nft.is_active {
+            global_state.total_community_boost = global_state.total_community_boost
+                .checked_sub(user_nft.boost as u64)
+                .ok_or(ErrorCode::MathOverflow)?;
+            global_state.active_locks_count = global_state.active_locks_count
+                .checked_sub(1)
+                .ok_or(ErrorCode::MathOverflow)?;
+            global_state.total_value_locked = global_state.total_value_locked
+                .checked_sub(user_nft.amount_locked)
+                .ok_or(ErrorCode::MathOverflow)?;
+        }
+        // Si on réactive (re-lock), incrémenter le boost total
+        else if is_active && !user_nft.is_active {
+            global_state.total_community_boost = global_state.total_community_boost
+                .checked_add(user_nft.boost as u64)
+                .ok_or(ErrorCode::MathOverflow)?;
+            global_state.active_locks_count = global_state.active_locks_count
+                .checked_add(1)
+                .ok_or(ErrorCode::MathOverflow)?;
+            global_state.total_value_locked = global_state.total_value_locked
+                .checked_add(user_nft.amount_locked)
+                .ok_or(ErrorCode::MathOverflow)?;
+        }
 
         user_nft.is_active = is_active;
 
@@ -86,6 +135,13 @@ pub mod swapback_cnft {
             is_active,
             timestamp: Clock::get()?.unix_timestamp,
         });
+
+        msg!(
+            "NFT {} {} - Boost communautaire total: {} BP",
+            if is_active { "activé" } else { "désactivé" },
+            ctx.accounts.user.key(),
+            global_state.total_community_boost
+        );
 
         Ok(())
     }
@@ -133,6 +189,23 @@ impl LockLevel {
 }
 
 #[derive(Accounts)]
+pub struct InitializeGlobalState<'info> {
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + GlobalState::INIT_SPACE,
+        seeds = [b"global_state"],
+        bump
+    )]
+    pub global_state: Account<'info, GlobalState>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 pub struct InitializeCollection<'info> {
     #[account(
         init,
@@ -162,6 +235,13 @@ pub struct MintLevelNft<'info> {
     pub collection_config: Account<'info, CollectionConfig>,
 
     #[account(
+        mut,
+        seeds = [b"global_state"],
+        bump
+    )]
+    pub global_state: Account<'info, GlobalState>,
+
+    #[account(
         init,
         payer = user,
         space = 8 + UserNft::INIT_SPACE,
@@ -185,6 +265,13 @@ pub struct UpdateNftStatus<'info> {
     )]
     pub user_nft: Account<'info, UserNft>,
 
+    #[account(
+        mut,
+        seeds = [b"global_state"],
+        bump
+    )]
+    pub global_state: Account<'info, GlobalState>,
+
     pub user: Signer<'info>,
 }
 
@@ -195,6 +282,17 @@ pub struct CollectionConfig {
     pub tree_config: Pubkey,
     pub total_minted: u64,
     pub bump: u8,
+}
+
+/// GlobalState pour tracker le boost total de la communauté
+/// Utilisé pour calculer la distribution du buyback proportionnellement au boost de chaque utilisateur
+#[account]
+#[derive(InitSpace)]
+pub struct GlobalState {
+    pub authority: Pubkey,
+    pub total_community_boost: u64,  // Somme de tous les boosts actifs (en basis points)
+    pub active_locks_count: u64,     // Nombre de locks actifs
+    pub total_value_locked: u64,     // TVL total en lamports
 }
 
 #[account]
@@ -327,4 +425,6 @@ pub enum ErrorCode {
     InsufficientBoost,
     #[msg("Non autorisé")]
     Unauthorized,
+    #[msg("Dépassement arithmétique")]
+    MathOverflow,
 }

@@ -20,8 +20,14 @@ pub const JUPITER_PROGRAM_ID: Pubkey = pubkey!("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZ
 // Buyback Program ID
 pub const BUYBACK_PROGRAM_ID: Pubkey = pubkey!("46UWFYdksvkGhTPy9cTSJGa3d5nqzpY766rtJeuxtMgU");
 
+// cNFT Program ID for boost verification
+pub const CNFT_PROGRAM_ID: Pubkey = pubkey!("CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH");
+
 // Oracle constants
 pub const MAX_STALENESS_SECS: i64 = 300; // 5 minutes max staleness
+
+// Rebate configuration
+pub const BASE_REBATE_USDC: u64 = 3_000_000; // 3 USDC base rebate (6 decimals)
 
 // Security limits
 pub const MAX_VENUES: usize = 10;
@@ -127,6 +133,14 @@ pub struct SwapToC<'info> {
     /// CHECK: Optional swap plan account when using dynamic plans
     pub plan: Option<Account<'info, SwapPlan>>,
 
+    /// CHECK: Optional UserNft account for boost verification
+    #[account(
+        seeds = [b"user_nft", user.key().as_ref()],
+        bump,
+        seeds::program = CNFT_PROGRAM_ID
+    )]
+    pub user_nft: Option<Account<'info, UserNft>>,
+
     /// CHECK: Buyback program
     #[account(address = BUYBACK_PROGRAM_ID)]
     pub buyback_program: Option<AccountInfo<'info>>,
@@ -138,6 +152,10 @@ pub struct SwapToC<'info> {
     /// CHECK: Buyback state account (validated in buyback program)
     #[account(mut)]
     pub buyback_state: Option<AccountInfo<'info>>,
+
+    /// CHECK: User's rebate USDC account (for receiving boosted rebates)
+    #[account(mut)]
+    pub user_rebate_account: Option<Account<'info, token::TokenAccount>>,
 
     pub token_program: Program<'info, token::Token>,
     pub system_program: Program<'info, System>,
@@ -239,6 +257,17 @@ pub struct SwapCompleted {
     pub platform_fee: u64,
     pub routing_profit: u64,
     pub buyback_deposit: u64,
+    pub user_boost: u16,        // Boost de l'utilisateur (basis points)
+    pub rebate_amount: u64,     // Montant du rebate en USDC
+}
+
+#[event]
+pub struct RebatePaid {
+    pub user: Pubkey,
+    pub base_rebate: u64,       // Rebate de base (3 USDC)
+    pub boost: u16,             // Boost appliqué (basis points)
+    pub total_rebate: u64,      // Rebate total après boost
+    pub timestamp: i64,
 }
 
 #[event]
@@ -246,6 +275,30 @@ pub struct BuybackDeposit {
     pub amount: u64,
     pub source: String, // "platform_fee" or "routing_profit"
     pub timestamp: i64,
+}
+
+// Structure UserNft importée du programme cNFT pour vérification du boost
+#[account]
+#[derive(Default)]
+pub struct UserNft {
+    pub user: Pubkey,              // Utilisateur propriétaire
+    pub level: LockLevel,          // Niveau de lock (Bronze à Diamond)
+    pub amount_locked: u64,        // Montant de tokens lockés
+    pub lock_duration: i64,        // Durée du lock en secondes
+    pub boost: u16,                // Boost en basis points (0-10000)
+    pub mint_time: i64,            // Timestamp du mint
+    pub is_active: bool,           // Statut actif/inactif
+}
+
+// Enum LockLevel importé du programme cNFT
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LockLevel {
+    #[default]
+    Bronze,   // 100+ BACK × 7+ jours
+    Silver,   // 1k+ BACK × 30+ jours
+    Gold,     // 10k+ BACK × 90+ jours
+    Platinum, // 50k+ BACK × 180+ jours
+    Diamond,  // 100k+ BACK × 365+ jours
 }
 
 #[error_code]
@@ -517,6 +570,20 @@ pub mod swap_toc_processor {
             return err!(ErrorCode::SlippageExceeded);
         }
 
+        // Lire le boost depuis le compte UserNft (si disponible)
+        let user_boost = if let Some(user_nft) = &ctx.accounts.user_nft {
+            if user_nft.is_active {
+                user_nft.boost
+            } else {
+                0 // NFT inactif, pas de boost
+            }
+        } else {
+            0 // Pas de NFT, pas de boost
+        };
+
+        // Payer le rebate avec boost à l'utilisateur
+        let rebate_paid = pay_rebate_to_user(ctx, user_boost)?;
+
         // Calculate platform fee (0.3% of amount_out)
         let platform_fee = calculate_fee(total_amount_out, PLATFORM_FEE_BPS)?;
         
@@ -555,6 +622,8 @@ pub mod swap_toc_processor {
                 platform_fee,
                 routing_profit,
                 buyback_deposit: total_buyback_deposit,
+                user_boost,
+                rebate_amount: rebate_paid,
             });
         }
 
@@ -714,13 +783,57 @@ pub mod swap_toc_processor {
     }
 
     /// Calculate fee based on amount and basis points
-    fn calculate_fee(amount: u64, fee_bps: u16) -> Result<u64> {
+    pub fn calculate_fee(amount: u64, fee_bps: u16) -> Result<u64> {
         let fee = (amount as u128)
             .checked_mul(fee_bps as u128)
             .ok_or(ErrorCode::InvalidOraclePrice)?
             .checked_div(10_000)
             .ok_or(ErrorCode::InvalidOraclePrice)? as u64;
         Ok(fee)
+    }
+
+    /// Calculate boosted rebate based on user's cNFT boost
+    /// Formula: rebate = base_rebate * (1 + boost/10000)
+    /// Example: base 3 USDC, boost 2300 BP (23%) = 3 * 1.23 = 3.69 USDC
+    pub fn calculate_boosted_rebate(base_rebate: u64, boost_bp: u16) -> Result<u64> {
+        // Multiplier = 10000 (100%) + boost_bp
+        // Example: 10000 + 2300 = 12300 (123%)
+        let multiplier = 10_000u128
+            .checked_add(boost_bp as u128)
+            .ok_or(ErrorCode::InvalidOraclePrice)?;
+        
+        let boosted = (base_rebate as u128)
+            .checked_mul(multiplier)
+            .ok_or(ErrorCode::InvalidOraclePrice)?
+            .checked_div(10_000)
+            .ok_or(ErrorCode::InvalidOraclePrice)? as u64;
+        
+        Ok(boosted)
+    }
+
+    /// Pay rebate to user with boost applied
+    fn pay_rebate_to_user(ctx: &Context<SwapToC>, boost: u16) -> Result<u64> {
+        // Si pas de compte rebate, pas de paiement
+        let _user_rebate_account = match &ctx.accounts.user_rebate_account {
+            Some(acc) => acc,
+            None => return Ok(0),
+        };
+
+        // Calculer le rebate avec boost
+        let boosted_rebate = calculate_boosted_rebate(BASE_REBATE_USDC, boost)?;
+
+        // TODO: Transférer les USDC depuis le vault vers le compte utilisateur
+        // Pour l'instant, juste émettre l'événement
+
+        emit!(RebatePaid {
+            user: ctx.accounts.user.key(),
+            base_rebate: BASE_REBATE_USDC,
+            boost,
+            total_rebate: boosted_rebate,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        Ok(boosted_rebate)
     }
 
     /// Deposit USDC to buyback program via CPI
@@ -780,5 +893,82 @@ pub mod swap_toc_processor {
 
         msg!("Deposited {} USDC to buyback vault", amount);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calculate_boosted_rebate_no_boost() {
+        // Base: 3 USDC (3_000_000 avec 6 decimals)
+        // Boost: 0 BP (0%)
+        // Expected: 3 USDC
+        let base = 3_000_000u64;
+        let boost = 0u16;
+        let result = swap_toc_processor::calculate_boosted_rebate(base, boost).unwrap();
+        assert_eq!(result, 3_000_000, "No boost should return base amount");
+    }
+
+    #[test]
+    fn test_calculate_boosted_rebate_small_boost() {
+        // Base: 3 USDC
+        // Boost: 350 BP (3.5%)
+        // Expected: 3 × 1.035 = 3.105 USDC
+        let base = 3_000_000u64;
+        let boost = 350u16;
+        let result = swap_toc_processor::calculate_boosted_rebate(base, boost).unwrap();
+        assert_eq!(result, 3_105_000, "3.5% boost should give 3.105 USDC");
+    }
+
+    #[test]
+    fn test_calculate_boosted_rebate_medium_boost() {
+        // Base: 3 USDC
+        // Boost: 2300 BP (23%)
+        // Expected: 3 × 1.23 = 3.69 USDC
+        let base = 3_000_000u64;
+        let boost = 2300u16;
+        let result = swap_toc_processor::calculate_boosted_rebate(base, boost).unwrap();
+        assert_eq!(result, 3_690_000, "23% boost should give 3.69 USDC");
+    }
+
+    #[test]
+    fn test_calculate_boosted_rebate_high_boost() {
+        // Base: 3 USDC
+        // Boost: 8600 BP (86%)
+        // Expected: 3 × 1.86 = 5.58 USDC
+        let base = 3_000_000u64;
+        let boost = 8600u16;
+        let result = swap_toc_processor::calculate_boosted_rebate(base, boost).unwrap();
+        assert_eq!(result, 5_580_000, "86% boost should give 5.58 USDC");
+    }
+
+    #[test]
+    fn test_calculate_boosted_rebate_maximum_boost() {
+        // Base: 3 USDC
+        // Boost: 10000 BP (100%)
+        // Expected: 3 × 2 = 6 USDC
+        let base = 3_000_000u64;
+        let boost = 10_000u16;
+        let result = swap_toc_processor::calculate_boosted_rebate(base, boost).unwrap();
+        assert_eq!(result, 6_000_000, "100% boost should double the rebate to 6 USDC");
+    }
+
+    #[test]
+    fn test_calculate_fee() {
+        // Test platform fee calculation (0.3% = 30 BP)
+        let amount = 1_000_000u64; // 1 USDC
+        let fee_bps = 30u16;
+        let result = swap_toc_processor::calculate_fee(amount, fee_bps).unwrap();
+        assert_eq!(result, 3_000, "0.3% of 1 USDC should be 0.003 USDC");
+    }
+
+    #[test]
+    fn test_buyback_allocation() {
+        // Test buyback allocation (40% = 4000 BP)
+        let platform_fee = 10_000u64; // 0.01 USDC in fees
+        let result = swap_toc_processor::calculate_fee(platform_fee, BUYBACK_ALLOCATION_BPS).unwrap();
+        assert_eq!(result, 4_000, "40% of 10k should be 4k");
     }
 }
