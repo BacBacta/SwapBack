@@ -622,29 +622,6 @@ html {
   color: var(--primary);
 }
 
-/* Terminal scanline effect */
-@keyframes scanline {
-  0% {
-    transform: translateY(-100%);
-  }
-  100% {
-    transform: translateY(100vh);
-  }
-}
-
-.terminal-scanline::after {
-  content: "";
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: rgba(0, 255, 0, 0.1);
-  animation: scanline 8s linear infinite;
-  pointer-events: none;
-  z-index: 9999;
-}
-
 /* ASCII Art Border */
 .terminal-border-top::before {
   content: "═══════════════════════════════════════════";
