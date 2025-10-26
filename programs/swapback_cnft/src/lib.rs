@@ -24,28 +24,25 @@ pub mod swapback_cnft {
     /// L'intégration Bubblegum sera ajoutée après résolution des versions
     pub fn mint_level_nft(
         ctx: Context<MintLevelNft>,
-        level: LockLevel,
         amount_locked: u64,
         lock_duration: i64,
     ) -> Result<()> {
         let collection_config = &mut ctx.accounts.collection_config;
         let user_nft = &mut ctx.accounts.user_nft;
 
-        // Vérifier que l'utilisateur mérite ce niveau
-        let required_boost = match level {
-            LockLevel::Bronze => 10,
-            LockLevel::Silver => 30,
-            LockLevel::Gold => 50,
-        };
-
-        let actual_boost = calculate_boost(amount_locked, lock_duration);
-        require!(actual_boost >= required_boost, ErrorCode::InsufficientBoost);
+        // Calculer le boost dynamique
+        let boost = calculate_boost(amount_locked, lock_duration);
+        
+        // Déterminer le niveau automatiquement basé sur montant + durée
+        let duration_days = (lock_duration / 86400) as u64;
+        let level = LockLevel::from_lock_params(amount_locked, duration_days);
 
         // Enregistrer le NFT de l'utilisateur (sans mint réel pour l'instant)
         user_nft.user = ctx.accounts.user.key();
         user_nft.level = level;
         user_nft.amount_locked = amount_locked;
         user_nft.lock_duration = lock_duration;
+        user_nft.boost = boost;
         user_nft.mint_time = Clock::get()?.unix_timestamp;
         user_nft.is_active = true;
 
@@ -57,13 +54,16 @@ pub mod swapback_cnft {
             level,
             amount_locked,
             lock_duration,
+            boost,
             timestamp: Clock::get()?.unix_timestamp,
         });
 
         msg!(
-            "cNFT de niveau {:?} enregistré pour {}",
+            "cNFT de niveau {:?} enregistré pour {} - Boost: {} basis points ({}%)",
             level,
-            ctx.accounts.user.key()
+            ctx.accounts.user.key(),
+            boost,
+            boost / 100
         );
         Ok(())
     }
@@ -96,10 +96,40 @@ pub enum LockLevel {
     Bronze,
     Silver,
     Gold,
+    Platinum,
+    Diamond,
 }
 
 impl anchor_lang::Space for LockLevel {
-    const INIT_SPACE: usize = 1; // 1 byte pour un enum avec 3 variants
+    const INIT_SPACE: usize = 1; // 1 byte pour un enum avec 5 variants
+}
+
+impl LockLevel {
+    /// Détermine le tier basé sur le montant et la durée
+    pub fn from_lock_params(amount: u64, duration_days: u64) -> Self {
+        let amount_tokens = amount / 1_000_000_000; // Convertir lamports en tokens
+
+        // Diamond: 100,000+ BACK AND 365+ days
+        if amount_tokens >= 100_000 && duration_days >= 365 {
+            return LockLevel::Diamond;
+        }
+        // Platinum: 50,000+ BACK AND 180+ days
+        else if amount_tokens >= 50_000 && duration_days >= 180 {
+            return LockLevel::Platinum;
+        }
+        // Gold: 10,000+ BACK AND 90+ days
+        else if amount_tokens >= 10_000 && duration_days >= 90 {
+            return LockLevel::Gold;
+        }
+        // Silver: 1,000+ BACK AND 30+ days
+        else if amount_tokens >= 1_000 && duration_days >= 30 {
+            return LockLevel::Silver;
+        }
+        // Bronze: default (100+ BACK AND 7+ days recommended)
+        else {
+            return LockLevel::Bronze;
+        }
+    }
 }
 
 #[derive(Accounts)]
@@ -174,6 +204,7 @@ pub struct UserNft {
     pub level: LockLevel,
     pub amount_locked: u64,
     pub lock_duration: i64,
+    pub boost: u16,           // Boost en basis points (10000 = 100%)
     pub mint_time: i64,
     pub is_active: bool,
     pub bump: u8,
@@ -185,6 +216,7 @@ pub struct LevelNftMinted {
     pub level: LockLevel,
     pub amount_locked: u64,
     pub lock_duration: i64,
+    pub boost: u16,           // Boost en basis points
     pub timestamp: i64,
 }
 
@@ -196,18 +228,96 @@ pub struct NftStatusUpdated {
     pub timestamp: i64,
 }
 
-// Fonction utilitaire pour calculer le boost (dupliquée du router pour indépendance)
-fn calculate_boost(amount: u64, duration: i64) -> u8 {
-    let days = duration / 86400; // Conversion en jours
+// Fonction utilitaire pour calculer le boost dynamique
+// Formule: boost = min((amount_score + duration_score), 10000)
+// amount_score: max 5000 basis points (50%)
+// duration_score: max 5000 basis points (50%)
+// Total: max 10000 basis points (100%)
+fn calculate_boost(amount: u64, duration: i64) -> u16 {
+    let days = (duration / 86400) as u64; // Conversion en jours
+    let amount_tokens = amount / 1_000_000_000; // Convertir lamports en tokens
 
-    if amount >= 10_000_000_000 && days >= 365 {
-        50 // Gold: 50% boost
-    } else if amount >= 1_000_000_000 && days >= 180 {
-        30 // Silver: 30% boost
-    } else if amount >= 100_000_000 && days >= 90 {
-        10 // Bronze: 10% boost
-    } else {
-        0
+    // Amount score: (amount / 1000) * 50, max 5000 basis points (50%)
+    let amount_score = std::cmp::min((amount_tokens / 1000) * 50, 5000);
+    
+    // Duration score: (days / 10) * 100, max 5000 basis points (50%)
+    let duration_score = std::cmp::min((days / 10) * 100, 5000);
+    
+    // Total boost: max 10000 basis points (100%)
+    std::cmp::min(amount_score + duration_score, 10000) as u16
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calculate_boost_small_lock() {
+        // 1,000 BACK × 30 days = 3.5% boost = 350 basis points
+        let amount = 1_000 * 1_000_000_000;
+        let duration = 30 * 86400;
+        let boost = calculate_boost(amount, duration);
+        assert_eq!(boost, 350);
+    }
+
+    #[test]
+    fn test_calculate_boost_medium_lock() {
+        // 10,000 BACK × 180 days = 23% boost = 2300 basis points
+        let amount = 10_000 * 1_000_000_000;
+        let duration = 180 * 86400;
+        let boost = calculate_boost(amount, duration);
+        assert_eq!(boost, 2300);
+    }
+
+    #[test]
+    fn test_calculate_boost_whale_lock() {
+        // 100,000 BACK × 365 days
+        // Amount score: (100000 / 1000) * 50 = 5000 BP (max)
+        // Duration score: (365 / 10) * 100 = 3650 BP (36.5 troncated = 36)
+        // Total: 5000 + 3600 = 8600 BP (86%)
+        let amount = 100_000 * 1_000_000_000;
+        let duration = 365 * 86400;
+        let boost = calculate_boost(amount, duration);
+        assert_eq!(boost, 8600); // Arrondi à cause de la division entière
+    }
+
+    #[test]
+    fn test_calculate_boost_maximum() {
+        // 100,000 BACK × 730 days = 100% boost (capped at 10000 BP)
+        let amount = 100_000 * 1_000_000_000;
+        let duration = 730 * 86400;
+        let boost = calculate_boost(amount, duration);
+        assert_eq!(boost, 10000);
+    }
+
+    #[test]
+    fn test_lock_level_bronze() {
+        let level = LockLevel::from_lock_params(100 * 1_000_000_000, 7);
+        assert_eq!(level, LockLevel::Bronze);
+    }
+
+    #[test]
+    fn test_lock_level_silver() {
+        let level = LockLevel::from_lock_params(1_000 * 1_000_000_000, 30);
+        assert_eq!(level, LockLevel::Silver);
+    }
+
+    #[test]
+    fn test_lock_level_gold() {
+        let level = LockLevel::from_lock_params(10_000 * 1_000_000_000, 90);
+        assert_eq!(level, LockLevel::Gold);
+    }
+
+    #[test]
+    fn test_lock_level_platinum() {
+        let level = LockLevel::from_lock_params(50_000 * 1_000_000_000, 180);
+        assert_eq!(level, LockLevel::Platinum);
+    }
+
+    #[test]
+    fn test_lock_level_diamond() {
+        let level = LockLevel::from_lock_params(100_000 * 1_000_000_000, 365);
+        assert_eq!(level, LockLevel::Diamond);
     }
 }
 
