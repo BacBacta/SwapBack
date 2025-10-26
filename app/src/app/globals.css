@@ -191,26 +191,7 @@ body::before {
   box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
 }
 
-.swap-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--primary), transparent);
-  opacity: 1;
-  animation: terminal-scan 2s linear infinite;
-}
 
-@keyframes terminal-scan {
-  0% {
-    transform: translateY(0);
-  }
-  100% {
-    transform: translateY(400px);
-  }
-}
 
 .swap-card:hover {
   border-color: var(--primary-hover);
