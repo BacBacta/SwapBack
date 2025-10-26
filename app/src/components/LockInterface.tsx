@@ -11,21 +11,36 @@ const BACK_TOKEN_MINT = new PublicKey('nKnrana1TdBHZGmVbNkpN1Dazj8285VftqCnkHCG8
 const ROUTER_PROGRAM_ID = new PublicKey('FPK46poe53iX6Bcv3q8cgmc1jm7dJKQ9Qs9oESFxGN55');
 const CNFT_PROGRAM_ID = new PublicKey('FPNibu4RhrTt9yLDxcc8nQuHiVkFCfLVJ7DZUn6yn8K8');
 
-// Types pour les niveaux de cNFT
-type CNFTLevel = 'Bronze' | 'Silver' | 'Gold';
+// Types pour les niveaux de cNFT - Étendus
+type CNFTLevel = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond';
 
-// Seuils pour les niveaux (en nombre de jours)
+// Seuils pour les niveaux (en nombre de jours) - Visuels uniquement
 const LEVEL_THRESHOLDS = {
   Bronze: 7,
   Silver: 30,
   Gold: 90,
+  Platinum: 180,
+  Diamond: 365,
 };
 
-// Boost associés aux niveaux (en pourcentage)
-const LEVEL_BOOSTS = {
-  Bronze: 5,
-  Silver: 10,
-  Gold: 20,
+// Fonction de calcul du boost dynamique
+const calculateDynamicBoost = (amount: number, durationDays: number): number => {
+  // Score du montant (max 50)
+  const amountScore = Math.min((amount / 1000) * 0.5, 50);
+  
+  // Score de la durée (max 50)
+  const durationScore = Math.min((durationDays / 10) * 1, 50);
+  
+  // Boost total (max 100%)
+  const totalBoost = Math.min(amountScore + durationScore, 100);
+  
+  return Math.round(totalBoost * 10) / 10; // Arrondi à 1 décimale
+};
+
+// Calcul de la part de buyback de l'utilisateur
+const calculateBuybackShare = (userBoost: number, totalCommunityBoost: number): number => {
+  if (totalCommunityBoost === 0) return 0;
+  return (userBoost / totalCommunityBoost) * 100;
 };
 
 interface LockInterfaceProps {
@@ -43,18 +58,35 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Calcul du niveau basé sur la durée
+  // Calcul du niveau basé sur la durée et le montant (visuel uniquement)
   const predictedLevel: CNFTLevel = useMemo(() => {
     const days = parseInt(duration) || 0;
-    if (days >= LEVEL_THRESHOLDS.Gold) return 'Gold';
-    if (days >= LEVEL_THRESHOLDS.Silver) return 'Silver';
+    const amt = parseFloat(amount) || 0;
+    
+    if (amt >= 100000 && days >= LEVEL_THRESHOLDS.Diamond) return 'Diamond' as CNFTLevel;
+    if (amt >= 50000 && days >= LEVEL_THRESHOLDS.Platinum) return 'Platinum' as CNFTLevel;
+    if (amt >= 10000 && days >= LEVEL_THRESHOLDS.Gold) return 'Gold';
+    if (amt >= 1000 && days >= LEVEL_THRESHOLDS.Silver) return 'Silver';
     return 'Bronze';
-  }, [duration]);
+  }, [duration, amount]);
 
-  // Calcul du boost basé sur le niveau
+  // Calcul du boost basé sur le montant ET la durée (DYNAMIQUE)
   const predictedBoost = useMemo(() => {
-    return LEVEL_BOOSTS[predictedLevel];
-  }, [predictedLevel]);
+    const amt = parseFloat(amount) || 0;
+    const days = parseInt(duration) || 0;
+    return calculateDynamicBoost(amt, days);
+  }, [amount, duration]);
+  
+  // Détails du calcul du boost pour affichage
+  const boostDetails = useMemo(() => {
+    const amt = parseFloat(amount) || 0;
+    const days = parseInt(duration) || 0;
+    
+    const amountScore = Math.min((amt / 1000) * 0.5, 50);
+    const durationScore = Math.min((days / 10) * 1, 50);
+    
+    return { amountScore, durationScore };
+  }, [amount, duration]);
 
   // Couleur du badge selon le niveau
   const levelColor = useMemo(() => {
@@ -382,27 +414,79 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         </div>
       </div>
 
-      {/* Tier and boost preview */}
+      {/* Tier and boost preview - ENHANCED with calculation details */}
       <div className="mb-6 p-5 glass-effect rounded-lg border border-primary/20 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-radial from-primary/10 to-transparent rounded-full blur-2xl"></div>
         
-        <div className="relative">
-          <div className="flex justify-between items-center mb-4">
-            <span className="text-gray-400 font-medium">Predicted Tier</span>
+        <div className="relative space-y-4">
+          {/* Visual Tier */}
+          <div className="flex justify-between items-center">
+            <span className="text-gray-400 font-medium">Visual Tier</span>
             <span
               className={`px-4 py-1.5 rounded-full border font-bold ${levelColor} transition-all hover:scale-105`}
             >
               {predictedLevel}
             </span>
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-gray-400 font-medium">Predicted Boost</span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-bold bg-gradient-to-r from-secondary to-green-400 bg-clip-text text-transparent">
-                +{predictedBoost}%
-              </span>
+          
+          {/* Boost Calculation Details */}
+          <div className="p-3 rounded-lg bg-gradient-to-r from-secondary/5 to-transparent border border-secondary/10">
+            <div className="text-sm font-bold text-secondary mb-2">🎯 Boost Calculation</div>
+            <div className="space-y-1 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Amount Score:</span>
+                <span className="text-gray-200">+{boostDetails.amountScore.toFixed(1)}%</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Duration Score:</span>
+                <span className="text-gray-200">+{boostDetails.durationScore.toFixed(1)}%</span>
+              </div>
+              <div className="h-px bg-secondary/20 my-2"></div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-300 font-medium">Total Boost:</span>
+                <span className="text-2xl font-bold bg-gradient-to-r from-secondary to-green-400 bg-clip-text text-transparent">
+                  +{predictedBoost.toFixed(1)}%
+                </span>
+              </div>
             </div>
           </div>
+          
+          {/* Rebate Multiplier Impact */}
+          {predictedBoost > 0 && (
+            <>
+              <div className="p-3 rounded-lg bg-gradient-to-r from-primary/5 to-transparent border border-primary/10">
+                <div className="text-sm font-bold text-primary mb-2">💰 Rebate Multiplier</div>
+                <div className="text-xs text-gray-400 mb-1">
+                  Your rebates will be multiplied by:
+                </div>
+                <div className="text-2xl font-bold text-primary">
+                  {(1 + predictedBoost / 100).toFixed(2)}x
+                </div>
+                <div className="text-xs text-gray-400 mt-1">
+                  Example: Base 3 USDC → {(3 * (1 + predictedBoost / 100)).toFixed(2)} USDC
+                </div>
+              </div>
+              
+              {/* Buyback Share Estimation */}
+              <div className="p-3 rounded-lg bg-gradient-to-r from-green-500/5 to-transparent border border-green-500/10">
+                <div className="text-sm font-bold text-green-400 mb-2">🔥 Buyback Allocation</div>
+                <div className="text-xs text-gray-400 mb-2">
+                  Your share of buyback tokens (burned):
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold text-green-400">
+                    {calculateBuybackShare(predictedBoost, 10000).toFixed(3)}%
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    (estimated*)
+                  </span>
+                </div>
+                <div className="text-xs text-gray-500 mt-2">
+                  * Based on current community total boost
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
