@@ -34,7 +34,7 @@ pub const MAX_VENUES: usize = 10;
 pub const MAX_FALLBACKS: usize = 5;
 
 // Fee configuration (in basis points, 10000 = 100%)
-pub const PLATFORM_FEE_BPS: u16 = 30; // 0.3% platform fee
+pub const PLATFORM_FEE_BPS: u16 = 20; // 0.2% platform fee (plus compétitif que Raydium 0.25% et Orca 0.30%)
 pub const BUYBACK_ALLOCATION_BPS: u16 = 4000; // 40% of (fees + routing profit) goes to buyback
 
 #[program]
@@ -597,7 +597,7 @@ pub mod swap_toc_processor {
         // Payer le rebate avec boost à l'utilisateur
         let rebate_paid = pay_rebate_to_user(ctx, user_boost)?;
 
-        // Calculate platform fee (0.3% of amount_out)
+        // Calculate platform fee (0.2% of amount_out - plus bas que Raydium 0.25% et Orca 0.30%)
         let platform_fee = calculate_fee(total_amount_out, PLATFORM_FEE_BPS)?;
         
         // Calculate routing profit (amount_out - min_out - platform_fee)
