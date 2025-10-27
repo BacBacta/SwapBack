@@ -1,0 +1,11 @@
+name,email,wallet_address,discord,status
+Alice Defi,alice@example.com,3PiZ1xdHbPbj1UaPS8pfzKnHpmQQLfR8zrhy5RcksqAt,alice_defi,confirmed
+Bob Trader,bob@example.com,7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU,bob_trader,confirmed
+Charlie NFT,charlie@example.com,4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU,charlie_nft,pending
+Diana Whale,diana@example.com,5MMCMV8X3MGxRe6A47qLJAJEuJdmSzgJJCnG7mDzmZNP,diana_whale,confirmed
+Eve Early,eve@example.com,6zhisjPMu7fQJdXnUZvQJqnXREMdsgKvHZTZhG9aAxVy,eve_early,pending
+Frank Power,frank@example.com,8jkZSTqRNhAWGQ9J3hXXEWQrN4nV8P8BqJYaFz3jWKVR,frank_power,confirmed
+Grace Degen,grace@example.com,9sBHYGF4jW8hRNtqPQKjXkAJuVZcE2nVPsWrHzJmNQaP,grace_degen,pending
+Henry Ape,henry@example.com,AjKXtQBPmJqN8VvZrHzJpEkWRnVsE2mUQsYrGzLmMRcQ,,confirmed
+Iris Moon,iris@example.com,BkLYuRCQnKrO9WwAsI0KqFlXSoWtF3nVRtZsH0MnNSdR,iris_moon,pending
+Jack Hodl,jack@example.com,ClMZvSDRoLsP0XxBtJ1LrGmYTpXuG4oWSuAtI1NoOTeS,jack_hodl,confirmed
