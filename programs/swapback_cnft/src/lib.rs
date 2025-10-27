@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
-// Program ID generated locally for deployment
-declare_id!("CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH");
+// Program ID déployé sur devnet - 27 Oct 2025 (mis à jour)
+declare_id!("9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw");
 
 #[program]
 pub mod swapback_cnft {

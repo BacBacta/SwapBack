@@ -11,8 +11,8 @@
  */
 
 import * as anchor from "@coral-xyz/anchor";
-import { Program, AnchorProvider, web3 } from "@coral-xyz/anchor";
-import { Connection, PublicKey, Keypair } from "@solana/web3.js";
+import { Program, AnchorProvider, Wallet } from "@coral-xyz/anchor";
+import { Connection, PublicKey, Keypair, SystemProgram } from "@solana/web3.js";
 import fs from "fs";
 import path from "path";
 
@@ -36,7 +36,7 @@ async function main() {
     new Uint8Array(JSON.parse(fs.readFileSync(walletPath, "utf-8")))
   );
 
-  const wallet = new anchor.Wallet(walletKeypair);
+  const wallet = new Wallet(walletKeypair);
   const provider = new AnchorProvider(connection, wallet, {
     commitment: "confirmed",
   });
@@ -70,6 +70,7 @@ async function main() {
   }
 
   // Créer le programme
+  // @ts-ignore - Anchor 0.30.1 API
   const program = new Program(idl, ROUTER_PROGRAM_ID, provider);
 
   // Dériver le PDA router_state
@@ -94,10 +95,12 @@ async function main() {
       
       // Lire les données du state
       try {
-        const stateData = await program.account.routerState.fetch(routerStatePDA);
+        // @ts-ignore - IDL chargé dynamiquement
+        const stateAccount = program.account["RouterState"];
+        const stateData = await stateAccount.fetch(routerStatePDA);
         console.log("📊 État actuel:");
-        console.log(`   Authority: ${stateData.authority.toString()}`);
-        console.log(`   Bump: ${stateData.bump}\n`);
+        console.log(`   Authority: ${(stateData as any).authority.toString()}`);
+        console.log(`   Bump: ${(stateData as any).bump}\n`);
       } catch (e) {
         console.log("⚠️  Impossible de décoder le state (format incompatible)\n");
       }
@@ -124,12 +127,13 @@ async function main() {
 
   try {
     // Appeler initialize()
+    // @ts-ignore - Types Anchor complexes
     const tx = await program.methods
       .initialize()
       .accounts({
         state: routerStatePDA,
         authority: wallet.publicKey,
-        systemProgram: web3.SystemProgram.programId,
+        systemProgram: SystemProgram.programId,
       })
       .rpc();
 
@@ -138,10 +142,12 @@ async function main() {
     console.log(`   Explorer: https://explorer.solana.com/tx/${tx}?cluster=devnet\n`);
 
     // Vérifier le state créé
-    const stateData = await program.account.routerState.fetch(routerStatePDA);
+    // @ts-ignore - IDL chargé dynamiquement
+    const stateAccount = program.account["RouterState"];
+    const stateData = await stateAccount.fetch(routerStatePDA);
     console.log("📊 État créé:");
-    console.log(`   Authority: ${stateData.authority.toString()}`);
-    console.log(`   Bump: ${stateData.bump}\n`);
+    console.log(`   Authority: ${(stateData as any).authority.toString()}`);
+    console.log(`   Bump: ${(stateData as any).bump}\n`);
 
     console.log("🎉 Initialisation terminée !");
   } catch (error: any) {

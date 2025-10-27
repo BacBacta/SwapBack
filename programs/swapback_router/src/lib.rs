@@ -8,8 +8,8 @@ mod oracle;
 #[cfg(target_os = "solana")]
 mod getrandom_stub;
 
-// Program ID déployé sur devnet - 19 Oct 2025
-declare_id!("3Z295H9QHByYn9sHm3tH7ASHitwd2Y4AEaXUddfhQKap");
+// Program ID déployé sur devnet - 27 Oct 2025 (mis à jour)
+declare_id!("GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt");
 
 // DEX Program IDs (example - would need to be updated with actual deployed programs)
 pub const RAYDIUM_AMM_PROGRAM_ID: Pubkey = pubkey!("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8");
@@ -17,11 +17,11 @@ pub const ORCA_WHIRLPOOL_PROGRAM_ID: Pubkey =
     pubkey!("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc");
 pub const JUPITER_PROGRAM_ID: Pubkey = pubkey!("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4");
 
-// Buyback Program ID
-pub const BUYBACK_PROGRAM_ID: Pubkey = pubkey!("46UWFYdksvkGhTPy9cTSJGa3d5nqzpY766rtJeuxtMgU");
+// Buyback Program ID (mis à jour)
+pub const BUYBACK_PROGRAM_ID: Pubkey = pubkey!("EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf");
 
-// cNFT Program ID for boost verification
-pub const CNFT_PROGRAM_ID: Pubkey = pubkey!("CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH");
+// cNFT Program ID for boost verification (mis à jour)
+pub const CNFT_PROGRAM_ID: Pubkey = pubkey!("9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw");
 
 // Oracle constants
 pub const MAX_STALENESS_SECS: i64 = 300; // 5 minutes max staleness

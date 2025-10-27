@@ -2,10 +2,11 @@ use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, Burn, Mint, Token, TokenAccount, Transfer};
 
-declare_id!("71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW");
+// Program ID déployé sur devnet - 27 Oct 2025 (mis à jour)
+declare_id!("EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf");
 
-// Program ID du cNFT pour lire GlobalState et UserNft
-pub const CNFT_PROGRAM_ID: Pubkey = pubkey!("CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH");
+// Program ID du cNFT pour lire GlobalState et UserNft (mis à jour)
+pub const CNFT_PROGRAM_ID: Pubkey = pubkey!("9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw");
 
 // Ratio de distribution: 50% burn, 50% distribution
 pub const BURN_RATIO_BPS: u16 = 5000; // 50%
