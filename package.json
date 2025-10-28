@@ -27,8 +27,7 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --ext .ts,.tsx --max-warnings 300",
-    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
-    "prepare": "node -e \"try { require('husky').install() } catch (e) { if (e.code !== 'MODULE_NOT_FOUND') throw e }\""
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\""
   },
   "devDependencies": {
     "@coral-xyz/anchor": "^0.30.1",
