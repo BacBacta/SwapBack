@@ -1,0 +1,949 @@
+{
+  "address": "71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW",
+  "metadata": {
+    "name": "swapback_buyback",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Programme de buyback et burn pour le token $BACK"
+  },
+  "instructions": [
+    {
+      "name": "burn_back",
+      "docs": [
+        "Brûle les tokens $BACK achetés"
+      ],
+      "discriminator": [
+        238,
+        77,
+        46,
+        209,
+        249,
+        70,
+        100,
+        231
+      ],
+      "accounts": [
+        {
+          "name": "buyback_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  98,
+                  97,
+                  99,
+                  107,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "back_mint",
+          "writable": true
+        },
+        {
+          "name": "back_vault",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "deposit_usdc",
+      "docs": [
+        "Dépose des USDC pour le buyback (appelé par le routeur)"
+      ],
+      "discriminator": [
+        184,
+        148,
+        250,
+        169,
+        224,
+        213,
+        34,
+        126
+      ],
+      "accounts": [
+        {
+          "name": "buyback_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  98,
+                  97,
+                  99,
+                  107,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "source_usdc",
+          "writable": true
+        },
+        {
+          "name": "usdc_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  100,
+                  99,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "depositor",
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "distribute_buyback",
+      "docs": [
+        "Distribue une portion des tokens buyback à un utilisateur proportionnellement à son boost",
+        "Ratio: 50% distribution, 50% burn",
+        "Formula: user_share = (user_boost / total_community_boost) * (buyback_tokens * 50%)"
+      ],
+      "discriminator": [
+        250,
+        138,
+        67,
+        209,
+        221,
+        129,
+        152,
+        109
+      ],
+      "accounts": [
+        {
+          "name": "buyback_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  98,
+                  97,
+                  99,
+                  107,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "global_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                177,
+                147,
+                223,
+                114,
+                84,
+                71,
+                86,
+                189,
+                80,
+                58,
+                43,
+                83,
+                206,
+                52,
+                130,
+                54,
+                245,
+                230,
+                205,
+                216,
+                93,
+                242,
+                62,
+                117,
+                199,
+                57,
+                38,
+                17,
+                58,
+                84,
+                74,
+                48
+              ]
+            }
+          }
+        },
+        {
+          "name": "user_nft",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  110,
+                  102,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                177,
+                147,
+                223,
+                114,
+                84,
+                71,
+                86,
+                189,
+                80,
+                58,
+                43,
+                83,
+                206,
+                52,
+                130,
+                54,
+                245,
+                230,
+                205,
+                216,
+                93,
+                242,
+                62,
+                117,
+                199,
+                57,
+                38,
+                17,
+                58,
+                84,
+                74,
+                48
+              ]
+            }
+          }
+        },
+        {
+          "name": "back_vault",
+          "writable": true
+        },
+        {
+          "name": "user_back_account",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "max_tokens",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "execute_buyback",
+      "docs": [
+        "Exécute un buyback de $BACK avec les USDC accumulés"
+      ],
+      "discriminator": [
+        47,
+        32,
+        19,
+        100,
+        184,
+        96,
+        144,
+        49
+      ],
+      "accounts": [
+        {
+          "name": "buyback_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  98,
+                  97,
+                  99,
+                  107,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  100,
+                  99,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "back_vault",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "max_usdc_amount",
+          "type": "u64"
+        },
+        {
+          "name": "min_back_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "docs": [
+        "Initialise le programme de buyback"
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "buyback_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  98,
+                  97,
+                  99,
+                  107,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "back_mint"
+        },
+        {
+          "name": "usdc_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  100,
+                  99,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "min_buyback_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "update_params",
+      "docs": [
+        "Met à jour les paramètres du buyback"
+      ],
+      "discriminator": [
+        108,
+        178,
+        190,
+        95,
+        94,
+        203,
+        116,
+        20
+      ],
+      "accounts": [
+        {
+          "name": "buyback_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  98,
+                  97,
+                  99,
+                  107,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_min_buyback",
+          "type": {
+            "option": "u64"
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "BuybackState",
+      "discriminator": [
+        247,
+        168,
+        248,
+        43,
+        167,
+        32,
+        210,
+        84
+      ]
+    },
+    {
+      "name": "GlobalState",
+      "discriminator": [
+        163,
+        46,
+        74,
+        168,
+        216,
+        123,
+        133,
+        98
+      ]
+    },
+    {
+      "name": "UserNft",
+      "discriminator": [
+        118,
+        117,
+        125,
+        216,
+        67,
+        180,
+        173,
+        226
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "BackBurned",
+      "discriminator": [
+        31,
+        99,
+        211,
+        231,
+        101,
+        75,
+        229,
+        20
+      ]
+    },
+    {
+      "name": "BuybackDistributed",
+      "discriminator": [
+        31,
+        95,
+        165,
+        203,
+        24,
+        182,
+        88,
+        100
+      ]
+    },
+    {
+      "name": "BuybackExecuted",
+      "discriminator": [
+        150,
+        109,
+        157,
+        10,
+        124,
+        24,
+        38,
+        189
+      ]
+    },
+    {
+      "name": "USDCDeposited",
+      "discriminator": [
+        75,
+        200,
+        113,
+        3,
+        12,
+        197,
+        106,
+        215
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidAmount",
+      "msg": "Montant invalide"
+    },
+    {
+      "code": 6001,
+      "name": "InsufficientFunds",
+      "msg": "Fonds insuffisants"
+    },
+    {
+      "code": 6002,
+      "name": "Unauthorized",
+      "msg": "Non autorisé"
+    },
+    {
+      "code": 6003,
+      "name": "InactiveNft",
+      "msg": "NFT inactif"
+    },
+    {
+      "code": 6004,
+      "name": "NoBoostInCommunity",
+      "msg": "Aucun boost dans la communauté"
+    },
+    {
+      "code": 6005,
+      "name": "MathOverflow",
+      "msg": "Dépassement arithmétique"
+    },
+    {
+      "code": 6006,
+      "name": "ShareTooSmall",
+      "msg": "Part trop petite"
+    }
+  ],
+  "types": [
+    {
+      "name": "BackBurned",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "total_burned",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BuybackDistributed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "user_boost",
+            "type": "u16"
+          },
+          {
+            "name": "total_boost",
+            "type": "u64"
+          },
+          {
+            "name": "distributable_amount",
+            "type": "u64"
+          },
+          {
+            "name": "tokens_received",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BuybackExecuted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "usdc_amount",
+            "type": "u64"
+          },
+          {
+            "name": "back_amount",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BuybackState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "back_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "usdc_vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "min_buyback_amount",
+            "type": "u64"
+          },
+          {
+            "name": "total_usdc_spent",
+            "type": "u64"
+          },
+          {
+            "name": "total_back_burned",
+            "type": "u64"
+          },
+          {
+            "name": "buyback_count",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GlobalState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_community_boost",
+            "type": "u64"
+          },
+          {
+            "name": "active_locks_count",
+            "type": "u64"
+          },
+          {
+            "name": "total_value_locked",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LockLevel",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Bronze"
+          },
+          {
+            "name": "Silver"
+          },
+          {
+            "name": "Gold"
+          },
+          {
+            "name": "Platinum"
+          },
+          {
+            "name": "Diamond"
+          }
+        ]
+      }
+    },
+    {
+      "name": "USDCDeposited",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "depositor",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UserNft",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "level",
+            "type": {
+              "defined": {
+                "name": "LockLevel"
+              }
+            }
+          },
+          {
+            "name": "amount_locked",
+            "type": "u64"
+          },
+          {
+            "name": "lock_duration",
+            "type": "i64"
+          },
+          {
+            "name": "boost",
+            "type": "u16"
+          },
+          {
+            "name": "mint_time",
+            "type": "i64"
+          },
+          {
+            "name": "is_active",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

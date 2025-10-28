@@ -1,0 +1,29 @@
+{
+  "network": "testnet",
+  "rpc_url": "https://api.testnet.solana.com",
+  "deployed_at": "2025-10-28T08:55:24+00:00",
+  "deployer": "3PiZ1xdHbPbj1UaPS8pfzKnHpmQQLfR8zrhy5RcksqAt",
+  "programs": {
+    "swapback_cnft": "GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B",
+    "swapback_router": "yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn",
+    "swapback_buyback": "DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi"
+  },
+  "tokens": {
+    "back_mint": "5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27",
+    "back_account": "6WjqC6VxE2JEF6C7P9F2aeG7KUzUnrHmki5KqyhdyPAi",
+    "usdc_mock": "BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR"
+  },
+  "states": {
+    "router_state": "",
+    "buyback_state": "",
+    "global_state": "",
+    "collection_config": "4zhpvzBMqvGoM7j9RAaAF5ZizwDUAtgYr5Pnzn8uRh5s"
+  },
+  "merkle_tree": "93Tzc7btocwzDSbscW9EfL9dBzWLx85FHE6zeWrwHbNT",
+  "fees": {
+    "platform_fee_bps": 20,
+    "platform_fee_percent": "0.20%",
+    "buyback_allocation_bps": 4000,
+    "buyback_allocation_percent": "40%"
+  }
+}
