@@ -11,7 +11,10 @@ const fs = require("fs");
 const path = require("path");
 
 // Load configuration
-const configPath = path.join(__dirname, "testnet_deployment_20251028_085343.json");
+const configPath = path.join(
+  __dirname,
+  "testnet_deployment_20251028_085343.json"
+);
 const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
 
 const ROUTER_PROGRAM_ID = new PublicKey(config.programs.swapback_router);
@@ -19,9 +22,15 @@ const BUYBACK_PROGRAM_ID = new PublicKey(config.programs.swapback_buyback);
 const BACK_MINT = new PublicKey(config.tokens.back_mint);
 const USDC_MINT = new PublicKey(config.tokens.usdc_mock);
 
-console.log("╔══════════════════════════════════════════════════════════════════════════╗");
-console.log("║              🚀 Initialize SwapBack States - Testnet                     ║");
-console.log("╚══════════════════════════════════════════════════════════════════════════╝");
+console.log(
+  "╔══════════════════════════════════════════════════════════════════════════╗"
+);
+console.log(
+  "║              🚀 Initialize SwapBack States - Testnet                     ║"
+);
+console.log(
+  "╚══════════════════════════════════════════════════════════════════════════╝"
+);
 console.log("");
 
 async function initializeStates() {
@@ -48,16 +57,24 @@ async function initializeStates() {
     // Check balance
     const balance = await connection.getBalance(wallet.publicKey);
     console.log(`💰 Balance: ${(balance / 1e9).toFixed(4)} SOL`);
-    
+
     if (balance < 0.5 * 1e9) {
-      console.log("⚠️  Warning: Low balance. You may need more SOL for initialization.");
+      console.log(
+        "⚠️  Warning: Low balance. You may need more SOL for initialization."
+      );
     }
     console.log("");
 
     // Load IDLs
-    const routerIdlPath = path.join(__dirname, "app/public/idl/swapback_router.json");
-    const buybackIdlPath = path.join(__dirname, "app/public/idl/swapback_buyback.json");
-    
+    const routerIdlPath = path.join(
+      __dirname,
+      "app/public/idl/swapback_router.json"
+    );
+    const buybackIdlPath = path.join(
+      __dirname,
+      "app/public/idl/swapback_buyback.json"
+    );
+
     const routerIdl = JSON.parse(fs.readFileSync(routerIdlPath, "utf8"));
     const buybackIdl = JSON.parse(fs.readFileSync(buybackIdlPath, "utf8"));
 
@@ -69,8 +86,16 @@ async function initializeStates() {
     routerIdl.metadata = { address: ROUTER_PROGRAM_ID.toString() };
     buybackIdl.metadata = { address: BUYBACK_PROGRAM_ID.toString() };
 
-    const routerProgram = new anchor.Program(routerIdl, ROUTER_PROGRAM_ID, provider);
-    const buybackProgram = new anchor.Program(buybackIdl, BUYBACK_PROGRAM_ID, provider);
+    const routerProgram = new anchor.Program(
+      routerIdl,
+      ROUTER_PROGRAM_ID,
+      provider
+    );
+    const buybackProgram = new anchor.Program(
+      buybackIdl,
+      BUYBACK_PROGRAM_ID,
+      provider
+    );
 
     // 1. Initialize Router State
     console.log("🔄 Step 1: Initialize Router State...");
@@ -82,7 +107,9 @@ async function initializeStates() {
 
       const routerAccount = await connection.getAccountInfo(routerState);
       if (routerAccount) {
-        console.log(`   ✅ Router State already initialized: ${routerState.toString()}`);
+        console.log(
+          `   ✅ Router State already initialized: ${routerState.toString()}`
+        );
       } else {
         const tx = await routerProgram.methods
           .initialize()
@@ -93,9 +120,11 @@ async function initializeStates() {
           })
           .rpc();
 
-        console.log(`   ✅ Router State initialized: ${routerState.toString()}`);
+        console.log(
+          `   ✅ Router State initialized: ${routerState.toString()}`
+        );
         console.log(`   📝 Transaction: ${tx}`);
-        
+
         // Update config
         config.states.router_state = routerState.toString();
       }
@@ -114,7 +143,9 @@ async function initializeStates() {
 
       const buybackAccount = await connection.getAccountInfo(buybackState);
       if (buybackAccount) {
-        console.log(`   ✅ Buyback State already initialized: ${buybackState.toString()}`);
+        console.log(
+          `   ✅ Buyback State already initialized: ${buybackState.toString()}`
+        );
       } else {
         const tx = await buybackProgram.methods
           .initialize()
@@ -126,9 +157,11 @@ async function initializeStates() {
           })
           .rpc();
 
-        console.log(`   ✅ Buyback State initialized: ${buybackState.toString()}`);
+        console.log(
+          `   ✅ Buyback State initialized: ${buybackState.toString()}`
+        );
         console.log(`   📝 Transaction: ${tx}`);
-        
+
         // Update config
         config.states.buyback_state = buybackState.toString();
       }
@@ -147,7 +180,9 @@ async function initializeStates() {
 
       const globalAccount = await connection.getAccountInfo(globalState);
       if (globalAccount) {
-        console.log(`   ✅ Global State already initialized: ${globalState.toString()}`);
+        console.log(
+          `   ✅ Global State already initialized: ${globalState.toString()}`
+        );
       } else {
         const tx = await routerProgram.methods
           .initializeGlobalState()
@@ -158,9 +193,11 @@ async function initializeStates() {
           })
           .rpc();
 
-        console.log(`   ✅ Global State initialized: ${globalState.toString()}`);
+        console.log(
+          `   ✅ Global State initialized: ${globalState.toString()}`
+        );
         console.log(`   📝 Transaction: ${tx}`);
-        
+
         // Update config
         config.states.global_state = globalState.toString();
       }
@@ -175,14 +212,26 @@ async function initializeStates() {
     console.log("");
 
     // Final status
-    console.log("╔══════════════════════════════════════════════════════════════════════════╗");
-    console.log("║                    ✅ INITIALIZATION COMPLETE                            ║");
-    console.log("╚══════════════════════════════════════════════════════════════════════════╝");
+    console.log(
+      "╔══════════════════════════════════════════════════════════════════════════╗"
+    );
+    console.log(
+      "║                    ✅ INITIALIZATION COMPLETE                            ║"
+    );
+    console.log(
+      "╚══════════════════════════════════════════════════════════════════════════╝"
+    );
     console.log("");
     console.log("📊 Initialized States:");
-    console.log(`   Router State:   ${config.states.router_state || 'Pending'}`);
-    console.log(`   Buyback State:  ${config.states.buyback_state || 'Pending'}`);
-    console.log(`   Global State:   ${config.states.global_state || 'Pending'}`);
+    console.log(
+      `   Router State:   ${config.states.router_state || "Pending"}`
+    );
+    console.log(
+      `   Buyback State:  ${config.states.buyback_state || "Pending"}`
+    );
+    console.log(
+      `   Global State:   ${config.states.global_state || "Pending"}`
+    );
     console.log(`   Collection:     ${config.states.collection_config}`);
     console.log(`   Merkle Tree:    ${config.merkle_tree}`);
     console.log("");
@@ -192,7 +241,6 @@ async function initializeStates() {
     console.log(`💰 Cost: ${costSOL.toFixed(6)} SOL`);
     console.log(`💰 Remaining Balance: ${(finalBalance / 1e9).toFixed(4)} SOL`);
     console.log("");
-
   } catch (error) {
     console.error("❌ Error:", error);
     process.exit(1);
