@@ -2,7 +2,9 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "framework": "nextjs",
+  "installCommand": "npm install --ignore-scripts",
   "env": {
+    "HUSKY": "0",
     "NEXT_PUBLIC_SOLANA_NETWORK": "testnet",
     "NEXT_PUBLIC_SOLANA_RPC_URL": "https://api.testnet.solana.com",
     "NEXT_PUBLIC_ROUTER_PROGRAM_ID": "yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn",
