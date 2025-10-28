@@ -99,50 +99,35 @@ export function useBoostSystem() {
       // Pour l'instant, on désactive cette fonctionnalité en production
       console.warn("fetchUserNft not implemented yet - needs IDL loading");
       setUserNft(null);
-      return;
-
-      /* 
-      // Code original - à réactiver avec IDL
-      const provider = getProvider();
-      if (!provider) throw new Error("Provider not available");
-
-      // Charger le programme cNFT avec IDL
-      const cnftProgram = new Program(cnftIdl, PROGRAM_IDS.swapback_cnft, provider);
-
-      // Dériver le PDA du UserNft
-      const [userNftPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("user_nft"), publicKey.toBuffer()],
-        PROGRAM_IDS.swapback_cnft
-      );
-
-      // Récupérer les données
-      const nftData = await cnftProgram.account.userNft.fetch(userNftPda);
-
-      // Convertir les données
-      const formattedData: UserNftData = {
-        user: nftData.user,
-        level: getLevelName(nftData.level),
-        amountLocked: nftData.amountLocked,
-        lockDuration: nftData.lockDuration,
-        boost: nftData.boost,
-        mintTime: nftData.mintTime,
-        isActive: nftData.isActive,
-      };
-
-      setUserNft(formattedData);
-      */
     } catch (err: unknown) {
       // NFT n'existe pas encore (première fois)
       const errorMessage = err instanceof Error ? err.message : String(err);
-      if (errorMessage?.includes("Account does not exist")) {
-        setUserNft(null);
-      } else {
-        setError(errorMessage || "Erreur lors de la récupération du NFT");
-        console.error("Erreur fetchUserNft:", err);
-      }
+      setError(errorMessage || "Erreur lors de la récupération du NFT");
+      console.error("Erreur fetchUserNft:", err);
     } finally {
       setLoading(false);
     }
+
+    /* CODE DÉSACTIVÉ - À réactiver avec IDL chargé dynamiquement
+    // const provider = getProvider();
+    // if (!provider) throw new Error("Provider not available");
+    // const cnftProgram = new Program(cnftIdl, PROGRAM_IDS.swapback_cnft, provider);
+    // const [userNftPda] = PublicKey.findProgramAddressSync(
+    //   [Buffer.from("user_nft"), publicKey.toBuffer()],
+    //   PROGRAM_IDS.swapback_cnft
+    // );
+    // const nftData = await cnftProgram.account.userNft.fetch(userNftPda);
+    // const formattedData: UserNftData = {
+    //   user: nftData.user,
+    //   level: getLevelName(nftData.level),
+    //   amountLocked: nftData.amountLocked,
+    //   lockDuration: nftData.lockDuration,
+    //   boost: nftData.boost,
+    //   mintTime: nftData.mintTime,
+    //   isActive: nftData.isActive,
+    // };
+    // setUserNft(formattedData);
+    */
   }, [publicKey]);
 
   // Récupérer le GlobalState
