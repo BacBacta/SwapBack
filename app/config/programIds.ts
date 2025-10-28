@@ -45,11 +45,16 @@ const DEVNET_PROGRAM_IDS: ProgramIds = {
 
 /**
  * Program IDs - TESTNET
+ * 
+ * ✅ Déployé le 28 Octobre 2025
+ * Wallet: 3PiZ1xdHbPbj1UaPS8pfzKnHpmQQLfR8zrhy5RcksqAt
+ * CNFT: 260KB, Router: 306KB, Buyback: 365KB
+ * Coût total: ~6.5 SOL
  */
 const TESTNET_PROGRAM_IDS: ProgramIds = {
-  cnftProgram: new PublicKey('11111111111111111111111111111111'), // À déployer
-  routerProgram: new PublicKey('11111111111111111111111111111111'), // À déployer
-  buybackProgram: new PublicKey('11111111111111111111111111111111'), // À déployer
+  cnftProgram: new PublicKey('GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B'),
+  routerProgram: new PublicKey('yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn'),
+  buybackProgram: new PublicKey('DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi'),
 };
 
 /**
