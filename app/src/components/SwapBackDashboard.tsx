@@ -239,13 +239,13 @@ export const SwapBackDashboard = () => {
 
   if (!connected) {
     return (
-      <div className="max-w-4xl mx-auto p-6">
-        <div className="bg-[var(--primary)] rounded-2xl shadow-xl p-12 text-center">
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-12 text-center">
           <div className="text-6xl mb-6">🔒</div>
-          <h2 className="text-3xl font-bold text-gray-800 mb-4">
+          <h2 className="text-3xl font-bold text-white mb-4">
             Dashboard SwapBack
           </h2>
-          <p className="text-gray-600 mb-8 text-lg">
+          <p className="text-gray-400 mb-8 text-lg">
             Connectez votre wallet pour voir vos plans DCA
           </p>
           <WalletMultiButton className="mx-auto" />
@@ -255,32 +255,32 @@ export const SwapBackDashboard = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       {/* HEADER */}
-      <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-8 mb-8 text-[var(--primary)]">
-        <h1 className="text-4xl font-bold mb-2">Mes Plans DCA</h1>
-        <p className="text-purple-100 text-lg">
+      <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-8">
+        <h1 className="text-4xl font-bold mb-2 text-white">Mes Plans DCA</h1>
+        <p className="text-gray-400 text-lg">
           Gérez vos stratégies de Dollar-Cost Averaging
         </p>
         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-[var(--primary)]/20 rounded-xl p-4">
-            <div className="text-sm text-purple-100 mb-1">Plans actifs</div>
-            <div className="text-3xl font-bold">
+          <div className="bg-gray-900 rounded-lg p-4">
+            <div className="text-sm text-gray-400 mb-1">Plans actifs</div>
+            <div className="text-3xl font-bold text-white">
               {plans.filter((p) => !p.account.isPaused).length}
             </div>
           </div>
-          <div className="bg-[var(--primary)]/20 rounded-xl p-4">
-            <div className="text-sm text-purple-100 mb-1">Total investi</div>
-            <div className="text-3xl font-bold">
+          <div className="bg-gray-900 rounded-lg p-4">
+            <div className="text-sm text-gray-400 mb-1">Total investi</div>
+            <div className="text-3xl font-bold text-white">
               {plans
                 .reduce((sum, p) => sum + p.account.inputAmount.toNumber(), 0)
                 .toFixed(2)}{" "}
               SOL
             </div>
           </div>
-          <div className="bg-[var(--primary)]/20 rounded-xl p-4">
-            <div className="text-sm text-purple-100 mb-1">Swaps exécutés</div>
-            <div className="text-3xl font-bold">
+          <div className="bg-gray-900 rounded-lg p-4">
+            <div className="text-sm text-gray-400 mb-1">Swaps exécutés</div>
+            <div className="text-3xl font-bold text-white">
               {plans.reduce(
                 (sum, p) => sum + p.account.swapsExecuted.toNumber(),
                 0
@@ -292,32 +292,32 @@ export const SwapBackDashboard = () => {
 
       {/* LOADING */}
       {loading && (
-        <div className="bg-[var(--primary)] rounded-2xl shadow-xl p-12 text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement de vos plans DCA...</p>
+        <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-12 text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[var(--primary)] mx-auto mb-4"></div>
+          <p className="text-gray-400">Chargement de vos plans DCA...</p>
         </div>
       )}
 
       {/* ERROR */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-xl mb-6">
+        <div className="bg-red-900/20 border border-red-500/50 text-red-400 px-6 py-4 rounded-xl">
           <p className="font-medium">⚠️ {error}</p>
         </div>
       )}
 
       {/* NO PLANS */}
       {!loading && plans.length === 0 && (
-        <div className="bg-[var(--primary)] rounded-2xl shadow-xl p-12 text-center">
+        <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-12 text-center">
           <div className="text-6xl mb-6">📊</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">
+          <h2 className="text-2xl font-bold text-white mb-4">
             Aucun plan DCA actif
           </h2>
-          <p className="text-gray-600 mb-8">
+          <p className="text-gray-400 mb-8">
             Créez votre premier plan pour commencer à investir automatiquement
           </p>
           <a
             href="/"
-            className="inline-block bg-gradient-to-r from-purple-600 to-blue-600 text-[var(--primary)] px-8 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all"
+            className="inline-block bg-[var(--primary)] text-black px-8 py-3 rounded-lg font-semibold hover:bg-[var(--primary)]/90 transition-colors"
           >
             Créer un plan DCA
           </a>
@@ -337,12 +337,12 @@ export const SwapBackDashboard = () => {
             return (
               <div
                 key={plan.publicKey.toString()}
-                className="bg-[var(--primary)] rounded-2xl shadow-xl p-6 hover:shadow-2xl transition-shadow"
+                className="bg-black border border-[var(--primary)]/20 rounded-xl p-6 hover:border-[var(--primary)]/40 transition-all"
               >
                 {/* HEADER */}
                 <div className="flex items-start justify-between mb-6">
                   <div>
-                    <h3 className="text-xl font-bold text-gray-800 mb-2">
+                    <h3 className="text-xl font-bold text-white mb-2">
                       Plan DCA #{index + 1}
                     </h3>
                     <p className="text-sm text-gray-500">
@@ -351,17 +351,17 @@ export const SwapBackDashboard = () => {
                   </div>
                   <div className="flex gap-2">
                     {isPaused && (
-                      <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
+                      <span className="bg-yellow-900/30 text-yellow-400 px-3 py-1 rounded-full text-sm font-medium border border-yellow-500/30">
                         ⏸ En pause
                       </span>
                     )}
                     {isComplete && (
-                      <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                      <span className="bg-green-900/30 text-green-400 px-3 py-1 rounded-full text-sm font-medium border border-green-500/30">
                         ✅ Terminé
                       </span>
                     )}
                     {!isPaused && !isComplete && (
-                      <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                      <span className="bg-blue-900/30 text-blue-400 px-3 py-1 rounded-full text-sm font-medium border border-blue-500/30">
                         🔄 Actif
                       </span>
                     )}
@@ -370,16 +370,16 @@ export const SwapBackDashboard = () => {
 
                 {/* PROGRESS BAR */}
                 <div className="mb-6">
-                  <div className="flex justify-between text-sm text-gray-600 mb-2">
+                  <div className="flex justify-between text-sm text-gray-400 mb-2">
                     <span>Progression</span>
-                    <span className="font-medium">
+                    <span className="font-medium text-white">
                       {plan.account.swapsExecuted.toString()} /{" "}
                       {plan.account.numberOfSwaps.toString()} swaps
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div className="w-full bg-gray-800 rounded-full h-3">
                     <div
-                      className="bg-gradient-to-r from-purple-600 to-blue-600 h-3 rounded-full transition-all"
+                      className="bg-[var(--primary)] h-3 rounded-full transition-all"
                       style={{ width: `${progress}%` }}
                     ></div>
                   </div>
@@ -390,53 +390,53 @@ export const SwapBackDashboard = () => {
 
                 {/* DETAILS GRID */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                  <div className="bg-gray-50 rounded-xl p-4">
-                    <div className="text-xs text-gray-500 mb-1">
+                  <div className="bg-gray-900 rounded-lg p-4">
+                    <div className="text-xs text-gray-400 mb-1">
                       Montant total
                     </div>
-                    <div className="text-lg font-bold text-gray-800">
+                    <div className="text-lg font-bold text-white">
                       {formatAmount(plan.account.inputAmount)} SOL
                     </div>
                   </div>
 
-                  <div className="bg-gray-50 rounded-xl p-4">
-                    <div className="text-xs text-gray-500 mb-1">
+                  <div className="bg-gray-900 rounded-lg p-4">
+                    <div className="text-xs text-gray-400 mb-1">
                       Token destination
                     </div>
-                    <div className="text-lg font-bold text-gray-800">
+                    <div className="text-lg font-bold text-white">
                       {getTokenSymbol(plan.account.destinationToken)}
                     </div>
                   </div>
 
-                  <div className="bg-gray-50 rounded-xl p-4">
-                    <div className="text-xs text-gray-500 mb-1">Intervalle</div>
-                    <div className="text-lg font-bold text-gray-800">
+                  <div className="bg-gray-900 rounded-lg p-4">
+                    <div className="text-xs text-gray-400 mb-1">Intervalle</div>
+                    <div className="text-lg font-bold text-white">
                       {(plan.account.dcaInterval.toNumber() / 3600).toFixed(1)}h
                     </div>
                   </div>
 
-                  <div className="bg-gray-50 rounded-xl p-4">
-                    <div className="text-xs text-gray-500 mb-1">
+                  <div className="bg-gray-900 rounded-lg p-4">
+                    <div className="text-xs text-gray-400 mb-1">
                       Prochain swap
                     </div>
-                    <div className="text-sm font-medium text-gray-800">
+                    <div className="text-sm font-medium text-white">
                       {getNextSwapTime(plan)}
                     </div>
                   </div>
                 </div>
 
                 {/* STATS */}
-                <div className="border-t border-gray-200 pt-4">
+                <div className="border-t border-gray-800 pt-4">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
-                      <span className="text-gray-500">Swappé:</span>
-                      <span className="ml-2 font-medium text-gray-800">
+                      <span className="text-gray-400">Swappé:</span>
+                      <span className="ml-2 font-medium text-white">
                         {formatAmount(plan.account.amountSwapped)} SOL
                       </span>
                     </div>
                     <div>
-                      <span className="text-gray-500">Par swap:</span>
-                      <span className="ml-2 font-medium text-gray-800">
+                      <span className="text-gray-400">Par swap:</span>
+                      <span className="ml-2 font-medium text-white">
                         {formatAmount(
                           plan.account.inputAmount.div(
                             plan.account.numberOfSwaps
@@ -446,14 +446,14 @@ export const SwapBackDashboard = () => {
                       </span>
                     </div>
                     <div>
-                      <span className="text-gray-500">Dernier swap:</span>
-                      <span className="ml-2 font-medium text-gray-800">
+                      <span className="text-gray-400">Dernier swap:</span>
+                      <span className="ml-2 font-medium text-white">
                         {formatDate(plan.account.lastSwapTime)}
                       </span>
                     </div>
                     <div>
-                      <span className="text-gray-500">Slippage min:</span>
-                      <span className="ml-2 font-medium text-gray-800">
+                      <span className="text-gray-400">Slippage min:</span>
+                      <span className="ml-2 font-medium text-white">
                         {plan.account.minOutputAmount.toString() === "0"
                           ? "Illimité"
                           : formatAmount(plan.account.minOutputAmount)}
@@ -468,14 +468,14 @@ export const SwapBackDashboard = () => {
                     href={`https://explorer.solana.com/address/${plan.publicKey.toString()}?cluster=${process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'testnet'}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg font-medium text-center transition-colors"
+                    className="flex-1 bg-gray-900 hover:bg-gray-800 text-white px-4 py-2 rounded-lg font-medium text-center transition-colors border border-gray-700"
                   >
                     🔍 Explorer
                   </a>
                   {!isPaused && !isComplete && (
                     <button
                       disabled
-                      className="flex-1 bg-gray-300 text-gray-500 px-4 py-2 rounded-lg font-medium cursor-not-allowed"
+                      className="flex-1 bg-gray-900/50 text-gray-500 px-4 py-2 rounded-lg font-medium cursor-not-allowed border border-gray-800"
                     >
                       ⏸ Pause (bientôt)
                     </button>
@@ -483,7 +483,7 @@ export const SwapBackDashboard = () => {
                   {!isComplete && (
                     <button
                       disabled
-                      className="flex-1 bg-gray-300 text-gray-500 px-4 py-2 rounded-lg font-medium cursor-not-allowed"
+                      className="flex-1 bg-gray-900/50 text-gray-500 px-4 py-2 rounded-lg font-medium cursor-not-allowed border border-gray-800"
                     >
                       ❌ Annuler (bientôt)
                     </button>
@@ -496,11 +496,11 @@ export const SwapBackDashboard = () => {
       )}
 
       {/* INFO FOOTER */}
-      <div className="mt-8 bg-blue-50 rounded-xl p-6">
-        <h3 className="text-lg font-semibold text-blue-900 mb-3">
+      <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-6">
+        <h3 className="text-lg font-semibold text-blue-400 mb-3">
           💡 Comment ça marche ?
         </h3>
-        <ul className="space-y-2 text-sm text-blue-800">
+        <ul className="space-y-2 text-sm text-gray-300">
           <li className="flex items-start">
             <span className="mr-2">•</span>
             <span>

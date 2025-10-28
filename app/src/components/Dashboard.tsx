@@ -6,7 +6,7 @@ import { CNFTCard } from "./CNFTCard";
 import { useCNFT } from "../hooks/useCNFT";
 import { useRealtimeStats } from "../hooks/useRealtimeStats";
 import { VolumeChart, ActivityChart } from "./Charts";
-import { SkeletonLoader, ChartSkeleton } from "./Skeletons";
+import { SkeletonLoader } from "./Skeletons";
 import { NoActivityState, NoConnectionState } from "./EmptyState";
 import { SwapBackDashboard } from "./SwapBackDashboard";
 import LockInterface from "./LockInterface";
@@ -58,48 +58,48 @@ export const Dashboard = () => {
         {loading ? "Loading dashboard data..." : `Dashboard updated. Total volume: $${globalStats.totalVolume.toLocaleString()}`}
       </div>
 
-      {/* Global Stats avec animation */}
-      <div className="swap-card">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold terminal-text terminal-glow uppercase tracking-wider" id="protocol-stats-heading">PROTOCOL STATISTICS</h2>
-          <div className="flex items-center gap-2 px-3 py-1 border-2 border-[var(--secondary)]">
-            <span className="w-2 h-2 bg-[var(--secondary)] animate-pulse" aria-hidden="true"></span>
-            <span className="text-xs terminal-text uppercase tracking-wider">[LIVE]</span>
+      {/* Global Stats */}
+      <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-white" id="protocol-stats-heading">Protocol Statistics</h2>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-900 rounded-lg border border-[var(--secondary)]/30">
+            <span className="w-2 h-2 bg-[var(--secondary)] rounded-full animate-pulse" aria-hidden="true"></span>
+            <span className="text-xs text-gray-400">Live</span>
           </div>
         </div>
         <div 
-          className="grid grid-cols-1 md:grid-cols-3 gap-6"
+          className="grid grid-cols-1 md:grid-cols-3 gap-4"
           role="group"
           aria-labelledby="protocol-stats-heading"
         >
-          <div className="stat-card text-center group hover:scale-105 transition-transform">
-            <div className="text-sm terminal-text opacity-70 mb-2 uppercase tracking-wider" id="total-volume-label">[TOTAL VOLUME]</div>
+          <div className="bg-gray-900 rounded-lg p-4 text-center group hover:border hover:border-[var(--primary)]/30 transition-all">
+            <div className="text-sm text-gray-400 mb-2" id="total-volume-label">Total Volume</div>
             <div 
-              className="text-3xl font-bold terminal-text terminal-glow"
+              className="text-3xl font-bold text-white"
               aria-labelledby="total-volume-label"
               aria-live="polite"
             >
               ${globalStats.totalVolume.toLocaleString('en-US', { maximumFractionDigits: 0 })}
             </div>
-            <div className="text-xs terminal-text opacity-60 mt-2">
+            <div className="text-xs text-gray-500 mt-2">
               +{globalStats.swapsLast24h} swaps (24h)
             </div>
           </div>
-          <div className="stat-card text-center group hover:scale-105 transition-transform">
-            <div className="text-sm terminal-text opacity-70 mb-2 uppercase tracking-wider">[$BACK BURNED]</div>
-            <div className="text-3xl font-bold text-[var(--accent)] terminal-glow">
+          <div className="bg-gray-900 rounded-lg p-4 text-center group hover:border hover:border-[var(--primary)]/30 transition-all">
+            <div className="text-sm text-gray-400 mb-2">$BACK Burned</div>
+            <div className="text-3xl font-bold text-[var(--accent)]">
               {globalStats.totalBurned.toLocaleString('en-US')}
             </div>
-            <div className="text-xs terminal-text opacity-60 mt-2">
-              🔥 DEFLATIONARY
+            <div className="text-xs text-gray-500 mt-2">
+              🔥 Deflationary
             </div>
           </div>
-          <div className="stat-card text-center group hover:scale-105 transition-transform">
-            <div className="text-sm terminal-text opacity-70 mb-2 uppercase tracking-wider">[REBATES DISTRIBUTED]</div>
-            <div className="text-3xl font-bold terminal-text terminal-glow">
+          <div className="bg-gray-900 rounded-lg p-4 text-center group hover:border hover:border-[var(--primary)]/30 transition-all">
+            <div className="text-sm text-gray-400 mb-2">Rebates Distributed</div>
+            <div className="text-3xl font-bold text-white">
               ${globalStats.totalRebates.toLocaleString('en-US', { maximumFractionDigits: 0 })}
             </div>
-            <div className="text-xs terminal-text opacity-60 mt-2">
+            <div className="text-xs text-gray-500 mt-2">
               {globalStats.activeUsers.toLocaleString()} active users
             </div>
           </div>
@@ -119,46 +119,46 @@ export const Dashboard = () => {
       )}
 
       {/* Tabs Navigation */}
-      <div className="flex gap-0 p-0 bg-black border-2 border-[var(--primary)]/30">
+      <div className="flex gap-1 p-1 bg-gray-900 rounded-xl border border-[var(--primary)]/20">
         <button
           onClick={() => setActiveTab("dca")}
-          className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 ${
+          className={`flex-1 px-6 py-3 font-semibold transition-all rounded-lg ${
             activeTab === "dca"
-              ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
-              : "text-[var(--primary)] border-[var(--primary)]/30 hover:bg-[var(--primary)]/10"
+              ? "bg-[var(--primary)] text-black"
+              : "text-gray-400 hover:text-white hover:bg-gray-800"
           }`}
         >
           📊 DCA
         </button>
         <button
           onClick={() => setActiveTab("lock-unlock")}
-          className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 ${
+          className={`flex-1 px-6 py-3 font-semibold transition-all rounded-lg ${
             activeTab === "lock-unlock"
-              ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
-              : "text-[var(--primary)] border-[var(--primary)]/30 hover:bg-[var(--primary)]/10"
+              ? "bg-[var(--primary)] text-black"
+              : "text-gray-400 hover:text-white hover:bg-gray-800"
           }`}
         >
-          🔒 LOCK/UNLOCK
+          🔒 Lock/Unlock
         </button>
         <button
           onClick={() => setActiveTab("overview")}
-          className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 ${
+          className={`flex-1 px-6 py-3 font-semibold transition-all rounded-lg ${
             activeTab === "overview"
-              ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
-              : "text-[var(--primary)] border-[var(--primary)]/30 hover:bg-[var(--primary)]/10"
+              ? "bg-[var(--primary)] text-black"
+              : "text-gray-400 hover:text-white hover:bg-gray-800"
           }`}
         >
-          � OVERVIEW
+          👤 Overview
         </button>
         <button
           onClick={() => setActiveTab("analytics")}
-          className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider ${
+          className={`flex-1 px-6 py-3 font-semibold transition-all rounded-lg ${
             activeTab === "analytics"
-              ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
-              : "text-[var(--primary)] hover:bg-[var(--primary)]/10"
+              ? "bg-[var(--primary)] text-black"
+              : "text-gray-400 hover:text-white hover:bg-gray-800"
           }`}
         >
-          � ANALYTICS
+          📈 Analytics
         </button>
       </div>
 
@@ -170,29 +170,26 @@ export const Dashboard = () => {
       )}
 
       {activeTab === "lock-unlock" && (
-        <div className="space-y-6">
-          {/* Sub-tabs for Lock/Unlock */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="swap-card">
-              <h3 className="text-xl font-bold mb-6 terminal-text uppercase tracking-wider flex items-center gap-2">
-                <span>🔒</span>
-                <span>LOCK $BACK</span>
-              </h3>
-              <LockInterface onLockSuccess={() => {
-                // Refresh data after lock
-                window.location.reload();
-              }} />
-            </div>
-            <div className="swap-card">
-              <h3 className="text-xl font-bold mb-6 terminal-text uppercase tracking-wider flex items-center gap-2">
-                <span>🔓</span>
-                <span>UNLOCK $BACK</span>
-              </h3>
-              <UnlockInterface onUnlockSuccess={() => {
-                // Refresh data after unlock
-                window.location.reload();
-              }} />
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6">
+            <h3 className="text-xl font-bold mb-6 text-white flex items-center gap-2">
+              <span>🔒</span>
+              <span>Lock $BACK</span>
+            </h3>
+            <LockInterface onLockSuccess={() => {
+              // Refresh data after lock
+              window.location.reload();
+            }} />
+          </div>
+          <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6">
+            <h3 className="text-xl font-bold mb-6 text-white flex items-center gap-2">
+              <span>🔓</span>
+              <span>Unlock $BACK</span>
+            </h3>
+            <UnlockInterface onUnlockSuccess={() => {
+              // Refresh data after unlock
+              window.location.reload();
+            }} />
           </div>
         </div>
       )}
@@ -201,46 +198,46 @@ export const Dashboard = () => {
         <div className="space-y-6">
           {/* Quick Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="terminal-box p-5 border-2 border-[var(--primary)]/30 hover:border-[var(--primary)] transition-all group">
+            <div className="bg-gray-900 rounded-lg p-5 hover:border hover:border-[var(--primary)]/30 transition-all">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 border-2 border-[var(--primary)] flex items-center justify-center group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 border border-[var(--primary)] rounded flex items-center justify-center">
                   <span className="text-lg">🔄</span>
                 </div>
-                <span className="terminal-text opacity-70 text-sm uppercase tracking-wider">[SWAPS]</span>
+                <span className="text-gray-400 text-sm">Swaps</span>
               </div>
-              <div className="text-2xl font-bold terminal-text terminal-glow">{userStats.totalSwaps}</div>
+              <div className="text-2xl font-bold text-white">{userStats.totalSwaps}</div>
             </div>
 
-            <div className="terminal-box p-5 border-2 border-[var(--secondary)]/30 hover:border-[var(--secondary)] transition-all group">
+            <div className="bg-gray-900 rounded-lg p-5 hover:border hover:border-[var(--secondary)]/30 transition-all">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 border-2 border-[var(--secondary)] flex items-center justify-center group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 border border-[var(--secondary)] rounded flex items-center justify-center">
                   <span className="text-lg">💰</span>
                 </div>
-                <span className="terminal-text opacity-70 text-sm uppercase tracking-wider">[VOLUME]</span>
+                <span className="text-gray-400 text-sm">Volume</span>
               </div>
-              <div className="text-2xl font-bold terminal-text terminal-glow">${userStats.totalVolume.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-white">${userStats.totalVolume.toLocaleString()}</div>
             </div>
 
-            <div className="terminal-box p-5 border-2 border-[var(--secondary)]/30 hover:border-[var(--secondary)] transition-all group">
+            <div className="bg-gray-900 rounded-lg p-5 hover:border hover:border-[var(--secondary)]/30 transition-all">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 border-2 border-[var(--secondary)] flex items-center justify-center group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 border border-[var(--secondary)] rounded flex items-center justify-center">
                   <span className="text-lg">📈</span>
                 </div>
-                <span className="terminal-text opacity-70 text-sm uppercase tracking-wider">[NPI]</span>
+                <span className="text-gray-400 text-sm">NPI</span>
               </div>
-              <div className="text-2xl font-bold terminal-text terminal-glow">
+              <div className="text-2xl font-bold text-white">
                 +${userStats.totalNPI.toFixed(2)}
               </div>
             </div>
 
-            <div className="terminal-box p-5 border-2 border-[var(--secondary)]/30 hover:border-[var(--secondary)] transition-all group">
+            <div className="bg-gray-900 rounded-lg p-5 hover:border hover:border-[var(--secondary)]/30 transition-all">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 border-2 border-[var(--secondary)] flex items-center justify-center group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 border border-[var(--secondary)] rounded flex items-center justify-center">
                   <span className="text-lg">✅</span>
                 </div>
-                <span className="terminal-text opacity-70 text-sm uppercase tracking-wider">[REBATES]</span>
+                <span className="text-gray-400 text-sm">Rebates</span>
               </div>
-              <div className="text-2xl font-bold terminal-text terminal-glow">
+              <div className="text-2xl font-bold text-white">
                 ${userStats.totalRebates.toFixed(2)}
               </div>
             </div>
@@ -248,21 +245,21 @@ export const Dashboard = () => {
 
           {/* Pending Rebates Card */}
           {userStats.pendingRebates > 0 && (
-            <div className="terminal-box p-6 border-2 border-[var(--primary)] hover:scale-[1.02] transition-all relative overflow-hidden terminal-scanline">
-              <div className="relative flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="bg-black border border-[var(--primary)] rounded-xl p-6 hover:scale-[1.01] transition-all">
+              <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 border-2 border-[var(--accent)] flex items-center justify-center animate-pulse">
+                  <div className="w-14 h-14 border border-[var(--accent)] rounded flex items-center justify-center">
                     <span className="text-2xl">💎</span>
                   </div>
                   <div>
-                    <div className="font-bold text-lg mb-1 terminal-text uppercase tracking-wider">[PENDING REBATES]</div>
-                    <div className="text-3xl font-bold terminal-text terminal-glow">
+                    <div className="font-bold text-lg mb-1 text-gray-400">Pending Rebates</div>
+                    <div className="text-3xl font-bold text-white">
                       ${userStats.pendingRebates.toFixed(2)}
                     </div>
                   </div>
                 </div>
-                <button className="btn-primary px-8 py-3 text-lg font-bold uppercase tracking-wider">
-                  🎁 CLAIM NOW
+                <button className="bg-[var(--primary)] text-black px-8 py-3 rounded-lg text-lg font-bold hover:bg-[var(--primary)]/90 transition-colors">
+                  🎁 Claim Now
                 </button>
               </div>
             </div>
@@ -270,12 +267,12 @@ export const Dashboard = () => {
         </div>
       )}
 
-      {/* Analytics Tab avec Charts */}
+      {/* Analytics Tab */}
       {activeTab === "analytics" && (
         <div className="space-y-6">
           {/* Volume Chart */}
-          <div className="swap-card">
-            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+          <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6">
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-white">
               <span>📊</span>
               <span>Volume Trend (7 Days)</span>
             </h3>
@@ -285,8 +282,8 @@ export const Dashboard = () => {
           </div>
 
           {/* Activity Chart */}
-          <div className="swap-card">
-            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+          <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6">
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-white">
               <span>📈</span>
               <span>Trading Activity (7 Days)</span>
             </h3>
@@ -297,12 +294,12 @@ export const Dashboard = () => {
 
           {/* Stats Summary */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="swap-card">
+            <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6">
               <h4 className="font-bold mb-4 text-[var(--primary)]">Performance</h4>
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-400">Avg. Swap Size</span>
-                  <span className="font-semibold">${(userStats?.totalVolume || 0 / (userStats?.totalSwaps || 1)).toFixed(2)}</span>
+                  <span className="font-semibold text-white">${(userStats?.totalVolume || 0 / (userStats?.totalSwaps || 1)).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Avg. NPI per Swap</span>
@@ -319,7 +316,7 @@ export const Dashboard = () => {
               </div>
             </div>
 
-            <div className="swap-card">
+            <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6">
               <h4 className="font-bold mb-4 text-[var(--secondary)]">Rewards</h4>
               <div className="space-y-3">
                 <div className="flex justify-between">
@@ -330,11 +327,11 @@ export const Dashboard = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Rebate Boost</span>
-                  <span className="font-semibold">+{userStats?.rebateBoost || 0}%</span>
+                  <span className="font-semibold text-white">+{userStats?.rebateBoost || 0}%</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Locked Amount</span>
-                  <span className="font-semibold">
+                  <span className="font-semibold text-white">
                     {(userStats?.lockedAmount || 0).toLocaleString()} $BACK
                   </span>
                 </div>
