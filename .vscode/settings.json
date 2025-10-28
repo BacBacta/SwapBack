@@ -45,6 +45,10 @@
   "sonarlint.disableTelemetry": true,
   "sonarlint.ls.javaHome": "/usr/lib/jvm/java-21-openjdk-amd64",
   
+  // Auto-save pour éviter les pertes lors des déconnexions
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1000,
+  
   "files.exclude": {
     "**/.git": true,
     "**/.DS_Store": true,

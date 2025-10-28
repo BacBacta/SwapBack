@@ -1,15 +1,26 @@
 # PHASE 11 - TASK 11: UAT (User Acceptance Testing)
-## Guide de test utilisateur - SwapBack Devnet
+## Guide de test utilisateur - SwapBack Testnet
 
 ---
 
 ## 📋 INFORMATIONS GÉNÉRALES
 
-**Date de début**: 27 octobre 2025  
+**Date de début**: 28 octobre 2025  
 **Durée estimée**: 3 semaines  
 **Nombre de testeurs**: 10-20 beta testers  
-**Réseau**: Solana Devnet  
+**Réseau**: Solana Testnet  
+**RPC URL**: https://api.testnet.solana.com  
 **Budget alloué**: Airdrop SOL + tokens BACK/USDC pour chaque testeur
+
+### 🔗 Adresses testnet déployées
+- **BACK Token**: `5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27`
+- **USDC Testnet**: `BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR`
+- **Router Program**: `yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn`
+- **Buyback Program**: `DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi`
+- **CNFT Program**: `GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B`
+- **Merkle Tree**: `93Tzc7btocwzDSbscW9EfL9dBzWLx85FHE6zeWrwHbNT` (16,384 capacity)
+- **Collection Config**: `4zhpvzBMqvGoM7j9RAaAF5ZizwDUAtgYr5Pnzn8uRh5s`
+- **Deployer Wallet**: `3PiZ1xdHbPbj1UaPS8pfzKnHpmQQLfR8zrhy5RcksqAt` (5.49 SOL, 1B BACK)
 
 ---
 
@@ -58,9 +69,9 @@
 ### Étape 1: Setup initial (15 min)
 1. **Créer wallet Phantom/Solflare** (ou utiliser existant)
 2. **Rejoindre Discord SwapBack** → Channel #beta-testers
-3. **Ajouter réseau Devnet** dans wallet
-   - RPC: `https://api.devnet.solana.com`
-   - Explorer: `https://explorer.solana.com/?cluster=devnet`
+3. **Ajouter réseau Testnet** dans wallet
+   - RPC: `https://api.testnet.solana.com`
+   - Explorer: `https://explorer.solana.com/?cluster=testnet`
 
 ### Étape 2: Recevoir tokens de test (5 min)
 1. **Partager adresse wallet** dans Discord #beta-testers
@@ -72,16 +83,43 @@
 ### Étape 3: Vérifier réception (5 min)
 ```bash
 # Vérifier SOL
-Wallet → Networks → Devnet → Check balance
+Wallet → Networks → Testnet → Check balance
 
 # Vérifier tokens
-Wallet → Tokens → Devnet → BACK + USDC visible
+Wallet → Tokens → Testnet → BACK + USDC visible
 ```
 
 ### Étape 4: Accéder à l'interface (5 min)
-- **URL devnet**: `https://devnet.swapback.io` (à créer)
-- **Alternative**: Localhost si nécessaire
-- **Vérifier connexion**: Connect Wallet → Devnet détecté
+- **URL locale**: `http://localhost:3000` (configuration testnet active)
+- **URL testnet Vercel**: `https://testnet.swapback.io` (à déployer)
+- **Vérifier connexion**: 
+  - Connect Wallet → Testnet détecté
+  - Network indicator affiche "Testnet"
+  - RPC URL: https://api.testnet.solana.com
+  
+**Note importante**: Si vous voyez "Devnet", rafraîchissez la page (Ctrl+Shift+R)
+
+### 🚀 Optimisation performance (Optionnel mais recommandé)
+
+Si vous testez en local et que votre environnement (Codespaces/container) connaît une forte utilisation CPU :
+
+**Option 1: Build production (recommandé pour tests locaux)**
+```bash
+cd app
+npm run build      # Build optimisé (prend 1-2 min)
+npm run start      # Serveur production (50-70% moins de CPU)
+```
+
+**Option 2: Désactiver temporairement les extensions VS Code**
+Les serveurs de langage TypeScript/Rust peuvent consommer 200-400% de CPU pendant l'indexation.
+- Désactiver extensions non-essentielles pendant les tests
+- Ou attendre 5-10 min que l'indexation se termine
+
+**Option 3: Utiliser le déploiement Vercel (meilleur pour UAT)**
+- Accéder à `https://testnet.swapback.io` au lieu de localhost
+- Aucune charge CPU locale
+- Performances optimales
+- **Note**: Le déploiement Vercel sera disponible avant le début de l'UAT officielle
 
 ---
 
@@ -339,15 +377,18 @@ Wallet → Tokens → Devnet → BACK + USDC visible
 
 ## 📅 PLANNING UAT
 
-### Semaine 1 (Oct 27 - Nov 2)
+### Semaine 1 (Oct 28 - Nov 3)
 **Focus**: Setup + Scénarios 1-2
 
-- **Jour 1-2**: Onboarding testeurs, airdrop tokens
+- **Jour 1** (28 oct): Setup environnement testnet, vérification frontend
+- **Jour 2** (29 oct): Onboarding testeurs, airdrop tokens
 - **Jour 3-4**: Tests Scénario 1 (Lock & Mint)
 - **Jour 5-7**: Tests Scénario 2 (Swap avec boost)
 - **Collecte**: Feedback initial, bugs critiques
 
-### Semaine 2 (Nov 3 - Nov 9)
+**Note**: Les états (RouterState, BuybackState, GlobalState) seront initialisés lors de la première transaction (lazy initialization)
+
+### Semaine 2 (Nov 4 - Nov 10)
 **Focus**: Scénarios 3-4 + Fixes
 
 - **Jour 1-3**: Tests Scénario 3 (Buyback rewards)
@@ -355,7 +396,7 @@ Wallet → Tokens → Devnet → BACK + USDC visible
 - **Jour 6-7**: Fixes bugs semaine 1, retests
 - **Collecte**: Feedback UX, suggestions features
 
-### Semaine 3 (Nov 10 - Nov 16)
+### Semaine 3 (Nov 11 - Nov 17)
 **Focus**: Tests robustesse + Final polish
 
 - **Jour 1-2**: Tests Scénario 5 (Edge cases)
