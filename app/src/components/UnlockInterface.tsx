@@ -9,10 +9,16 @@ import { useCNFT } from '../hooks/useCNFT';
 // CNFTLevel type with extended tiers
 type CNFTLevel = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond';
 
-// Configuration
-const BACK_TOKEN_MINT = new PublicKey('nKnrana1TdBHZGmVbNkpN1Dazj8285VftqCnkHCG8sh');
-const ROUTER_PROGRAM_ID = new PublicKey('FPK46poe53iX6Bcv3q8cgmc1jm7dJKQ9Qs9oESFxGN55');
-const CNFT_PROGRAM_ID = new PublicKey('FPNibu4RhrTt9yLDxcc8nQuHiVkFCfLVJ7DZUn6yn8K8');
+// Configuration - Utilise les variables d'environnement
+const BACK_TOKEN_MINT = new PublicKey(
+  process.env.NEXT_PUBLIC_BACK_MINT || '5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27'
+);
+const ROUTER_PROGRAM_ID = new PublicKey(
+  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || 'yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn'
+);
+const CNFT_PROGRAM_ID = new PublicKey(
+  process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || 'GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B'
+);
 
 // Dynamic boost calculation function
 const calculateDynamicBoost = (amount: number, durationDays: number): number => {

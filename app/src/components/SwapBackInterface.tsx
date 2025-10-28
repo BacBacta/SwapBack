@@ -11,15 +11,15 @@ import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
 // ============================
 
 const ROUTER_PROGRAM_ID = new PublicKey(
-  "3Z295H9QHByYn9sHm3tH7ASHitwd2Y4AEaXUddfhQKap"
+  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn"
 );
 
 const BACK_TOKEN_MINT = new PublicKey(
-  "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
+  process.env.NEXT_PUBLIC_BACK_MINT || "5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27"
 );
 
 const SWITCHBOARD_FEED = new PublicKey(
-  "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
+  process.env.NEXT_PUBLIC_SWITCHBOARD_FEED || "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
 );
 
 // Minimal IDL pour create_plan
