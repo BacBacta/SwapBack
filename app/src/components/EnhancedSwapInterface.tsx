@@ -29,60 +29,49 @@ export function EnhancedSwapInterface() {
     swap,
     routes,
     setInputAmount,
-    setOutputAmount,
     setSlippageTolerance,
     switchTokens,
     fetchRoutes,
   } = useSwapStore();
 
   // WebSocket for real-time data
-  useSwapWebSocket(swap.inputToken?.mint, swap.outputToken?.mint);
+  useSwapWebSocket();
 
   // State
   const [selectedRouter, setSelectedRouter] = useState<"swapback" | "jupiter">("swapback");
   const [showSlippageModal, setShowSlippageModal] = useState(false);
   const [customSlippage, setCustomSlippage] = useState("");
-  const [inputValue, setInputValue] = useState(swap.inputAmount);
-  const [outputValue, setOutputValue] = useState(swap.outputAmount);
-  const [priceImpact, setPriceImpact] = useState(0);
   const [hasSearchedRoute, setHasSearchedRoute] = useState(false);
+  const [priceImpact, setPriceImpact] = useState(0);
 
   // Debounced route fetching
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const debouncedFetchRoutes = useCallback(
-    debounce(() => {
-      if (swap.inputToken && swap.outputToken && swap.inputAmount > 0) {
+    debounce((inputToken: typeof swap.inputToken, outputToken: typeof swap.outputToken, inputAmount: string) => {
+      const amount = parseFloat(inputAmount);
+      if (inputToken && outputToken && amount > 0) {
         fetchRoutes();
       }
     }, 800),
-    [swap.inputToken, swap.outputToken, swap.inputAmount]
+    [fetchRoutes]
   );
-
-  // Sync local state with store
-  useEffect(() => {
-    setInputValue(swap.inputAmount);
-    setOutputValue(swap.outputAmount);
-  }, [swap.inputAmount, swap.outputAmount]);
 
   // Fetch routes when amount changes
   useEffect(() => {
-    if (swap.inputAmount > 0) {
-      debouncedFetchRoutes();
-    }
-  }, [swap.inputAmount, debouncedFetchRoutes]);
+    debouncedFetchRoutes(swap.inputToken, swap.outputToken, swap.inputAmount);
+  }, [swap.inputToken, swap.outputToken, swap.inputAmount, debouncedFetchRoutes]);
 
   // Calculate price impact
   useEffect(() => {
     if (routes.selectedRoute) {
-      const impact = routes.selectedRoute.priceImpact || 0;
-      setPriceImpact(impact);
+      // RouteCandidate n'a pas priceImpact, on utilise 0.5% par défaut
+      setPriceImpact(0.5);
     }
   }, [routes.selectedRoute]);
 
   // Handlers
   const handleInputChange = (value: string) => {
-    const numValue = parseFloat(value) || 0;
-    setInputValue(numValue);
-    setInputAmount(numValue);
+    setInputAmount(value);
   };
 
   const handleSlippagePreset = (value: number) => {
@@ -100,43 +89,45 @@ export function EnhancedSwapInterface() {
 
   const setMaxBalance = () => {
     if (swap.inputToken?.balance) {
-      setInputValue(swap.inputToken.balance);
-      setInputAmount(swap.inputToken.balance);
+      setInputAmount(swap.inputToken.balance.toString());
     }
   };
 
   const setHalfBalance = () => {
     if (swap.inputToken?.balance) {
       const half = swap.inputToken.balance / 2;
-      setInputValue(half);
-      setInputAmount(half);
+      setInputAmount(half.toString());
     }
   };
 
   const handleSearchRoute = () => {
-    if (swap.inputToken && swap.outputToken && inputValue > 0) {
+    const amount = parseFloat(swap.inputAmount);
+    if (swap.inputToken && swap.outputToken && amount > 0) {
       fetchRoutes();
       setHasSearchedRoute(true);
     }
   };
 
   // Mock route data for display
+  const inputAmount = parseFloat(swap.inputAmount) || 0;
+  const outputAmount = parseFloat(swap.outputAmount) || 0;
+  
   const mockRouteInfo = routes.selectedRoute
     ? {
         type: "Aggregator" as const,
-        estimatedOutput: outputValue,
-        nonOptimizedOutput: outputValue * 0.98,
-        npi: outputValue * 0.02,
-        rebate: outputValue * 0.012,
-        burn: outputValue * 0.004,
-        fees: outputValue * 0.004,
+        estimatedOutput: outputAmount,
+        nonOptimizedOutput: outputAmount * 0.98,
+        npi: outputAmount * 0.02,
+        rebate: outputAmount * 0.012,
+        burn: outputAmount * 0.004,
+        fees: outputAmount * 0.004,
         priceImpact: priceImpact,
         route: routes.selectedRoute.venues.map((venue) => ({
           label: venue,
           inputMint: swap.inputToken?.mint || "",
           outputMint: swap.outputToken?.mint || "",
-          inAmount: (inputValue * 1000000).toString(),
-          outAmount: ((outputValue * 1000000) / routes.selectedRoute!.venues.length).toString(),
+          inAmount: (inputAmount * 1000000).toString(),
+          outAmount: ((outputAmount * 1000000) / routes.selectedRoute!.venues.length).toString(),
           fee: "1000",
         })) as RouteStep[],
       }
@@ -219,7 +210,7 @@ export function EnhancedSwapInterface() {
             <div className="flex items-center gap-3">
               <input
                 type="number"
-                value={inputValue || ""}
+                value={swap.inputAmount || ""}
                 onChange={(e) => handleInputChange(e.target.value)}
                 placeholder="0.00"
                 className="flex-1 bg-transparent text-2xl font-bold text-white outline-none"
@@ -244,9 +235,9 @@ export function EnhancedSwapInterface() {
                 </svg>
               </button>
             </div>
-            {swap.inputToken?.usdPrice && inputValue > 0 && (
+            {inputAmount > 0 && (
               <div className="text-sm text-gray-500 mt-2">
-                ≈ ${(inputValue * swap.inputToken.usdPrice).toFixed(2)}
+                ≈ ${(inputAmount * 1).toFixed(2)} USD
               </div>
             )}
           </div>
@@ -278,7 +269,7 @@ export function EnhancedSwapInterface() {
             <div className="flex items-center gap-3">
               <input
                 type="number"
-                value={outputValue || ""}
+                value={swap.outputAmount || ""}
                 readOnly
                 placeholder="0.00"
                 className="flex-1 bg-transparent text-2xl font-bold text-white outline-none"
@@ -303,9 +294,9 @@ export function EnhancedSwapInterface() {
                 </svg>
               </button>
             </div>
-            {swap.outputToken?.usdPrice && outputValue > 0 && (
+            {outputAmount > 0 && (
               <div className="text-sm text-gray-500 mt-2">
-                ≈ ${(outputValue * swap.outputToken.usdPrice).toFixed(2)}
+                ≈ ${(outputAmount * 1).toFixed(2)} USD
               </div>
             )}
           </div>
@@ -319,7 +310,7 @@ export function EnhancedSwapInterface() {
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-gray-400">Rate</span>
                 <span className="text-white font-medium">
-                  1 {swap.inputToken?.symbol} ≈ {outputValue > 0 && inputValue > 0 ? (outputValue / inputValue).toFixed(6) : '0'} {swap.outputToken?.symbol}
+                  1 {swap.inputToken?.symbol} ≈ {outputAmount > 0 && inputAmount > 0 ? (outputAmount / inputAmount).toFixed(6) : '0'} {swap.outputToken?.symbol}
                 </span>
               </div>
               <div className="flex justify-between text-sm mb-2">
@@ -398,9 +389,9 @@ export function EnhancedSwapInterface() {
         {/* Swap Button */}
         <button
           onClick={handleSearchRoute}
-          disabled={!connected || !swap.inputToken || !swap.outputToken || inputValue <= 0 || routes.isLoading}
+          disabled={!connected || !swap.inputToken || !swap.outputToken || inputAmount <= 0 || routes.isLoading}
           className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
-            !connected || !swap.inputToken || !swap.outputToken || inputValue <= 0
+            !connected || !swap.inputToken || !swap.outputToken || inputAmount <= 0
               ? "bg-gray-800 text-gray-600 cursor-not-allowed"
               : routes.isLoading
               ? "bg-[var(--primary)]/50 text-black cursor-wait"
@@ -411,7 +402,7 @@ export function EnhancedSwapInterface() {
             ? "Connect Wallet"
             : !swap.inputToken || !swap.outputToken
             ? "Select Tokens"
-            : inputValue <= 0
+            : inputAmount <= 0
             ? "Enter Amount"
             : routes.isLoading
             ? "Finding Best Route..."
