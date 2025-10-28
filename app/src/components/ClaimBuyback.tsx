@@ -325,7 +325,7 @@ export default function ClaimBuyback() {
                     <span>{(claim.boost / 100).toFixed(1)}%</span>
                     <span>{claim.sharePercentage.toFixed(2)}%</span>
                     <a
-                      href={`https://explorer.solana.com/tx/${claim.signature}?cluster=devnet`}
+                      href={`https://explorer.solana.com/tx/${claim.signature}?cluster=${process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'testnet'}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="signature-link"

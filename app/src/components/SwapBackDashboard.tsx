@@ -465,7 +465,7 @@ export const SwapBackDashboard = () => {
                 {/* ACTIONS */}
                 <div className="mt-6 flex gap-3">
                   <a
-                    href={`https://explorer.solana.com/address/${plan.publicKey.toString()}?cluster=devnet`}
+                    href={`https://explorer.solana.com/address/${plan.publicKey.toString()}?cluster=${process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'testnet'}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg font-medium text-center transition-colors"

@@ -74,16 +74,18 @@ export const useTokenData = (tokenMint: string) => {
   useEffect(() => {
     const fetchPrice = async () => {
       try {
-        // 🔧 Sur devnet, on utilise des prix simulés réalistes
+        // 🔧 Sur testnet, on utilise des prix simulés réalistes
         // Sur mainnet, utiliser: https://price.jup.ag/v4/price?ids=${tokenMint}
 
-        // Prix simulés pour devnet (basés sur les prix mainnet approximatifs)
-        const devnetPrices: { [key: string]: number } = {
+        // Prix simulés pour testnet (basés sur les prix mainnet approximatifs)
+        const testnetPrices: { [key: string]: number } = {
           // Native tokens
           So11111111111111111111111111111111111111112: 145.5, // SOL ~$145
 
-          // Devnet test tokens
-          BH8thpWca6kpN2pKwWTaKv2F5s4MEkbML18LtJ8eFypU: 0.001, // $BACK (simulé)
+          // Testnet deployed tokens (Oct 28, 2025)
+          "5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27": 0.001, // $BACK (testnet)
+          
+          // Common test tokens
           "3y4dCqwWuYx1B97YEDmgq9qjuNE1eyEwGx2eLgz6Rc6G": 1.0, // USDC Test
           DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263: 0.00002, // BONK
 
@@ -96,7 +98,7 @@ export const useTokenData = (tokenMint: string) => {
         };
 
         // Utiliser le prix simulé ou 0
-        const price = devnetPrices[tokenMint] || 0;
+        const price = testnetPrices[tokenMint] || 0;
         setUsdPrice(price);
 
         if (price > 0) {

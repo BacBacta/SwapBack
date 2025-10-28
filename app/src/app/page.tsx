@@ -31,7 +31,7 @@ export default function Home() {
             <div className="inline-flex items-center gap-2 border-2 border-[var(--secondary)] px-4 py-2 mb-4">
               <span className="w-2 h-2 bg-[var(--secondary)] animate-pulse"></span>
               <span className="text-sm font-bold terminal-text uppercase tracking-wider">
-                [LIVE_ON_SOLANA_DEVNET]
+                [LIVE_ON_SOLANA_TESTNET]
               </span>
             </div>
             <h1 className="text-5xl md:text-6xl font-bold terminal-text terminal-glow mb-4 uppercase tracking-wider">

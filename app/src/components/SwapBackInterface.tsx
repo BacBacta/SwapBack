@@ -395,7 +395,7 @@ export const SwapBackInterface = () => {
                 ✅ Plan DCA créé avec succès!
               </p>
               <a
-                href={`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}
+                href={`https://explorer.solana.com/tx/${txSignature}?cluster=${process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'testnet'}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-green-600 hover:text-green-800 underline"

@@ -12,7 +12,7 @@ import { Connection, VersionedTransaction } from "@solana/web3.js";
 
 const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
-  "https://api.mainnet-beta.solana.com";
+  "https://api.testnet.solana.com";
 
 // ============================================================================
 // API HANDLER

@@ -212,11 +212,11 @@ export function getWebSocketService(): SwapWebSocketService {
     // Ensure we have a valid RPC URL
     let rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
     
-    // Fallback to devnet if not set or invalid
+    // Fallback to testnet if not set or invalid
     if (!rpcUrl || rpcUrl.trim() === "") {
-      rpcUrl = "https://api.devnet.solana.com";
+      rpcUrl = "https://api.testnet.solana.com";
       console.warn(
-        "[WebSocket] NEXT_PUBLIC_SOLANA_RPC_URL not set, using devnet fallback:",
+        "[WebSocket] NEXT_PUBLIC_SOLANA_RPC_URL not set, using testnet fallback:",
         rpcUrl
       );
     }

@@ -95,8 +95,8 @@ export function getCurrentEnvironment(): NetworkEnvironment {
     return envNetwork as NetworkEnvironment;
   }
 
-  // Par défaut: devnet en développement, mainnet en production
-  return process.env.NODE_ENV === 'production' ? 'mainnet-beta' : 'devnet';
+  // Par défaut: testnet (déployé le 28 Oct 2025)
+  return 'testnet';
 }
 
 /**

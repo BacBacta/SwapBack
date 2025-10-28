@@ -9,7 +9,7 @@ import { Connection } from "@solana/web3.js";
 const JUPITER_API = "https://quote-api.jup.ag/v6";
 const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
-  "https://api.devnet.solana.com";
+  "https://api.testnet.solana.com";
 
 // Mode MOCK pour tests sans réseau (quand Jupiter API inaccessible)
 const USE_MOCK_DATA = process.env.USE_MOCK_QUOTES === "true";

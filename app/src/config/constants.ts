@@ -6,19 +6,19 @@ import { PublicKey } from '@solana/web3.js';
  */
 
 // ============================================
-// PROGRAM IDs (Devnet)
+// PROGRAM IDs (Testnet - Deployed Oct 28, 2025)
 // ============================================
 
 export const ROUTER_PROGRAM_ID = new PublicKey(
-  'FPK46poe53iX6Bcv3q8cgmc1jm7dJKQ9Qs9oESFxGN55'
+  'yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn'
 );
 
 export const BUYBACK_PROGRAM_ID = new PublicKey(
-  '75nEwGH4cpRq13PG2eEioQE1wBqSvxvK9bhWfvpvZvP7'
+  'DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi'
 );
 
 export const CNFT_PROGRAM_ID = new PublicKey(
-  'FPNibu4RhrTt9yLDxcc8nQuHiVkFCfLVJ7DZUn6yn8K8'
+  'GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B'
 );
 
 // ============================================
@@ -26,7 +26,7 @@ export const CNFT_PROGRAM_ID = new PublicKey(
 // ============================================
 
 export const BACK_TOKEN_MINT = new PublicKey(
-  'nKnrana1TdBHZGmVbNkpN1Dazj8285VftqCnkHCG8sh'
+  '5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27'
 );
 
 // Tokens communs sur Solana (pour référence future)
@@ -79,7 +79,7 @@ export const LEVEL_COLORS: Record<CNFTLevel, string> = {
 // SOLANA NETWORK
 // ============================================
 
-export const SOLANA_NETWORK = 'devnet';
+export const SOLANA_NETWORK = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'testnet';
 
 export const SOLANA_RPC_ENDPOINTS = {
   mainnet: 'https://api.mainnet-beta.solana.com',
