@@ -10,6 +10,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useSwapStore } from "@/store/swapStore";
 import { useSwapWebSocket } from "@/hooks/useSwapWebSocket";
 import { ConnectionStatus } from "./ConnectionStatus";
+import { TokenSelector } from "./TokenSelector";
 import { debounce } from "lodash";
 
 interface RouteStep {
@@ -29,6 +30,8 @@ export function EnhancedSwapInterface() {
     swap,
     routes,
     setInputAmount,
+    setInputToken,
+    setOutputToken,
     setSlippageTolerance,
     switchTokens,
     fetchRoutes,
@@ -40,6 +43,8 @@ export function EnhancedSwapInterface() {
   // State
   const [selectedRouter, setSelectedRouter] = useState<"swapback" | "jupiter">("swapback");
   const [showSlippageModal, setShowSlippageModal] = useState(false);
+  const [showTokenSelector, setShowTokenSelector] = useState(false);
+  const [tokenSelectorType, setTokenSelectorType] = useState<"input" | "output">("input");
   const [customSlippage, setCustomSlippage] = useState("");
   const [hasSearchedRoute, setHasSearchedRoute] = useState(false);
   const [priceImpact, setPriceImpact] = useState(0);
@@ -106,6 +111,35 @@ export function EnhancedSwapInterface() {
       fetchRoutes();
       setHasSearchedRoute(true);
     }
+  };
+
+  const openInputTokenSelector = () => {
+    setTokenSelectorType("input");
+    setShowTokenSelector(true);
+  };
+
+  const openOutputTokenSelector = () => {
+    setTokenSelectorType("output");
+    setShowTokenSelector(true);
+  };
+
+  const handleTokenSelect = (token: { address: string; symbol: string; name: string; decimals: number; logoURI?: string }) => {
+    // Convert TokenSelector format to swapStore format
+    const storeToken = {
+      mint: token.address,
+      symbol: token.symbol,
+      name: token.name,
+      decimals: token.decimals,
+      logoURI: token.logoURI,
+      balance: 0, // Will be updated by websocket
+    };
+    
+    if (tokenSelectorType === "input") {
+      setInputToken(storeToken);
+    } else {
+      setOutputToken(storeToken);
+    }
+    setShowTokenSelector(false);
   };
 
   // Mock route data for display
@@ -215,7 +249,10 @@ export function EnhancedSwapInterface() {
                 placeholder="0.00"
                 className="flex-1 bg-transparent text-2xl font-bold text-white outline-none"
               />
-              <button className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg transition-colors">
+              <button 
+                onClick={openInputTokenSelector}
+                className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg transition-colors"
+              >
                 {swap.inputToken ? (
                   <>
                     {swap.inputToken.logoURI && (
@@ -274,7 +311,10 @@ export function EnhancedSwapInterface() {
                 placeholder="0.00"
                 className="flex-1 bg-transparent text-2xl font-bold text-white outline-none"
               />
-              <button className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg transition-colors">
+              <button 
+                onClick={openOutputTokenSelector}
+                className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg transition-colors"
+              >
                 {swap.outputToken ? (
                   <>
                     {swap.outputToken.logoURI && (
@@ -481,6 +521,15 @@ export function EnhancedSwapInterface() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Token Selector Modal */}
+      {showTokenSelector && (
+        <TokenSelector
+          selectedToken={tokenSelectorType === "input" ? swap.inputToken?.mint || "" : swap.outputToken?.mint || ""}
+          onSelect={handleTokenSelect}
+          onClose={() => setShowTokenSelector(false)}
+        />
       )}
     </div>
   );
