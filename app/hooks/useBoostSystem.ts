@@ -48,13 +48,16 @@ export interface ClaimBuybackParams {
 }
 
 // Configuration des Program IDs (à mettre à jour après déploiement)
+// Utilise les Program IDs depuis les variables d'environnement
 const PROGRAM_IDS = {
-  swapback_cnft: new PublicKey("CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH"),
+  swapback_cnft: new PublicKey(
+    process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B"
+  ),
   swapback_router: new PublicKey(
-    "3Z295H9QHByYn9sHm3tH7ASHitwd2Y4AEaXUddfhQKap"
+    process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn"
   ),
   swapback_buyback: new PublicKey(
-    "71vALqj3cmQWDmq9bi9GYYDPQqpoRstej3snUbikpCHW"
+    process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || "DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi"
   ),
 };
 

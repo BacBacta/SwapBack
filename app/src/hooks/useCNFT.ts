@@ -2,9 +2,13 @@ import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import { useEffect, useState } from 'react';
 
-// Program IDs déployés sur devnet
-const CNFT_PROGRAM_ID = new PublicKey('FPNibu4RhrTt9yLDxcc8nQuHiVkFCfLVJ7DZUn6yn8K8');
-const ROUTER_PROGRAM_ID = new PublicKey('FPK46poe53iX6Bcv3q8cgmc1jm7dJKQ9Qs9oESFxGN55');
+// Utilise les Program IDs depuis les variables d'environnement
+const CNFT_PROGRAM_ID = new PublicKey(
+  process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || 'GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B'
+);
+const ROUTER_PROGRAM_ID = new PublicKey(
+  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || 'yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn'
+);
 
 export interface CNFTData {
   level: number;
