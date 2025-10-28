@@ -4,7 +4,6 @@ import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { BackButton } from "./BackButton";
 
 export const Navigation = () => {
   const pathname = usePathname();
@@ -17,7 +16,9 @@ export const Navigation = () => {
 
   const navLinks = [
     { href: "/", label: "Swap" },
-    { href: "/dashboard", label: "Dashboard" },
+    { href: "/lock", label: "Lock & Earn" },
+    { href: "/stats", label: "Stats" },
+    { href: "/docs", label: "Docs" },
   ];
 
   const isActive = (href: string) => {
@@ -25,16 +26,8 @@ export const Navigation = () => {
     return pathname?.startsWith(href);
   };
 
-  // Show floating back button on secondary pages (not home or dashboard)
-  const showFloatingBack = pathname && pathname !== "/" && pathname !== "/dashboard";
-
   return (
     <>
-      {/* Floating Back Button for secondary pages */}
-      {showFloatingBack && isMounted && (
-        <BackButton variant="floating" fallbackUrl="/" />
-      )}
-      
       <nav className="border-b-2 border-[var(--primary)] bg-black sticky top-0 z-50">
         <div className="container mx-auto px-4 md:px-6 py-4">
           <div className="flex justify-between items-center">
@@ -149,7 +142,7 @@ export const Navigation = () => {
                         : "text-[var(--primary)] border-[var(--primary)]/30 hover:bg-[var(--primary)]/10 hover:border-[var(--primary)]"
                     }`}
                   >
-                    {">"} {link.label}
+                    {'>'} {link.label}
                   </Link>
                 ))}
               </div>

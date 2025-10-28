@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Star } from "lucide-react";
 
 interface Token {
   address: string;
@@ -16,10 +15,6 @@ interface TokenSelectorProps {
   onSelect: (token: Token) => void;
   onClose: () => void;
 }
-
-// LocalStorage keys
-const FAVORITES_KEY = "swapback_favorite_tokens";
-const RECENT_KEY = "swapback_recent_tokens";
 
 // Popular tokens on Solana (Devnet pour tests)
 const POPULAR_TOKENS: Token[] = [
@@ -101,48 +96,8 @@ export const TokenSelector = ({
   onClose,
 }: TokenSelectorProps) => {
   const [search, setSearch] = useState("");
-  const [tokens] = useState<Token[]>(POPULAR_TOKENS);
-  const [loading] = useState(false);
-  const [favorites, setFavorites] = useState<string[]>([]);
-  const [recentTokens, setRecentTokens] = useState<string[]>([]);
-
-  // Load favorites and recent from localStorage
-  useEffect(() => {
-    try {
-      const savedFavorites = localStorage.getItem(FAVORITES_KEY);
-      const savedRecent = localStorage.getItem(RECENT_KEY);
-      
-      if (savedFavorites) {
-        setFavorites(JSON.parse(savedFavorites));
-      }
-      if (savedRecent) {
-        setRecentTokens(JSON.parse(savedRecent));
-      }
-    } catch (error) {
-      console.error("Error loading token preferences:", error);
-    }
-  }, []);
-
-  // Toggle favorite
-  const toggleFavorite = (symbol: string) => {
-    setFavorites((prev) => {
-      const newFavorites = prev.includes(symbol)
-        ? prev.filter((s) => s !== symbol)
-        : [...prev, symbol];
-      localStorage.setItem(FAVORITES_KEY, JSON.stringify(newFavorites));
-      return newFavorites;
-    });
-  };
-
-  // Add to recent when selecting
-  const handleSelectToken = (token: Token) => {
-    // Add to recent (max 5)
-    const newRecent = [token.symbol, ...recentTokens.filter(s => s !== token.symbol)].slice(0, 5);
-    setRecentTokens(newRecent);
-    localStorage.setItem(RECENT_KEY, JSON.stringify(newRecent));
-    
-    onSelect(token);
-  };
+  const [tokens, setTokens] = useState<Token[]>(POPULAR_TOKENS);
+  const [loading, setLoading] = useState(false);
 
   const filteredTokens = tokens.filter(
     (token) =>
@@ -210,63 +165,7 @@ export const TokenSelector = ({
 
           {/* Popular Tokens */}
           {!search && (
-            <>
-              {/* Favorites Section */}
-              {favorites.length > 0 && (
-                <div className="mb-4">
-                  <p className="text-xs terminal-text opacity-70 mb-3 uppercase font-semibold tracking-wider flex items-center gap-2">
-                    <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                    [FAVORITES]
-                  </p>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {tokens
-                      .filter((token) => favorites.includes(token.symbol))
-                      .slice(0, 6)
-                      .map((token) => (
-                        <button
-                          key={`fav-${token.address}`}
-                          onClick={() => handleSelectToken(token)}
-                          className="px-3 py-1.5 border-2 border-yellow-400/30 bg-yellow-400/10 hover:bg-yellow-400/20 transition-all text-xs font-bold terminal-text uppercase tracking-wider text-yellow-400"
-                        >
-                          {token.symbol}
-                        </button>
-                      ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Recent Section */}
-              {recentTokens.length > 0 && (
-                <div className="mb-4">
-                  <p className="text-xs terminal-text opacity-70 mb-3 uppercase font-semibold tracking-wider">
-                    🕐 [RECENTLY USED]
-                  </p>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {tokens
-                      .filter((token) => recentTokens.includes(token.symbol))
-                      .map((token) => (
-                        <button
-                          key={`recent-${token.address}`}
-                          onClick={() => handleSelectToken(token)}
-                          className="px-3 py-1.5 border-2 border-[var(--primary)]/30 bg-[var(--primary)]/10 hover:bg-[var(--primary)]/20 transition-all text-xs font-bold terminal-text uppercase tracking-wider"
-                        >
-                          {token.symbol}
-                        </button>
-                      ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="mb-4">
-                <p className="text-xs terminal-text opacity-70 mb-3 uppercase font-semibold tracking-wider">
-                  [POPULAR TOKENS]
-                </p>
-              </div>
-            </>
-          )}
-
-          {!search && (
-            <div className="mb-4 hidden">
+            <div className="mb-4">
               <p className="text-xs terminal-text opacity-70 mb-3 uppercase font-semibold tracking-wider">
                 [POPULAR TOKENS]
               </p>
@@ -288,7 +187,10 @@ export const TokenSelector = ({
               filteredTokens.map((token) => (
                 <button
                   key={token.address}
-                  onClick={() => handleSelectToken(token)}
+                  onClick={() => {
+                    onSelect(token);
+                    onClose();
+                  }}
                   className={`w-full flex items-center gap-3 p-3 border-2 transition-all terminal-text uppercase tracking-wider ${
                     selectedToken === token.symbol
                       ? "bg-[var(--primary)]/10 border-[var(--primary)] terminal-glow"
@@ -317,24 +219,6 @@ export const TokenSelector = ({
                     </div>
                     <div className="text-xs terminal-text opacity-60">{token.name}</div>
                   </div>
-
-                  {/* Favorite Star Button */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleFavorite(token.symbol);
-                    }}
-                    className="p-1.5 hover:bg-yellow-400/20 transition-all"
-                    title={favorites.includes(token.symbol) ? "Remove from favorites" : "Add to favorites"}
-                  >
-                    <Star 
-                      className={`w-4 h-4 transition-all ${
-                        favorites.includes(token.symbol)
-                          ? "fill-yellow-400 text-yellow-400"
-                          : "text-[var(--primary)]/30 hover:text-yellow-400/70"
-                      }`}
-                    />
-                  </button>
 
                   {/* Selected indicator */}
                   {selectedToken === token.symbol && (

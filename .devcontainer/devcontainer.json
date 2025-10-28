@@ -21,12 +21,19 @@
   "customizations": {
     "vscode": {
       "settings": {
-        // FIX: Paramètres réseau pour nouvelle infrastructure Codespaces
-        "remote.SSH.connectTimeout": 300,
+        // FIX: Paramètres réseau pour connexion VS Code Desktop → Remote stable
+        "remote.SSH.connectTimeout": 600,
+        "remote.SSH.serverAliveInterval": 60,
+        "remote.SSH.serverAliveCountMax": 10,
+        "remote.SSH.keepAlive": true,
+        "remote.SSH.useFlock": false,
+        "remote.SSH.lockfilesInTmp": true,
+        "remote.SSH.remoteServerListenOnSocket": true,
         "remote.SSH.serverPickPortsFromRange": {"22": 22},
         "remote.autoForwardPorts": false,
         "remote.autoForwardPortsSource": "process",
         "remote.restoreForwardedPorts": true,
+        "remote.downloadExtensionsLocally": false,
         "terminal.integrated.enablePersistentSessions": true,
         "terminal.integrated.persistentSessionReviveProcess": "onExit",
         
@@ -54,6 +61,20 @@
         "rust-analyzer.check.command": "clippy",
         "rust-analyzer.cargo.buildScripts.enable": false,
         "rust-analyzer.procMacro.enable": false,
+        "rust-analyzer.cachePriming.enable": false,
+        "rust-analyzer.diagnostics.enable": false,
+        "rust-analyzer.lens.enable": false,
+        "rust-analyzer.inlayHints.enable": false,
+        
+        // Optimisation TypeScript - Réduction CPU
+        "typescript.tsserver.maxTsServerMemory": 2048,
+        "typescript.tsserver.useSeparateSyntaxServer": false,
+        "typescript.disableAutomaticTypeAcquisition": true,
+        "typescript.surveys.enabled": false,
+        
+        // Optimisation Git - Réduction CPU
+        "git.autorefresh": false,
+        "git.autofetch": false,
         
         // Exclusions
         "files.watcherExclude": {

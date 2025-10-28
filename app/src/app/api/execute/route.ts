@@ -1,22 +1,29 @@
 /**
- * API Route: Execute Swap Transaction
- * Sends signed transaction to Solana network and confirms it
+ * API Route: Execute Transaction
+ * Executes the selected swap route and returns transaction signature
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import {
-  Connection,
-  VersionedTransaction,
-} from "@solana/web3.js";
+import { Connection, VersionedTransaction } from "@solana/web3.js";
+
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
 
 const RPC_ENDPOINT =
-  process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.devnet.solana.com";
+  process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
+  "https://api.mainnet-beta.solana.com";
+
+// ============================================================================
+// API HANDLER
+// ============================================================================
 
 export async function POST(request: NextRequest) {
   try {
+    const body = await request.json();
     const {
-      signedTransaction,
-    } = await request.json();
+      signedTransaction, // Base64 encoded signed transaction
+    } = body;
 
     if (!signedTransaction) {
       return NextResponse.json(
@@ -25,102 +32,40 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("📡 Sending transaction to network...");
-
+    // Initialize connection
     const connection = new Connection(RPC_ENDPOINT, "confirmed");
-    const txBuffer = Buffer.from(signedTransaction, "base64");
-    const transaction = VersionedTransaction.deserialize(txBuffer);
 
-    const signature = await connection.sendRawTransaction(
-      transaction.serialize(),
-      {
+    // Decode transaction
+    const txBuffer = Buffer.from(signedTransaction, "base64");
+    let signature: string;
+
+    try {
+      // Try as VersionedTransaction first
+      const versionedTx = VersionedTransaction.deserialize(txBuffer);
+      signature = await connection.sendRawTransaction(versionedTx.serialize(), {
         skipPreflight: false,
         maxRetries: 3,
-        preflightCommitment: "confirmed",
-      }
-    );
-
-    console.log("✅ Transaction sent:", signature);
-    console.log("⏳ Confirming transaction...");
-    
-    // Use polling instead of deprecated confirmTransaction
-    let confirmed = false;
-    let attempt = 0;
-    const maxAttempts = 30;
-    
-    while (!confirmed && attempt < maxAttempts) {
-      try {
-        const status = await connection.getSignatureStatus(signature);
-        if (status.value?.confirmationStatus === "confirmed" || 
-            status.value?.confirmationStatus === "finalized") {
-          confirmed = true;
-          break;
-        }
-      } catch (_error) {
-        console.log(`Confirmation check attempt ${attempt + 1}/${maxAttempts}`);
-      }
-      
-      attempt++;
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s between checks
+      });
+    } catch (error) {
+      console.error("Failed to send transaction:", error);
+      throw new Error("Invalid transaction format");
     }
 
-    if (!confirmed) {
-      console.error("❌ Transaction failed: Timeout waiting for confirmation");
-
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Transaction confirmation timeout",
-          signature,
-        },
-        { status: 400 }
-      );
-    }
-
-    console.log("🎉 Transaction confirmed:", signature);
+    // Wait for confirmation (initial)
+    const latestBlockhash = await connection.getLatestBlockhash("confirmed");
 
     return NextResponse.json({
       success: true,
       signature,
-      confirmed: true,
-      timestamp: Date.now(),
+      blockhash: latestBlockhash.blockhash,
+      lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
     });
   } catch (error) {
-    console.error("❌ Error executing transaction:", error);
-
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-
+    console.error("Transaction execution error:", error);
     return NextResponse.json(
       {
-        success: false,
-        error: "Failed to execute transaction",
-        message: errorMessage,
-      },
-      { status: 500 }
-    );
-  }
-}
-
-export async function GET() {
-  try {
-    const connection = new Connection(RPC_ENDPOINT);
-    const slot = await connection.getSlot();
-    const blockHeight = await connection.getBlockHeight();
-
-    return NextResponse.json({
-      status: "ok",
-      service: "Transaction Execute API",
-      rpc: RPC_ENDPOINT,
-      currentSlot: slot,
-      blockHeight,
-      timestamp: Date.now(),
-    });
-  } catch (_error) {
-    return NextResponse.json(
-      {
-        status: "error",
-        error: "Health check failed",
+        error: "Transaction execution failed",
+        message: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }
     );
