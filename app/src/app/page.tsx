@@ -4,10 +4,9 @@ import { useState } from "react";
 import { Navigation } from "@/components/Navigation";
 import { EnhancedSwapInterface } from "@/components/EnhancedSwapInterface";
 import { Dashboard } from "@/components/Dashboard";
-import { DCA } from "@/components/DCA";
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<"swap" | "dashboard" | "dca">("swap");
+  const [activeTab, setActiveTab] = useState<"swap" | "dashboard">("swap");
 
   return (
     <main className="min-h-screen terminal-scanline" id="main-content">
@@ -81,17 +80,6 @@ export default function Home() {
               [SWAP]
             </button>
             <button
-              onClick={() => setActiveTab("dca")}
-              className={`px-6 py-3 font-bold terminal-text uppercase tracking-wider border-r-2 border-[var(--primary)]/30 transition-all ${
-                activeTab === "dca"
-                  ? "bg-[var(--primary)] text-black"
-                  : "text-[var(--primary)] hover:bg-[var(--primary)]/10"
-              }`}
-              aria-label="DCA tab"
-            >
-              [DCA]
-            </button>
-            <button
               onClick={() => setActiveTab("dashboard")}
               className={`px-6 py-3 font-bold terminal-text uppercase tracking-wider transition-all ${
                 activeTab === "dashboard"
@@ -112,12 +100,6 @@ export default function Home() {
           {activeTab === "swap" && (
             <div className="animate-fade-in">
               <EnhancedSwapInterface />
-            </div>
-          )}
-          
-          {activeTab === "dca" && (
-            <div className="animate-fade-in">
-              <DCA />
             </div>
           )}
           

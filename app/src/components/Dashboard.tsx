@@ -8,10 +8,13 @@ import { useRealtimeStats } from "../hooks/useRealtimeStats";
 import { VolumeChart, ActivityChart } from "./Charts";
 import { SkeletonLoader, ChartSkeleton } from "./Skeletons";
 import { NoActivityState, NoConnectionState } from "./EmptyState";
+import { SwapBackDashboard } from "./SwapBackDashboard";
+import LockInterface from "./LockInterface";
+import UnlockInterface from "./UnlockInterface";
 
 export const Dashboard = () => {
   const { connected, publicKey } = useWallet();
-  const [activeTab, setActiveTab] = useState<"overview" | "analytics">("overview");
+  const [activeTab, setActiveTab] = useState<"dca" | "lock-unlock" | "overview" | "analytics">("dca");
 
   const { cnftData, levelName } = useCNFT();
   const { userStats, globalStats, loading } = useRealtimeStats(publicKey?.toString());
@@ -118,6 +121,26 @@ export const Dashboard = () => {
       {/* Tabs Navigation */}
       <div className="flex gap-0 p-0 bg-black border-2 border-[var(--primary)]/30">
         <button
+          onClick={() => setActiveTab("dca")}
+          className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 ${
+            activeTab === "dca"
+              ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
+              : "text-[var(--primary)] border-[var(--primary)]/30 hover:bg-[var(--primary)]/10"
+          }`}
+        >
+          📊 DCA
+        </button>
+        <button
+          onClick={() => setActiveTab("lock-unlock")}
+          className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 ${
+            activeTab === "lock-unlock"
+              ? "bg-[var(--primary)] text-black border-[var(--primary)] terminal-glow"
+              : "text-[var(--primary)] border-[var(--primary)]/30 hover:bg-[var(--primary)]/10"
+          }`}
+        >
+          🔒 LOCK/UNLOCK
+        </button>
+        <button
           onClick={() => setActiveTab("overview")}
           className={`flex-1 px-6 py-3 font-semibold transition-all terminal-text uppercase tracking-wider border-r-2 ${
             activeTab === "overview"
@@ -125,7 +148,7 @@ export const Dashboard = () => {
               : "text-[var(--primary)] border-[var(--primary)]/30 hover:bg-[var(--primary)]/10"
           }`}
         >
-          📊 OVERVIEW
+          � OVERVIEW
         </button>
         <button
           onClick={() => setActiveTab("analytics")}
@@ -135,11 +158,45 @@ export const Dashboard = () => {
               : "text-[var(--primary)] hover:bg-[var(--primary)]/10"
           }`}
         >
-          📈 ANALYTICS
+          � ANALYTICS
         </button>
       </div>
 
       {/* Content based on active tab */}
+      {activeTab === "dca" && (
+        <div className="space-y-6">
+          <SwapBackDashboard />
+        </div>
+      )}
+
+      {activeTab === "lock-unlock" && (
+        <div className="space-y-6">
+          {/* Sub-tabs for Lock/Unlock */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="swap-card">
+              <h3 className="text-xl font-bold mb-6 terminal-text uppercase tracking-wider flex items-center gap-2">
+                <span>🔒</span>
+                <span>LOCK $BACK</span>
+              </h3>
+              <LockInterface onLockSuccess={() => {
+                // Refresh data after lock
+                window.location.reload();
+              }} />
+            </div>
+            <div className="swap-card">
+              <h3 className="text-xl font-bold mb-6 terminal-text uppercase tracking-wider flex items-center gap-2">
+                <span>🔓</span>
+                <span>UNLOCK $BACK</span>
+              </h3>
+              <UnlockInterface onUnlockSuccess={() => {
+                // Refresh data after unlock
+                window.location.reload();
+              }} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeTab === "overview" && userStats && (
         <div className="space-y-6">
           {/* Quick Stats Grid */}
