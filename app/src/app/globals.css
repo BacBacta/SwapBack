@@ -633,8 +633,8 @@ html {
   color: var(--primary);
 }
 
-/* Terminal scanline effect */
-@keyframes scanline {
+/* Terminal scanline effect - DISABLED for cleaner UI */
+/* @keyframes scanline {
   0% { transform: translateY(-100%); }
   100% { transform: translateY(100vh); }
 }
@@ -650,7 +650,7 @@ html {
   animation: scanline 8s linear infinite;
   pointer-events: none;
   z-index: 9999;
-}
+} */
 
 /* ASCII Art Border */
 .terminal-border-top::before {

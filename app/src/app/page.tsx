@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Navigation } from "@/components/Navigation";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { EnhancedSwapInterface } from "@/components/EnhancedSwapInterface";
 import { Dashboard } from "@/components/Dashboard";
 
@@ -9,87 +9,84 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<"swap" | "dashboard">("swap");
 
   return (
-    <main className="min-h-screen terminal-scanline" id="main-content">
-      {/* NAVIGATION - Using existing Navigation component */}
-      <Navigation />
+    <main className="min-h-screen bg-black" id="main-content">
+      {/* HEADER PRINCIPAL - Une seule navigation */}
+      <nav className="border-b-2 border-[var(--primary)] bg-black sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex justify-between items-center">
+            {/* Logo */}
+            <div className="text-2xl font-bold terminal-text terminal-glow hover:text-[var(--accent)] transition-colors flex items-center gap-3 uppercase tracking-wider">
+              <span className="text-3xl">⚡</span>
+              <span>SWAPBACK</span>
+            </div>
 
-      {/* TERMINAL HEADER */}
-      <div className="border-b-2 border-[var(--primary)] bg-black">
-        <div className="max-w-7xl mx-auto px-6 py-3">
-          <div className="terminal-text text-sm">
-            <span className="text-[var(--muted)]">user@swapback:~$</span>{" "}
-            <span className="terminal-cursor">./swap --interactive</span>
+            {/* Tabs Navigation */}
+            <div className="flex items-center gap-0">
+              <button
+                onClick={() => setActiveTab("swap")}
+                className={`px-6 py-2 font-bold terminal-text uppercase tracking-wider border-r-2 border-[var(--primary)]/30 transition-all ${
+                  activeTab === "swap"
+                    ? "text-[var(--primary)]"
+                    : "text-gray-400 hover:text-[var(--primary)]"
+                }`}
+              >
+                [SWAP]
+              </button>
+              <button
+                onClick={() => setActiveTab("dashboard")}
+                className={`px-6 py-2 font-bold terminal-text uppercase tracking-wider transition-all ${
+                  activeTab === "dashboard"
+                    ? "text-[var(--primary)]"
+                    : "text-gray-400 hover:text-[var(--primary)]"
+                }`}
+              >
+                [DASHBOARD]
+              </button>
+            </div>
+
+            {/* Wallet Button */}
+            <div className="flex items-center">
+              <WalletMultiButton />
+            </div>
           </div>
         </div>
-      </div>
+      </nav>
 
-      {/* HERO BANNER - Terminal Style */}
+      {/* HERO BANNER - Clean & Professional */}
       <div className="border-b-2 border-[var(--primary)]/30 bg-black">
-        <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="max-w-7xl mx-auto px-6 py-12">
           <div className="text-center">
-            <div className="inline-flex items-center gap-2 border-2 border-[var(--secondary)] px-4 py-2 mb-4">
+            <div className="inline-flex items-center gap-2 border-2 border-[var(--secondary)] px-4 py-2 mb-6">
               <span className="w-2 h-2 bg-[var(--secondary)] animate-pulse"></span>
               <span className="text-sm font-bold terminal-text uppercase tracking-wider">
                 [LIVE_ON_SOLANA_TESTNET]
               </span>
             </div>
-            <h1 className="text-5xl md:text-6xl font-bold terminal-text terminal-glow mb-4 uppercase tracking-wider">
-              ╔═══════════════════╗<br/>
-              ║ SWAPBACK v2.0.1  ║<br/>
-              ╚═══════════════════╝
+            <h1 className="text-5xl md:text-6xl font-bold terminal-text terminal-glow mb-6 uppercase tracking-wider">
+              SWAPBACK
             </h1>
-            <p className="text-lg terminal-text max-w-3xl mx-auto mb-4">
-              <span className="terminal-prompt"></span>THE SMART ROUTER FOR SOLANA
+            <p className="text-xl terminal-text max-w-3xl mx-auto mb-2 text-[var(--primary)]">
+              THE SMART ROUTER FOR SOLANA
             </p>
-            <p className="text-sm terminal-text text-[var(--muted)] max-w-3xl mx-auto">
-              MAXIMIZE_PROFITS | MINIMIZE_FEES | EARN_REBATES
+            <p className="text-sm terminal-text text-[var(--muted)] max-w-3xl mx-auto mb-8">
+              MAXIMIZE PROFITS • MINIMIZE FEES • EARN REBATES
             </p>
             
-            {/* STATS - Terminal Style */}
-            <div className="flex justify-center gap-8 mt-6 text-sm">
-              <div className="terminal-box px-4 py-2">
-                <span className="terminal-text terminal-number font-bold text-lg">$1.2M+</span>
-                <span className="terminal-text text-[var(--muted)] ml-2">VOLUME</span>
+            {/* STATS - Clean Grid */}
+            <div className="grid grid-cols-3 gap-6 max-w-2xl mx-auto mt-8">
+              <div className="terminal-box p-4">
+                <div className="terminal-text terminal-number font-bold text-2xl text-[var(--primary)]">$1.2M+</div>
+                <div className="terminal-text text-[var(--muted)] text-xs mt-1">VOLUME</div>
               </div>
-              <div className="terminal-box px-4 py-2">
-                <span className="terminal-text terminal-number font-bold text-lg">98%</span>
-                <span className="terminal-text text-[var(--muted)] ml-2">SUCCESS</span>
+              <div className="terminal-box p-4">
+                <div className="terminal-text terminal-number font-bold text-2xl text-[var(--secondary)]">98%</div>
+                <div className="terminal-text text-[var(--muted)] text-xs mt-1">SUCCESS</div>
               </div>
-              <div className="terminal-box px-4 py-2">
-                <span className="terminal-text terminal-number font-bold text-lg">0.1s</span>
-                <span className="terminal-text text-[var(--muted)] ml-2">AVG_TIME</span>
+              <div className="terminal-box p-4">
+                <div className="terminal-text terminal-number font-bold text-2xl text-[var(--accent)]">0.1s</div>
+                <div className="terminal-text text-[var(--muted)] text-xs mt-1">AVG TIME</div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* TAB NAVIGATION - Terminal Style */}
-      <div className="border-b-2 border-[var(--primary)]/30 bg-black sticky top-[73px] z-40">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex gap-0">
-            <button
-              onClick={() => setActiveTab("swap")}
-              className={`px-6 py-3 font-bold terminal-text uppercase tracking-wider border-r-2 border-[var(--primary)]/30 transition-all ${
-                activeTab === "swap"
-                  ? "bg-[var(--primary)] text-black"
-                  : "text-[var(--primary)] hover:bg-[var(--primary)]/10"
-              }`}
-              aria-label="Swap tab"
-            >
-              [SWAP]
-            </button>
-            <button
-              onClick={() => setActiveTab("dashboard")}
-              className={`px-6 py-3 font-bold terminal-text uppercase tracking-wider transition-all ${
-                activeTab === "dashboard"
-                  ? "bg-[var(--primary)] text-black"
-                  : "text-[var(--primary)] hover:bg-[var(--primary)]/10"
-              }`}
-              aria-label="Dashboard tab"
-            >
-              [DASHBOARD]
-            </button>
           </div>
         </div>
       </div>
@@ -125,7 +122,7 @@ export default function Home() {
                 href="https://docs.swapback.io" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="terminal-brackets hover:text-[var(--accent)] transition-colors"
+                className="text-[var(--primary)] hover:text-[var(--accent)] transition-colors uppercase tracking-wider"
               >
                 DOCS
               </a>
@@ -133,7 +130,7 @@ export default function Home() {
                 href="https://twitter.com/swapback" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="terminal-brackets hover:text-[var(--accent)] transition-colors"
+                className="text-[var(--primary)] hover:text-[var(--accent)] transition-colors uppercase tracking-wider"
               >
                 TWITTER
               </a>
@@ -141,15 +138,11 @@ export default function Home() {
                 href="https://discord.gg/swapback" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="terminal-brackets hover:text-[var(--accent)] transition-colors"
+                className="text-[var(--primary)] hover:text-[var(--accent)] transition-colors uppercase tracking-wider"
               >
                 DISCORD
               </a>
             </div>
-          </div>
-          <div className="terminal-border-bottom mt-4"></div>
-          <div className="text-center mt-4 terminal-text text-xs text-[var(--muted)]">
-            <span className="terminal-prompt"></span>TYPE 'HELP' FOR COMMANDS | PRESS CTRL+C TO EXIT
           </div>
         </div>
       </footer>
