@@ -6,12 +6,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Connection } from "@solana/web3.js";
 
-const JUPITER_API = "https://quote-api.jup.ag/v6";
+// ============================================================================
+// ENVIRONMENT VARIABLES - Configurables sur Vercel
+// ============================================================================
+
+/**
+ * Jupiter API Base URL
+ * Default: https://quote-api.jup.ag/v6
+ * Vercel: Ajouter JUPITER_API_URL dans Environment Variables
+ */
+const JUPITER_API = process.env.JUPITER_API_URL || "https://quote-api.jup.ag/v6";
+
+/**
+ * Solana RPC Endpoint
+ * Default: testnet
+ * Vercel: Ajouter NEXT_PUBLIC_SOLANA_RPC_URL dans Environment Variables
+ */
 const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
   "https://api.testnet.solana.com";
 
-// Mode MOCK pour tests sans réseau (quand Jupiter API inaccessible)
+/**
+ * Mock Mode (pour dev/test sans réseau)
+ * Default: false
+ * Vercel: Ajouter USE_MOCK_QUOTES=false (ou true pour staging)
+ */
 const USE_MOCK_DATA = process.env.USE_MOCK_QUOTES === "true";
 
 export async function POST(request: NextRequest) {

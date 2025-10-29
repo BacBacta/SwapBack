@@ -192,34 +192,76 @@ export const useSwapStore = create<SwapStore>()(
           }));
 
           try {
-            const response = await fetch("/api/swap-simple", {
+            // Convert amount to lamports (assuming 9 decimals for SOL-like tokens)
+            const inputDecimals = swap.inputToken.decimals || 9;
+            const amountInSmallestUnit = Math.floor(
+              parseFloat(swap.inputAmount) * Math.pow(10, inputDecimals)
+            );
+
+            const response = await fetch("/api/swap/quote", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 inputMint: swap.inputToken.mint,
                 outputMint: swap.outputToken.mint,
-                inputAmount: parseFloat(swap.inputAmount),
-                slippageTolerance: swap.slippageTolerance,
-                useMEVProtection: swap.useMEVProtection,
-                priorityLevel: swap.priorityLevel,
+                amount: amountInSmallestUnit,
+                slippageBps: swap.slippageTolerance * 100, // Convert % to bps
+                onlyDirectRoutes: false,
               }),
             });
 
             if (!response.ok) {
-              throw new Error("Failed to fetch routes");
+              const errorData = await response.json();
+              throw new Error(errorData.error || "Failed to fetch routes");
             }
 
             const data = await response.json();
 
-            set((state) => ({
-              routes: {
-                ...state.routes,
-                routes: data.routes || [],
-                selectedRoute: data.routes?.[0] || null,
-                isLoading: false,
-              },
-            }));
+            // Transform Jupiter quote into our route format
+            if (data.quote) {
+              // Parse price impact (peut être string ou number)
+              const priceImpact = typeof data.quote.priceImpactPct === 'string' 
+                ? parseFloat(data.quote.priceImpactPct) 
+                : (data.quote.priceImpactPct || 0);
+
+              const route: RouteCandidate = {
+                id: `route_${Date.now()}`,
+                venues: data.quote.routePlan?.map((step: { swapInfo?: { label?: string } }) => 
+                  step.swapInfo?.label || "Unknown"
+                ) || [],
+                path: [swap.inputToken.mint, swap.outputToken.mint],
+                hops: data.quote.routePlan?.length || 1,
+                splits: [],
+                expectedOutput: parseFloat(data.quote.outAmount),
+                totalCost: 0,
+                effectiveRate: parseFloat(data.quote.outAmount) / parseFloat(data.quote.inAmount),
+                riskScore: priceImpact ? Math.min(100, priceImpact * 10) : 10,
+                mevRisk: priceImpact > 2 ? "high" : priceImpact > 0.5 ? "medium" : "low",
+                instructions: [],
+                estimatedComputeUnits: 200000,
+              };
+
+              // Calculate output amount in human-readable format
+              const outputDecimals = swap.outputToken.decimals || 9;
+              const outputAmount = parseFloat(data.quote.outAmount) / Math.pow(10, outputDecimals);
+
+              set((state) => ({
+                swap: {
+                  ...state.swap,
+                  outputAmount: outputAmount.toString(),
+                },
+                routes: {
+                  ...state.routes,
+                  routes: [route],
+                  selectedRoute: route,
+                  isLoading: false,
+                },
+              }));
+            } else {
+              throw new Error("No quote received from API");
+            }
           } catch (error) {
+            console.error("Error fetching routes:", error);
             set((state) => ({
               routes: {
                 ...state.routes,

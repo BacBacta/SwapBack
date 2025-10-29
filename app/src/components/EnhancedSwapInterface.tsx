@@ -5,13 +5,14 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useSwapStore } from "@/store/swapStore";
 import { useSwapWebSocket } from "@/hooks/useSwapWebSocket";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { TokenSelector } from "./TokenSelector";
-import { debounce } from "lodash";
+import { AnimatePresence, motion } from "framer-motion";
+// import { debounce } from "lodash"; // Désactivé - Pas d'auto-fetch
 
 interface RouteStep {
   label: string;
@@ -49,22 +50,24 @@ export function EnhancedSwapInterface() {
   const [hasSearchedRoute, setHasSearchedRoute] = useState(false);
   const [priceImpact, setPriceImpact] = useState(0);
 
-  // Debounced route fetching
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const debouncedFetchRoutes = useCallback(
-    debounce((inputToken: typeof swap.inputToken, outputToken: typeof swap.outputToken, inputAmount: string) => {
-      const amount = parseFloat(inputAmount);
-      if (inputToken && outputToken && amount > 0) {
-        fetchRoutes();
-      }
-    }, 800),
-    [fetchRoutes]
-  );
+  // ⚠️ AUTO-FETCH DÉSACTIVÉ pour éviter les boucles infinies
+  // L'utilisateur doit cliquer sur "Rechercher Route" manuellement
+  
+  // Debounced route fetching - DÉSACTIVÉ
+  // const debouncedFetchRoutes = useCallback(
+  //   debounce((inputToken: typeof swap.inputToken, outputToken: typeof swap.outputToken, inputAmount: string) => {
+  //     const amount = parseFloat(inputAmount);
+  //     if (inputToken && outputToken && amount > 0) {
+  //       fetchRoutes();
+  //     }
+  //   }, 800),
+  //   [fetchRoutes]
+  // );
 
-  // Fetch routes when amount changes
-  useEffect(() => {
-    debouncedFetchRoutes(swap.inputToken, swap.outputToken, swap.inputAmount);
-  }, [swap.inputToken, swap.outputToken, swap.inputAmount, debouncedFetchRoutes]);
+  // Fetch routes when amount changes - DÉSACTIVÉ
+  // useEffect(() => {
+  //   debouncedFetchRoutes(swap.inputToken, swap.outputToken, swap.inputAmount);
+  // }, [swap.inputToken, swap.outputToken, swap.inputAmount, debouncedFetchRoutes]);
 
   // Calculate price impact
   useEffect(() => {
@@ -445,10 +448,10 @@ export function EnhancedSwapInterface() {
             : inputAmount <= 0
             ? "Enter Amount"
             : routes.isLoading
-            ? "Finding Best Route..."
-            : hasSearchedRoute
-            ? "Swap"
-            : "Review Swap"}
+            ? "🔍 Finding Best Route..."
+            : hasSearchedRoute && routes.selectedRoute
+            ? "✅ Execute Swap"
+            : "🔍 Search Route"}
         </button>
 
         {/* Footer Info */}
