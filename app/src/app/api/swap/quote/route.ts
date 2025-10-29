@@ -104,7 +104,14 @@ export async function POST(request: NextRequest) {
     const jupiterEndpoint = `/order?${params.toString()}`;
     const quoteUrl = getJupiterUrl(jupiterEndpoint);
     
-    console.log("🔄 Fetching from:", USE_CORS_PROXY ? "CORS Proxy" : "Direct Jupiter Ultra API");
+    console.log("🔄 Fetching Jupiter quote...");
+    console.log("   URL:", quoteUrl);
+    console.log("   Params:", {
+      inputMint: inputMint.slice(0, 8) + "...",
+      outputMint: outputMint.slice(0, 8) + "...",
+      amount: parsedAmount,
+      slippageBps,
+    });
     
     const response = await fetch(quoteUrl, {
       method: "GET",
@@ -113,9 +120,18 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    console.log("📡 Jupiter API Response:", {
+      status: response.status,
+      ok: response.ok,
+      statusText: response.statusText,
+    });
+
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("❌ Jupiter API error:", response.status, errorText);
+      console.error("❌ Jupiter API error:");
+      console.error("   Status:", response.status);
+      console.error("   Response:", errorText);
+      console.error("   URL called:", quoteUrl);
       
       return NextResponse.json(
         {
