@@ -39,7 +39,12 @@ const validateTokenSupport = async (
   }
 
   // First check local curated list
-  if (getTokenByMint(mint)) {
+  const localToken = getTokenByMint(mint);
+  if (localToken) {
+    console.log("✅ Token validated from local list:", {
+      mint,
+      symbol: localToken.symbol,
+    });
     tokenValidationCache.set(mint, "supported");
     return "supported";
   }
