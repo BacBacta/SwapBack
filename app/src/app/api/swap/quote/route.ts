@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { Connection } from "@solana/web3.js";
+import { getTokenByMint } from "@/constants/tokens";
 
 // ============================================================================
 // ENVIRONMENT VARIABLES - Configurables sur Vercel
@@ -19,6 +20,75 @@ import { Connection } from "@solana/web3.js";
 const JUPITER_API = process.env.JUPITER_API_URL || "https://lite-api.jup.ag/ultra/v1";
 const USE_CORS_PROXY = process.env.USE_CORS_PROXY === "true"; // Default: false (direct call)
 const CORS_PROXY = "https://corsproxy.io/?";
+
+const JUPITER_TOKEN_INFO_URL =
+  process.env.JUPITER_TOKEN_INFO_URL || "https://token.jup.ag/token";
+const TOKEN_VALIDATION_TIMEOUT_MS = Number(
+  process.env.JUPITER_TOKEN_INFO_TIMEOUT_MS || 3000
+);
+
+type TokenSupportStatus = "supported" | "unsupported" | "unknown";
+
+const tokenValidationCache = new Map<string, TokenSupportStatus>();
+
+const validateTokenSupport = async (
+  mint: string
+): Promise<TokenSupportStatus> => {
+  if (!mint) {
+    return "unsupported";
+  }
+
+  // First check local curated list
+  if (getTokenByMint(mint)) {
+    tokenValidationCache.set(mint, "supported");
+    return "supported";
+  }
+
+  const cachedStatus = tokenValidationCache.get(mint);
+  if (cachedStatus) {
+    return cachedStatus;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TOKEN_VALIDATION_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${JUPITER_TOKEN_INFO_URL}/${mint}`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (response.ok) {
+      tokenValidationCache.set(mint, "supported");
+      return "supported";
+    }
+
+    if (response.status === 404) {
+      console.warn("⚠️ Unsupported token mint detected:", mint);
+      tokenValidationCache.set(mint, "unsupported");
+      return "unsupported";
+    }
+
+    console.warn(
+      "⚠️ Unexpected response while validating token mint:",
+      mint,
+      response.status,
+      response.statusText
+    );
+    return "unknown";
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if ((error as Error)?.name === "AbortError") {
+      console.error("⏱️ Token validation timed out:", mint);
+    } else {
+      console.error("❌ Token validation failed:", mint, error);
+    }
+    return "unknown";
+  }
+};
 
 // Construct final Jupiter URL
 const getJupiterUrl = (endpoint: string) => {
@@ -67,6 +137,44 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Invalid amount: must be a positive number" },
         { status: 400 }
+      );
+    }
+
+    // Ensure tokens are supported before querying Jupiter
+    const [inputTokenStatus, outputTokenStatus] = await Promise.all([
+      validateTokenSupport(inputMint),
+      validateTokenSupport(outputMint),
+    ]);
+
+    if (inputTokenStatus !== "supported") {
+      const statusCode = inputTokenStatus === "unknown" ? 503 : 400;
+      const errorMessage =
+        inputTokenStatus === "unknown"
+          ? "Unable to validate input token support"
+          : "Unsupported input token";
+
+      return NextResponse.json(
+        {
+          error: errorMessage,
+          mint: inputMint,
+        },
+        { status: statusCode }
+      );
+    }
+
+    if (outputTokenStatus !== "supported") {
+      const statusCode = outputTokenStatus === "unknown" ? 503 : 400;
+      const errorMessage =
+        outputTokenStatus === "unknown"
+          ? "Unable to validate output token support"
+          : "Unsupported output token";
+
+      return NextResponse.json(
+        {
+          error: errorMessage,
+          mint: outputMint,
+        },
+        { status: statusCode }
       );
     }
 
