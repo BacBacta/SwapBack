@@ -199,16 +199,12 @@ export const useSwapStore = create<SwapStore>()(
               parseFloat(swap.inputAmount) * Math.pow(10, inputDecimals)
             );
 
-            const response = await fetch("/api/swap/quote", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                inputMint: swap.inputToken.mint,
-                outputMint: swap.outputToken.mint,
-                amount: amountInSmallestUnit,
-                slippageBps: swap.slippageTolerance * 100,
-                onlyDirectRoutes: false,
-              }),
+            // Call Jupiter API directly from client to avoid Vercel timeout
+            const jupiterUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${swap.inputToken.mint}&outputMint=${swap.outputToken.mint}&amount=${amountInSmallestUnit}&slippageBps=${Math.floor(swap.slippageTolerance * 10000)}`;
+            
+            const response = await fetch(jupiterUrl, {
+              method: "GET",
+              headers: { "Accept": "application/json" },
             });
 
             if (!response.ok) {
@@ -219,23 +215,26 @@ export const useSwapStore = create<SwapStore>()(
             const data = await response.json();
 
             // Transform Jupiter quote into our route format
-            if (data.quote) {
+            // Direct API returns quote directly (not wrapped in {quote: ...})
+            const quote = data.quote || data;
+            
+            if (quote && quote.outAmount) {
               // Parse price impact (peut être string ou number)
-              const priceImpact = typeof data.quote.priceImpactPct === 'string' 
-                ? parseFloat(data.quote.priceImpactPct) 
-                : (data.quote.priceImpactPct || 0);
+              const priceImpact = typeof quote.priceImpactPct === 'string' 
+                ? parseFloat(quote.priceImpactPct) 
+                : (quote.priceImpactPct || 0);
 
               const route: RouteCandidate = {
                 id: `route_${Date.now()}`,
-                venues: data.quote.routePlan?.map((step: { swapInfo?: { label?: string } }) => 
+                venues: quote.routePlan?.map((step: { swapInfo?: { label?: string } }) => 
                   step.swapInfo?.label || "Unknown"
                 ) || [],
                 path: [swap.inputToken.mint, swap.outputToken.mint],
-                hops: data.quote.routePlan?.length || 1,
+                hops: quote.routePlan?.length || 1,
                 splits: [],
-                expectedOutput: parseFloat(data.quote.outAmount),
+                expectedOutput: parseFloat(quote.outAmount),
                 totalCost: 0,
-                effectiveRate: parseFloat(data.quote.outAmount) / parseFloat(data.quote.inAmount),
+                effectiveRate: parseFloat(quote.outAmount) / parseFloat(quote.inAmount),
                 riskScore: priceImpact ? Math.min(100, priceImpact * 10) : 10,
                 mevRisk: priceImpact > 2 ? "high" : priceImpact > 0.5 ? "medium" : "low",
                 instructions: [],
@@ -244,7 +243,7 @@ export const useSwapStore = create<SwapStore>()(
 
               // Calculate output amount in human-readable format
               const outputDecimals = swap.outputToken.decimals || 9;
-              const outputAmount = parseFloat(data.quote.outAmount) / Math.pow(10, outputDecimals);
+              const outputAmount = parseFloat(quote.outAmount) / Math.pow(10, outputDecimals);
 
               set((state) => ({
                 swap: {
