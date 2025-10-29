@@ -68,7 +68,7 @@ export const SOLANA_TOKENS: TokenInfo[] = [
     popular: true,
   },
   {
-    mint: "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs",
+    mint: "orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE",
     symbol: "ORCA",
     name: "Orca",
     decimals: 6,
@@ -146,6 +146,176 @@ export const SOLANA_TOKENS: TokenInfo[] = [
       "https://bafkreibf4hdjurmkwj4f4d2wl3z2ju4aaqpvjhqm5sqqz3xmz3zyikqh4e.ipfs.nftstorage.link",
     coingeckoId: "popcat",
     popular: true,
+  },
+  {
+    mint: "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
+    symbol: "WIF",
+    name: "dog wif hat",
+    decimals: 6,
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm/logo.png",
+    coingeckoId: "dogwifcoin",
+    popular: true,
+  },
+  {
+    mint: "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL",
+    symbol: "JTO",
+    name: "Jito",
+    decimals: 9,
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL/logo.png",
+    coingeckoId: "jito-governance-token",
+    popular: true,
+  },
+  {
+    mint: "HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3",
+    symbol: "PYTH",
+    name: "Pyth Network",
+    decimals: 6,
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3/logo.png",
+    coingeckoId: "pyth-network",
+    popular: true,
+  },
+  {
+    mint: "MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac",
+    symbol: "MNGO",
+    name: "Mango",
+    decimals: 6,
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac/logo.png",
+    coingeckoId: "mango-markets",
+    popular: false,
+  },
+  {
+    mint: "EchesyfXePKdLtoiZSL8pBe8Myagyy8ZRqsACNCFGnvp",
+    symbol: "FIDA",
+    name: "Bonfida",
+    decimals: 6,
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EchesyfXePKdLtoiZSL8pBe8Myagyy8ZRqsACNCFGnvp/logo.png",
+    coingeckoId: "bonfida",
+    popular: false,
+  },
+  {
+    mint: "8HGyAAB1yoM1ttS7pXjHMa3dukTFGQggnFFH3hJZgzQh",
+    symbol: "COPE",
+    name: "COPE",
+    decimals: 6,
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/8HGyAAB1yoM1ttS7pXjHMa3dukTFGQggnFFH3hJZgzQh/logo.png",
+    coingeckoId: "cope",
+    popular: false,
+  },
+  {
+    mint: "StepAscQoEioFxxWGnh2sLBDFp9d8rvKz2Yp39iDpyT",
+    symbol: "STEP",
+    name: "Step Finance",
+    decimals: 9,
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/StepAscQoEioFxxWGnh2sLBDFp9d8rvKz2Yp39iDpyT/logo.png",
+    coingeckoId: "step-finance",
+    popular: false,
+  },
+  {
+    mint: "ETAtLmCmsoiEEKfNrHKJ2kYy3MoABhU6NQvpSfij5tDs",
+    symbol: "MEDIA",
+    name: "Media Network",
+    decimals: 6,
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/ETAtLmCmsoiEEKfNrHKJ2kYy3MoABhU6NQvpSfij5tDs/logo.png",
+    coingeckoId: "media-network",
+    popular: false,
+  },
+  {
+    mint: "8PMHT4swUMtBzgHnh5U564N5sjPSiUz2cjEQzFnnP1Fo",
+    symbol: "ROPE",
+    name: "Rope",
+    decimals: 9,
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/8PMHT4swUMtBzgHnh5U564N5sjPSiUz2cjEQzFnnP1Fo/logo.png",
+    coingeckoId: "rope",
+    popular: false,
+  },
+  {
+    mint: "MERt85fc5boKw3BW1eYdxonEuJNvXbiMbs6hvheau5K",
+    symbol: "MER",
+    name: "Mercurial",
+    decimals: 6,
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/MERt85fc5boKw3BW1eYdxonEuJNvXbiMbs6hvheau5K/logo.png",
+    coingeckoId: "mercurial",
+    popular: false,
+  },
+  {
+    mint: "TuLipcqtGVXP9XR62wM8WWCm6a9vhLs7T1uoWBk6FDs",
+    symbol: "TULIP",
+    name: "Tulip",
+    decimals: 6,
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/TuLipcqtGVXP9XR62wM8WWCm6a9vhLs7T1uoWBk6FDs/logo.png",
+    coingeckoId: "tulip-protocol",
+    popular: false,
+  },
+  {
+    mint: "4dmKkXNHdgYsXqBHCuMikNQWwVomZURhYvkkX5c4pQ7y",
+    symbol: "SNY",
+    name: "Synthetify",
+    decimals: 6,
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/4dmKkXNHdgYsXqBHCuMikNQWwVomZURhYvkkX5c4pQ7y/logo.png",
+    coingeckoId: "synthetify",
+    popular: false,
+  },
+  {
+    mint: "SLRSSpSLUTP7okbCUBYStWCo1vUgyt775faPqz8HUMr",
+    symbol: "SLRS",
+    name: "Solrise Finance",
+    decimals: 6,
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/SLRSSpSLUTP7okbCUBYStWCo1vUgyt775faPqz8HUMr/logo.png",
+    coingeckoId: "solrise-finance",
+    popular: false,
+  },
+  {
+    mint: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+    symbol: "SAMO",
+    name: "Samoyedcoin",
+    decimals: 9,
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU/logo.png",
+    coingeckoId: "samoyedcoin",
+    popular: false,
+  },
+  {
+    mint: "SHDWyBxihqiCj6YekG2GUr7wqKLeLAMK1gHZck9pL6y",
+    symbol: "SHDW",
+    name: "Shadow",
+    decimals: 9,
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/SHDWyBxihqiCj6YekG2GUr7wqKLeLAMK1gHZck9pL6y/logo.png",
+    coingeckoId: "genesysgo-shadow",
+    popular: false,
+  },
+  {
+    mint: "DUSTawucrTsGU8hcqRdHDCbuYhCPADMLM2VcCb8VnFnQ",
+    symbol: "DUST",
+    name: "Dust Protocol",
+    decimals: 9,
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/DUSTawucrTsGU8hcqRdHDCbuYhCPADMLM2VcCb8VnFnQ/logo.png",
+    coingeckoId: "dust-protocol",
+    popular: false,
+  },
+  {
+    mint: "FoRGERiW7odcCBGU1bztZi16osPBHjxharvDathL5eds",
+    symbol: "FORGE",
+    name: "Forge",
+    decimals: 9,
+    logoURI:
+      "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/FoRGERiW7odcCBGU1bztZi16osPBHjxharvDathL5eds/logo.png",
+    coingeckoId: "forge",
+    popular: false,
   },
 ];
 

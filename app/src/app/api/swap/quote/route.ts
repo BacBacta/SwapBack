@@ -34,22 +34,24 @@ const tokenValidationCache = new Map<string, TokenSupportStatus>();
 const validateTokenSupport = async (
   mint: string
 ): Promise<TokenSupportStatus> => {
-  if (!mint) {
+  const normalizedMint = mint?.trim();
+
+  if (!normalizedMint) {
     return "unsupported";
   }
 
   // First check local curated list
-  const localToken = getTokenByMint(mint);
+  const localToken = getTokenByMint(normalizedMint);
   if (localToken) {
     console.log("✅ Token validated from local list:", {
-      mint,
+      mint: normalizedMint,
       symbol: localToken.symbol,
     });
-    tokenValidationCache.set(mint, "supported");
+    tokenValidationCache.set(normalizedMint, "supported");
     return "supported";
   }
 
-  const cachedStatus = tokenValidationCache.get(mint);
+  const cachedStatus = tokenValidationCache.get(normalizedMint);
   if (cachedStatus) {
     return cachedStatus;
   }
@@ -58,7 +60,7 @@ const validateTokenSupport = async (
   const timeoutId = setTimeout(() => controller.abort(), TOKEN_VALIDATION_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${JUPITER_TOKEN_INFO_URL}/${mint}`, {
+    const response = await fetch(`${JUPITER_TOKEN_INFO_URL}/${normalizedMint}`, {
       method: "GET",
       headers: { Accept: "application/json" },
       signal: controller.signal,
@@ -67,19 +69,19 @@ const validateTokenSupport = async (
     clearTimeout(timeoutId);
 
     if (response.ok) {
-      tokenValidationCache.set(mint, "supported");
+      tokenValidationCache.set(normalizedMint, "supported");
       return "supported";
     }
 
     if (response.status === 404) {
-      console.warn("⚠️ Unsupported token mint detected:", mint);
-      tokenValidationCache.set(mint, "unsupported");
+      console.warn("⚠️ Unsupported token mint detected:", normalizedMint);
+      tokenValidationCache.set(normalizedMint, "unsupported");
       return "unsupported";
     }
 
     console.warn(
       "⚠️ Unexpected response while validating token mint:",
-      mint,
+      normalizedMint,
       response.status,
       response.statusText
     );
@@ -87,9 +89,9 @@ const validateTokenSupport = async (
   } catch (error) {
     clearTimeout(timeoutId);
     if ((error as Error)?.name === "AbortError") {
-      console.error("⏱️ Token validation timed out:", mint);
+      console.error("⏱️ Token validation timed out:", normalizedMint);
     } else {
-      console.error("❌ Token validation failed:", mint, error);
+      console.error("❌ Token validation failed:", normalizedMint, error);
     }
     return "unknown";
   }
