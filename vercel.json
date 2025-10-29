@@ -1,0 +1,13 @@
+{
+  "buildCommand": "cd app && npm run build",
+  "outputDirectory": "app/.next",
+  "installCommand": "cd app && npm install",
+  "framework": "nextjs",
+  "regions": ["iad1"],
+  "env": {
+    "USE_MOCK_QUOTES": "false",
+    "NEXT_PUBLIC_USDC_MINT": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "NEXT_PUBLIC_SOLANA_NETWORK": "testnet",
+    "JUPITER_API_URL": "https://quote-api.jup.ag/v6"
+  }
+}
