@@ -12,10 +12,18 @@ import { Connection } from "@solana/web3.js";
 
 /**
  * Jupiter API Base URL
- * Default: https://quote-api.jup.ag/v6
- * Vercel: Ajouter JUPITER_API_URL dans Environment Variables
+ * Using CORS proxy to bypass Vercel DNS restrictions
+ * Alternative: Use direct URL if DNS works: https://quote-api.jup.ag/v6
  */
 const JUPITER_API = process.env.JUPITER_API_URL || "https://quote-api.jup.ag/v6";
+const USE_CORS_PROXY = process.env.USE_CORS_PROXY !== "false"; // Default: true
+const CORS_PROXY = "https://corsproxy.io/?";
+
+// Construct final Jupiter URL
+const getJupiterUrl = (endpoint: string) => {
+  const baseUrl = `${JUPITER_API}${endpoint}`;
+  return USE_CORS_PROXY ? `${CORS_PROXY}${encodeURIComponent(baseUrl)}` : baseUrl;
+};
 
 /**
  * Solana RPC Endpoint
@@ -94,7 +102,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch quote from Jupiter
-    const quoteUrl = `${JUPITER_API}/quote?${params.toString()}`;
+    const jupiterEndpoint = `/quote?${params.toString()}`;
+    const quoteUrl = getJupiterUrl(jupiterEndpoint);
+    
+    console.log("🔄 Fetching from:", USE_CORS_PROXY ? "CORS Proxy" : "Direct Jupiter");
+    
     const response = await fetch(quoteUrl, {
       method: "GET",
       headers: {

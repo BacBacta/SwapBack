@@ -199,12 +199,16 @@ export const useSwapStore = create<SwapStore>()(
               parseFloat(swap.inputAmount) * Math.pow(10, inputDecimals)
             );
 
-            // Call Jupiter API directly from client to avoid Vercel timeout
-            const jupiterUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${swap.inputToken.mint}&outputMint=${swap.outputToken.mint}&amount=${amountInSmallestUnit}&slippageBps=${Math.floor(swap.slippageTolerance * 10000)}`;
-            
-            const response = await fetch(jupiterUrl, {
-              method: "GET",
-              headers: { "Accept": "application/json" },
+            // Call API route (uses CORS proxy on Vercel)
+            const response = await fetch("/api/swap/quote", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                inputMint: swap.inputToken.mint,
+                outputMint: swap.outputToken.mint,
+                amount: amountInSmallestUnit,
+                slippageBps: Math.floor(swap.slippageTolerance * 10000),
+              }),
             });
 
             if (!response.ok) {
