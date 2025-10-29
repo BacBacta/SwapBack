@@ -6,7 +6,8 @@
   "env": {
     "HUSKY": "0",
     "JUPITER_API_URL": "https://quote-api.jup.ag/v6",
-    "USE_MOCK_QUOTES": "false",
+    "USE_MOCK_QUOTES": "true",
+    "USE_CORS_PROXY": "false",
     "NEXT_PUBLIC_SOLANA_NETWORK": "testnet",
     "NEXT_PUBLIC_SOLANA_RPC_URL": "https://api.testnet.solana.com",
     "NEXT_PUBLIC_ROUTER_PROGRAM_ID": "yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn",
