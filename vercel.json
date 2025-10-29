@@ -6,9 +6,9 @@
   "regions": ["iad1"],
   "env": {
     "HUSKY": "0",
-    "USE_MOCK_QUOTES": "true",
+    "USE_MOCK_QUOTES": "false",
     "USE_CORS_PROXY": "false",
-    "JUPITER_API_URL": "https://quote-api.jup.ag/v6",
+    "JUPITER_API_URL": "https://lite-api.jup.ag/ultra/v1",
     "NEXT_PUBLIC_USDC_MINT": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
     "NEXT_PUBLIC_SOLANA_NETWORK": "testnet",
     "NEXT_PUBLIC_SOLANA_RPC_URL": "https://api.testnet.solana.com",

@@ -1,6 +1,7 @@
 /**
  * API Route: Get Jupiter Quote
- * Returns real Jupiter V6 quote for token swap
+ * Returns real Jupiter Ultra API quote for token swap
+ * Endpoint: GET /ultra/v1/order
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -12,10 +13,10 @@ import { Connection } from "@solana/web3.js";
 
 /**
  * Jupiter API Base URL
- * Using CORS proxy to bypass Vercel DNS restrictions
- * Alternative: Use direct URL if DNS works: https://quote-api.jup.ag/v6
+ * New API: https://lite-api.jup.ag/ultra/v1
+ * Old API (deprecated): https://quote-api.jup.ag/v6
  */
-const JUPITER_API = process.env.JUPITER_API_URL || "https://quote-api.jup.ag/v6";
+const JUPITER_API = process.env.JUPITER_API_URL || "https://lite-api.jup.ag/ultra/v1";
 const USE_CORS_PROXY = process.env.USE_CORS_PROXY !== "false"; // Default: true
 const CORS_PROXY = "https://corsproxy.io/?";
 
@@ -101,11 +102,11 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Fetch quote from Jupiter
-    const jupiterEndpoint = `/quote?${params.toString()}`;
+    // Fetch quote from Jupiter Ultra API
+    const jupiterEndpoint = `/order?${params.toString()}`;
     const quoteUrl = getJupiterUrl(jupiterEndpoint);
     
-    console.log("🔄 Fetching from:", USE_CORS_PROXY ? "CORS Proxy" : "Direct Jupiter");
+    console.log("🔄 Fetching from:", USE_CORS_PROXY ? "CORS Proxy" : "Direct Jupiter Ultra API");
     
     const response = await fetch(quoteUrl, {
       method: "GET",
