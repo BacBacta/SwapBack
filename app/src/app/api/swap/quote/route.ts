@@ -49,7 +49,6 @@ export async function POST(request: NextRequest) {
       outputMint,
       amount,
       slippageBps = 50, // 0.5% default
-      onlyDirectRoutes = false,
     } = await request.json();
 
     // Validate inputs
@@ -71,14 +70,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build Jupiter quote URL
+    // Build Jupiter Ultra API URL
+    // Supported params: inputMint, outputMint, amount, slippageBps, taker, referralAccount, excludeRouters, excludeDexes
     const params = new URLSearchParams({
       inputMint,
       outputMint,
       amount: Math.floor(parsedAmount).toString(),
       slippageBps: slippageBps.toString(),
-      onlyDirectRoutes: onlyDirectRoutes.toString(),
-      swapMode: "ExactIn",
     });
 
     console.log("🔍 Fetching Jupiter quote:", {
