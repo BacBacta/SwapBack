@@ -1,8 +1,14 @@
 /**
  * API Route: Get Jupiter Quote
  * Returns real Jupiter Ultra API quote for token swap
- * Endpoint: GET /ultra/v1/order
+ * Endpoint: POST /api/swap/quote
  */
+
+// ============================================================================
+// VERCEL DEPLOYMENT DIRECTIVES
+// ============================================================================
+export const runtime = 'nodejs';     // Force Node.js runtime (not Edge)
+export const dynamic = 'force-dynamic'; // Disable static caching
 
 import { NextRequest, NextResponse } from "next/server";
 import { Connection } from "@solana/web3.js";
@@ -14,13 +20,9 @@ import { getTokenByMint } from "@/constants/tokens";
 
 /**
  * Jupiter API Base URL
- * New API: https://lite-api.jup.ag/ultra/v1
- * Old API (deprecated): https://quote-api.jup.ag/v6
+ * Using v6 API (more stable for quotes)
  */
-const JUPITER_API = process.env.JUPITER_API_URL || "https://lite-api.jup.ag/ultra/v1";
-const USE_CORS_PROXY = process.env.USE_CORS_PROXY === "true"; // Default: false (direct call)
-const CORS_PROXY = "https://corsproxy.io/?";
-
+const JUPITER_API = process.env.JUPITER_API_URL || "https://quote-api.jup.ag/v6";
 const JUPITER_TOKEN_INFO_URL =
   process.env.JUPITER_TOKEN_INFO_URL || "https://token.jup.ag/token";
 const TOKEN_VALIDATION_TIMEOUT_MS = Number(
@@ -97,27 +99,29 @@ const validateTokenSupport = async (
   }
 };
 
-// Construct final Jupiter URL
-const getJupiterUrl = (endpoint: string) => {
-  const baseUrl = `${JUPITER_API}${endpoint}`;
-  return USE_CORS_PROXY ? `${CORS_PROXY}${encodeURIComponent(baseUrl)}` : baseUrl;
-};
+// ============================================================================
+// SOLANA RPC & MOCK CONFIGURATION
+// ============================================================================
 
 /**
  * Solana RPC Endpoint
- * Default: testnet
- * Vercel: Ajouter NEXT_PUBLIC_SOLANA_RPC_URL dans Environment Variables
+ * Default: mainnet
+ * Vercel: Set NEXT_PUBLIC_SOLANA_RPC_URL to mainnet endpoint
  */
 const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
-  "https://api.testnet.solana.com";
+  "https://api.mainnet-beta.solana.com";
 
 /**
  * Mock Mode (pour dev/test sans réseau)
  * Default: false
- * Vercel: Ajouter USE_MOCK_QUOTES=false (ou true pour staging)
  */
 const USE_MOCK_DATA = process.env.USE_MOCK_QUOTES === "true";
+
+/**
+ * Jupiter v6 API (more stable than ultra for quotes)
+ */
+const JUPITER_V6_API = "https://quote-api.jup.ag/v6/quote";
 
 export async function POST(request: NextRequest) {
   try {
@@ -185,15 +189,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build Jupiter Ultra API URL
-    // Supported params: inputMint, outputMint, amount, slippageBps, taker, referralAccount, excludeRouters, excludeDexes
-    const params = new URLSearchParams({
-      inputMint,
-      outputMint,
-      amount: Math.floor(parsedAmount).toString(),
-      slippageBps: slippageBps.toString(),
-    });
-
     console.log("🔍 Fetching Jupiter quote:", {
       inputMint: inputMint.slice(0, 8) + "...",
       outputMint: outputMint.slice(0, 8) + "...",
@@ -215,24 +210,22 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Fetch quote from Jupiter Ultra API
-    const jupiterEndpoint = `/order?${params.toString()}`;
-    const quoteUrl = getJupiterUrl(jupiterEndpoint);
-    
-    console.log("🔄 Fetching Jupiter quote...");
-    console.log("   URL:", quoteUrl);
-    console.log("   Params:", {
-      inputMint: inputMint.slice(0, 8) + "...",
-      outputMint: outputMint.slice(0, 8) + "...",
-      amount: parsedAmount,
-      slippageBps,
-    });
-    
-    const response = await fetch(quoteUrl, {
+    // Build Jupiter v6 API URL with query params
+    const url = new URL(JUPITER_V6_API);
+    url.searchParams.set('inputMint', inputMint);
+    url.searchParams.set('outputMint', outputMint);
+    url.searchParams.set('amount', Math.floor(parsedAmount).toString());
+    url.searchParams.set('slippageBps', slippageBps.toString());
+
+    console.log("🔄 Fetching Jupiter v6 quote...");
+    console.log("   URL:", url.toString());
+
+    const response = await fetch(url.toString(), {
       method: "GET",
       headers: {
         "Accept": "application/json",
       },
+      cache: 'no-store', // Force fresh response on Vercel
     });
 
     console.log("📡 Jupiter API Response:", {
@@ -246,7 +239,7 @@ export async function POST(request: NextRequest) {
       console.error("❌ Jupiter API error:");
       console.error("   Status:", response.status);
       console.error("   Response:", errorText);
-      console.error("   URL called:", quoteUrl);
+      console.error("   URL called:", url.toString());
       
       return NextResponse.json(
         {

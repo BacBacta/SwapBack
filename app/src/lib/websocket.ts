@@ -28,22 +28,27 @@ export class SwapWebSocketService {
   private readonly activeSignatures: Map<string, number> = new Map(); // signature -> subscriptionId
 
   constructor(rpcUrl: string) {
-    // Ensure the Connection constructor receives an HTTP/HTTPS URL.
-    // Some environments may accidentally provide a websocket URL (ws:// or wss://).
-    // The Solana `Connection` expects http(s) RPC endpoints; convert if necessary.
-    let normalizedUrl = rpcUrl;
+    // Normalize the RPC URL for use with Solana Connection.
+    // The Connection constructor requires an http(s) URL; convert if necessary:
+    // 1. If it's a websocket URL (ws:// or wss://), convert to http(s)
+    // 2. If it's missing a protocol, auto-prefix with https://
+    let normalizedUrl = rpcUrl.trim();
 
     try {
-      if (/^wss?:\/\//i.test(rpcUrl)) {
-        // convert websocket schemes to http/https
-        normalizedUrl = rpcUrl.replace(/^wss:\/\//i, "https://").replace(/^ws:\/\//i, "http://");
+      // Convert websocket schemes to http/https
+      if (/^wss?:\/\//i.test(normalizedUrl)) {
+        normalizedUrl = normalizedUrl.replace(/^wss:\/\//i, "https://").replace(/^ws:\/\//i, "http://");
         console.warn(
-          `SwapWebSocketService: converted websocket URL to HTTP for Connection: ${rpcUrl} -> ${normalizedUrl}`
+          `SwapWebSocketService: converted websocket URL to HTTP: ${rpcUrl} -> ${normalizedUrl}`
         );
       }
 
+      // Auto-prefix with https:// if protocol is missing
       if (!/^https?:\/\//i.test(normalizedUrl)) {
-        throw new Error("Invalid RPC URL: must start with http:// or https://");
+        normalizedUrl = `https://${normalizedUrl}`;
+        console.warn(
+          `SwapWebSocketService: auto-prefixed RPC URL with https://: ${rpcUrl} -> ${normalizedUrl}`
+        );
       }
     } catch (err) {
       // Re-throw with clearer context for easier debugging in the browser

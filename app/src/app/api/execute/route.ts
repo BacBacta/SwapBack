@@ -3,6 +3,12 @@
  * Executes the selected swap route and returns transaction signature
  */
 
+// ============================================================================
+// VERCEL DEPLOYMENT DIRECTIVES
+// ============================================================================
+export const runtime = 'nodejs';     // Force Node.js runtime (not Edge)
+export const dynamic = 'force-dynamic'; // Disable static caching
+
 import { NextRequest, NextResponse } from "next/server";
 import { Connection, VersionedTransaction } from "@solana/web3.js";
 
@@ -12,7 +18,7 @@ import { Connection, VersionedTransaction } from "@solana/web3.js";
 
 const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
-  "https://api.testnet.solana.com";
+  "https://api.mainnet-beta.solana.com";
 
 // ============================================================================
 // API HANDLER
