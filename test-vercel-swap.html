@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test SwapBack Vercel API</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 10px 5px;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: scale(1.05);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .success {
+            border-left: 4px solid #10b981;
+        }
+        .error {
+            border-left: 4px solid #ef4444;
+        }
+        h1 {
+            margin-top: 0;
+            font-size: 28px;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .status.loading {
+            background: #fbbf24;
+            color: #000;
+        }
+        .status.success {
+            background: #10b981;
+        }
+        .status.error {
+            background: #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test SwapBack Vercel API <span id="status" class="status"></span></h1>
+        
+        <div>
+            <button onclick="testQuote()">📊 Test Quote (1 SOL → USDC)</button>
+            <button onclick="testCustomAmount()">💰 Test 0.1 SOL</button>
+            <button onclick="testInvalidMint()">❌ Test Invalid Mint</button>
+            <button onclick="clearResults()">🗑️ Clear</button>
+        </div>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const API_URL = 'https://swapback-teal.vercel.app/api/swap/quote';
+        const resultDiv = document.getElementById('result');
+        const statusSpan = document.getElementById('status');
+
+        function setStatus(text, type) {
+            statusSpan.textContent = text;
+            statusSpan.className = 'status ' + type;
+        }
+
+        function displayResult(data, isError = false) {
+            resultDiv.className = isError ? 'error' : 'success';
+            resultDiv.textContent = JSON.stringify(data, null, 2);
+        }
+
+        function clearResults() {
+            resultDiv.textContent = '';
+            resultDiv.className = '';
+            setStatus('', '');
+        }
+
+        async function testQuote() {
+            setStatus('Loading...', 'loading');
+            
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        inputMint: 'So11111111111111111111111111111111111111112',
+                        outputMint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+                        amount: 1000000000, // 1 SOL
+                        slippageBps: 50
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    setStatus('Error', 'error');
+                    displayResult({
+                        status: response.status,
+                        error: data.error || 'Request failed',
+                        details: data
+                    }, true);
+                    return;
+                }
+
+                setStatus('Success', 'success');
+                
+                // Parse the quote
+                const quote = data.quote || data;
+                const outputAmount = parseFloat(quote.outAmount) / 1e6; // USDC has 6 decimals
+                const routes = quote.routePlan?.map(step => step.swapInfo?.label).join(' → ') || 'No route';
+
+                displayResult({
+                    success: data.success,
+                    input: '1 SOL',
+                    output: `${outputAmount.toFixed(6)} USDC`,
+                    route: routes,
+                    priceImpact: quote.priceImpactPct,
+                    fullResponse: data
+                });
+            } catch (error) {
+                setStatus('Error', 'error');
+                displayResult({
+                    error: error.message,
+                    stack: error.stack
+                }, true);
+            }
+        }
+
+        async function testCustomAmount() {
+            setStatus('Loading...', 'loading');
+            
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        inputMint: 'So11111111111111111111111111111111111111112',
+                        outputMint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+                        amount: 100000000, // 0.1 SOL
+                        slippageBps: 50
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    setStatus('Error', 'error');
+                    displayResult(data, true);
+                    return;
+                }
+
+                setStatus('Success', 'success');
+                const quote = data.quote || data;
+                const outputAmount = parseFloat(quote.outAmount) / 1e6;
+
+                displayResult({
+                    success: data.success,
+                    input: '0.1 SOL',
+                    output: `${outputAmount.toFixed(6)} USDC`,
+                    fullResponse: data
+                });
+            } catch (error) {
+                setStatus('Error', 'error');
+                displayResult({ error: error.message }, true);
+            }
+        }
+
+        async function testInvalidMint() {
+            setStatus('Loading...', 'loading');
+            
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        inputMint: 'INVALID_MINT_ADDRESS',
+                        outputMint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+                        amount: 1000000000,
+                        slippageBps: 50
+                    })
+                });
+
+                const data = await response.json();
+                setStatus('Error (expected)', 'error');
+                displayResult(data, true);
+            } catch (error) {
+                setStatus('Error', 'error');
+                displayResult({ error: error.message }, true);
+            }
+        }
+
+        // Test automatique au chargement
+        window.addEventListener('load', () => {
+            console.log('🚀 Test page loaded');
+            console.log('API URL:', API_URL);
+        });
+    </script>
+</body>
+</html>
