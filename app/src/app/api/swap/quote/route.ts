@@ -17,7 +17,7 @@ import { Connection } from "@solana/web3.js";
  * Old API (deprecated): https://quote-api.jup.ag/v6
  */
 const JUPITER_API = process.env.JUPITER_API_URL || "https://lite-api.jup.ag/ultra/v1";
-const USE_CORS_PROXY = process.env.USE_CORS_PROXY !== "false"; // Default: true
+const USE_CORS_PROXY = process.env.USE_CORS_PROXY === "true"; // Default: false (direct call)
 const CORS_PROXY = "https://corsproxy.io/?";
 
 // Construct final Jupiter URL
