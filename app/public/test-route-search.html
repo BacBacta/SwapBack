@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test SwapBack - Search Route</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #000;
+            color: #fff;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .container {
+            background: #1a1a1a;
+            border: 1px solid #00ff88;
+            border-radius: 12px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+        h1 {
+            color: #00ff88;
+            text-align: center;
+        }
+        button {
+            background: #00ff88;
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin: 10px 0;
+        }
+        button:hover {
+            background: #00cc6f;
+        }
+        button:disabled {
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #00ff88;
+            padding-left: 10px;
+        }
+        .log-entry.error {
+            border-left-color: #ff4444;
+            color: #ff4444;
+        }
+        .log-entry.success {
+            border-left-color: #00ff88;
+            color: #00ff88;
+        }
+        .log-entry.info {
+            border-left-color: #ffaa00;
+            color: #ffaa00;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 14px;
+        }
+        label {
+            display: block;
+            margin-top: 15px;
+            color: #00ff88;
+            font-weight: bold;
+        }
+        .status {
+            text-align: center;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .status.loading {
+            background: #ffaa0033;
+            color: #ffaa00;
+        }
+        .status.success {
+            background: #00ff8833;
+            color: #00ff88;
+        }
+        .status.error {
+            background: #ff444433;
+            color: #ff4444;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test SwapBack - Search Route</h1>
+    
+    <div class="container">
+        <h2>Configuration</h2>
+        
+        <label>Input Token (SOL)</label>
+        <input type="text" id="inputMint" value="So11111111111111111111111111111111111111112" readonly>
+        
+        <label>Output Token (USDC Testnet)</label>
+        <input type="text" id="outputMint" value="BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR" readonly>
+        
+        <label>Amount (lamports - 1 SOL = 1000000000)</label>
+        <input type="number" id="amount" value="1000000000">
+        
+        <label>Slippage (bps - 50 = 0.5%)</label>
+        <input type="number" id="slippage" value="50">
+        
+        <div id="status" class="status" style="display: none;"></div>
+        
+        <button id="searchBtn" onclick="testSearchRoute()">🔍 Test Search Route</button>
+        <button onclick="clearLogs()">🗑️ Clear Logs</button>
+    </div>
+    
+    <div class="container">
+        <h2>Console Logs</h2>
+        <div id="logs" class="log"></div>
+    </div>
+
+    <script>
+        function addLog(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logsDiv.appendChild(entry);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+            addLog('Logs cleared', 'info');
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+        }
+
+        function hideStatus() {
+            document.getElementById('status').style.display = 'none';
+        }
+
+        async function testSearchRoute() {
+            const btn = document.getElementById('searchBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Recherche en cours...';
+            
+            clearLogs();
+            addLog('🚀 Début du test de recherche de route', 'info');
+            
+            const inputMint = document.getElementById('inputMint').value;
+            const outputMint = document.getElementById('outputMint').value;
+            const amount = parseInt(document.getElementById('amount').value);
+            const slippageBps = parseInt(document.getElementById('slippage').value);
+            
+            const requestBody = {
+                inputMint,
+                outputMint,
+                amount,
+                slippageBps,
+                onlyDirectRoutes: false
+            };
+            
+            addLog(`📤 Envoi de la requête: ${JSON.stringify(requestBody, null, 2)}`, 'info');
+            showStatus('⏳ Recherche de routes en cours...', 'loading');
+            
+            try {
+                const startTime = Date.now();
+                
+                const response = await fetch('/api/swap/quote', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                const duration = Date.now() - startTime;
+                addLog(`📥 Réponse reçue en ${duration}ms (Status: ${response.status})`, 'info');
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    addLog(`❌ Erreur HTTP ${response.status}: ${JSON.stringify(errorData)}`, 'error');
+                    showStatus(`❌ Erreur: ${errorData.error || 'Unknown'}`, 'error');
+                    btn.disabled = false;
+                    btn.textContent = '🔍 Test Search Route';
+                    return;
+                }
+                
+                const data = await response.json();
+                addLog(`✅ Données reçues avec succès`, 'success');
+                addLog(`Réponse complète: ${JSON.stringify(data, null, 2)}`, 'info');
+                
+                if (data.success && data.quote) {
+                    addLog(`✅ Quote trouvé!`, 'success');
+                    addLog(`  - Input: ${data.quote.inAmount} (${inputMint.substring(0, 8)}...)`, 'success');
+                    addLog(`  - Output: ${data.quote.outAmount} (${outputMint.substring(0, 8)}...)`, 'success');
+                    addLog(`  - Price Impact: ${data.quote.priceImpactPct}`, 'success');
+                    addLog(`  - Venues: ${data.quote.routePlan?.map(r => r.swapInfo?.label).join(' → ') || 'N/A'}`, 'success');
+                    addLog(`  - Mock Data: ${data.quote._isMockData ? 'OUI' : 'NON'}`, data.quote._isMockData ? 'info' : 'success');
+                    
+                    showStatus('✅ Route trouvée avec succès!', 'success');
+                } else {
+                    addLog(`⚠️ Pas de quote dans la réponse`, 'error');
+                    showStatus('⚠️ Aucune route trouvée', 'error');
+                }
+                
+            } catch (error) {
+                addLog(`❌ Erreur: ${error.message}`, 'error');
+                addLog(`Stack: ${error.stack}`, 'error');
+                showStatus(`❌ Erreur: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔍 Test Search Route';
+            }
+        }
+        
+        // Initial log
+        addLog('✅ Page de test chargée - Prêt à tester!', 'success');
+        addLog('ℹ️ Cliquez sur "Test Search Route" pour lancer le test', 'info');
+    </script>
+</body>
+</html>

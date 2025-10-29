@@ -110,6 +110,7 @@ export function EnhancedSwapInterface() {
 
   const handleSearchRoute = () => {
     const amount = parseFloat(swap.inputAmount);
+    
     if (swap.inputToken && swap.outputToken && amount > 0) {
       fetchRoutes();
       setHasSearchedRoute(true);

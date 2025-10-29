@@ -183,6 +183,7 @@ export const useSwapStore = create<SwapStore>()(
 
         fetchRoutes: async () => {
           const { swap } = get();
+          
           if (!swap.inputToken || !swap.outputToken || !swap.inputAmount) {
             return;
           }
@@ -205,7 +206,7 @@ export const useSwapStore = create<SwapStore>()(
                 inputMint: swap.inputToken.mint,
                 outputMint: swap.outputToken.mint,
                 amount: amountInSmallestUnit,
-                slippageBps: swap.slippageTolerance * 100, // Convert % to bps
+                slippageBps: swap.slippageTolerance * 100,
                 onlyDirectRoutes: false,
               }),
             });
