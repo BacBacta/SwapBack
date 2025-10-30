@@ -11,12 +11,12 @@
 ### ✅ Déploiement Testnet Complété
 
 1. **Programmes déployés** (6.4 SOL):
-   - CNFT: `GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B`
-   - Router: `yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn`
-   - Buyback: `DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi`
+   - CNFT: `9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw`
+   - Router: `GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt`
+   - Buyback: `EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf`
 
 2. **Tokens créés** (0.01 SOL):
-   - BACK Mint: `5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27`
+   - BACK Mint: `862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux`
    - Supply: 1,000,000,000 BACK (9 decimals)
 
 3. **Infrastructure** (0.003 SOL):
@@ -186,7 +186,7 @@ GlobalState:  2vG5tpKQFobHNJY85fn6tMoKNibrLBtUhuDSSApj4KSA
 declare_id!("GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"); // devnet
 
 // Adresse de déploiement
-yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn // testnet
+GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt // testnet
 ```
 
 **Impact:**
@@ -275,10 +275,10 @@ yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn // testnet
 ## 🔗 Liens Utiles
 
 **Testnet Explorer:**
-- [Router Program](https://explorer.solana.com/address/yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn?cluster=testnet)
-- [Buyback Program](https://explorer.solana.com/address/DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi?cluster=testnet)
-- [CNFT Program](https://explorer.solana.com/address/GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B?cluster=testnet)
-- [BACK Token](https://explorer.solana.com/address/5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27?cluster=testnet)
+- [Router Program](https://explorer.solana.com/address/GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt?cluster=testnet)
+- [Buyback Program](https://explorer.solana.com/address/EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf?cluster=testnet)
+- [CNFT Program](https://explorer.solana.com/address/9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw?cluster=testnet)
+- [BACK Token](https://explorer.solana.com/address/862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux?cluster=testnet)
 - [Merkle Tree](https://explorer.solana.com/address/93Tzc7btocwzDSbscW9EfL9dBzWLx85FHE6zeWrwHbNT?cluster=testnet)
 
 **RPC:**

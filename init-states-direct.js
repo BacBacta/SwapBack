@@ -14,12 +14,12 @@ const borsh = require("borsh");
 // Configuration
 const RPC_URL = "https://api.testnet.solana.com";
 const ROUTER_PROGRAM = new PublicKey(
-  "yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn"
+  "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
 );
 const BUYBACK_PROGRAM = new PublicKey(
-  "DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi"
+  "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"
 );
-const BACK_MINT = new PublicKey("5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27");
+const BACK_MINT = new PublicKey("862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux");
 const USDC_MOCK = new PublicKey("BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR");
 
 // Discriminators Anchor (sha256 des 8 premiers bytes de "global:initialize")

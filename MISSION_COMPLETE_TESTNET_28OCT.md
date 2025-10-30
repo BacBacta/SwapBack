@@ -28,19 +28,19 @@ Après audit complet du codebase (grep search révélant **50+ références devn
 #### Adresses de Programmes (MAUVAISES → BONNES)
 ```diff
 - ROUTER:  FPK46poe53iX6Bcv3q8cgmc1jm7dJKQ9Qs9oESFxGN55 (vieille adresse)
-+ ROUTER:  yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn (testnet Oct 28)
++ ROUTER:  GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt (testnet Oct 30)
 
 - BUYBACK: 75nEwGH4cpRq13PG2eEioQE1wBqSvxvK9bhWfvpvZvP7 (vieille adresse)
-+ BUYBACK: DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi (testnet Oct 28)
++ BUYBACK: EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf (testnet Oct 30)
 
 - CNFT:    FPNibu4RhrTt9yLDxcc8nQuHiVkFCfLVJ7DZUn6yn8K8 (vieille adresse)
-+ CNFT:    GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B (testnet Oct 28)
++ CNFT:    9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw (testnet Oct 30)
 ```
 
 #### Token BACK (MAUVAIS → BON)
 ```diff
 - BACK: nKnrana1TdBHZGmVbNkpN1Dazj8285VftqCnkHCG8sh (vieille adresse)
-+ BACK: 5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27 (testnet Oct 28)
++ BACK: 862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux (testnet Oct 30)
 ```
 
 #### Variable SOLANA_NETWORK
@@ -139,7 +139,7 @@ export const getCurrentEnvironment = (): NetworkEnvironment => {
 -   BH8thpWca6kpN2pKwWTaKv2F5s4MEkbML18LtJ8eFypU: 0.001, // $BACK (simulé)
 + // Sur testnet, on utilise des prix simulés
 + const testnetPrices = {
-+   "5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27": 0.001, // $BACK (testnet)
++   "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux": 0.001, // $BACK (testnet)
 ```
 
 ---
@@ -167,14 +167,14 @@ export const getCurrentEnvironment = (): NetworkEnvironment => {
 Network:  testnet
 RPC URL:  https://api.testnet.solana.com
 
-CNFT:     GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B
-Router:   yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn
-Buyback:  DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi
+CNFT:     9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw
+Router:   GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt
+Buyback:  EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf
 ```
 
 ### Tokens
 ```
-BACK:     5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27
+BACK:     862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux
 USDC:     BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR
 ```
 
@@ -200,10 +200,10 @@ Config:   4zhpvzBMqvGoM7j9RAaAF5ZizwDUAtgYr5Pnzn8uRh5s
 ```bash
 # Vérifier les variables d'environnement Vercel
 ✅ NEXT_PUBLIC_SOLANA_NETWORK=testnet
-✅ NEXT_PUBLIC_ROUTER_PROGRAM_ID=yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn
-✅ NEXT_PUBLIC_BUYBACK_PROGRAM_ID=DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi
-✅ NEXT_PUBLIC_CNFT_PROGRAM_ID=GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B
-✅ NEXT_PUBLIC_BACK_MINT=5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27
+✅ NEXT_PUBLIC_ROUTER_PROGRAM_ID=GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt
+✅ NEXT_PUBLIC_BUYBACK_PROGRAM_ID=EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf
+✅ NEXT_PUBLIC_CNFT_PROGRAM_ID=9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw
+✅ NEXT_PUBLIC_BACK_MINT=862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux
 ```
 
 ---
@@ -239,7 +239,7 @@ Config:   4zhpvzBMqvGoM7j9RAaAF5ZizwDUAtgYr5Pnzn8uRh5s
 - ✅ API routes utilisent testnet avec fallback correct
 - ✅ UI affiche "TESTNET" correctement
 - ✅ Liens explorer dynamiques pointant vers testnet
-- ✅ Token BACK correct (5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27)
+- ✅ Token BACK correct (862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux)
 - ✅ Configuration par défaut = testnet
 - ✅ **Cohérence totale**: Code ↔ .env.local ↔ vercel.json ↔ Déploiement testnet
 

@@ -10,16 +10,16 @@ Le déploiement testnet de SwapBack est **opérationnel à 90%** et **prêt pour
 ### ✅ Composants Déployés (100%)
 
 1. **Programmes Solana** (3/3):
-   - ✅ CNFT: `GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B` (260KB)
-   - ✅ Router: `yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn` (306KB)
-   - ✅ Buyback: `DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi` (365KB)
+   - ✅ CNFT: `9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw` (260KB)
+   - ✅ Router: `GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt` (306KB)
+   - ✅ Buyback: `EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf` (365KB)
 
 2. **Infrastructure cNFT**:
    - ✅ Merkle Tree: `93Tzc7btocwzDSbscW9EfL9dBzWLx85FHE6zeWrwHbNT` (16,384 cNFTs)
    - ✅ Collection Config: `4zhpvzBMqvGoM7j9RAaAF5ZizwDUAtgYr5Pnzn8uRh5s`
 
 3. **Tokens**:
-   - ✅ BACK Mint: `5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27`
+   - ✅ BACK Mint: `862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux`
    - ✅ Supply: 1,000,000,000 BACK (9 decimals)
 
 4. **Frontend**:
@@ -64,13 +64,13 @@ Les états seront initialisés automatiquement lors de:
 1. Mettre à jour `declare_id!()` dans chaque programme:
    ```rust
    // programs/swapback_router/src/lib.rs
-   declare_id!("yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn");
+   declare_id!("GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt");
    
    // programs/swapback_buyback/src/lib.rs
-   declare_id!("DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi");
+   declare_id!("EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf");
    
    // programs/swapback_cnft/src/lib.rs
-   declare_id!("GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B");
+   declare_id!("9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw");
    ```
 
 2. Recompiler:
@@ -80,8 +80,8 @@ Les états seront initialisés automatiquement lors de:
 
 3. Upgrade les programmes:
    ```bash
-   solana program deploy target/deploy/swapback_router.so \
-     --program-id yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn
+    solana program deploy target/deploy/swapback_router.so \
+       --program-id GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt
    ```
 
 **Coût:** ~6.5 SOL (redéploiement complet)

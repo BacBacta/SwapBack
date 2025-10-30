@@ -106,7 +106,7 @@ NEXT_PUBLIC_SOLANA_RPC_URL=https://api.testnet.solana.com
 USE_MOCK_QUOTES=false
 
 # Program IDs (copier depuis votre .env.local actuel)
-NEXT_PUBLIC_ROUTER_PROGRAM_ID=yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn
+NEXT_PUBLIC_ROUTER_PROGRAM_ID=GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt
 # ... etc
 EOF
 
@@ -158,7 +158,7 @@ function generateMockQuote(...) {
     'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v_Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': 1.001,
     
     // BACK → USDC (votre token)
-    '5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27_EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 0.004,
+  '862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux_EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 0.004,
   };
   
   const pairKey = `${inputMint}_${outputMint}`;

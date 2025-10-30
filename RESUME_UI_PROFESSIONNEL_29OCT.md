@@ -466,10 +466,10 @@ Une application SwapBack qui inspire confiance, professionnalisme et modernité,
 - Lodash (utils)
 
 **Testnet Programs** (28 Oct 2025):
-- CNFT: `GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B`
-- Router: `yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn`
-- Buyback: `DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi`
-- BACK Token: `5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27`
+- CNFT: `9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw`
+- Router: `GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt`
+- Buyback: `EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf`
+- BACK Token: `862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux`
 
 **Network** : https://api.testnet.solana.com
 

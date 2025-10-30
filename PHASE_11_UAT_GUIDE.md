@@ -13,11 +13,11 @@
 **Budget alloué**: Airdrop SOL + tokens BACK/USDC pour chaque testeur
 
 ### 🔗 Adresses testnet déployées
-- **BACK Token**: `5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27`
+- **BACK Token**: `862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux`
 - **USDC Testnet**: `BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR`
-- **Router Program**: `yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn`
-- **Buyback Program**: `DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi`
-- **CNFT Program**: `GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B`
+- **Router Program**: `GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt`
+- **Buyback Program**: `EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf`
+- **CNFT Program**: `9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw`
 - **Merkle Tree**: `93Tzc7btocwzDSbscW9EfL9dBzWLx85FHE6zeWrwHbNT` (16,384 capacity)
 - **Collection Config**: `4zhpvzBMqvGoM7j9RAaAF5ZizwDUAtgYr5Pnzn8uRh5s`
 - **Deployer Wallet**: `3PiZ1xdHbPbj1UaPS8pfzKnHpmQQLfR8zrhy5RcksqAt` (5.49 SOL, 1B BACK)

@@ -35,10 +35,10 @@
 
 | Type | Ancien (Devnet) | Nouveau (Testnet) |
 |------|----------------|-------------------|
-| **BACK Token** | `BH8thpWca6kpN2pKwWTaKv2F5s4MEkbML18LtJ8eFypU` | `5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27` |
+| **BACK Token** | `BH8thpWca6kpN2pKwWTaKv2F5s4MEkbML18LtJ8eFypU` | `862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux` |
 | **USDC** | `3y4dCqwWuYx1B97YEDmgq9qjuNE1eyEwGx2eLgz6Rc6G` | `BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR` |
-| **Router** | `3Z295H9QHByYn9sHm3tH7ASHitwd2Y4AEaXUddfhQKap` | `yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn` |
-| **CNFT** | `FPNibu4RhrTt9yLDxcc8nQuHiVkFCfLVJ7DZUn6yn8K8` | `GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B` |
+| **Router** | `3Z295H9QHByYn9sHm3tH7ASHitwd2Y4AEaXUddfhQKap` | `GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt` |
+| **CNFT** | `FPNibu4RhrTt9yLDxcc8nQuHiVkFCfLVJ7DZUn6yn8K8` | `9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw` |
 
 ### Nouvelle Architecture
 
@@ -63,10 +63,10 @@ const BACK_TOKEN_MINT = new PublicKey("862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn
 **Après** :
 ```typescript
 const ROUTER_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn"
+  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
 );
 const BACK_TOKEN_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_BACK_MINT || "5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27"
+  process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
 );
 ```
 
@@ -81,10 +81,10 @@ const SWITCHBOARD_FEED = new PublicKey("GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtP
 **Après** :
 ```typescript
 const ROUTER_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn"
+  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
 );
 const BACK_TOKEN_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_BACK_MINT || "5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27"
+  process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
 );
 const SWITCHBOARD_FEED = new PublicKey(
   process.env.NEXT_PUBLIC_SWITCHBOARD_FEED || "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
@@ -102,13 +102,13 @@ const CNFT_PROGRAM_ID = new PublicKey('FPNibu4RhrTt9yLDxcc8nQuHiVkFCfLVJ7DZUn6yn
 **Après** :
 ```typescript
 const BACK_TOKEN_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_BACK_MINT || '5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27'
+  process.env.NEXT_PUBLIC_BACK_MINT || '862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux'
 );
 const ROUTER_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || 'yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn'
+  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || 'GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt'
 );
 const CNFT_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || 'GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B'
+  process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || '9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw'
 );
 ```
 
@@ -123,13 +123,13 @@ const CNFT_PROGRAM_ID = new PublicKey('FPNibu4RhrTt9yLDxcc8nQuHiVkFCfLVJ7DZUn6yn
 **Après** :
 ```typescript
 const BACK_TOKEN_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_BACK_MINT || '5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27'
+  process.env.NEXT_PUBLIC_BACK_MINT || '862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux'
 );
 const ROUTER_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || 'yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn'
+  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || 'GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt'
 );
 const CNFT_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || 'GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B'
+  process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || '9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw'
 );
 ```
 
@@ -148,7 +148,7 @@ const tokenAddresses: { [key: string]: string } = {
 ```typescript
 const tokenAddresses: { [key: string]: string } = {
   SOL: "So11111111111111111111111111111111111111112",
-  BACK: process.env.NEXT_PUBLIC_BACK_MINT || "5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27",
+  BACK: process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
   USDC: process.env.NEXT_PUBLIC_USDC_MINT || "BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR",
   // ...
 };
@@ -179,7 +179,7 @@ const POPULAR_TOKENS: Token[] = [
 const POPULAR_TOKENS: Token[] = [
   // ...
   {
-    address: process.env.NEXT_PUBLIC_BACK_MINT || "5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27",
+  address: process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
     symbol: "BACK",
     name: "SwapBack Token",
     // ...
@@ -210,7 +210,7 @@ const TOKEN_MINTS: Record<string, string> = {
   SOL: "So11111111111111111111111111111111111111112",
   USDC: process.env.NEXT_PUBLIC_USDC_MINT || "BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR",
   USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-  BACK: process.env.NEXT_PUBLIC_BACK_MINT || "5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27",
+  BACK: process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
 };
 ```
 
@@ -231,7 +231,7 @@ Fichier centralisé pour la configuration testnet :
 export const TESTNET_TOKENS = {
   BACK: {
     mint: new PublicKey(
-      process.env.NEXT_PUBLIC_BACK_MINT || "5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27"
+  process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
     ),
     symbol: "BACK",
     name: "SwapBack Token",
@@ -249,9 +249,9 @@ export const TESTNET_TOKENS = {
 };
 
 export const TESTNET_PROGRAM_IDS = {
-  CNFT: new PublicKey("GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B"),
-  ROUTER: new PublicKey("yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn"),
-  BUYBACK: new PublicKey("DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi"),
+  CNFT: new PublicKey("9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw"),
+  ROUTER: new PublicKey("GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"),
+  BUYBACK: new PublicKey("EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"),
 };
 
 export const TESTNET_INFRASTRUCTURE = {
@@ -337,12 +337,12 @@ NEXT_PUBLIC_SOLANA_NETWORK=testnet
 NEXT_PUBLIC_SOLANA_RPC_URL=https://api.testnet.solana.com
 
 # Programmes
-NEXT_PUBLIC_CNFT_PROGRAM_ID=GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B
-NEXT_PUBLIC_ROUTER_PROGRAM_ID=yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn
-NEXT_PUBLIC_BUYBACK_PROGRAM_ID=DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi
+NEXT_PUBLIC_CNFT_PROGRAM_ID=9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw
+NEXT_PUBLIC_ROUTER_PROGRAM_ID=GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt
+NEXT_PUBLIC_BUYBACK_PROGRAM_ID=EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf
 
 # Tokens
-NEXT_PUBLIC_BACK_MINT=5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27
+NEXT_PUBLIC_BACK_MINT=862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux
 NEXT_PUBLIC_USDC_MINT=BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR
 
 # Infrastructure
@@ -402,11 +402,11 @@ NEXT_PUBLIC_COLLECTION_CONFIG=4zhpvzBMqvGoM7j9RAaAF5ZizwDUAtgYr5Pnzn8uRh5s
 ```bash
 # 1. Vérifier les Program IDs dans la console browser
 console.log(process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID)
-# Doit afficher: yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn
+# Doit afficher: GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt
 
 # 2. Vérifier le token BACK
 console.log(process.env.NEXT_PUBLIC_BACK_MINT)
-# Doit afficher: 5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27
+# Doit afficher: 862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux
 
 # 3. Vérifier la connexion RPC
 fetch(process.env.NEXT_PUBLIC_SOLANA_RPC_URL, {

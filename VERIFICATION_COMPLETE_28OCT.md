@@ -33,9 +33,9 @@ const TESTNET_PROGRAM_IDS: ProgramIds = {
 
 // ✅ APRÈS
 const TESTNET_PROGRAM_IDS: ProgramIds = {
-  cnftProgram: new PublicKey('GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B'),
-  routerProgram: new PublicKey('yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn'),
-  buybackProgram: new PublicKey('DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi'),
+  cnftProgram: new PublicKey('9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw'),
+  routerProgram: new PublicKey('GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt'),
+  buybackProgram: new PublicKey('EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf'),
 };
 ```
 
@@ -51,13 +51,13 @@ const PROGRAM_IDS = {
 // ✅ APRÈS - Utilise les variables d'environnement
 const PROGRAM_IDS = {
   swapback_cnft: new PublicKey(
-    process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B"
+    process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw"
   ),
   swapback_router: new PublicKey(
-    process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn"
+    process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
   ),
   swapback_buyback: new PublicKey(
-    process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || "DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi"
+    process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"
   ),
 };
 ```
@@ -70,10 +70,10 @@ const ROUTER_PROGRAM_ID = new PublicKey('FPK46poe53iX6Bcv3q8cgmc1jm7dJKQ9Qs9oESF
 
 // ✅ APRÈS - Utilise les variables d'environnement
 const CNFT_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || 'GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B'
+  process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || '9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw'
 );
 const ROUTER_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || 'yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn'
+  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || 'GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt'
 );
 ```
 
@@ -83,10 +83,10 @@ const ROUTER_PROGRAM_ID = new PublicKey(
 
 | Programme | Adresse Testnet | Taille | Status |
 |-----------|----------------|--------|--------|
-| **CNFT** | `GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B` | 260 KB | ✅ Déployé |
-| **Router** | `yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn` | 306 KB | ✅ Déployé |
-| **Buyback** | `DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi` | 365 KB | ✅ Déployé |
-| **BACK Token** | `5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27` | 1B supply | ✅ Créé |
+| **CNFT** | `9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw` | 260 KB | ✅ Déployé |
+| **Router** | `GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt` | 306 KB | ✅ Déployé |
+| **Buyback** | `EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf` | 365 KB | ✅ Déployé |
+| **BACK Token** | `862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux` | 1B supply | ✅ Créé |
 | **USDC (Testnet)** | `BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR` | - | ✅ Standard |
 | **Merkle Tree** | `93Tzc7btocwzDSbscW9EfL9dBzWLx85FHE6zeWrwHbNT` | - | ✅ Initialisé |
 | **Collection Config** | `4zhpvzBMqvGoM7j9RAaAF5ZizwDUAtgYr5Pnzn8uRh5s` | - | ✅ Configuré |
@@ -103,9 +103,9 @@ const ROUTER_PROGRAM_ID = new PublicKey(
 fix(config): Update testnet Program IDs in programIds.ts
 
 ✅ Correction critique pour le déploiement Vercel
-- CNFT: GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B
-- Router: yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn
-- Buyback: DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi
+- CNFT: 9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw
+- Router: GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt
+- Buyback: EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf
 ```
 
 ### Commit 2: `3efd8b7` - Fix React Hooks
@@ -131,10 +131,10 @@ Toutes les variables suivantes sont configurées dans `vercel.json` :
   "env": {
     "NEXT_PUBLIC_SOLANA_NETWORK": "testnet",
     "NEXT_PUBLIC_SOLANA_RPC_URL": "https://api.testnet.solana.com",
-    "NEXT_PUBLIC_ROUTER_PROGRAM_ID": "yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn",
-    "NEXT_PUBLIC_BUYBACK_PROGRAM_ID": "DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi",
-    "NEXT_PUBLIC_CNFT_PROGRAM_ID": "GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B",
-    "NEXT_PUBLIC_BACK_MINT": "5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27",
+  "NEXT_PUBLIC_ROUTER_PROGRAM_ID": "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt",
+  "NEXT_PUBLIC_BUYBACK_PROGRAM_ID": "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf",
+  "NEXT_PUBLIC_CNFT_PROGRAM_ID": "9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw",
+  "NEXT_PUBLIC_BACK_MINT": "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
     "NEXT_PUBLIC_USDC_MINT": "BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR",
     "NEXT_PUBLIC_MERKLE_TREE": "93Tzc7btocwzDSbscW9EfL9dBzWLx85FHE6zeWrwHbNT",
     "NEXT_PUBLIC_COLLECTION_CONFIG": "4zhpvzBMqvGoM7j9RAaAF5ZizwDUAtgYr5Pnzn8uRh5s"
@@ -146,16 +146,16 @@ Toutes les variables suivantes sont configurées dans `vercel.json` :
 
 ```bash
 # Vérifier CNFT Program
-solana program show GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B -u testnet
+solana program show 9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw -u testnet
 
 # Vérifier Router Program
-solana program show yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn -u testnet
+solana program show GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt -u testnet
 
 # Vérifier Buyback Program
-solana program show DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi -u testnet
+solana program show EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf -u testnet
 
 # Vérifier BACK Token
-spl-token display 5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27 -u testnet
+spl-token display 862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux -u testnet
 ```
 
 ---
@@ -217,12 +217,12 @@ spl-token display 5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27 -u testnet
 ### Validation On-Chain
 ```bash
 # 1. Vérifier les programmes existent
-solana program show GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B -u testnet
-solana program show yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn -u testnet
-solana program show DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi -u testnet
+solana program show 9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw -u testnet
+solana program show GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt -u testnet
+solana program show EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf -u testnet
 
 # 2. Vérifier le token BACK
-spl-token display 5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27 -u testnet
+spl-token display 862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux -u testnet
 
 # 3. Vérifier le Merkle Tree
 solana account 93Tzc7btocwzDSbscW9EfL9dBzWLx85FHE6zeWrwHbNT -u testnet

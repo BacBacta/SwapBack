@@ -40,9 +40,9 @@ const TESTNET_PROGRAM_IDS: ProgramIds = {
  * Coût total: ~6.5 SOL
  */
 const TESTNET_PROGRAM_IDS: ProgramIds = {
-  cnftProgram: new PublicKey('GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B'),
-  routerProgram: new PublicKey('yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn'),
-  buybackProgram: new PublicKey('DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi'),
+  cnftProgram: new PublicKey('9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw'),
+  routerProgram: new PublicKey('GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt'),
+  buybackProgram: new PublicKey('EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf'),
 };
 ```
 
@@ -50,10 +50,10 @@ const TESTNET_PROGRAM_IDS: ProgramIds = {
 
 | Programme | Adresse | Taille |
 |-----------|---------|--------|
-| **CNFT** | `GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B` | 260 KB |
-| **Router** | `yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn` | 306 KB |
-| **Buyback** | `DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi` | 365 KB |
-| **BACK Token** | `5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27` | 1B supply |
+| **CNFT** | `9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw` | 260 KB |
+| **Router** | `GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt` | 306 KB |
+| **Buyback** | `EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf` | 365 KB |
+| **BACK Token** | `862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux` | 1B supply |
 | **USDC (Testnet)** | `BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR` | - |
 | **Merkle Tree** | `93Tzc7btocwzDSbscW9EfL9dBzWLx85FHE6zeWrwHbNT` | - |
 | **Collection Config** | `4zhpvzBMqvGoM7j9RAaAF5ZizwDUAtgYr5Pnzn8uRh5s` | - |
@@ -69,10 +69,10 @@ Author: SwapBack Bot <bot@swapback.dev>
 fix(config): Update testnet Program IDs in programIds.ts
 
 ✅ Correction critique pour le déploiement Vercel
-- CNFT: GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B
-- Router: yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn
-- Buyback: DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi
-- BACK Mint: 5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27
+- CNFT: 9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw
+- Router: GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt
+- Buyback: EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf
+- BACK Mint: 862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux
 ```
 
 ### Vercel Redéploiement
@@ -96,12 +96,12 @@ fix(config): Update testnet Program IDs in programIds.ts
 
 ```bash
 # Vérifier que les programmes existent sur testnet
-solana program show GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B -u testnet
-solana program show yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn -u testnet
-solana program show DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi -u testnet
+solana program show 9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw -u testnet
+solana program show GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt -u testnet
+solana program show EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf -u testnet
 
 # Vérifier le token BACK
-spl-token display 5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27 -u testnet
+spl-token display 862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux -u testnet
 ```
 
 ## 📊 Impact

@@ -71,10 +71,10 @@ Correction systématique de **11 fichiers critiques** pour assurer la cohérence
   - BACK TOKEN: `nKnrana1TdBHZGmVbNkpN1Dazj8285VftqCnkHCG8sh`
 
 - **Après** (testnet - déployées 28 Oct 2025):
-  - ROUTER: `yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn`
-  - BUYBACK: `DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi`
-  - CNFT: `GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B`
-  - BACK TOKEN: `5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27`
+  - ROUTER: `GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt`
+  - BUYBACK: `EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf`
+  - CNFT: `9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw`
+  - BACK TOKEN: `862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux`
 
 - **Impact**: 🔥 **MAJEUR** - Correction des adresses permettant l'interaction avec les vrais programmes testnet
 
@@ -137,7 +137,7 @@ Correction systématique de **11 fichiers critiques** pour assurer la cohérence
   ```typescript
   // Sur testnet, on utilise des prix simulés
   const testnetPrices = {
-    "5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27": 0.001, // $BACK testnet
+    "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux": 0.001, // $BACK testnet
   };
   ```
 - **Impact**: Prix affichés correspondent au vrai token BACK testnet
@@ -152,10 +152,10 @@ Correction systématique de **11 fichiers critiques** pour assurer la cohérence
 ```bash
 NEXT_PUBLIC_SOLANA_NETWORK=testnet
 NEXT_PUBLIC_SOLANA_RPC_URL=https://api.testnet.solana.com
-NEXT_PUBLIC_ROUTER_PROGRAM_ID=yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn
-NEXT_PUBLIC_BUYBACK_PROGRAM_ID=DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi
-NEXT_PUBLIC_CNFT_PROGRAM_ID=GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B
-NEXT_PUBLIC_BACK_MINT=5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27
+NEXT_PUBLIC_ROUTER_PROGRAM_ID=GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt
+NEXT_PUBLIC_BUYBACK_PROGRAM_ID=EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf
+NEXT_PUBLIC_CNFT_PROGRAM_ID=9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw
+NEXT_PUBLIC_BACK_MINT=862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux
 ```
 
 #### `vercel.json` ✅
@@ -164,7 +164,7 @@ NEXT_PUBLIC_BACK_MINT=5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27
   "env": {
     "NEXT_PUBLIC_SOLANA_NETWORK": "testnet",
     "NEXT_PUBLIC_SOLANA_RPC_URL": "https://api.testnet.solana.com",
-    "NEXT_PUBLIC_ROUTER_PROGRAM_ID": "yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn",
+    "NEXT_PUBLIC_ROUTER_PROGRAM_ID": "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt",
     ...
   }
 }
@@ -176,14 +176,14 @@ NEXT_PUBLIC_BACK_MINT=5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27
 
 ### Programmes (Déployés 28 Oct 2025)
 ```
-CNFT Program:    GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B
-Router Program:  yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn
-Buyback Program: DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi
+CNFT Program:    9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw
+Router Program:  GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt
+Buyback Program: EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf
 ```
 
 ### Tokens
 ```
-BACK Token: 5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27
+BACK Token: 862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux
 USDC Test:  BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR
 ```
 

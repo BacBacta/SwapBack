@@ -33,10 +33,10 @@ node initialize-testnet-states.js
 ## 📋 Checklist Complète
 
 ### Infrastructure (100% ✅)
-- [x] CNFT Program déployé: `GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B`
-- [x] Router Program déployé: `yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn`
-- [x] Buyback Program déployé: `DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi`
-- [x] Token BACK créé: `5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27` (1B supply)
+- [x] CNFT Program déployé: `9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw`
+- [x] Router Program déployé: `GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt`
+- [x] Buyback Program déployé: `EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf`
+- [x] Token BACK créé: `862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux` (1B supply)
 - [x] Merkle Tree créé: `93Tzc7btocwzDSbscW9EfL9dBzWLx85FHE6zeWrwHbNT` (16K)
 - [x] Collection Config: `4zhpvzBMqvGoM7j9RAaAF5ZizwDUAtgYr5Pnzn8uRh5s`
 - [x] Frontend .env.testnet configuré
@@ -81,8 +81,8 @@ node initialize-testnet-states.js
 
 ### Programmes
 - **Explorer**: https://explorer.solana.com/?cluster=testnet
-- **Router**: https://explorer.solana.com/address/yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn?cluster=testnet
-- **BACK Token**: https://explorer.solana.com/address/5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27?cluster=testnet
+- **Router**: https://explorer.solana.com/address/GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt?cluster=testnet
+- **BACK Token**: https://explorer.solana.com/address/862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux?cluster=testnet
 
 ### Documentation
 - **Rapport complet**: `TESTNET_DEPLOYMENT_REPORT.md`

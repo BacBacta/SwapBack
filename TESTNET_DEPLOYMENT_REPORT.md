@@ -28,7 +28,7 @@ SwapBack a été déployé avec succès sur le testnet Solana avec les fees les 
 ### 📦 Programmes Solana
 
 #### 1. CNFT Program
-- **Program ID**: `GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B`
+- **Program ID**: `9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw`
 - **Taille**: 260,256 bytes (254 KB)
 - **Owner**: BPFLoaderUpgradeab1e11111111111111111111111
 - **ProgramData**: `FfKteELvshn8yJiTCnfdgnQpQiweuJs5JAr93PP59sdD`
@@ -36,7 +36,7 @@ SwapBack a été déployé avec succès sur le testnet Solana avec les fees les 
 - **Status**: ✅ Déployé et vérifiable
 
 #### 2. Router Program
-- **Program ID**: `yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn`
+- **Program ID**: `GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt`
 - **Taille**: 306,856 bytes (300 KB)
 - **Owner**: BPFLoaderUpgradeab1e11111111111111111111111
 - **ProgramData**: `5WQi66Fn6wDjmmdnR8mFCNKn4RXGxKXC59AESEWPNJga`
@@ -45,7 +45,7 @@ SwapBack a été déployé avec succès sur le testnet Solana avec les fees les 
 - **Status**: ✅ Déployé et vérifiable
 
 #### 3. Buyback Program
-- **Program ID**: `DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi`
+- **Program ID**: `EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf`
 - **Taille**: 365,232 bytes (357 KB)
 - **Owner**: BPFLoaderUpgradeab1e11111111111111111111111
 - **ProgramData**: `3mHzoqqAfxDPfWKgTSmgCPgZiRwUZHJ2MpgQeKFEJxe3`
@@ -58,7 +58,7 @@ SwapBack a été déployé avec succès sur le testnet Solana avec les fees les 
 ### 🪙 Tokens
 
 #### BACK Token
-- **Mint Address**: `5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27`
+- **Mint Address**: `862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux`
 - **Program**: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA (SPL Token)
 - **Decimals**: 9
 - **Supply Initiale**: 1,000,000,000 BACK (1 milliard)
@@ -149,12 +149,12 @@ NEXT_PUBLIC_SOLANA_NETWORK=testnet
 NEXT_PUBLIC_SOLANA_RPC_URL=https://api.testnet.solana.com
 
 # Program IDs
-NEXT_PUBLIC_ROUTER_PROGRAM_ID=yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn
-NEXT_PUBLIC_BUYBACK_PROGRAM_ID=DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi
-NEXT_PUBLIC_CNFT_PROGRAM_ID=GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B
+NEXT_PUBLIC_ROUTER_PROGRAM_ID=GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt
+NEXT_PUBLIC_BUYBACK_PROGRAM_ID=EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf
+NEXT_PUBLIC_CNFT_PROGRAM_ID=9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw
 
 # Tokens
-NEXT_PUBLIC_BACK_MINT=5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27
+NEXT_PUBLIC_BACK_MINT=862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux
 NEXT_PUBLIC_USDC_MINT=BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR
 
 # Infrastructure
@@ -167,9 +167,9 @@ NEXT_PUBLIC_PLATFORM_FEE_PERCENT=0.20
 ```
 
 ### IDLs Mis à Jour
-- ✅ `app/public/idl/swapback_router.json` (Program ID: yeKoCvF...)
-- ✅ `app/public/idl/swapback_buyback.json` (Program ID: DkaELUi...)
-- ✅ `app/public/idl/swapback_cnft.json` (Program ID: GFnJ59Q...)
+- ✅ `app/public/idl/swapback_router.json` (Program ID: GTNyqcg...)
+- ✅ `app/public/idl/swapback_buyback.json` (Program ID: EoVjmAL...)
+- ✅ `app/public/idl/swapback_cnft.json` (Program ID: 9MjuF4V...)
 
 ---
 
@@ -213,13 +213,13 @@ NEXT_PUBLIC_PLATFORM_FEE_PERCENT=0.20
 
 ```bash
 # Programmes
-solana program show GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B  # CNFT
-solana program show yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn  # Router
-solana program show DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi  # Buyback
+solana program show 9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw  # CNFT
+solana program show GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt  # Router
+solana program show EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf  # Buyback
 
 # Token BACK
-spl-token display 5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27
-spl-token balance 5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27
+spl-token display 862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux
+spl-token balance 862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux
 
 # Merkle Tree
 solana account 93Tzc7btocwzDSbscW9EfL9dBzWLx85FHE6zeWrwHbNT
@@ -240,12 +240,12 @@ solana balance 3PiZ1xdHbPbj1UaPS8pfzKnHpmQQLfR8zrhy5RcksqAt
 ### Liens Directs
 
 **Programmes**:
-- CNFT: https://explorer.solana.com/address/GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B?cluster=testnet
-- Router: https://explorer.solana.com/address/yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn?cluster=testnet
-- Buyback: https://explorer.solana.com/address/DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi?cluster=testnet
+- CNFT: https://explorer.solana.com/address/9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw?cluster=testnet
+- Router: https://explorer.solana.com/address/GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt?cluster=testnet
+- Buyback: https://explorer.solana.com/address/EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf?cluster=testnet
 
 **Token BACK**:
-- Mint: https://explorer.solana.com/address/5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27?cluster=testnet
+- Mint: https://explorer.solana.com/address/862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux?cluster=testnet
 
 **Infrastructure**:
 - Merkle Tree: https://explorer.solana.com/address/93Tzc7btocwzDSbscW9EfL9dBzWLx85FHE6zeWrwHbNT?cluster=testnet
@@ -393,8 +393,8 @@ solana balance 3PiZ1xdHbPbj1UaPS8pfzKnHpmQQLfR8zrhy5RcksqAt
 
 | Aspect | Devnet | Testnet |
 |--------|--------|---------|
-| Program IDs | GTNyq..., EoVjm..., 9MjuF... | yeKoCvF..., DkaELUi..., GFnJ59Q... |
-| BACK Mint | TokenkegQ... (pas créé) | 5UpRMH1... ✅ |
+| Program IDs | 3Z295..., 71vAL..., CxBwd... | GTNyq..., EoVjm..., 9MjuF... |
+| BACK Mint | BH8thp... (devnet legacy) | 862PQyz... ✅ |
 | États | Tous initialisés ✅ | À initialiser ⏸️ |
 | Merkle Tree | UKwWE... | 93Tzc7b... |
 | Budget utilisé | 0.267 SOL | ~6.5 SOL |

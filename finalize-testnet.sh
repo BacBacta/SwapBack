@@ -14,9 +14,9 @@ echo ""
 export ANCHOR_WALLET=$HOME/.config/solana/id.json
 export ANCHOR_PROVIDER_URL=https://api.testnet.solana.com
 
-ROUTER_PROGRAM="yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn"
-BUYBACK_PROGRAM="DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi"
-BACK_MINT="5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27"
+ROUTER_PROGRAM="GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
+BUYBACK_PROGRAM="EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"
+BACK_MINT="862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
 USDC_MOCK="BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR"
 
 echo "📊 Configuration:"
@@ -66,9 +66,9 @@ describe("init-testnet", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
-  const ROUTER_PROGRAM_ID = new PublicKey("yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn");
-  const BUYBACK_PROGRAM_ID = new PublicKey("DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi");
-  const BACK_MINT = new PublicKey("5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27");
+  const ROUTER_PROGRAM_ID = new PublicKey("GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt");
+  const BUYBACK_PROGRAM_ID = new PublicKey("EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf");
+  const BACK_MINT = new PublicKey("862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux");
   const USDC_MOCK = new PublicKey("BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR");
 
   it("Initialize all states", async () => {

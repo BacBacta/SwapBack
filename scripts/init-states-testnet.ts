@@ -6,9 +6,9 @@ import * as path from "path";
 
 // Configuration
 const RPC_URL = "https://api.testnet.solana.com";
-const ROUTER_PROGRAM_ID = "yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn";
-const BUYBACK_PROGRAM_ID = "DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi";
-const BACK_MINT = "5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27";
+const ROUTER_PROGRAM_ID = "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt";
+const BUYBACK_PROGRAM_ID = "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf";
+const BACK_MINT = "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux";
 const USDC_MOCK = "BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR";
 
 async function loadKeypair(): Promise<Keypair> {

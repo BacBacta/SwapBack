@@ -69,17 +69,17 @@ vercel env add NEXT_PUBLIC_SOLANA_RPC_URL
 
 # Program IDs
 vercel env add NEXT_PUBLIC_ROUTER_PROGRAM_ID
-# Entrer: yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn
+# Entrer: GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt
 
 vercel env add NEXT_PUBLIC_BUYBACK_PROGRAM_ID
-# Entrer: DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi
+# Entrer: EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf
 
 vercel env add NEXT_PUBLIC_CNFT_PROGRAM_ID
-# Entrer: GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B
+# Entrer: 9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw
 
 # Tokens
 vercel env add NEXT_PUBLIC_BACK_MINT
-# Entrer: 5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27
+# Entrer: 862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux
 
 vercel env add NEXT_PUBLIC_USDC_MINT
 # Entrer: BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR
@@ -159,10 +159,10 @@ Dans "Environment Variables", ajouter:
 | `USE_MOCK_QUOTES` | `false` | Production |
 | `NEXT_PUBLIC_SOLANA_NETWORK` | `testnet` | Production |
 | `NEXT_PUBLIC_SOLANA_RPC_URL` | `https://api.testnet.solana.com` | Production |
-| `NEXT_PUBLIC_ROUTER_PROGRAM_ID` | `yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn` | Production |
-| `NEXT_PUBLIC_BUYBACK_PROGRAM_ID` | `DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi` | Production |
-| `NEXT_PUBLIC_CNFT_PROGRAM_ID` | `GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B` | Production |
-| `NEXT_PUBLIC_BACK_MINT` | `5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27` | Production |
+| `NEXT_PUBLIC_ROUTER_PROGRAM_ID` | `GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt` | Production |
+| `NEXT_PUBLIC_BUYBACK_PROGRAM_ID` | `EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf` | Production |
+| `NEXT_PUBLIC_CNFT_PROGRAM_ID` | `9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw` | Production |
+| `NEXT_PUBLIC_BACK_MINT` | `862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux` | Production |
 | `NEXT_PUBLIC_USDC_MINT` | `BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR` | Production |
 | `NEXT_PUBLIC_PLATFORM_FEE_PERCENT` | `0.20` | Production |
 
