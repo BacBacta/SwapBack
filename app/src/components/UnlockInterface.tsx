@@ -2,42 +2,18 @@
 
 import React, { useState, useMemo } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
-import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token';
+import { createUnlockTransaction } from '@/lib/cnft';
 import { useCNFT } from '../hooks/useCNFT';
 
-// CNFTLevel type with extended tiers
-type CNFTLevel = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond';
-
-// Configuration - Utilise les variables d'environnement
-const BACK_TOKEN_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_BACK_MINT || '5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27'
-);
-const ROUTER_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || 'yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn'
-);
-const CNFT_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || 'GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B'
-);
-
-// Dynamic boost calculation function
-const calculateDynamicBoost = (amount: number, durationDays: number): number => {
-  // Amount score: max 50% (100,000 tokens = 50%)
-  const amountScore = Math.min((amount / 1000) * 0.5, 50);
-  
-  // Duration score: max 50% (500 days = 50%)
-  const durationScore = Math.min((durationDays / 10) * 1, 50);
-  
-  // Total boost: max 100%
-  return Math.min(amountScore + durationScore, 100);
-};
+type ExtendedCNFTLevel = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond';
 
 interface UnlockInterfaceProps {
   onUnlockSuccess?: () => void;
 }
 
 export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInterfaceProps>) {
-  const { publicKey, sendTransaction } = useWallet();
+  const wallet = useWallet();
+  const { publicKey, sendTransaction } = wallet;
   const { connection } = useConnection();
   const { cnftData, lockData, isLoading: isCNFTLoading, levelName, refresh } = useCNFT();
 
@@ -70,7 +46,9 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
 
   // Couleur du badge selon le niveau
   const levelColor = useMemo(() => {
-    switch (levelName) {
+    const normalizedLevel = levelName as ExtendedCNFTLevel | null;
+
+    switch (normalizedLevel) {
       case 'Diamond':
         return 'text-cyan-400 border-cyan-400 bg-cyan-400/10';
       case 'Platinum':
@@ -151,65 +129,8 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
     setSuccess(null);
 
     try {
-      // Dériver les PDAs
-      const [userStatePda] = PublicKey.findProgramAddressSync(
-        [Buffer.from('user_state'), publicKey.toBuffer()],
-        ROUTER_PROGRAM_ID
-      );
+  const transaction = await createUnlockTransaction(connection, wallet);
 
-      const [userNftPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from('user_nft'), publicKey.toBuffer()],
-        CNFT_PROGRAM_ID
-      );
-
-      const [lockStatePda] = PublicKey.findProgramAddressSync(
-        [Buffer.from('lock_state'), publicKey.toBuffer()],
-        CNFT_PROGRAM_ID
-      );
-
-      // Obtenir l'ATA de l'utilisateur pour $BACK
-      const userTokenAccount = await getAssociatedTokenAddress(
-        BACK_TOKEN_MINT,
-        publicKey
-      );
-
-      // Obtenir l'ATA du vault
-      const [vaultPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from('vault')],
-        ROUTER_PROGRAM_ID
-      );
-
-      const vaultTokenAccount = await getAssociatedTokenAddress(
-        BACK_TOKEN_MINT,
-        vaultPda,
-        true // allowOwnerOffCurve
-      );
-
-      // Créer l'instruction unlock_back
-      // Note: Ceci est une simulation, l'IDL réel du programme serait nécessaire
-      const instruction = {
-        programId: ROUTER_PROGRAM_ID,
-        keys: [
-          { pubkey: publicKey, isSigner: true, isWritable: true },
-          { pubkey: userStatePda, isSigner: false, isWritable: true },
-          { pubkey: userTokenAccount, isSigner: false, isWritable: true },
-          { pubkey: vaultTokenAccount, isSigner: false, isWritable: true },
-          { pubkey: vaultPda, isSigner: false, isWritable: false },
-          { pubkey: BACK_TOKEN_MINT, isSigner: false, isWritable: false },
-          { pubkey: userNftPda, isSigner: false, isWritable: true },
-          { pubkey: lockStatePda, isSigner: false, isWritable: true },
-          { pubkey: CNFT_PROGRAM_ID, isSigner: false, isWritable: false },
-          { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-        ],
-        data: Buffer.from([
-          0x02, // Instruction discriminator pour unlock_back (à déterminer selon l'IDL)
-        ]),
-      };
-
-      const transaction = new Transaction().add(instruction as any);
-
-      // Envoyer la transaction
       const signature = await sendTransaction(transaction, connection);
 
       // Attendre la confirmation
@@ -233,11 +154,10 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
       setTimeout(() => {
         refresh();
       }, 2000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error during unlock:', err);
-      setError(
-        err.message || 'Unlock failed. Please try again.'
-      );
+      const message = err instanceof Error ? err.message : 'Unlock failed. Please try again.';
+      setError(message);
     } finally {
       setIsUnlocking(false);
     }

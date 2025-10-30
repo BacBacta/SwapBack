@@ -1,13 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { useState, useEffect, useCallback } from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { ArrowDownUp, Settings, TrendingUp, Zap, Info, ChevronDown } from "lucide-react";
-import { useBlockchainTracer } from "../hooks/useBlockchainTracer";
 import { useTokenData } from "../hooks/useTokenData";
-import { useJupiter } from "../hooks/useJupiter";
 import { TokenSelector } from "./TokenSelector";
-import type { JupiterQuote } from "@swapback/sdk";
 
 interface RouteStep {
   label: string;
@@ -41,16 +38,6 @@ interface RouteOption {
 
 export const SwapInterface = () => {
   const { connected, publicKey } = useWallet();
-  const { connection } = useConnection();
-  const jupiter = useJupiter();
-
-  const {
-    traceSwap,
-    operations,
-    loading: tracerLoading,
-    error: tracerError,
-    statistics,
-  } = useBlockchainTracer();
 
   const [inputAmount, setInputAmount] = useState("");
   const [outputAmount, setOutputAmount] = useState("");
@@ -60,7 +47,6 @@ export const SwapInterface = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [loading, setLoading] = useState(false);
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
-  const [jupiterQuote, setJupiterQuote] = useState<JupiterQuote | null>(null);
   const [selectedRouter, setSelectedRouter] = useState<"swapback" | "jupiter">("swapback");
   const [showInputTokenSelector, setShowInputTokenSelector] = useState(false);
   const [showOutputTokenSelector, setShowOutputTokenSelector] = useState(false);
@@ -70,44 +56,20 @@ export const SwapInterface = () => {
   const [routeOptions, setRouteOptions] = useState<RouteOption[]>([]);
   const [showRouteComparison, setShowRouteComparison] = useState(false);
   const [showPriceImpactModal, setShowPriceImpactModal] = useState(false);
-  const [pendingSwap, setPendingSwap] = useState(false);
 
   const tokenAddresses: { [key: string]: string } = {
     SOL: "So11111111111111111111111111111111111111112",
-    BACK: process.env.NEXT_PUBLIC_BACK_MINT || "5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27",
+  BACK: process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
     USDC: process.env.NEXT_PUBLIC_USDC_MINT || "BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR",
     BONK: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
     USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
   };
 
-  const tokenDecimals: { [key: string]: number } = {
-    SOL: 9,
-    BACK: 9,
-    USDC: 6,
-    USDT: 6,
-    BONK: 5,
-  };
 
   const inputTokenData = useTokenData(tokenAddresses[inputToken]);
   const outputTokenData = useTokenData(tokenAddresses[outputToken]);
 
-  // Simulate price calculation with debounce
-  useEffect(() => {
-    if (!inputAmount || inputAmount === "" || parseFloat(inputAmount) <= 0) {
-      setOutputAmount("");
-      setRouteInfo(null);
-      setJupiterQuote(null);
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      simulateQuote();
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [inputAmount, inputToken, outputToken, selectedRouter]);
-
-  const simulateQuote = async () => {
+  const simulateQuote = useCallback(async () => {
     setLoading(true);
     try {
       await new Promise(resolve => setTimeout(resolve, 800));
@@ -168,7 +130,22 @@ export const SwapInterface = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [inputAmount]);
+
+  // Simulate price calculation with debounce
+  useEffect(() => {
+    if (!inputAmount || inputAmount === "" || parseFloat(inputAmount) <= 0) {
+      setOutputAmount("");
+      setRouteInfo(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      simulateQuote();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [inputAmount, simulateQuote]);
 
   const handleSwapTokens = () => {
     const tempToken = inputToken;
@@ -192,7 +169,6 @@ export const SwapInterface = () => {
     // Check price impact and show warning modal if > 3%
     if (routeInfo && routeInfo.priceImpact && routeInfo.priceImpact > 3) {
       setShowPriceImpactModal(true);
-      setPendingSwap(true);
       return;
     }
     
@@ -213,7 +189,6 @@ export const SwapInterface = () => {
       setOutputAmount("");
       setRouteInfo(null);
       setShowPriceImpactModal(false);
-      setPendingSwap(false);
     } catch (error) {
       console.error("Error:", error);
     } finally {
@@ -733,7 +708,6 @@ export const SwapInterface = () => {
               <button
                 onClick={() => {
                   setShowPriceImpactModal(false);
-                  setPendingSwap(false);
                 }}
                 className="flex-1 py-3 px-4 bg-black border-2 border-[var(--primary)] text-[var(--primary)] font-bold terminal-text uppercase tracking-wider hover:bg-[var(--primary)] hover:text-black transition-all"
               >

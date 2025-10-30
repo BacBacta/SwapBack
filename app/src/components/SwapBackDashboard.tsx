@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
+import { BN } from "@coral-xyz/anchor";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 
 // ============================
@@ -11,39 +11,12 @@ import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 // ============================
 
 const ROUTER_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn"
+  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
 );
 
 const BACK_TOKEN_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_BACK_MINT || "5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27"
+  process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
 );
-
-// Minimal IDL
-const ROUTER_IDL = {
-  version: "0.1.0",
-  name: "swapback_router",
-  instructions: [],
-  accounts: [
-    {
-      name: "DcaPlan",
-      type: {
-        kind: "struct",
-        fields: [
-          { name: "authority", type: "publicKey" },
-          { name: "inputAmount", type: "u64" },
-          { name: "amountSwapped", type: "u64" },
-          { name: "destinationToken", type: "publicKey" },
-          { name: "dcaInterval", type: "i64" },
-          { name: "numberOfSwaps", type: "u64" },
-          { name: "swapsExecuted", type: "u64" },
-          { name: "lastSwapTime", type: "i64" },
-          { name: "minOutputAmount", type: "u64" },
-          { name: "isPaused", type: "bool" },
-        ],
-      },
-    },
-  ],
-};
 
 // ============================
 // 🎨 TYPE DEFINITIONS
@@ -71,7 +44,7 @@ interface DcaPlan {
 
 export const SwapBackDashboard = () => {
   const { connection } = useConnection();
-  const { publicKey, connected, sendTransaction } = useWallet();
+  const { publicKey, connected } = useWallet();
 
   const [plans, setPlans] = useState<DcaPlan[]>([]);
   const [loading, setLoading] = useState(false);
@@ -92,23 +65,6 @@ export const SwapBackDashboard = () => {
       setError(null);
 
       try {
-        // Créer le provider
-        const provider = new AnchorProvider(
-          connection,
-          {
-            publicKey,
-            signTransaction: async (tx) => tx,
-            signAllTransactions: async (txs) => txs,
-          },
-          { commitment: "confirmed" }
-        );
-
-        // Charger le programme
-        const program = new Program(
-          ROUTER_IDL as any,
-          provider
-        );
-
         // Récupérer tous les plans DCA via getProgramAccounts
         // Discriminator pour DcaPlan = premiers 8 bytes du hash SHA256 de "account:DcaPlan"
         const accounts = await connection.getProgramAccounts(
@@ -179,9 +135,10 @@ export const SwapBackDashboard = () => {
         }
 
         setPlans(parsedPlans);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("❌ Erreur chargement plans:", err);
-        setError(err.message || "Erreur lors du chargement des plans");
+        const message = err instanceof Error ? err.message : "Erreur lors du chargement des plans";
+        setError(message);
       } finally {
         setLoading(false);
       }

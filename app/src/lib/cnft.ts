@@ -3,14 +3,41 @@ import {
   PublicKey,
   Transaction,
   SystemProgram,
+  TransactionInstruction,
 } from "@solana/web3.js";
-import { AnchorProvider, Program, web3 } from "@coral-xyz/anchor";
 import { WalletContextState } from "@solana/wallet-adapter-react";
+import { BN } from "@coral-xyz/anchor";
+import type { Idl } from "@coral-xyz/anchor";
+import cnftIdl from "@/../public/idl/swapback_cnft.json";
 
 // Program ID du programme swapback_cnft déployé
 export const CNFT_PROGRAM_ID = new PublicKey(
-  "CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH"
+  process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID ||
+    "9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw"
 );
+
+type AnchorInstruction = {
+  name: string;
+  discriminator?: number[];
+};
+
+type AnchorIdl = Idl & {
+  instructions: AnchorInstruction[];
+};
+
+const CNFT_IDL = cnftIdl as AnchorIdl;
+
+const getInstructionDiscriminator = (name: string): Buffer => {
+  const instruction = CNFT_IDL.instructions.find((ix) => ix.name === name);
+  if (!instruction?.discriminator) {
+    throw new Error(`Missing discriminator for instruction ${name} in swapback_cnft IDL`);
+  }
+  return Buffer.from(instruction.discriminator);
+};
+
+const MINT_LEVEL_NFT_DISCRIMINATOR = getInstructionDiscriminator("mint_level_nft");
+const UPDATE_NFT_STATUS_DISCRIMINATOR = getInstructionDiscriminator("update_nft_status");
+const LAMPORTS_PER_BACK = 1_000_000_000;
 
 export enum LockLevel {
   Bronze = "Bronze",
@@ -20,15 +47,13 @@ export enum LockLevel {
   Diamond = "Diamond",
 }
 
-export interface CNFTData {
-  user: PublicKey;
-  level: LockLevel;
-  amountLocked: number;
-  lockDuration: number;
-  mintTime: number;
-  isActive: boolean;
-  bump: number;
-}
+const LOCK_LEVEL_VARIANTS: LockLevel[] = [
+  LockLevel.Bronze,
+  LockLevel.Silver,
+  LockLevel.Gold,
+  LockLevel.Platinum,
+  LockLevel.Diamond,
+];
 
 export interface CNFTLockParams {
   amount: number;
@@ -94,6 +119,13 @@ export function getCollectionConfigPDA(): [PublicKey, number] {
   );
 }
 
+export function getGlobalStatePDA(): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("global_state")],
+    CNFT_PROGRAM_ID
+  );
+}
+
 /**
  * Dérive l'adresse PDA pour le cNFT d'un utilisateur
  */
@@ -109,8 +141,8 @@ export function getUserNftPDA(userPubkey: PublicKey): [PublicKey, number] {
  * (Seulement pour l'authority du programme)
  */
 export async function createInitializeCollectionTransaction(
-  connection: Connection,
-  authority: PublicKey
+  _connection: Connection,
+  _authority: PublicKey
 ): Promise<Transaction> {
   const [collectionConfig] = getCollectionConfigPDA();
 
@@ -127,7 +159,7 @@ export async function createInitializeCollectionTransaction(
  * Crée une transaction pour lock des tokens et mint un cNFT
  */
 export async function createLockTransaction(
-  connection: Connection,
+  _connection: Connection,
   wallet: WalletContextState,
   params: CNFTLockParams
 ): Promise<{ transaction: Transaction; level: LockLevel; boost: number }> {
@@ -140,29 +172,29 @@ export async function createLockTransaction(
   const boost = calculateBoost(params.amount, durationDays);
 
   const [collectionConfig] = getCollectionConfigPDA();
+  const [globalState] = getGlobalStatePDA();
   const [userNft] = getUserNftPDA(wallet.publicKey);
 
-  // Pour l'instant, transaction simulée
-  // TODO: Intégrer avec le vrai programme Anchor
-  const transaction = new Transaction();
+  const amountLamports = new BN(Math.round(params.amount * LAMPORTS_PER_BACK));
+  const lockDuration = new BN(Math.round(params.duration));
 
-  console.log("Lock transaction details:", {
-    user: wallet.publicKey.toString(),
-    userNftPDA: userNft.toString(),
-    level,
-    boost,
-    amount: params.amount,
-    duration: params.duration,
+  const instruction = new TransactionInstruction({
+    programId: CNFT_PROGRAM_ID,
+    keys: [
+      { pubkey: collectionConfig, isSigner: false, isWritable: true },
+      { pubkey: globalState, isSigner: false, isWritable: true },
+      { pubkey: userNft, isSigner: false, isWritable: true },
+      { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.concat([
+      MINT_LEVEL_NFT_DISCRIMINATOR,
+      amountLamports.toArrayLike(Buffer, "le", 8),
+      lockDuration.toArrayLike(Buffer, "le", 8),
+    ]),
   });
 
-  // Simulation: ajout d'une instruction vide pour tester
-  transaction.add(
-    SystemProgram.transfer({
-      fromPubkey: wallet.publicKey,
-      toPubkey: wallet.publicKey,
-      lamports: 0,
-    })
-  );
+  const transaction = new Transaction().add(instruction);
 
   return { transaction, level, boost };
 }
@@ -171,34 +203,27 @@ export async function createLockTransaction(
  * Crée une transaction pour unlock des tokens
  */
 export async function createUnlockTransaction(
-  connection: Connection,
+  _connection: Connection,
   wallet: WalletContextState
 ): Promise<Transaction> {
   if (!wallet.publicKey) {
     throw new Error("Wallet not connected");
   }
 
+  const [globalState] = getGlobalStatePDA();
   const [userNft] = getUserNftPDA(wallet.publicKey);
 
-  // Pour l'instant, transaction simulée
-  // TODO: Intégrer avec le vrai programme Anchor
-  const transaction = new Transaction();
-
-  console.log("Unlock transaction details:", {
-    user: wallet.publicKey.toString(),
-    userNftPDA: userNft.toString(),
+  const instruction = new TransactionInstruction({
+    programId: CNFT_PROGRAM_ID,
+    keys: [
+      { pubkey: userNft, isSigner: false, isWritable: true },
+      { pubkey: globalState, isSigner: false, isWritable: true },
+      { pubkey: wallet.publicKey, isSigner: true, isWritable: false },
+    ],
+    data: Buffer.concat([UPDATE_NFT_STATUS_DISCRIMINATOR, Buffer.from([0])]),
   });
 
-  // Simulation: ajout d'une instruction vide pour tester
-  transaction.add(
-    SystemProgram.transfer({
-      fromPubkey: wallet.publicKey,
-      toPubkey: wallet.publicKey,
-      lamports: 0,
-    })
-  );
-
-  return transaction;
+  return new Transaction().add(instruction);
 }
 
 /**
@@ -218,10 +243,51 @@ export async function fetchUserCNFT(
       return null;
     }
 
-    // TODO: Parser les données du compte avec Borsh
-    // Pour l'instant, retourner null
-    console.log("cNFT account found:", userNftPDA.toString());
-    return null;
+    const data = accountInfo.data;
+
+    if (data.length < 64) {
+      console.warn("Unexpected cNFT account size for", userPubkey.toString());
+      return null;
+    }
+
+    let offset = 8; // skip account discriminator
+    const owner = new PublicKey(data.slice(offset, offset + 32));
+    offset += 32;
+
+    const levelIndex = data.readUInt8(offset);
+    offset += 1;
+
+    const amountLocked = Number(data.readBigUInt64LE(offset));
+    offset += 8;
+
+    const lockDuration = Number(data.readBigInt64LE(offset));
+    offset += 8;
+
+    const boostBps = data.readUInt16LE(offset);
+    offset += 2;
+
+    const mintTime = Number(data.readBigInt64LE(offset));
+    offset += 8;
+
+    const isActive = data.readUInt8(offset) === 1;
+    offset += 1;
+
+    const bump = data.readUInt8(offset);
+
+    const level = LOCK_LEVEL_VARIANTS[levelIndex] ?? LockLevel.Bronze;
+
+    return {
+      user: owner,
+      level,
+      levelIndex,
+      amountLocked,
+      lockDuration,
+      boostBps,
+      mintTime,
+      isActive,
+      bump,
+      unlockTime: mintTime + lockDuration,
+    };
   } catch (error) {
     console.error("Error fetching user cNFT:", error);
     return null;
@@ -243,4 +309,17 @@ export function canUnlock(mintTime: number, lockDuration: number): boolean {
 export function getUnlockDate(mintTime: number, lockDuration: number): Date {
   const unlockTime = mintTime + lockDuration;
   return new Date(unlockTime * 1000);
+}
+
+export interface CNFTData {
+  user: PublicKey;
+  level: LockLevel;
+  levelIndex: number;
+  amountLocked: number;
+  lockDuration: number;
+  boostBps: number;
+  mintTime: number;
+  unlockTime: number;
+  isActive: boolean;
+  bump: number;
 }

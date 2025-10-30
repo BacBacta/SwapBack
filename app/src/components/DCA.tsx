@@ -21,12 +21,40 @@ interface DCAOrder {
   averagePrice: number;
 }
 
+interface SerializedDCAOrder extends Omit<DCAOrder, "nextExecution" | "createdAt"> {
+  nextExecution: string;
+  createdAt: string;
+}
+
+const isSerializedDCAOrder = (value: unknown): value is SerializedDCAOrder => {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<SerializedDCAOrder>;
+
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.inputToken === "string" &&
+    typeof candidate.outputToken === "string" &&
+    typeof candidate.amountPerOrder === "number" &&
+    typeof candidate.frequency === "string" &&
+    typeof candidate.totalOrders === "number" &&
+    typeof candidate.executedOrders === "number" &&
+    typeof candidate.nextExecution === "string" &&
+    typeof candidate.status === "string" &&
+    typeof candidate.createdAt === "string" &&
+    typeof candidate.totalInvested === "number" &&
+    typeof candidate.averagePrice === "number"
+  );
+};
+
 // Token symbol to mint address mapping - Utilise les variables d'environnement
 const TOKEN_MINTS: Record<string, string> = {
   SOL: "So11111111111111111111111111111111111111112",
   USDC: process.env.NEXT_PUBLIC_USDC_MINT || "BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR",
   USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-  BACK: process.env.NEXT_PUBLIC_BACK_MINT || "5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27",
+  BACK: process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
 };
 
 export const DCA = () => {
@@ -80,14 +108,19 @@ export const DCA = () => {
       const stored = localStorage.getItem(storageKey);
       if (stored) {
         try {
-          const parsed = JSON.parse(stored);
-          // Convert date strings back to Date objects
-          const orders = parsed.map((order: any) => ({
-            ...order,
-            nextExecution: new Date(order.nextExecution),
-            createdAt: new Date(order.createdAt),
-          }));
-          setDcaOrders(orders);
+          const parsed: unknown = JSON.parse(stored);
+
+          if (Array.isArray(parsed)) {
+            const orders = parsed
+              .filter(isSerializedDCAOrder)
+              .map((order) => ({
+                ...order,
+                nextExecution: new Date(order.nextExecution),
+                createdAt: new Date(order.createdAt),
+              }));
+
+            setDcaOrders(orders);
+          }
         } catch (e) {
           console.error("Error loading DCA orders:", e);
         }

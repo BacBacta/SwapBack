@@ -52,9 +52,9 @@ const DEVNET_PROGRAM_IDS: ProgramIds = {
  * Coût total: ~6.5 SOL
  */
 const TESTNET_PROGRAM_IDS: ProgramIds = {
-  cnftProgram: new PublicKey('GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B'),
-  routerProgram: new PublicKey('yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn'),
-  buybackProgram: new PublicKey('DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi'),
+  cnftProgram: new PublicKey('9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw'),
+  routerProgram: new PublicKey('GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt'),
+  buybackProgram: new PublicKey('EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf'),
 };
 
 /**
@@ -152,7 +152,6 @@ export async function loadProgramIdsFromFile(
   filePath: string = './deployed-program-ids.json'
 ): Promise<ProgramIds | null> {
   try {
-    // @ts-ignore - fs n'existe que côté serveur
     const fs = await import('fs');
     const data = fs.readFileSync(filePath, 'utf-8');
     const json = JSON.parse(data);

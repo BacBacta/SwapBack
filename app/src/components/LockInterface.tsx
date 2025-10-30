@@ -2,19 +2,13 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
-import { BN } from '@coral-xyz/anchor';
-import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token';
+import { PublicKey } from '@solana/web3.js';
+import { getAssociatedTokenAddress } from '@solana/spl-token';
+import { createLockTransaction } from '@/lib/cnft';
 
 // Configuration du token $BACK - Utilise les variables d'environnement
 const BACK_TOKEN_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_BACK_MINT || '5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27'
-);
-const ROUTER_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || 'yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn'
-);
-const CNFT_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || 'GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B'
+  process.env.NEXT_PUBLIC_BACK_MINT || '862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux'
 );
 
 // Types pour les niveaux de cNFT - Étendus
@@ -54,7 +48,8 @@ interface LockInterfaceProps {
 }
 
 export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceProps>) {
-  const { publicKey, sendTransaction } = useWallet();
+  const wallet = useWallet();
+  const { publicKey, sendTransaction } = wallet;
   const { connection } = useConnection();
 
   const [amount, setAmount] = useState<string>('');
@@ -173,78 +168,12 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
     setSuccess(null);
 
     try {
-      // Convertir le montant en unités de base (9 décimales)
-      const amountLamports = new BN(amt * 1_000_000_000);
+      const durationSeconds = days * 24 * 60 * 60;
+      const { transaction } = await createLockTransaction(connection, wallet, {
+        amount: amt,
+        duration: durationSeconds,
+      });
 
-      // Calculer unlock_time (timestamp Unix en secondes)
-      const currentTime = Math.floor(Date.now() / 1000);
-      const unlockTime = new BN(currentTime + days * 24 * 60 * 60);
-
-      // Dériver les PDAs
-      const [userStatePda] = PublicKey.findProgramAddressSync(
-        [Buffer.from('user_state'), publicKey.toBuffer()],
-        ROUTER_PROGRAM_ID
-      );
-
-      const [userNftPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from('user_nft'), publicKey.toBuffer()],
-        CNFT_PROGRAM_ID
-      );
-
-      const [lockStatePda] = PublicKey.findProgramAddressSync(
-        [Buffer.from('lock_state'), publicKey.toBuffer()],
-        CNFT_PROGRAM_ID
-      );
-
-      // Obtenir l'ATA de l'utilisateur pour $BACK
-      const userTokenAccount = await getAssociatedTokenAddress(
-        BACK_TOKEN_MINT,
-        publicKey
-      );
-
-      // Obtenir l'ATA du vault (PDA du programme router)
-      const [vaultPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from('vault')],
-        ROUTER_PROGRAM_ID
-      );
-
-      const vaultTokenAccount = await getAssociatedTokenAddress(
-        BACK_TOKEN_MINT,
-        vaultPda,
-        true // allowOwnerOffCurve
-      );
-
-      // Créer l'instruction lock_back
-      // Note: Ceci est une simulation, l'IDL réel du programme serait nécessaire
-      // Pour l'instant, on utilise une instruction manuelle
-
-      const instruction = {
-        programId: ROUTER_PROGRAM_ID,
-        keys: [
-          { pubkey: publicKey, isSigner: true, isWritable: true },
-          { pubkey: userStatePda, isSigner: false, isWritable: true },
-          { pubkey: userTokenAccount, isSigner: false, isWritable: true },
-          { pubkey: vaultTokenAccount, isSigner: false, isWritable: true },
-          { pubkey: vaultPda, isSigner: false, isWritable: false },
-          { pubkey: BACK_TOKEN_MINT, isSigner: false, isWritable: false },
-          { pubkey: userNftPda, isSigner: false, isWritable: true },
-          { pubkey: lockStatePda, isSigner: false, isWritable: true },
-          { pubkey: CNFT_PROGRAM_ID, isSigner: false, isWritable: false },
-          { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-        ],
-        data: Buffer.from([
-          // Instruction discriminator pour lock_back (à déterminer selon l'IDL)
-          // Pour l'instant, on simule
-          0x01, // Exemple de discriminator
-          ...amountLamports.toArray('le', 8),
-          ...unlockTime.toArray('le', 8),
-        ]),
-      };
-
-      const transaction = new Transaction().add(instruction as any);
-
-      // Envoyer la transaction
       const signature = await sendTransaction(transaction, connection);
 
       // Attendre la confirmation (méthode moderne)
@@ -273,11 +202,10 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         const bal = tokenAccount.value.uiAmount || 0;
         setBalance(bal);
       }, 2000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error during lock:', err);
-      setError(
-        err.message || 'Lock failed. Please try again.'
-      );
+      const message = err instanceof Error ? err.message : 'Lock failed. Please try again.';
+      setError(message);
     } finally {
       setIsLoading(false);
     }

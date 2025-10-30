@@ -51,13 +51,13 @@ export interface ClaimBuybackParams {
 // Utilise les Program IDs depuis les variables d'environnement
 const PROGRAM_IDS = {
   swapback_cnft: new PublicKey(
-    process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B"
+    process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw"
   ),
   swapback_router: new PublicKey(
-    process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn"
+    process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
   ),
   swapback_buyback: new PublicKey(
-    process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || "DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi"
+    process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"
   ),
 };
 

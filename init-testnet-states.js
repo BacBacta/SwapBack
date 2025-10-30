@@ -15,11 +15,11 @@ const CONFIG = {
   network: "testnet",
   rpcUrl: "https://api.testnet.solana.com",
   programs: {
-    router: "yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn",
-    buyback: "DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi",
+    router: "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt",
+    buyback: "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf",
   },
   tokens: {
-    backMint: "5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27",
+    backMint: "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
     usdcMock: "BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR",
   },
 };

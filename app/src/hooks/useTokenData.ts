@@ -4,17 +4,6 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useEffect, useState } from "react";
 import { PublicKey } from "@solana/web3.js";
 
-interface TokenBalance {
-  mint: string;
-  amount: number;
-  decimals: number;
-  uiAmount: number;
-}
-
-interface TokenPrice {
-  [mint: string]: number; // Prix en USD
-}
-
 export const useTokenData = (tokenMint: string) => {
   const { connection } = useConnection();
   const { publicKey } = useWallet();
@@ -83,7 +72,7 @@ export const useTokenData = (tokenMint: string) => {
           So11111111111111111111111111111111111111112: 145.5, // SOL ~$145
 
           // Testnet deployed tokens (Oct 28, 2025)
-          "5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27": 0.001, // $BACK (testnet)
+          "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux": 0.001, // $BACK (testnet)
           
           // Common test tokens
           "3y4dCqwWuYx1B97YEDmgq9qjuNE1eyEwGx2eLgz6Rc6G": 1.0, // USDC Test

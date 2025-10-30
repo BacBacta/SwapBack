@@ -10,15 +10,15 @@ import { PublicKey } from '@solana/web3.js';
 // ============================================
 
 export const ROUTER_PROGRAM_ID = new PublicKey(
-  'yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn'
+  'GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt'
 );
 
 export const BUYBACK_PROGRAM_ID = new PublicKey(
-  'DkaELUiGtTcFniZvHRicHn3RK11CsemDRW7h8qVQaiJi'
+  'EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf'
 );
 
 export const CNFT_PROGRAM_ID = new PublicKey(
-  'GFnJ59QDC4ANdMhsvDZaFoBTNUiq3cY3rQfHCoDYAQ3B'
+  '9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw'
 );
 
 // ============================================
@@ -26,7 +26,7 @@ export const CNFT_PROGRAM_ID = new PublicKey(
 // ============================================
 
 export const BACK_TOKEN_MINT = new PublicKey(
-  '5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27'
+  '862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux'
 );
 
 // Tokens communs sur Solana (pour référence future)

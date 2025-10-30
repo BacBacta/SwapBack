@@ -4,18 +4,18 @@ import { useState, useEffect, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
+import { Program, AnchorProvider, BN, type Idl } from "@coral-xyz/anchor";
 
 // ============================
 // 🎯 CONFIGURATION SWAPBACK
 // ============================
 
 const ROUTER_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "yeKoCvFPTmgn5oCejqFVU5mUNdVbZSxwETCXDuBpfxn"
+  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
 );
 
 const BACK_TOKEN_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_BACK_MINT || "5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27"
+  process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
 );
 
 const SWITCHBOARD_FEED = new PublicKey(
@@ -50,7 +50,7 @@ const ROUTER_IDL = {
       ],
     },
   ],
-};
+} as unknown as Idl;
 
 // ============================
 // 🎨 COMPOSANT PRINCIPAL
@@ -129,7 +129,7 @@ export const SwapBackInterface = () => {
 
       // 2. Charger le programme
       const program = new Program(
-        ROUTER_IDL as any,
+        ROUTER_IDL,
         provider
       );
 
@@ -159,7 +159,6 @@ export const SwapBackInterface = () => {
       const minOutputAmount = new BN(0); // Slippage illimité pour test
 
       // 6. Créer la transaction
-      // @ts-expect-error - Program.methods type issue avec IDL minimal
       const tx = await program.methods
         .createPlan(
           inputAmountLamports,
