@@ -4,7 +4,6 @@
  */
 
 import { Connection, PublicKey } from "@solana/web3.js";
-import { Client as PhoenixClient } from "@ellipsis-labs/phoenix-sdk";
 import {
   VenueName,
   VenueType,
@@ -12,7 +11,6 @@ import {
   AggregatedLiquidity,
   VenueConfig,
 } from "../types/smart-router";
-import { getPhoenixMarket } from "../config/phoenix-markets";
 import { getOrcaWhirlpool } from "../config/orca-pools";
 import { getRaydiumPool } from "../config/raydium-pools";
 
@@ -166,7 +164,7 @@ export class LiquidityDataCollector {
       totalDepth,
       sources,
       bestSingleVenue,
-      bestCombinedRoute: null as any, // Will be calculated by optimizer
+  bestCombinedRoute: null, // Will be calculated by optimizer
       fetchedAt: Date.now(),
       staleness: 0,
     };
@@ -231,10 +229,8 @@ export class LiquidityDataCollector {
     venue: VenueName,
     inputMint: string,
     outputMint: string,
-    inputAmount: number
+    _inputAmount: number
   ): Promise<LiquiditySource | null> {
-    const config = VENUE_CONFIGS[venue];
-
     // Phoenix integration
     if (venue === VenueName.PHOENIX) {
       try {
@@ -558,8 +554,6 @@ export class LiquidityDataCollector {
       // - ammOwner: Pubkey at offset 608 (32 bytes)
       // - poolLpTokenAccount: Pubkey at offset 640 (32 bytes)
 
-      const data = ammAccount.data;
-
       // Read coin vault balance (token A)
       const coinVaultAccount = await this.connection.getTokenAccountBalance(
         poolConfig.poolCoinTokenAccount
@@ -647,8 +641,6 @@ export class LiquidityDataCollector {
     outputMint: string,
     inputAmount: number
   ): Promise<LiquiditySource | null> {
-    const config = VENUE_CONFIGS[venue];
-
     // Jupiter v6 API integration
     if (venue === VenueName.JUPITER) {
       try {
@@ -696,7 +688,21 @@ export class LiquidityDataCollector {
         return null;
       }
 
-      const data = await response.json();
+      type JupiterRouteStep = {
+        swapInfo?: {
+          label?: string;
+          outputMint?: string;
+        };
+      };
+
+      type JupiterQuoteResponse = {
+        inAmount?: string;
+        outAmount?: string;
+        priceImpactPct?: number | string;
+        routePlan?: JupiterRouteStep[];
+      };
+
+      const data = (await response.json()) as JupiterQuoteResponse;
 
       if (!data || !data.outAmount) {
         console.warn("Invalid Jupiter quote response:", data);
@@ -705,8 +711,8 @@ export class LiquidityDataCollector {
 
       // Parse Jupiter response
       const outputAmount = Number(data.outAmount) / 1e9; // Convert back to UI units
-      const priceImpactPct = Number(data.priceImpactPct || 0);
-      const routePlan = data.routePlan || [];
+      const priceImpactPct = Number(data.priceImpactPct ?? 0);
+      const routePlan = data.routePlan ?? [];
 
       // Extract route from Jupiter's route plan
       const route: string[] = [inputMint];
@@ -723,7 +729,6 @@ export class LiquidityDataCollector {
       const effectivePrice = inputAmount / outputAmount;
 
       // Jupiter fees are included in the quote
-      const spotPrice = effectivePrice / (1 + priceImpactPct / 100);
       const feeAmount = inputAmount - inputAmount / effectivePrice;
 
       return {
@@ -742,8 +747,8 @@ export class LiquidityDataCollector {
             inAmount: data.inAmount,
             outAmount: data.outAmount,
             priceImpactPct: data.priceImpactPct,
-            marketInfos: data.routePlan
-              ?.map((r: any) => r.swapInfo?.label)
+            marketInfos: routePlan
+              .map((r) => r.swapInfo?.label)
               .filter(Boolean),
           },
         },

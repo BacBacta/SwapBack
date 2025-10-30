@@ -11,7 +11,6 @@ import { useSwapStore } from "@/store/swapStore";
 import { useSwapWebSocket } from "@/hooks/useSwapWebSocket";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { TokenSelector } from "./TokenSelector";
-import { AnimatePresence, motion } from "framer-motion";
 // import { debounce } from "lodash"; // Désactivé - Pas d'auto-fetch
 
 interface RouteStep {

@@ -71,10 +71,7 @@ export class RouterClient {
     if (params.useBundle && this.jitoService) {
       // Use bundle service for MEV protection
       const tx = new Transaction();
-      const bundleResult = await this.jitoService.submitBundle({
-        transactions: [tx],
-        signers: [params.user],
-      } as any);
+      const bundleResult = await this.jitoService.submitBundle([tx]);
 
       return bundleResult.signatures?.[0] || "bundle-executed";
     } else {

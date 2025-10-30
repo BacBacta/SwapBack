@@ -12,6 +12,7 @@ import {
   Legend,
   Filler,
 } from 'chart.js';
+import type { ChartOptions, TooltipItem } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
 
 ChartJS.register(
@@ -53,7 +54,7 @@ export const VolumeChart = ({ data }: VolumeChartProps) => {
     ],
   };
 
-  const options = {
+  const options: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -69,7 +70,8 @@ export const VolumeChart = ({ data }: VolumeChartProps) => {
         padding: 12,
         displayColors: false,
         callbacks: {
-          label: (context: any) => `$${context.parsed.y.toLocaleString()}`,
+          label: (context: TooltipItem<'line'>) =>
+            `$${context.parsed.y?.toLocaleString() ?? '0'}`,
         },
       },
     },
@@ -77,7 +79,6 @@ export const VolumeChart = ({ data }: VolumeChartProps) => {
       x: {
         grid: {
           color: 'rgba(255, 255, 255, 0.05)',
-          drawBorder: false,
         },
         ticks: {
           color: '#9CA3AF',
@@ -89,14 +90,14 @@ export const VolumeChart = ({ data }: VolumeChartProps) => {
       y: {
         grid: {
           color: 'rgba(255, 255, 255, 0.05)',
-          drawBorder: false,
         },
         ticks: {
           color: '#9CA3AF',
           font: {
             size: 11,
           },
-          callback: (value: any) => `$${value.toLocaleString()}`,
+          callback: (value: number | string) =>
+            `$${Number(value).toLocaleString()}`,
         },
       },
     },
@@ -143,7 +144,7 @@ export const ActivityChart = ({ data }: ActivityChartProps) => {
     ],
   };
 
-  const options = {
+  const options: ChartOptions<'bar'> = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -159,7 +160,8 @@ export const ActivityChart = ({ data }: ActivityChartProps) => {
         padding: 12,
         displayColors: false,
         callbacks: {
-          label: (context: any) => `${context.parsed.y} swaps`,
+          label: (context: TooltipItem<'bar'>) =>
+            `${context.parsed.y ?? 0} swaps`,
         },
       },
     },
@@ -178,7 +180,6 @@ export const ActivityChart = ({ data }: ActivityChartProps) => {
       y: {
         grid: {
           color: 'rgba(255, 255, 255, 0.05)',
-          drawBorder: false,
         },
         ticks: {
           color: '#9CA3AF',

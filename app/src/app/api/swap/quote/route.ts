@@ -1,14 +1,12 @@
 /**
  * API Route: Get Jupiter Quote
- * Returns real Jupiter Ultra API quote for token swap
- * Endpoint: POST /api/swap/quote
+ * Returns real Jupiter API quote for token swap
+ * Endpoint: GET /quote
  */
 
-// ============================================================================
-// VERCEL DEPLOYMENT DIRECTIVES
-// ============================================================================
-export const runtime = 'nodejs';     // Force Node.js runtime (not Edge)
-export const dynamic = 'force-dynamic'; // Disable static caching
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 import { NextRequest, NextResponse } from "next/server";
 import { Connection } from "@solana/web3.js";
@@ -20,9 +18,13 @@ import { getTokenByMint } from "@/constants/tokens";
 
 /**
  * Jupiter API Base URL
- * Using v6 API (more stable for quotes)
+ * New API: https://lite-api.jup.ag/ultra/v1
+ * Old API (deprecated): https://quote-api.jup.ag/v6
  */
 const JUPITER_API = process.env.JUPITER_API_URL || "https://quote-api.jup.ag/v6";
+const USE_CORS_PROXY = process.env.USE_CORS_PROXY === "true"; // Default: false (direct call)
+const CORS_PROXY = "https://corsproxy.io/?";
+
 const JUPITER_TOKEN_INFO_URL =
   process.env.JUPITER_TOKEN_INFO_URL || "https://token.jup.ag/token";
 const TOKEN_VALIDATION_TIMEOUT_MS = Number(
@@ -32,6 +34,36 @@ const TOKEN_VALIDATION_TIMEOUT_MS = Number(
 type TokenSupportStatus = "supported" | "unsupported" | "unknown";
 
 const tokenValidationCache = new Map<string, TokenSupportStatus>();
+
+const withNoStore = (init?: ResponseInit): ResponseInit => {
+  const headers = new Headers(init?.headers);
+  headers.set("Cache-Control", "no-store");
+  return { ...init, headers };
+};
+
+type JupiterRoutePlanStep = {
+  swapInfo?: {
+    ammKey?: string;
+    label?: string;
+    inputMint?: string;
+    outputMint?: string;
+    inAmount?: string;
+    outAmount?: string;
+    feeAmount?: string;
+    feeMint?: string;
+  };
+  [key: string]: unknown;
+};
+
+type JupiterQuoteResponse = {
+  inAmount?: string;
+  outAmount?: string;
+  priceImpactPct?: number | string;
+  routePlan?: JupiterRoutePlanStep[];
+  otherAmountThreshold?: string;
+  swapMode?: string;
+  [key: string]: unknown;
+};
 
 const validateTokenSupport = async (
   mint: string
@@ -99,14 +131,16 @@ const validateTokenSupport = async (
   }
 };
 
-// ============================================================================
-// SOLANA RPC & MOCK CONFIGURATION
-// ============================================================================
+// Construct final Jupiter URL
+const getJupiterUrl = (endpoint: string) => {
+  const baseUrl = `${JUPITER_API.replace(/\/$/, "")}${endpoint}`;
+  return USE_CORS_PROXY ? `${CORS_PROXY}${encodeURIComponent(baseUrl)}` : baseUrl;
+};
 
 /**
  * Solana RPC Endpoint
- * Default: mainnet
- * Vercel: Set NEXT_PUBLIC_SOLANA_RPC_URL to mainnet endpoint
+ * Default: testnet
+ * Vercel: Ajouter NEXT_PUBLIC_SOLANA_RPC_URL dans Environment Variables
  */
 const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
@@ -115,13 +149,9 @@ const RPC_ENDPOINT =
 /**
  * Mock Mode (pour dev/test sans réseau)
  * Default: false
+ * Vercel: Ajouter USE_MOCK_QUOTES=false (ou true pour staging)
  */
 const USE_MOCK_DATA = process.env.USE_MOCK_QUOTES === "true";
-
-/**
- * Jupiter v6 API (more stable than ultra for quotes)
- */
-const JUPITER_V6_API = "https://quote-api.jup.ag/v6/quote";
 
 export async function POST(request: NextRequest) {
   try {
@@ -138,7 +168,7 @@ export async function POST(request: NextRequest) {
         {
           error: "Missing required fields: inputMint, outputMint, amount",
         },
-        { status: 400 }
+        withNoStore({ status: 400 })
       );
     }
 
@@ -147,7 +177,7 @@ export async function POST(request: NextRequest) {
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       return NextResponse.json(
         { error: "Invalid amount: must be a positive number" },
-        { status: 400 }
+        withNoStore({ status: 400 })
       );
     }
 
@@ -169,7 +199,7 @@ export async function POST(request: NextRequest) {
           error: errorMessage,
           mint: inputMint,
         },
-        { status: statusCode }
+        withNoStore({ status: statusCode })
       );
     }
 
@@ -185,9 +215,18 @@ export async function POST(request: NextRequest) {
           error: errorMessage,
           mint: outputMint,
         },
-        { status: statusCode }
+        withNoStore({ status: statusCode })
       );
     }
+
+    // Build Jupiter API URL
+    // Supported params: inputMint, outputMint, amount, slippageBps, taker, referralAccount, excludeRouters, excludeDexes
+    const params = new URLSearchParams({
+      inputMint,
+      outputMint,
+      amount: Math.floor(parsedAmount).toString(),
+      slippageBps: slippageBps.toString(),
+    });
 
     console.log("🔍 Fetching Jupiter quote:", {
       inputMint: inputMint.slice(0, 8) + "...",
@@ -202,30 +241,37 @@ export async function POST(request: NextRequest) {
       const mockQuote = generateMockQuote(inputMint, outputMint, parsedAmount, slippageBps);
       const mockRouteInfo = parseRouteInfo(mockQuote);
       
-      return NextResponse.json({
-        success: true,
-        quote: mockQuote,
-        routeInfo: mockRouteInfo,
-        timestamp: Date.now(),
-      });
+      return NextResponse.json(
+        {
+          success: true,
+          quote: mockQuote,
+          routeInfo: mockRouteInfo,
+          timestamp: Date.now(),
+        },
+        withNoStore()
+      );
     }
 
-    // Build Jupiter v6 API URL with query params
-    const url = new URL(JUPITER_V6_API);
-    url.searchParams.set('inputMint', inputMint);
-    url.searchParams.set('outputMint', outputMint);
-    url.searchParams.set('amount', Math.floor(parsedAmount).toString());
-    url.searchParams.set('slippageBps', slippageBps.toString());
-
-    console.log("🔄 Fetching Jupiter v6 quote...");
-    console.log("   URL:", url.toString());
-
-    const response = await fetch(url.toString(), {
+    // Fetch quote from Jupiter API
+    const jupiterEndpoint = `/quote?${params.toString()}`;
+    const quoteUrl = getJupiterUrl(jupiterEndpoint);
+    
+    console.log("🔄 Fetching Jupiter quote...");
+    console.log("   URL:", quoteUrl);
+    console.log("   Params:", {
+      inputMint: inputMint.slice(0, 8) + "...",
+      outputMint: outputMint.slice(0, 8) + "...",
+      amount: parsedAmount,
+      slippageBps,
+    });
+    
+    const response = await fetch(quoteUrl, {
       method: "GET",
       headers: {
         "Accept": "application/json",
       },
-      cache: 'no-store', // Force fresh response on Vercel
+      cache: "no-store",
+      next: { revalidate: 0 },
     });
 
     console.log("📡 Jupiter API Response:", {
@@ -239,7 +285,7 @@ export async function POST(request: NextRequest) {
       console.error("❌ Jupiter API error:");
       console.error("   Status:", response.status);
       console.error("   Response:", errorText);
-      console.error("   URL called:", url.toString());
+      console.error("   URL called:", quoteUrl);
       
       return NextResponse.json(
         {
@@ -247,16 +293,16 @@ export async function POST(request: NextRequest) {
           details: errorText,
           status: response.status,
         },
-        { status: response.status }
+        withNoStore({ status: response.status })
       );
     }
 
-    const quote = await response.json();
+  const quote = (await response.json()) as JupiterQuoteResponse;
 
     if (!quote || !quote.outAmount) {
       return NextResponse.json(
         { error: "Invalid quote response from Jupiter" },
-        { status: 500 }
+        withNoStore({ status: 500 })
       );
     }
 
@@ -268,14 +314,17 @@ export async function POST(request: NextRequest) {
     });
 
     // Parse and enhance the quote with route information
-    const routeInfo = parseRouteInfo(quote);
+  const routeInfo = parseRouteInfo(quote);
 
-    return NextResponse.json({
-      success: true,
-      quote,
-      routeInfo,
-      timestamp: Date.now(),
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        quote,
+        routeInfo,
+        timestamp: Date.now(),
+      },
+      withNoStore()
+    );
   } catch (error) {
     console.error("❌ Error fetching quote:", error);
     
@@ -284,7 +333,7 @@ export async function POST(request: NextRequest) {
         error: "Failed to fetch quote",
         message: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      withNoStore({ status: 500 })
     );
   }
 }
@@ -292,45 +341,50 @@ export async function POST(request: NextRequest) {
 /**
  * Parse Jupiter quote into readable route information
  */
-function parseRouteInfo(quote: any) {
-  const routes = quote.routePlan || [];
-  
-  const steps = routes.map((route: any, index: number) => {
-    const swapInfo = route.swapInfo || {};
-    
+function parseRouteInfo(quote: JupiterQuoteResponse) {
+  const routes = quote.routePlan ?? [];
+
+  const steps = routes.map((route: JupiterRoutePlanStep, index: number) => {
+    const swapInfo = route.swapInfo;
+
     return {
       stepNumber: index + 1,
-      ammKey: swapInfo.ammKey || "Unknown",
-      label: swapInfo.label || `Step ${index + 1}`,
-      inputMint: swapInfo.inputMint || "",
-      outputMint: swapInfo.outputMint || "",
-      inAmount: swapInfo.inAmount || "0",
-      outAmount: swapInfo.outAmount || "0",
-      feeAmount: swapInfo.feeAmount || "0",
-      feeMint: swapInfo.feeMint || "",
+      ammKey: swapInfo?.ammKey ?? "Unknown",
+      label: swapInfo?.label ?? `Step ${index + 1}`,
+      inputMint: swapInfo?.inputMint ?? "",
+      outputMint: swapInfo?.outputMint ?? "",
+      inAmount: swapInfo?.inAmount ?? "0",
+      outAmount: swapInfo?.outAmount ?? "0",
+      feeAmount: swapInfo?.feeAmount ?? "0",
+      feeMint: swapInfo?.feeMint ?? "",
     };
   });
 
-  // Convert priceImpactPct to number if it's a string
-  const priceImpact = typeof quote.priceImpactPct === 'string' 
-    ? parseFloat(quote.priceImpactPct) 
-    : (quote.priceImpactPct || 0);
+  const priceImpact =
+    typeof quote.priceImpactPct === "string"
+      ? parseFloat(quote.priceImpactPct)
+      : quote.priceImpactPct ?? 0;
 
   return {
     totalSteps: routes.length,
-    inputAmount: quote.inAmount,
-    outputAmount: quote.outAmount,
+    inputAmount: quote.inAmount ?? "0",
+    outputAmount: quote.outAmount ?? "0",
     priceImpactPct: priceImpact,
     steps,
     otherAmountThreshold: quote.otherAmountThreshold,
-    swapMode: quote.swapMode || "ExactIn",
+    swapMode: quote.swapMode ?? "ExactIn",
   };
 }
 
 /**
  * Generate mock quote data for testing (when network unavailable)
  */
-function generateMockQuote(inputMint: string, outputMint: string, amount: number, slippageBps: number) {
+function generateMockQuote(
+  inputMint: string,
+  outputMint: string,
+  amount: number,
+  slippageBps: number
+): JupiterQuoteResponse {
   // Simuler un taux de change SOL/USDC ~ 150 USDC par SOL
   const mockPrice = inputMint.startsWith("So11") && outputMint.startsWith("EPjF") 
     ? 150 
@@ -378,14 +432,17 @@ export async function GET() {
     const connection = new Connection(RPC_ENDPOINT);
     const slot = await connection.getSlot();
 
-    return NextResponse.json({
-      status: "ok",
-      service: "Jupiter Quote API",
-      jupiterApi: JUPITER_API,
-      rpc: RPC_ENDPOINT,
-      currentSlot: slot,
-      timestamp: Date.now(),
-    });
+    return NextResponse.json(
+      {
+        status: "ok",
+        service: "Jupiter Quote API",
+        jupiterApi: JUPITER_API,
+        rpc: RPC_ENDPOINT,
+        currentSlot: slot,
+        timestamp: Date.now(),
+      },
+      withNoStore()
+    );
   } catch (error) {
     return NextResponse.json(
       {
@@ -393,7 +450,7 @@ export async function GET() {
         error: "Health check failed",
         message: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      withNoStore({ status: 500 })
     );
   }
 }

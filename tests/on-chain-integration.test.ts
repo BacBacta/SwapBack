@@ -10,9 +10,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { BN } from "@coral-xyz/anchor";
 import { createMint, createAccount, mintTo } from "@solana/spl-token";
-
-// Import program types
-import { CommonSwap } from "../target/types/common_swap";
+import { loadProgram } from "./utils/load-idl";
 
 // ============================================================================
 // ON-CHAIN INTEGRATION TESTS
@@ -41,7 +39,11 @@ describeOnChain("On-Chain Integration Tests", () => {
   anchor.setProvider(provider);
 
   // Program instance
-  let program: anchor.Program<CommonSwap>;
+  let program: any;
+
+  const COMMON_SWAP_PROGRAM_ID = new PublicKey(
+    "D4Hz5ZBPWrLvnjNheQa7FYLVpzuGmPGRqFGWNqg5jRg6"
+  );
 
   // Test tokens (using devnet tokens)
   const SOL_MINT = new PublicKey("So11111111111111111111111111111111111111112"); // Wrapped SOL
@@ -61,7 +63,11 @@ describeOnChain("On-Chain Integration Tests", () => {
     await connection.confirmTransaction(airdropSignature);
 
     // Load the program
-    program = anchor.workspace.CommonSwap as anchor.Program<CommonSwap>;
+    program = loadProgram({
+      programName: "common_swap",
+      provider,
+      programId: COMMON_SWAP_PROGRAM_ID.toBase58(),
+    }) as any;
 
     // Derive global state PDA
     [globalState] = PublicKey.findProgramAddressSync(
@@ -250,9 +256,9 @@ describeOnChain("On-Chain Integration Tests", () => {
 
     it("should handle emergency pause correctly", async () => {
       // Get current authority from global state
-      const globalStateAccount =
+      const initialGlobalState =
         await program.account.globalState.fetch(globalState);
-      const currentAuthority = globalStateAccount.authority;
+      const currentAuthority = initialGlobalState.authority;
 
       // First pause the program using the correct authority
       await program.methods
@@ -310,8 +316,10 @@ describeOnChain("On-Chain Integration Tests", () => {
         .rpc();
 
       // Verify program is unpaused
-      globalStateAccount = await program.account.globalState.fetch(globalState);
-      expect(globalStateAccount.isPaused).toBe(false);
+      const resumedGlobalState = await program.account.globalState.fetch(
+        globalState
+      );
+      expect(resumedGlobalState.isPaused).toBe(false);
     });
 
     it("should execute dynamic swap with oracle data", async () => {

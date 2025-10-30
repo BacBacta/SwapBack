@@ -169,7 +169,7 @@ export function TransactionTracker() {
         <div>
           <h3 className="text-lg font-bold text-[var(--primary)] mb-3">Recent Swaps</h3>
           <div className="space-y-2">
-            {transactionHistory.slice(0, 10).map((tx, index) => (
+            {transactionHistory.slice(0, 10).map((tx, _index) => (
               <div
                 key={tx.signature}
                 className="bg-gray-800 rounded-lg p-3 hover:bg-gray-750"

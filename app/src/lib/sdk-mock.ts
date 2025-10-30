@@ -4,23 +4,23 @@
  */
 
 export class CircuitBreaker {
-  constructor(maxFailures: number, timeout: number) {}
+  constructor(_maxFailures: number, _timeout: number) {}
   async execute<T>(fn: () => Promise<T>): Promise<T> {
     return fn();
   }
 }
 
 export class OraclePriceService {
-  constructor(connection: any) {}
+  constructor(_connection: unknown) {}
   async initialize(): Promise<void> {}
-  async getPrice(tokenMint: string): Promise<number> {
+  async getPrice(_tokenMint: string): Promise<number> {
     return 100; // Mock price
   }
 }
 
 export class LiquidityDataCollector {
-  constructor(connection: any) {}
-  async collectLiquidity(tokenA: string, tokenB: string) {
+  constructor(_connection: unknown) {}
+  async collectLiquidity(_tokenA: string, _tokenB: string) {
     return [
       { venue: "Orca", liquidity: 1000000 },
       { venue: "Raydium", liquidity: 800000 },
@@ -30,12 +30,12 @@ export class LiquidityDataCollector {
 
 export class RouteOptimizationEngine {
   constructor(
-    liquidityCollector: any,
-    priceService: any,
-    circuitBreaker: any
+    _liquidityCollector: LiquidityDataCollector,
+    _priceService: OraclePriceService,
+    _circuitBreaker: CircuitBreaker
   ) {}
 
-  async findOptimalRoutes(config: any) {
+  async findOptimalRoutes(_config: unknown) {
     return [
       {
         id: "route-1",
@@ -52,19 +52,19 @@ export class RouteOptimizationEngine {
 }
 
 export class JitoBundleService {
-  constructor(connection: any, options: any) {}
+  constructor(_connection: unknown, _options: unknown) {}
   async initialize(): Promise<void> {}
 }
 
 export class SwapExecutor {
   constructor(
-    connection: any,
-    routeEngine: any,
-    jitoService: any,
-    circuitBreaker: any
+    _connection: unknown,
+    _routeEngine: RouteOptimizationEngine,
+    _jitoService: JitoBundleService,
+    _circuitBreaker: CircuitBreaker
   ) {}
 
-  async executeSwap(params: any) {
+  async executeSwap(_params: unknown) {
     return {
       signature: "5xK7MockSignature",
       blockhash: "9xTMockBlockhash",

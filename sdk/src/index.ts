@@ -1,11 +1,5 @@
-import {
-  Connection,
-  PublicKey,
-  Transaction,
-  TransactionInstruction,
-  Keypair,
-} from "@solana/web3.js";
-import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
+import { Connection, PublicKey, Transaction } from "@solana/web3.js";
+import { BN } from "@coral-xyz/anchor";
 import axios from "axios";
 
 /**
@@ -40,6 +34,7 @@ export { OraclePriceService } from "./services/OraclePriceService";
 export { JitoBundleService } from "./services/JitoBundleService";
 export { IntelligentOrderRouter } from "./services/IntelligentOrderRouter";
 export { RouterClient } from "./services/RouterClient";
+export { JupiterRealIntegration } from "./integrations/JupiterRealIntegration";
 
 /**
  * Types pour les routes de swap
@@ -69,7 +64,7 @@ export interface SwapResult {
   rebateEarned: number;
   burnExecuted?: number; // Optional for backward compatibility
   burnAmount?: number; // Optional alias
-  route?: any; // Optional route details
+  route?: RouteSimulation; // Optional route details
 }
 
 export interface UserStats {
@@ -82,12 +77,19 @@ export interface UserStats {
   rebateBoost: number;
 }
 
+export interface SwapBackWallet {
+  publicKey: PublicKey | null;
+  signTransaction: (transaction: Transaction) => Promise<Transaction>;
+  signAllTransactions: (transactions: Transaction[]) => Promise<Transaction[]>;
+  sendTransaction: (transaction: Transaction, connection: Connection) => Promise<string>;
+}
+
 /**
  * Configuration du client SwapBack
  */
 export interface SwapBackConfig {
   connection: Connection;
-  wallet: any; // Wallet adapter
+  wallet: SwapBackWallet; // Wallet adapter
   routerProgramId: PublicKey;
   buybackProgramId: PublicKey;
   oracleEndpoint?: string;
@@ -98,7 +100,7 @@ export interface SwapBackConfig {
  */
 export class SwapBackClient {
   private connection: Connection;
-  private wallet: any;
+  private wallet: SwapBackWallet;
   private routerProgramId: PublicKey;
   private buybackProgramId: PublicKey;
   private oracleEndpoint: string;
@@ -120,6 +122,10 @@ export class SwapBackClient {
     inputAmount: number,
     slippage: number = 0.5
   ): Promise<RouteSimulation> {
+    if (!this.wallet.publicKey) {
+      throw new Error("Wallet non connecté");
+    }
+
     try {
       // Appel à l'oracle/API pour simuler les routes
       const response = await axios.post(`${this.oracleEndpoint}/simulate`, {
@@ -318,37 +324,17 @@ export class SwapBackClient {
         duration: _durationDays,
       });
 
-      // Import du IDL
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const idl = require("./idl/swapback_router.json");
-      const provider = new AnchorProvider(
-        this.connection,
-        this.wallet,
-        { commitment: "confirmed" }
-      );
-      const program = new Program(idl as any, provider);
-
       // Dériver le PDA user_lock
       const [userLockPDA] = PublicKey.findProgramAddressSync(
         [Buffer.from("user_lock"), this.wallet.publicKey.toBuffer()],
         this.routerProgramId
       );
 
-      const amountBN = new BN(_amount);
-      const durationBN = new BN(_durationDays * 86400); // Convertir jours en secondes
-
       const transaction = new Transaction();
 
       // Note: L'instruction lock_tokens doit être ajoutée au programme Solana
       // Pour le MVP, on simule avec une transaction de base
       console.log("📝 Creating lock instruction for PDA:", userLockPDA.toBase58());
-
-      // Dans une implémentation complète, utiliser:
-      // const lockIx = await program.methods
-      //   .lockTokens(amountBN, durationBN)
-      //   .accounts({...})
-      //   .instruction();
-      // transaction.add(lockIx);
 
       // Pour le MVP, on retourne une signature simulée
       console.log("⚠️ Lock tokens not fully implemented in program yet");

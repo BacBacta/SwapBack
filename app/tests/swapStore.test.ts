@@ -6,6 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+import type { Mock } from "vitest";
 import { useSwapStore } from "../src/store/swapStore";
 import type { Token } from "../src/store/swapStore";
 import { VenueName } from "@/../../sdk/src/types/smart-router";
@@ -218,25 +219,38 @@ describe("SwapStore", () => {
       setOutputToken(mockUSDC);
       setInputAmount("1.5");
 
-      // Mock fetch response
-      const mockResponse = {
-        routes: [mockRoute, { ...mockRoute, expectedOutput: 99 }],
+      // Mock Jupiter-style quote response
+      const mockQuoteResponse = {
+        inAmount: "1500000000", // 1.5 SOL (9 decimals)
+        outAmount: "100000000", // 100 USDC (6 decimals)
+        priceImpactPct: "0.5",
+        routePlan: [
+          {
+            swapInfo: {
+              label: "Jupiter",
+              inAmount: "1500000000",
+              outAmount: "100000000",
+            },
+            percent: 100,
+          },
+        ],
       };
 
-      (global.fetch as any).mockResolvedValueOnce({
+  (global.fetch as unknown as Mock).mockResolvedValueOnce({
         ok: true,
-        json: async () => mockResponse,
+        json: async () => mockQuoteResponse,
       });
 
       // Fetch routes
       await fetchRoutes();
 
       const state = useSwapStore.getState().routes;
-      expect(state.routes).toHaveLength(2);
-      expect(state.routes[0].expectedOutput).toBe(100);
-      expect(state.selectedRoute).toEqual(mockRoute);
+      expect(state.routes).toHaveLength(1);
+      expect(state.routes[0].expectedOutput).toBe(100000000);
+      expect(state.selectedRoute?.venues[0]).toBe("Jupiter");
       expect(state.isLoading).toBe(false);
       expect(state.error).toBeNull();
+      expect(useSwapStore.getState().swap.outputAmount).toBe("100");
     });
 
     it("should set loading state during fetch", async () => {
@@ -248,14 +262,21 @@ describe("SwapStore", () => {
       setInputAmount("1.5");
 
       // Mock delayed response
-      (global.fetch as any).mockImplementationOnce(
+      const mockQuoteResponse = {
+        inAmount: "1500000000",
+        outAmount: "100000000",
+        priceImpactPct: "0.5",
+        routePlan: [],
+      };
+
+      (global.fetch as unknown as Mock).mockImplementationOnce(
         () =>
           new Promise((resolve) =>
             setTimeout(
               () =>
                 resolve({
                   ok: true,
-                  json: async () => ({ routes: [] }),
+                  json: async () => mockQuoteResponse,
                 }),
               100
             )
@@ -282,16 +303,17 @@ describe("SwapStore", () => {
       setInputAmount("1.5");
 
       // Mock fetch error
-      (global.fetch as any).mockResolvedValueOnce({
+  (global.fetch as unknown as Mock).mockResolvedValueOnce({
         ok: false,
         status: 500,
+        json: async () => ({ error: "Internal server error" }),
       });
 
       await fetchRoutes();
 
       const state = useSwapStore.getState().routes;
       expect(state.isLoading).toBe(false);
-      expect(state.error).toBe("Failed to fetch routes");
+  expect(state.error).toBe("Internal server error");
       expect(state.routes).toHaveLength(0);
     });
 
@@ -304,7 +326,7 @@ describe("SwapStore", () => {
       setInputAmount("1.5");
 
       // Mock network error
-      (global.fetch as any).mockRejectedValueOnce(new Error("Network error"));
+  (global.fetch as unknown as Mock).mockRejectedValueOnce(new Error("Network error"));
 
       await fetchRoutes();
 

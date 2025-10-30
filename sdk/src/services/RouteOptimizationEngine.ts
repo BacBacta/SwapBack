@@ -7,7 +7,6 @@ import {
   RouteCandidate,
   RouteSplit,
   OptimizationConfig,
-  AggregatedLiquidity,
   LiquiditySource,
   VenueName,
   VenueType,

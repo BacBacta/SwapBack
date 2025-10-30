@@ -74,7 +74,7 @@ export interface LiquiditySource {
   timestamp: number; // When this data was fetched
 
   // Optional metadata (for debugging/analytics)
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 // ============================================================================
@@ -102,7 +102,7 @@ export interface RouteCandidate {
   mevRisk: "low" | "medium" | "high";
 
   // Execution
-  instructions: any[]; // Solana instructions to execute
+  instructions: unknown[]; // Solana instructions to execute
   estimatedComputeUnits: number;
 }
 
@@ -297,7 +297,7 @@ export interface AggregatedLiquidity {
 
   // Best available
   bestSingleVenue: VenueName;
-  bestCombinedRoute: RouteCandidate;
+  bestCombinedRoute: RouteCandidate | null;
 
   // Metadata
   fetchedAt: number;
@@ -314,8 +314,8 @@ export interface JitoBundleConfig {
   maxRetries: number;
 
   // Bundle composition
-  setupInstructions?: any[]; // Pre-swap setup (e.g., create ATA)
-  cleanupInstructions?: any[]; // Post-swap cleanup
+  setupInstructions?: unknown[]; // Pre-swap setup (e.g., create ATA)
+  cleanupInstructions?: unknown[]; // Post-swap cleanup
 }
 
 export interface JitoBundleResult {

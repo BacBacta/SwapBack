@@ -13,7 +13,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useBoostSystem } from "../hooks/useBoostSystem";
 import { useBoostCalculations } from "../hooks/useBoostCalculations";
@@ -37,7 +37,7 @@ interface ClaimHistory {
 
 export default function ClaimBuyback() {
   const { connected, publicKey } = useWallet();
-  const { claimBuyback, calculateBuybackShare } = useBoostSystem();
+  const { claimBuyback } = useBoostSystem();
   const { calculateBuybackShare: calcShare } = useBoostCalculations();
 
   // State
@@ -60,14 +60,7 @@ export default function ClaimBuyback() {
   }, [stats, calcShare]);
 
   // Charger les stats au montage
-  useEffect(() => {
-    if (connected && publicKey) {
-      loadBuybackStats();
-      loadClaimHistory();
-    }
-  }, [connected, publicKey]);
-
-  const loadBuybackStats = async () => {
+  const loadBuybackStats = useCallback(async () => {
     setIsLoading(true);
     try {
       // TODO: Fetch real data from blockchain
@@ -96,9 +89,9 @@ export default function ClaimBuyback() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [calcShare]);
 
-  const loadClaimHistory = async () => {
+  const loadClaimHistory = useCallback(async () => {
     try {
       // TODO: Fetch real history from blockchain
       const mockHistory: ClaimHistory[] = [
@@ -122,7 +115,14 @@ export default function ClaimBuyback() {
     } catch (err) {
       console.error("Erreur chargement historique:", err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (connected && publicKey) {
+      void loadBuybackStats();
+      void loadClaimHistory();
+    }
+  }, [connected, publicKey, loadBuybackStats, loadClaimHistory]);
 
   const handleClaim = async () => {
     if (!stats || stats.userClaimable === 0) {
@@ -136,7 +136,7 @@ export default function ClaimBuyback() {
 
     try {
       // Claim avec le montant max disponible
-      const signature = await claimBuyback({
+      await claimBuyback({
         maxTokens: stats.totalAvailable,
       });
 
@@ -147,9 +147,10 @@ export default function ClaimBuyback() {
       // Recharger les stats
       await loadBuybackStats();
       await loadClaimHistory();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Erreur claim:", err);
-      setError(err.message || "Échec du claim");
+      const message = err instanceof Error ? err.message : "Échec du claim";
+      setError(message);
     } finally {
       setIsClaiming(false);
     }

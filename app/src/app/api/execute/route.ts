@@ -3,12 +3,6 @@
  * Executes the selected swap route and returns transaction signature
  */
 
-// ============================================================================
-// VERCEL DEPLOYMENT DIRECTIVES
-// ============================================================================
-export const runtime = 'nodejs';     // Force Node.js runtime (not Edge)
-export const dynamic = 'force-dynamic'; // Disable static caching
-
 import { NextRequest, NextResponse } from "next/server";
 import { Connection, VersionedTransaction } from "@solana/web3.js";
 

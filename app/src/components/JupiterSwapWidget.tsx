@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useJupiter } from "../hooks/useJupiter";
 import { JupiterRouteDisplay } from "./JupiterRouteDisplay";
 import type { JupiterQuote, RouteInfo } from "@swapback/sdk";
@@ -63,7 +63,7 @@ export const JupiterSwapWidget: React.FC = () => {
   };
 
   // Obtenir un quote
-  const fetchQuote = async () => {
+  const fetchQuote = useCallback(async () => {
     if (!inputAmount || parseFloat(inputAmount) <= 0) {
       setQuoteError("Veuillez entrer un montant valide");
       return;
@@ -105,7 +105,7 @@ export const JupiterSwapWidget: React.FC = () => {
     } finally {
       setIsLoadingQuote(false);
     }
-  };
+  }, [inputAmount, inputToken, outputToken, slippage, jupiter]);
 
   // Exécuter le swap
   const handleSwap = async () => {
@@ -156,7 +156,7 @@ export const JupiterSwapWidget: React.FC = () => {
 
       return () => clearInterval(interval);
     }
-  }, [quote, inputAmount]);
+  }, [quote, inputAmount, fetchQuote]);
 
   return (
     <div className="max-w-md mx-auto bg-[var(--primary)] rounded-xl shadow-lg p-6 space-y-4">

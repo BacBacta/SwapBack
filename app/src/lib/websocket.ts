@@ -26,29 +26,25 @@ export class SwapWebSocketService {
   private readonly connection: Connection;
   private readonly listeners: Set<EventListener> = new Set();
   private readonly activeSignatures: Map<string, number> = new Map(); // signature -> subscriptionId
+  private readonly priceIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
 
   constructor(rpcUrl: string) {
-    // Normalize the RPC URL for use with Solana Connection.
-    // The Connection constructor requires an http(s) URL; convert if necessary:
-    // 1. If it's a websocket URL (ws:// or wss://), convert to http(s)
-    // 2. If it's missing a protocol, auto-prefix with https://
-    let normalizedUrl = rpcUrl.trim();
+    // Ensure the Connection constructor receives an HTTP/HTTPS URL.
+    // Some environments may accidentally provide a websocket URL (ws:// or wss://).
+    // The Solana `Connection` expects http(s) RPC endpoints; convert if necessary.
+    let normalizedUrl = rpcUrl;
 
     try {
-      // Convert websocket schemes to http/https
-      if (/^wss?:\/\//i.test(normalizedUrl)) {
-        normalizedUrl = normalizedUrl.replace(/^wss:\/\//i, "https://").replace(/^ws:\/\//i, "http://");
+      if (/^wss?:\/\//i.test(rpcUrl)) {
+        // convert websocket schemes to http/https
+        normalizedUrl = rpcUrl.replace(/^wss:\/\//i, "https://").replace(/^ws:\/\//i, "http://");
         console.warn(
-          `SwapWebSocketService: converted websocket URL to HTTP: ${rpcUrl} -> ${normalizedUrl}`
+          `SwapWebSocketService: converted websocket URL to HTTP for Connection: ${rpcUrl} -> ${normalizedUrl}`
         );
       }
 
-      // Auto-prefix with https:// if protocol is missing
       if (!/^https?:\/\//i.test(normalizedUrl)) {
-        normalizedUrl = `https://${normalizedUrl}`;
-        console.warn(
-          `SwapWebSocketService: auto-prefixed RPC URL with https://: ${rpcUrl} -> ${normalizedUrl}`
-        );
+        throw new Error("Invalid RPC URL: must start with http:// or https://");
       }
     } catch (err) {
       // Re-throw with clearer context for easier debugging in the browser
@@ -135,6 +131,11 @@ export class SwapWebSocketService {
    * Subscribe to price updates for a token
    */
   public subscribeToPriceUpdates(tokenMint: string): void {
+    const existingInterval = this.priceIntervals.get(tokenMint);
+    if (existingInterval) {
+      clearInterval(existingInterval);
+    }
+
     // Poll price every 10 seconds
     const intervalId = setInterval(async () => {
       try {
@@ -145,14 +146,13 @@ export class SwapWebSocketService {
       }
     }, 10000);
 
-    // Store interval ID for cleanup (simplified, should use a map in production)
-    (this as any)[`priceInterval_${tokenMint}`] = intervalId;
+    this.priceIntervals.set(tokenMint, intervalId);
   }
 
   /**
    * Fetch token price (placeholder - integrate with actual price oracle)
    */
-  private async fetchTokenPrice(tokenMint: string): Promise<number> {
+  private async fetchTokenPrice(_tokenMint: string): Promise<number> {
     // NOTE: Price oracle integration pending - returns mock data for now
     return Math.random() * 100;
   }
@@ -183,18 +183,16 @@ export class SwapWebSocketService {
    */
   public cleanup(): void {
     // Unsubscribe from all transactions
-    this.activeSignatures.forEach((subscriptionId, signature) => {
+    this.activeSignatures.forEach((subscriptionId) => {
       this.connection.removeSignatureListener(subscriptionId);
     });
     this.activeSignatures.clear();
 
     // Clear price update intervals
-    Object.keys(this).forEach((key) => {
-      if (key.startsWith("priceInterval_")) {
-        clearInterval((this as any)[key]);
-        delete (this as any)[key];
-      }
+    this.priceIntervals.forEach((intervalId) => {
+      clearInterval(intervalId);
     });
+    this.priceIntervals.clear();
 
     // Clear listeners
     this.listeners.clear();
@@ -217,11 +215,11 @@ export function getWebSocketService(): SwapWebSocketService {
     // Ensure we have a valid RPC URL
     let rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
     
-    // Fallback to testnet if not set or invalid
+    // Fallback to devnet if not set or invalid
     if (!rpcUrl || rpcUrl.trim() === "") {
-      rpcUrl = "https://api.testnet.solana.com";
+      rpcUrl = "https://api.devnet.solana.com";
       console.warn(
-        "[WebSocket] NEXT_PUBLIC_SOLANA_RPC_URL not set, using testnet fallback:",
+        "[WebSocket] NEXT_PUBLIC_SOLANA_RPC_URL not set, using devnet fallback:",
         rpcUrl
       );
     }

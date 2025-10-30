@@ -1,5 +1,5 @@
 import { Connection, Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
-import { Program, AnchorProvider, Wallet } from '@coral-xyz/anchor';
+import { Program, AnchorProvider, Wallet, type Idl } from '@coral-xyz/anchor';
 
 // Note: L'IDL sera généré après le build du programme
 // Pour l'instant, on utilise une interface basique
@@ -25,9 +25,9 @@ export class CnftClient {
   /**
    * Initialise le programme (à appeler après génération de l'IDL)
    */
-  setProgram(idl: any) {
+  setProgram(idl: Idl) {
     const provider = new AnchorProvider(this.connection, this.wallet, {});
-    this.program = new Program(idl as any, provider);
+    this.program = new Program(idl, provider);
   }
 
   /**
@@ -59,10 +59,10 @@ export class CnftClient {
    * Note: Cette méthode nécessite l'implémentation complète des comptes Bubblegum
    */
   async mintLevelNft(
-    user: Keypair,
-    level: 'Bronze' | 'Silver' | 'Gold',
-    amountLocked: number,
-    lockDuration: number
+    _user: Keypair,
+    _level: 'Bronze' | 'Silver' | 'Gold',
+    _amountLocked: number,
+    _lockDuration: number
   ): Promise<string> {
     // TODO: Implémenter avec les vraies instructions Bubblegum
     throw new Error('mintLevelNft nécessite l\'implémentation complète des comptes Bubblegum');

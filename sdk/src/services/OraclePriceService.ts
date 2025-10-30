@@ -5,7 +5,6 @@
 
 import { Connection, PublicKey } from "@solana/web3.js";
 import { parsePriceData } from "@pythnetwork/client";
-import { AggregatorAccount } from "@switchboard-xyz/solana.js";
 import {
   OraclePriceData,
   PriceVerification,
@@ -183,9 +182,32 @@ export class OraclePriceService {
       }
 
       // Validate price freshness
-      const publishTimeSeconds = Number(
-        (priceData as any).publishTime ?? priceData.timestamp ?? 0
-      );
+  const priceDataRecord = priceData as unknown as Record<string, unknown>;
+      const publishTimeCandidateRaw = priceDataRecord.publishTime;
+      const timestampCandidateRaw = priceDataRecord.timestamp;
+      const publishTimeSeconds = (() => {
+        if (typeof publishTimeCandidateRaw === "bigint") {
+          return Number(publishTimeCandidateRaw);
+        }
+        if (typeof publishTimeCandidateRaw === "number") {
+          return publishTimeCandidateRaw;
+        }
+        if (typeof publishTimeCandidateRaw === "string") {
+          const parsed = Number(publishTimeCandidateRaw);
+          return Number.isFinite(parsed) ? parsed : undefined;
+        }
+        if (typeof timestampCandidateRaw === "bigint") {
+          return Number(timestampCandidateRaw);
+        }
+        if (typeof timestampCandidateRaw === "number") {
+          return timestampCandidateRaw;
+        }
+        if (typeof timestampCandidateRaw === "string") {
+          const parsed = Number(timestampCandidateRaw);
+          return Number.isFinite(parsed) ? parsed : undefined;
+        }
+        return undefined;
+      })();
 
       if (!publishTimeSeconds || !Number.isFinite(publishTimeSeconds)) {
         console.warn("Pyth publish time missing or invalid");

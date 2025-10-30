@@ -11,7 +11,14 @@ import path from 'path';
 const ROUTER_PROGRAM_ID = new PublicKey('3Z295H9QHByYn9sHm3tH7ASHitwd2Y4AEaXUddfhQKap');
 const RPC_URL = 'https://api.devnet.solana.com';
 
-describe('TODO #1 - Initialize State PDA', () => {
+const RUN_ANCHOR_TESTS = process.env.SWAPBACK_RUN_ANCHOR_TESTS === 'true';
+const describeAnchor = RUN_ANCHOR_TESTS ? describe : describe.skip;
+
+if (!RUN_ANCHOR_TESTS) {
+  console.warn('⏭️  Skip TODO #1 - Initialize State PDA (set SWAPBACK_RUN_ANCHOR_TESTS=true to enable).');
+}
+
+describeAnchor('TODO #1 - Initialize State PDA', () => {
   it('should initialize Router State PDA on devnet', async () => {
     console.log('\n🔧 TODO #1: Initializing Router State PDA...\n');
 

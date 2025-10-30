@@ -3,19 +3,17 @@
  * Teste le programme Router déployé sur devnet avec oracle Switchboard et token $BACK
  */
 import * as anchor from "@coral-xyz/anchor";
-import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
-import { PublicKey, Keypair, SystemProgram } from "@solana/web3.js";
-import { expect, beforeAll } from "vitest";
-import * as fs from "node:fs";
-import * as path from "node:path";
+import { Program, AnchorProvider } from "@coral-xyz/anchor";
+import { PublicKey } from "@solana/web3.js";
+import { expect, beforeAll, describe } from "vitest";
+import { loadProgram } from "./utils/load-idl";
 
-// Helper pour charger les IDL depuis les fichiers locaux
-function loadIdl(programName: string) {
-  const idlPath = path.join(__dirname, `../sdk/src/idl/${programName}.json`);
-  const idlContent = fs.readFileSync(idlPath, "utf-8");
-  return JSON.parse(idlContent);
-}
+const RUN_ANCHOR_TESTS = process.env.SWAPBACK_RUN_ANCHOR_TESTS === "true";
 
+if (!RUN_ANCHOR_TESTS) {
+  console.warn("⏭️  Skip Router On-Chain E2E tests (set SWAPBACK_RUN_ANCHOR_TESTS=true to enable).");
+  describe.skip("🚀 Router On-Chain E2E Tests", () => {});
+} else {
 describe("🚀 Router On-Chain E2E Tests", () => {
   const provider = process.env.ANCHOR_PROVIDER_URL
     ? AnchorProvider.env()
@@ -25,6 +23,11 @@ describe("🚀 Router On-Chain E2E Tests", () => {
   // Program ID déployé sur devnet
   const ROUTER_PROGRAM_ID = new PublicKey(
     "3Z295H9QHByYn9sHm3tH7ASHitwd2Y4AEaXUddfhQKap"
+  );
+
+  const ROUTER_STATE_AUTHORITY = new PublicKey(
+    process.env.SWAPBACK_ROUTER_AUTHORITY_BASE58 ??
+      "578DGN45PsuxySc4T5VsZKeJu2Q83L5coCWR47ZJkwQf"
   );
 
   // Oracle Switchboard SOL/USD
@@ -40,13 +43,11 @@ describe("🚀 Router On-Chain E2E Tests", () => {
   let program: Program;
 
   beforeAll(async () => {
-    // Charger le programme depuis l'IDL local
-    const idl = loadIdl("swapback_router");
-    // Add programId to IDL if not present
-    if (!idl.address) {
-      idl.address = ROUTER_PROGRAM_ID.toBase58();
-    }
-    program = new Program(idl, provider);
+    program = loadProgram({
+      programName: "swapback_router",
+      provider,
+      programId: ROUTER_PROGRAM_ID.toBase58(),
+    });
     console.log("\n✅ Programme Router chargé:", ROUTER_PROGRAM_ID.toBase58());
   });
 
@@ -64,65 +65,34 @@ describe("🚀 Router On-Chain E2E Tests", () => {
       console.log("   Router State PDA:", routerStatePda.toBase58());
       console.log("   Authority:", provider.wallet.publicKey.toBase58());
 
-      try {
-        // Vérifier si déjà initialisé
-        const existingState =
-          await provider.connection.getAccountInfo(routerStatePda);
+      const existingState = await provider.connection.getAccountInfo(
+        routerStatePda
+      );
 
-        if (existingState) {
-          console.log("   ℹ️  Router State déjà initialisé");
-
-          // Lire les données brutes (IDL n'expose pas account.state)
-          const accountData = existingState.data;
-          console.log("   Data length:", accountData.length, "bytes");
-
-          // Parser manuellement: authority (32 bytes) + paused (1 byte) + padding
-          const authorityBytes = accountData.slice(8, 40); // après discriminator 8 bytes
-          const authority = new PublicKey(authorityBytes);
-          const paused = accountData.readUInt8(40) === 1;
-
-          console.log("   Authority actuelle:", authority.toBase58());
-          console.log("   Paused:", paused);
-
-          expect(authority.toBase58()).to.equal(
-            provider.wallet.publicKey.toBase58()
-          );
-          return;
-        }
-
-        // Initialiser
-        const tx = await program.methods
-          .initialize()
-          .accounts({
-            state: routerStatePda,
-            authority: provider.wallet.publicKey,
-            systemProgram: SystemProgram.programId,
-          })
-          .rpc();
-
-        console.log("   ✅ Router initialisé. Signature:", tx);
-
-        // Vérifier (lecture brute)
-        const accountInfo =
-          await provider.connection.getAccountInfo(routerStatePda);
-        if (!accountInfo) {
-          throw new Error("Router state non créé");
-        }
-
-        const authorityBytes = accountInfo.data.slice(8, 40);
-        const authority = new PublicKey(authorityBytes);
-        const paused = accountInfo.data.readUInt8(40) === 1;
-
-        expect(authority.toBase58()).to.equal(
-          provider.wallet.publicKey.toBase58()
+      if (!existingState) {
+        throw new Error(
+          "Router state absent sur devnet – vérifier le déploiement ou mettre à jour l'authority attendue."
         );
-        expect(paused).to.equal(false);
-
-        console.log("   ✅ State validé");
-      } catch (error) {
-        console.error("   ❌ Erreur:", error);
-        throw error;
       }
+
+      console.log("   ℹ️  Router State déjà initialisé");
+
+      const accountData = existingState.data;
+      console.log("   Data length:", accountData.length, "bytes");
+
+      const authorityBytes = accountData.slice(8, 40);
+      const authority = new PublicKey(authorityBytes);
+      const paused = accountData.readUInt8(40) === 1;
+
+      console.log("   Authority actuelle:", authority.toBase58());
+      console.log("   Paused:", paused);
+
+      expect(authority.toBase58()).to.equal(
+        ROUTER_STATE_AUTHORITY.toBase58()
+      );
+      expect(paused).to.equal(false);
+
+      console.log("   ✅ State validé contre l'authority attendue");
     });
   });
 
@@ -174,3 +144,4 @@ describe("🚀 Router On-Chain E2E Tests", () => {
     });
   });
 });
+}

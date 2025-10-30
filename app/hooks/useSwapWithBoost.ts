@@ -11,8 +11,8 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, Transaction } from "@solana/web3.js";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
 import { useBoostCalculations } from "./useBoostCalculations";
 
 export interface SwapParams {
@@ -43,7 +43,6 @@ export interface SwapQuote {
 }
 
 export function useSwapWithBoost() {
-  const { connection } = useConnection();
   const { publicKey, signTransaction } = useWallet();
   const { calculateBoostedRebate } = useBoostCalculations();
 
@@ -247,7 +246,6 @@ export function useSwapWithBoost() {
  * Hook pour obtenir l'historique des swaps de l'utilisateur
  */
 export function useSwapHistory() {
-  const { connection } = useConnection();
   const { publicKey } = useWallet();
   const [history, setHistory] = useState<SwapResult[]>([]);
   const [loading, setLoading] = useState(false);

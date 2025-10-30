@@ -59,24 +59,6 @@ export const TransactionHistory = ({
     }
   }, [connected, publicKey]);
 
-  // Fonction pour ajouter une transaction (exportée via context ou props)
-  const addTransaction = (tx: Omit<Transaction, "id" | "timestamp">) => {
-    const newTx: Transaction = {
-      ...tx,
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: Date.now(),
-    };
-
-    const updated = [newTx, ...transactions].slice(0, 50); // Garder les 50 dernières
-    setTransactions(updated);
-
-    // Sauvegarder dans localStorage
-    if (publicKey) {
-      const storageKey = `swapback_history_${publicKey.toString()}`;
-      localStorage.setItem(storageKey, JSON.stringify(updated));
-    }
-  };
-
   const filteredTransactions = transactions.filter(
     (tx) => filter === "all" || tx.type === filter
   );

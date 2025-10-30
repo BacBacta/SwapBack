@@ -7,10 +7,7 @@ import {
   Connection,
   PublicKey,
   Transaction,
-  SystemProgram,
   TransactionInstruction,
-  Keypair,
-  LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 
 /**
@@ -117,6 +114,29 @@ export interface BurnDetails {
   token: string;
   amount: number;
   reason: "OPTIMIZATION" | "GOVERNANCE" | "PENALTY";
+}
+
+type TraceOperationDetails =
+  | SwapDetails
+  | LockDetails
+  | UnlockDetails
+  | StakeDetails
+  | BurnDetails;
+
+interface InstructionWithData {
+  data: Buffer | Uint8Array | string;
+}
+
+interface ParsedTransactionInfo {
+  transaction: {
+    message: {
+      instructions: InstructionWithData[];
+      accountKeys: Array<{ toBase58(): string }>;
+    };
+  };
+  meta?: { err?: unknown } | null;
+  blockTime?: number | null;
+  slot: number;
 }
 
 /**
@@ -506,7 +526,7 @@ export class BlockchainTracer {
   private async createTraceInstruction(
     operationType: OperationType,
     userPubkey: PublicKey,
-    details: any
+  details: TraceOperationDetails
   ): Promise<TransactionInstruction> {
     // Sérialiser les détails de l'opération
     const data = Buffer.from(
@@ -532,7 +552,7 @@ export class BlockchainTracer {
    * Parse une transaction pour extraire l'opération
    */
   private async parseTransactionToOperation(
-    tx: any,
+    tx: ParsedTransactionInfo,
     signature: string
   ): Promise<TracedOperation | null> {
     try {
@@ -543,18 +563,34 @@ export class BlockchainTracer {
       if (!instruction) return null;
 
       // Décoder les données
-      const decodedData = JSON.parse(instruction.data.toString());
+      const rawData = instruction.data;
+      const serialized =
+        typeof rawData === "string"
+          ? rawData
+          : Buffer.from(rawData).toString();
+
+      const decodedData = JSON.parse(serialized) as {
+        type: OperationType;
+        details: TraceOperationDetails;
+        timestamp?: number;
+      };
+
+      const userKey = tx.transaction.message.accountKeys[0];
+      if (!userKey) {
+        return null;
+      }
+      const blockTime = tx.blockTime ?? null;
 
       return {
         id: signature,
         type: decodedData.type,
         status: tx.meta?.err ? OperationStatus.FAILED : OperationStatus.SUCCESS,
-        timestamp: decodedData.timestamp || tx.blockTime! * 1000,
-        user: tx.transaction.message.accountKeys[0].toBase58(),
-        details: decodedData.details,
+        timestamp: decodedData.timestamp || (blockTime ? blockTime * 1000 : Date.now()),
+        user: userKey.toBase58(),
+  details: decodedData.details,
         signature,
         slot: tx.slot,
-        blockTime: tx.blockTime || undefined,
+        blockTime: blockTime ?? undefined,
       };
     } catch (error) {
       console.error("Erreur lors du parsing:", error);

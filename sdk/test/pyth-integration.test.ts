@@ -1,7 +1,9 @@
 import { describe, it, vi, beforeEach } from "vitest";
+import type { Mock } from "vitest";
 import { Connection } from "@solana/web3.js";
 import { OraclePriceService } from "../src/services/OraclePriceService";
 import { VenueName, RouteCandidate } from "../src/types/smart-router";
+import { parsePriceData } from "@pythnetwork/client";
 
 // Mock Solana connection
 vi.mock("@solana/web3.js", () => ({
@@ -33,6 +35,22 @@ describe("Pyth Oracle Integration", () => {
     vi.clearAllMocks();
     mockConnection = new Connection("mock-url");
     oracleService = new OraclePriceService(mockConnection, 5000);
+
+    const accountInfo = {
+      data: Buffer.alloc(280, 1),
+      owner: { toBase58: () => "FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH" },
+      lamports: 1_000_000,
+      executable: false,
+    };
+
+    (mockConnection.getAccountInfo as Mock).mockResolvedValue(accountInfo);
+
+    (parsePriceData as Mock).mockReturnValue({
+      price: BigInt(100_000_000_00),
+      confidence: BigInt(500_000_00),
+      exponent: -8,
+      publishTime: BigInt(Math.floor(Date.now() / 1000)),
+    });
   });
 
   it("should test Pyth integration with mocked data", async () => {

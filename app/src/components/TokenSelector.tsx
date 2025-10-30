@@ -27,7 +27,7 @@ const POPULAR_TOKENS: Token[] = [
       "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png",
   },
   {
-    address: process.env.NEXT_PUBLIC_BACK_MINT || "5UpRMH1xbHYsZdrYwjVab8cVN3QXJpFubCB5WXeB8i27",
+    address: "BH8thpWca6kpN2pKwWTaKv2F5s4MEkbML18LtJ8eFypU",
     symbol: "BACK",
     name: "SwapBack Token",
     decimals: 9,
@@ -35,9 +35,9 @@ const POPULAR_TOKENS: Token[] = [
       "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png", // TODO: Add custom logo
   },
   {
-    address: process.env.NEXT_PUBLIC_USDC_MINT || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    address: "3y4dCqwWuYx1B97YEDmgq9qjuNE1eyEwGx2eLgz6Rc6G",
     symbol: "USDC",
-    name: "USD Coin (Mainnet)",
+    name: "USD Coin (Test)",
     decimals: 6,
     logoURI:
       "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png",
@@ -96,10 +96,8 @@ export const TokenSelector = ({
   onClose,
 }: TokenSelectorProps) => {
   const [search, setSearch] = useState("");
-  const [tokens, setTokens] = useState<Token[]>(POPULAR_TOKENS);
-  const [loading, setLoading] = useState(false);
 
-  const filteredTokens = tokens.filter(
+  const filteredTokens = POPULAR_TOKENS.filter(
     (token) =>
       token.symbol.toLowerCase().includes(search.toLowerCase()) ||
       token.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -174,12 +172,7 @@ export const TokenSelector = ({
 
           {/* Token List */}
           <div className="max-h-96 overflow-y-auto space-y-1 pr-2">
-            {loading ? (
-              <div className="text-center py-8">
-                <div className="inline-block w-8 h-8 border-4 border-[var(--primary)]/20 border-t-[var(--primary)] animate-spin"></div>
-                <p className="terminal-text opacity-70 text-sm mt-4 uppercase tracking-wider">LOADING TOKENS...</p>
-              </div>
-            ) : filteredTokens.length === 0 ? (
+            {filteredTokens.length === 0 ? (
               <div className="text-center py-8">
                 <p className="terminal-text opacity-70 uppercase tracking-wider">NO TOKENS FOUND</p>
               </div>

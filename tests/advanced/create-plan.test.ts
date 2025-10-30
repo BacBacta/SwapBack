@@ -19,7 +19,14 @@ const RPC_ENDPOINT = process.env.NEXT_PUBLIC_RPC_URL || "https://api.devnet.sola
 const ROUTER_PROGRAM_ID = new PublicKey("3Z295H9QHByYn9sHm3tH7ASHitwd2Y4AEaXUddfhQKap");
 const USDC_DEVNET = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 
-describe("Advanced: create_plan Instruction", () => {
+const RUN_ANCHOR_TESTS = process.env.SWAPBACK_RUN_ANCHOR_TESTS === "true";
+const describeAnchor = RUN_ANCHOR_TESTS ? describe : describe.skip;
+
+if (!RUN_ANCHOR_TESTS) {
+  console.warn("⏭️  Skip advanced on-chain create_plan tests (set SWAPBACK_RUN_ANCHOR_TESTS=true to enable).");
+}
+
+describeAnchor("Advanced: create_plan Instruction", () => {
   let connection: Connection;
   let provider: AnchorProvider;
   let userWallet: Keypair;
@@ -183,7 +190,7 @@ describe("Advanced: create_plan Instruction", () => {
   });
 });
 
-describe("Advanced: State Account Validation", () => {
+describeAnchor("Advanced: State Account Validation", () => {
   let connection: Connection;
   let statePda: PublicKey;
 

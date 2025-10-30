@@ -3,7 +3,7 @@
  * Valide que l'interface SwapBack communique correctement avec les programmes déployés
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { Connection, PublicKey, Keypair } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@coral-xyz/anchor';
 import NodeWallet from '@coral-xyz/anchor/dist/cjs/nodewallet';
@@ -13,10 +13,13 @@ const RPC_URL = process.env.ANCHOR_PROVIDER_URL || 'https://api.devnet.solana.co
 const ROUTER_PROGRAM_ID = new PublicKey('3Z295H9QHByYn9sHm3tH7ASHitwd2Y4AEaXUddfhQKap');
 const BACK_TOKEN_MINT = new PublicKey('862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux');
 const SWITCHBOARD_FEED = new PublicKey('GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR');
+const RUN_REAL_FRONTEND = process.env.SWAPBACK_REAL_FRONTEND_TESTS === 'true';
 
 describe('Frontend Integration Tests', () => {
   let connection: Connection;
   let provider: AnchorProvider;
+  let versionSpy: ReturnType<typeof vi.spyOn> | null = null;
+  let accountInfoSpy: ReturnType<typeof vi.spyOn> | null = null;
 
   beforeAll(() => {
     connection = new Connection(RPC_URL, 'confirmed');
@@ -24,6 +27,63 @@ describe('Frontend Integration Tests', () => {
     provider = new AnchorProvider(connection, wallet, {
       commitment: 'confirmed',
     });
+
+  if (!RUN_REAL_FRONTEND) {
+      versionSpy = vi.spyOn(connection, 'getVersion').mockResolvedValue({
+        'solana-core': '1.17.0',
+        'feature-set': 0,
+      });
+
+      const defaultAccount = {
+        data: Buffer.alloc(256),
+        executable: false,
+        lamports: 1_000_000,
+        owner: new PublicKey('11111111111111111111111111111111'),
+        rentEpoch: 0,
+      };
+
+      const statePda = PublicKey.findProgramAddressSync([
+        Buffer.from('state'),
+      ], ROUTER_PROGRAM_ID)[0];
+
+      accountInfoSpy = (vi
+        .spyOn(connection, 'getAccountInfo')
+        .mockImplementation(async (pubkey: PublicKey) => {
+          if (pubkey.equals(ROUTER_PROGRAM_ID)) {
+            return {
+              ...defaultAccount,
+              executable: true,
+              owner: ROUTER_PROGRAM_ID,
+            };
+          }
+
+          if (pubkey.equals(BACK_TOKEN_MINT)) {
+            return {
+              ...defaultAccount,
+              owner: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
+            };
+          }
+
+          if (pubkey.equals(SWITCHBOARD_FEED)) {
+            return {
+              ...defaultAccount,
+              owner: new PublicKey('SW1TCH7qEPTdLsDHRgPuMQjbQxKdH2aBStViMFnt64f'),
+              data: Buffer.alloc(280, 1),
+            };
+          }
+
+          if (pubkey.equals(statePda)) {
+            return defaultAccount;
+          }
+
+          return defaultAccount;
+        })) as unknown as ReturnType<typeof vi.spyOn>;
+    }
+  });
+
+  afterAll(() => {
+    versionSpy?.mockRestore();
+    accountInfoSpy?.mockRestore();
   });
 
   describe('🔗 Connexion Blockchain', () => {

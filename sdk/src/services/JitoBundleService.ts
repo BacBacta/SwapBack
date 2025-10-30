@@ -220,9 +220,15 @@ export class JitoBundleService {
       );
     }
 
-    let parsed: any = {};
+    type QuickNodeResponse = {
+      bundleId?: string;
+      result?: string;
+      id?: string;
+    };
+
+    let parsed: QuickNodeResponse | null = null;
     try {
-      parsed = await response.json();
+      parsed = (await response.json()) as QuickNodeResponse;
     } catch (error) {
       console.warn("QuickNode response parse failed", error);
     }
@@ -473,8 +479,8 @@ export class SandwichDetector {
    * This is a simplified version - real implementation would monitor mempool
    */
   async detectSuspiciousActivity(
-    inputMint: string,
-    outputMint: string
+  _inputMint: string,
+  _outputMint: string
   ): Promise<{
     suspicious: boolean;
     reason?: string;
@@ -498,7 +504,7 @@ export class SandwichDetector {
    */
   async monitorTransaction(
     signature: string,
-    timeoutMs = 30000
+  _timeoutMs = 30000
   ): Promise<{
     sandwiched: boolean;
     frontRunner?: string;

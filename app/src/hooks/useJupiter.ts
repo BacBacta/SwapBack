@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, VersionedTransaction } from "@solana/web3.js";
+import { VersionedTransaction } from "@solana/web3.js";
 import { JupiterService } from "@swapback/sdk";
 import type { JupiterQuote } from "@swapback/sdk";
 
