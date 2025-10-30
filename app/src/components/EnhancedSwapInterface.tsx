@@ -24,7 +24,7 @@ interface RouteStep {
 
 export function EnhancedSwapInterface() {
   const { connected } = useWallet();
-  
+
   // Store
   const {
     swap,
@@ -41,17 +41,21 @@ export function EnhancedSwapInterface() {
   useSwapWebSocket();
 
   // State
-  const [selectedRouter, setSelectedRouter] = useState<"swapback" | "jupiter">("swapback");
+  const [selectedRouter, setSelectedRouter] = useState<"swapback" | "jupiter">(
+    "swapback"
+  );
   const [showSlippageModal, setShowSlippageModal] = useState(false);
   const [showTokenSelector, setShowTokenSelector] = useState(false);
-  const [tokenSelectorType, setTokenSelectorType] = useState<"input" | "output">("input");
+  const [tokenSelectorType, setTokenSelectorType] = useState<
+    "input" | "output"
+  >("input");
   const [customSlippage, setCustomSlippage] = useState("");
   const [hasSearchedRoute, setHasSearchedRoute] = useState(false);
   const [priceImpact, setPriceImpact] = useState(0);
 
   // ⚠️ AUTO-FETCH DÉSACTIVÉ pour éviter les boucles infinies
   // L'utilisateur doit cliquer sur "Rechercher Route" manuellement
-  
+
   // Debounced route fetching - DÉSACTIVÉ
   // const debouncedFetchRoutes = useCallback(
   //   debounce((inputToken: typeof swap.inputToken, outputToken: typeof swap.outputToken, inputAmount: string) => {
@@ -109,7 +113,7 @@ export function EnhancedSwapInterface() {
 
   const handleSearchRoute = () => {
     const amount = parseFloat(swap.inputAmount);
-    
+
     if (swap.inputToken && swap.outputToken && amount > 0) {
       fetchRoutes();
       setHasSearchedRoute(true);
@@ -126,7 +130,13 @@ export function EnhancedSwapInterface() {
     setShowTokenSelector(true);
   };
 
-  const handleTokenSelect = (token: { address: string; symbol: string; name: string; decimals: number; logoURI?: string }) => {
+  const handleTokenSelect = (token: {
+    address: string;
+    symbol: string;
+    name: string;
+    decimals: number;
+    logoURI?: string;
+  }) => {
     // Convert TokenSelector format to swapStore format
     const storeToken = {
       mint: token.address,
@@ -136,7 +146,7 @@ export function EnhancedSwapInterface() {
       logoURI: token.logoURI,
       balance: 0, // Will be updated by websocket
     };
-    
+
     if (tokenSelectorType === "input") {
       setInputToken(storeToken);
     } else {
@@ -148,7 +158,7 @@ export function EnhancedSwapInterface() {
   // Mock route data for display
   const inputAmount = parseFloat(swap.inputAmount) || 0;
   const outputAmount = parseFloat(swap.outputAmount) || 0;
-  
+
   const mockRouteInfo = routes.selectedRoute
     ? {
         type: "Aggregator" as const,
@@ -164,7 +174,10 @@ export function EnhancedSwapInterface() {
           inputMint: swap.inputToken?.mint || "",
           outputMint: swap.outputToken?.mint || "",
           inAmount: (inputAmount * 1000000).toString(),
-          outAmount: ((outputAmount * 1000000) / routes.selectedRoute!.venues.length).toString(),
+          outAmount: (
+            (outputAmount * 1000000) /
+            routes.selectedRoute!.venues.length
+          ).toString(),
           fee: "1000",
         })) as RouteStep[],
       }
@@ -174,14 +187,13 @@ export function EnhancedSwapInterface() {
     <div className="max-w-lg mx-auto">
       {/* Main Swap Card */}
       <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6 shadow-xl">
-        
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-white">Swap</h2>
             <ConnectionStatus />
           </div>
-          
+
           {/* Router Selection */}
           <div className="flex gap-2 mb-4">
             <button
@@ -252,7 +264,7 @@ export function EnhancedSwapInterface() {
                 placeholder="0.00"
                 className="flex-1 bg-transparent text-2xl font-bold text-white outline-none"
               />
-              <button 
+              <button
                 onClick={openInputTokenSelector}
                 className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg transition-colors"
               >
@@ -265,13 +277,25 @@ export function EnhancedSwapInterface() {
                         className="w-6 h-6 rounded-full"
                       />
                     )}
-                    <span className="font-semibold">{swap.inputToken.symbol}</span>
+                    <span className="font-semibold">
+                      {swap.inputToken.symbol}
+                    </span>
                   </>
                 ) : (
                   <span className="text-gray-400">Select token</span>
                 )}
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
                 </svg>
               </button>
             </div>
@@ -289,8 +313,18 @@ export function EnhancedSwapInterface() {
             onClick={switchTokens}
             className="bg-gray-900 border-2 border-gray-800 hover:border-[var(--primary)] rounded-lg p-2 transition-all"
           >
-            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+            <svg
+              className="w-5 h-5 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
+              />
             </svg>
           </button>
         </div>
@@ -314,7 +348,7 @@ export function EnhancedSwapInterface() {
                 placeholder="0.00"
                 className="flex-1 bg-transparent text-2xl font-bold text-white outline-none"
               />
-              <button 
+              <button
                 onClick={openOutputTokenSelector}
                 className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg transition-colors"
               >
@@ -327,13 +361,25 @@ export function EnhancedSwapInterface() {
                         className="w-6 h-6 rounded-full"
                       />
                     )}
-                    <span className="font-semibold">{swap.outputToken.symbol}</span>
+                    <span className="font-semibold">
+                      {swap.outputToken.symbol}
+                    </span>
                   </>
                 ) : (
                   <span className="text-gray-400">Select token</span>
                 )}
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
                 </svg>
               </button>
             </div>
@@ -353,12 +399,24 @@ export function EnhancedSwapInterface() {
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-gray-400">Rate</span>
                 <span className="text-white font-medium">
-                  1 {swap.inputToken?.symbol} ≈ {outputAmount > 0 && inputAmount > 0 ? (outputAmount / inputAmount).toFixed(6) : '0'} {swap.outputToken?.symbol}
+                  1 {swap.inputToken?.symbol} ≈{" "}
+                  {outputAmount > 0 && inputAmount > 0
+                    ? (outputAmount / inputAmount).toFixed(6)
+                    : "0"}{" "}
+                  {swap.outputToken?.symbol}
                 </span>
               </div>
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-gray-400">Price Impact</span>
-                <span className={priceImpact > 5 ? "text-red-400" : priceImpact > 1 ? "text-yellow-400" : "text-green-400"}>
+                <span
+                  className={
+                    priceImpact > 5
+                      ? "text-red-400"
+                      : priceImpact > 1
+                        ? "text-yellow-400"
+                        : "text-green-400"
+                  }
+                >
                   {priceImpact.toFixed(2)}%
                 </span>
               </div>
@@ -389,7 +447,8 @@ export function EnhancedSwapInterface() {
                   <div className="flex justify-between">
                     <span className="text-gray-400">BACK Rebate</span>
                     <span className="text-green-400 font-medium">
-                      +{mockRouteInfo.rebate.toFixed(4)} {swap.outputToken?.symbol}
+                      +{mockRouteInfo.rebate.toFixed(4)}{" "}
+                      {swap.outputToken?.symbol}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -402,7 +461,8 @@ export function EnhancedSwapInterface() {
                     <div className="flex justify-between font-semibold">
                       <span className="text-white">Total Saved</span>
                       <span className="text-[var(--primary)]">
-                        +{(mockRouteInfo.npi + mockRouteInfo.rebate).toFixed(4)} {swap.outputToken?.symbol}
+                        +{(mockRouteInfo.npi + mockRouteInfo.rebate).toFixed(4)}{" "}
+                        {swap.outputToken?.symbol}
                       </span>
                     </div>
                   </div>
@@ -411,47 +471,61 @@ export function EnhancedSwapInterface() {
             )}
 
             {/* Route Visualization */}
-            {routes.selectedRoute.venues && routes.selectedRoute.venues.length > 0 && (
-              <div className="bg-gray-900 rounded-lg p-3">
-                <div className="text-sm font-semibold text-gray-300 mb-2">Route</div>
-                <div className="flex items-center gap-1 text-xs text-gray-400">
-                  {routes.selectedRoute.venues.map((venue, index) => (
-                    <div key={index} className="flex items-center">
-                      <span className="bg-gray-800 px-2 py-1 rounded">{venue}</span>
-                      {index < routes.selectedRoute!.venues.length - 1 && (
-                        <span className="mx-1">→</span>
-                      )}
-                    </div>
-                  ))}
+            {routes.selectedRoute.venues &&
+              routes.selectedRoute.venues.length > 0 && (
+                <div className="bg-gray-900 rounded-lg p-3">
+                  <div className="text-sm font-semibold text-gray-300 mb-2">
+                    Route
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-gray-400">
+                    {routes.selectedRoute.venues.map((venue, index) => (
+                      <div key={index} className="flex items-center">
+                        <span className="bg-gray-800 px-2 py-1 rounded">
+                          {venue}
+                        </span>
+                        {index < routes.selectedRoute!.venues.length - 1 && (
+                          <span className="mx-1">→</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
           </div>
         )}
 
         {/* Swap Button */}
         <button
           onClick={handleSearchRoute}
-          disabled={!connected || !swap.inputToken || !swap.outputToken || inputAmount <= 0 || routes.isLoading}
+          disabled={
+            !connected ||
+            !swap.inputToken ||
+            !swap.outputToken ||
+            inputAmount <= 0 ||
+            routes.isLoading
+          }
           className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
-            !connected || !swap.inputToken || !swap.outputToken || inputAmount <= 0
+            !connected ||
+            !swap.inputToken ||
+            !swap.outputToken ||
+            inputAmount <= 0
               ? "bg-gray-800 text-gray-600 cursor-not-allowed"
               : routes.isLoading
-              ? "bg-[var(--primary)]/50 text-black cursor-wait"
-              : "bg-[var(--primary)] text-black hover:bg-[var(--primary)]/90"
+                ? "bg-[var(--primary)]/50 text-black cursor-wait"
+                : "bg-[var(--primary)] text-black hover:bg-[var(--primary)]/90"
           }`}
         >
           {!connected
             ? "Connect Wallet"
             : !swap.inputToken || !swap.outputToken
-            ? "Select Tokens"
-            : inputAmount <= 0
-            ? "Enter Amount"
-            : routes.isLoading
-            ? "🔍 Finding Best Route..."
-            : hasSearchedRoute && routes.selectedRoute
-            ? "✅ Execute Swap"
-            : "🔍 Search Route"}
+              ? "Select Tokens"
+              : inputAmount <= 0
+                ? "Enter Amount"
+                : routes.isLoading
+                  ? "🔍 Finding Best Route..."
+                  : hasSearchedRoute && routes.selectedRoute
+                    ? "✅ Execute Swap"
+                    : "🔍 Search Route"}
         </button>
 
         {/* Footer Info */}
@@ -470,7 +544,9 @@ export function EnhancedSwapInterface() {
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 border border-[var(--primary)]/30 rounded-xl p-6 max-w-md w-full">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-white">Slippage Settings</h3>
+              <h3 className="text-xl font-bold text-white">
+                Slippage Settings
+              </h3>
               <button
                 onClick={() => setShowSlippageModal(false)}
                 className="text-gray-400 hover:text-white"
@@ -498,7 +574,9 @@ export function EnhancedSwapInterface() {
 
             {/* Custom Input */}
             <div className="mb-6">
-              <label className="text-sm text-gray-400 mb-2 block">Custom Slippage</label>
+              <label className="text-sm text-gray-400 mb-2 block">
+                Custom Slippage
+              </label>
               <div className="flex gap-2">
                 <input
                   type="number"
@@ -529,7 +607,11 @@ export function EnhancedSwapInterface() {
       {/* Token Selector Modal */}
       {showTokenSelector && (
         <TokenSelector
-          selectedToken={tokenSelectorType === "input" ? swap.inputToken?.mint || "" : swap.outputToken?.mint || ""}
+          selectedToken={
+            tokenSelectorType === "input"
+              ? swap.inputToken?.mint || ""
+              : swap.outputToken?.mint || ""
+          }
           onSelect={handleTokenSelect}
           onClose={() => setShowTokenSelector(false)}
         />

@@ -74,7 +74,9 @@ export function TransactionTracker() {
                   </div>
                   <span
                     className={`text-xs mt-2 ${
-                      index <= currentStepIndex ? "text-[var(--primary)]" : "text-gray-500"
+                      index <= currentStepIndex
+                        ? "text-[var(--primary)]"
+                        : "text-gray-500"
                     }`}
                   >
                     {step.label}
@@ -167,7 +169,9 @@ export function TransactionTracker() {
       {/* Transaction History */}
       {transactionHistory.length > 0 && (
         <div>
-          <h3 className="text-lg font-bold text-[var(--primary)] mb-3">Recent Swaps</h3>
+          <h3 className="text-lg font-bold text-[var(--primary)] mb-3">
+            Recent Swaps
+          </h3>
           <div className="space-y-2">
             {transactionHistory.slice(0, 10).map((tx, _index) => (
               <div

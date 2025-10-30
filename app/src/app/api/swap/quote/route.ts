@@ -21,7 +21,8 @@ import { getTokenByMint } from "@/constants/tokens";
  * New API: https://lite-api.jup.ag/ultra/v1
  * Old API (deprecated): https://quote-api.jup.ag/v6
  */
-const JUPITER_API = process.env.JUPITER_API_URL || "https://quote-api.jup.ag/v6";
+const JUPITER_API =
+  process.env.JUPITER_API_URL || "https://quote-api.jup.ag/v6";
 const USE_CORS_PROXY = process.env.USE_CORS_PROXY === "true"; // Default: false (direct call)
 const CORS_PROXY = "https://corsproxy.io/?";
 
@@ -91,14 +92,20 @@ const validateTokenSupport = async (
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TOKEN_VALIDATION_TIMEOUT_MS);
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    TOKEN_VALIDATION_TIMEOUT_MS
+  );
 
   try {
-    const response = await fetch(`${JUPITER_TOKEN_INFO_URL}/${normalizedMint}`, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      signal: controller.signal,
-    });
+    const response = await fetch(
+      `${JUPITER_TOKEN_INFO_URL}/${normalizedMint}`,
+      {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      }
+    );
 
     clearTimeout(timeoutId);
 
@@ -134,7 +141,9 @@ const validateTokenSupport = async (
 // Construct final Jupiter URL
 const getJupiterUrl = (endpoint: string) => {
   const baseUrl = `${JUPITER_API.replace(/\/$/, "")}${endpoint}`;
-  return USE_CORS_PROXY ? `${CORS_PROXY}${encodeURIComponent(baseUrl)}` : baseUrl;
+  return USE_CORS_PROXY
+    ? `${CORS_PROXY}${encodeURIComponent(baseUrl)}`
+    : baseUrl;
 };
 
 /**
@@ -173,7 +182,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate amount
-    const parsedAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+    const parsedAmount =
+      typeof amount === "string" ? parseFloat(amount) : amount;
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       return NextResponse.json(
         { error: "Invalid amount: must be a positive number" },
@@ -238,9 +248,14 @@ export async function POST(request: NextRequest) {
     // MODE MOCK pour tests (si problème réseau)
     if (USE_MOCK_DATA) {
       console.log("🧪 Using MOCK data (network unavailable)");
-      const mockQuote = generateMockQuote(inputMint, outputMint, parsedAmount, slippageBps);
+      const mockQuote = generateMockQuote(
+        inputMint,
+        outputMint,
+        parsedAmount,
+        slippageBps
+      );
       const mockRouteInfo = parseRouteInfo(mockQuote);
-      
+
       return NextResponse.json(
         {
           success: true,
@@ -255,7 +270,7 @@ export async function POST(request: NextRequest) {
     // Fetch quote from Jupiter API
     const jupiterEndpoint = `/quote?${params.toString()}`;
     const quoteUrl = getJupiterUrl(jupiterEndpoint);
-    
+
     console.log("🔄 Fetching Jupiter quote...");
     console.log("   URL:", quoteUrl);
     console.log("   Params:", {
@@ -264,11 +279,11 @@ export async function POST(request: NextRequest) {
       amount: parsedAmount,
       slippageBps,
     });
-    
+
     const response = await fetch(quoteUrl, {
       method: "GET",
       headers: {
-        "Accept": "application/json",
+        Accept: "application/json",
       },
       cache: "no-store",
       next: { revalidate: 0 },
@@ -286,7 +301,7 @@ export async function POST(request: NextRequest) {
       console.error("   Status:", response.status);
       console.error("   Response:", errorText);
       console.error("   URL called:", quoteUrl);
-      
+
       return NextResponse.json(
         {
           error: "Jupiter API error",
@@ -297,7 +312,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-  const quote = (await response.json()) as JupiterQuoteResponse;
+    const quote = (await response.json()) as JupiterQuoteResponse;
 
     if (!quote || !quote.outAmount) {
       return NextResponse.json(
@@ -314,7 +329,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Parse and enhance the quote with route information
-  const routeInfo = parseRouteInfo(quote);
+    const routeInfo = parseRouteInfo(quote);
 
     return NextResponse.json(
       {
@@ -327,7 +342,7 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("❌ Error fetching quote:", error);
-    
+
     return NextResponse.json(
       {
         error: "Failed to fetch quote",
@@ -363,7 +378,7 @@ function parseRouteInfo(quote: JupiterQuoteResponse) {
   const priceImpact =
     typeof quote.priceImpactPct === "string"
       ? parseFloat(quote.priceImpactPct)
-      : quote.priceImpactPct ?? 0;
+      : (quote.priceImpactPct ?? 0);
 
   return {
     totalSteps: routes.length,
@@ -386,10 +401,9 @@ function generateMockQuote(
   slippageBps: number
 ): JupiterQuoteResponse {
   // Simuler un taux de change SOL/USDC ~ 150 USDC par SOL
-  const mockPrice = inputMint.startsWith("So11") && outputMint.startsWith("EPjF") 
-    ? 150 
-    : 1.05; // Prix par défaut
-  
+  const mockPrice =
+    inputMint.startsWith("So11") && outputMint.startsWith("EPjF") ? 150 : 1.05; // Prix par défaut
+
   const outAmount = Math.floor(amount * mockPrice);
   const priceImpact = (amount / 1000000000) * 0.01; // 0.01% par SOL
 
@@ -398,7 +412,9 @@ function generateMockQuote(
     outputMint,
     inAmount: amount.toString(),
     outAmount: outAmount.toString(),
-    otherAmountThreshold: Math.floor(outAmount * (1 - slippageBps / 10000)).toString(),
+    otherAmountThreshold: Math.floor(
+      outAmount * (1 - slippageBps / 10000)
+    ).toString(),
     swapMode: "ExactIn",
     slippageBps,
     priceImpactPct: priceImpact.toFixed(4),

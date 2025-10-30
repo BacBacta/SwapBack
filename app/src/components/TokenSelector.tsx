@@ -127,7 +127,9 @@ export const TokenSelector = ({
         <div className="swap-card m-4 border-2 border-[var(--primary)]">
           {/* Header */}
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-bold terminal-text terminal-glow uppercase tracking-wider">[SELECT TOKEN]</h3>
+            <h3 className="text-xl font-bold terminal-text terminal-glow uppercase tracking-wider">
+              [SELECT TOKEN]
+            </h3>
             <button
               onClick={onClose}
               className="p-2 border-2 border-[var(--primary)] hover:bg-[var(--primary)] hover:text-black transition-colors terminal-text"
@@ -174,7 +176,9 @@ export const TokenSelector = ({
           <div className="max-h-96 overflow-y-auto space-y-1 pr-2">
             {filteredTokens.length === 0 ? (
               <div className="text-center py-8">
-                <p className="terminal-text opacity-70 uppercase tracking-wider">NO TOKENS FOUND</p>
+                <p className="terminal-text opacity-70 uppercase tracking-wider">
+                  NO TOKENS FOUND
+                </p>
               </div>
             ) : (
               filteredTokens.map((token) => (
@@ -210,7 +214,9 @@ export const TokenSelector = ({
                     <div className="font-semibold terminal-text terminal-glow">
                       {token.symbol}
                     </div>
-                    <div className="text-xs terminal-text opacity-60">{token.name}</div>
+                    <div className="text-xs terminal-text opacity-60">
+                      {token.name}
+                    </div>
                   </div>
 
                   {/* Selected indicator */}

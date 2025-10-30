@@ -40,7 +40,10 @@ export interface JupiterQuoteResponse {
 export class JupiterRealIntegration {
   private readonly baseUrl = "https://quote-api.jup.ag/v6";
 
-  constructor(private readonly connection: Connection, private readonly wallet: Keypair) {
+  constructor(
+    private readonly connection: Connection,
+    private readonly wallet: Keypair
+  ) {
     if (!connection) {
       throw new Error("Connection is required");
     }
@@ -57,7 +60,10 @@ export class JupiterRealIntegration {
     url.searchParams.set("slippageBps", String(request.slippageBps ?? 50));
     url.searchParams.set("swapMode", request.swapMode ?? "ExactIn");
     if (request.onlyDirectRoutes !== undefined) {
-      url.searchParams.set("onlyDirectRoutes", String(request.onlyDirectRoutes));
+      url.searchParams.set(
+        "onlyDirectRoutes",
+        String(request.onlyDirectRoutes)
+      );
     }
 
     const response = await fetch(url.toString(), {
@@ -68,7 +74,9 @@ export class JupiterRealIntegration {
     });
 
     if (!response.ok) {
-      throw new Error(`Jupiter quote request failed with status ${response.status}`);
+      throw new Error(
+        `Jupiter quote request failed with status ${response.status}`
+      );
     }
 
     const parsed = (await response.json()) as JupiterQuoteResponse;

@@ -479,8 +479,8 @@ export class SandwichDetector {
    * This is a simplified version - real implementation would monitor mempool
    */
   async detectSuspiciousActivity(
-  _inputMint: string,
-  _outputMint: string
+    _inputMint: string,
+    _outputMint: string
   ): Promise<{
     suspicious: boolean;
     reason?: string;
@@ -504,7 +504,7 @@ export class SandwichDetector {
    */
   async monitorTransaction(
     signature: string,
-  _timeoutMs = 30000
+    _timeoutMs = 30000
   ): Promise<{
     sandwiched: boolean;
     frontRunner?: string;

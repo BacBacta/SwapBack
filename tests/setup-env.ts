@@ -14,7 +14,7 @@ if (!fs.existsSync(walletPath)) {
 
   if (!base58Secret) {
     throw new Error(
-      "Missing SWAPBACK_DEVNET_SECRET_BASE58. Provide the devnet wallet secret in base58 format.",
+      "Missing SWAPBACK_DEVNET_SECRET_BASE58. Provide the devnet wallet secret in base58 format."
     );
   }
 

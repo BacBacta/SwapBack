@@ -103,9 +103,7 @@ export const DCASimulator = () => {
             </label>
             <select
               value={frequency}
-              onChange={(e) =>
-                setFrequency(e.target.value as typeof frequency)
-              }
+              onChange={(e) => setFrequency(e.target.value as typeof frequency)}
               className="input-field w-full"
             >
               <option value="daily">[DAILY]</option>

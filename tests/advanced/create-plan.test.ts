@@ -15,15 +15,22 @@ import {
 import { AnchorProvider, Program, BN, Wallet } from "@coral-xyz/anchor";
 import { airdropIfNeeded } from "../utils/solana-helpers";
 
-const RPC_ENDPOINT = process.env.NEXT_PUBLIC_RPC_URL || "https://api.devnet.solana.com";
-const ROUTER_PROGRAM_ID = new PublicKey("3Z295H9QHByYn9sHm3tH7ASHitwd2Y4AEaXUddfhQKap");
-const USDC_DEVNET = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+const RPC_ENDPOINT =
+  process.env.NEXT_PUBLIC_RPC_URL || "https://api.devnet.solana.com";
+const ROUTER_PROGRAM_ID = new PublicKey(
+  "3Z295H9QHByYn9sHm3tH7ASHitwd2Y4AEaXUddfhQKap"
+);
+const USDC_DEVNET = new PublicKey(
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+);
 
 const RUN_ANCHOR_TESTS = process.env.SWAPBACK_RUN_ANCHOR_TESTS === "true";
 const describeAnchor = RUN_ANCHOR_TESTS ? describe : describe.skip;
 
 if (!RUN_ANCHOR_TESTS) {
-  console.warn("⏭️  Skip advanced on-chain create_plan tests (set SWAPBACK_RUN_ANCHOR_TESTS=true to enable).");
+  console.warn(
+    "⏭️  Skip advanced on-chain create_plan tests (set SWAPBACK_RUN_ANCHOR_TESTS=true to enable)."
+  );
 }
 
 describeAnchor("Advanced: create_plan Instruction", () => {
@@ -35,16 +42,14 @@ describeAnchor("Advanced: create_plan Instruction", () => {
   beforeAll(async () => {
     connection = new Connection(RPC_ENDPOINT, "confirmed");
     userWallet = Keypair.generate();
-    
+
     // Skip airdrop pour éviter rate limit - tests logiques seulement
     // await airdropIfNeeded(connection, userWallet.publicKey, 2 * LAMPORTS_PER_SOL);
-    
+
     // Setup provider
-    provider = new AnchorProvider(
-      connection,
-      new Wallet(userWallet),
-      { commitment: "confirmed" }
-    );
+    provider = new AnchorProvider(connection, new Wallet(userWallet), {
+      commitment: "confirmed",
+    });
 
     // Dériver State PDA
     [statePda] = PublicKey.findProgramAddressSync(
@@ -60,7 +65,11 @@ describeAnchor("Advanced: create_plan Instruction", () => {
   it("✅ Test 1: create_plan avec paramètres valides", async () => {
     const planId = new BN(Date.now());
     const [dcaPlanPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("dca_plan"), userWallet.publicKey.toBuffer(), planId.toArrayLike(Buffer, "le", 8)],
+      [
+        Buffer.from("dca_plan"),
+        userWallet.publicKey.toBuffer(),
+        planId.toArrayLike(Buffer, "le", 8),
+      ],
       ROUTER_PROGRAM_ID
     );
 
@@ -73,8 +82,12 @@ describeAnchor("Advanced: create_plan Instruction", () => {
     };
 
     console.log("\n   📝 Paramètres:");
-    console.log(`      Input: ${params.inputAmount.toNumber() / LAMPORTS_PER_SOL} SOL`);
-    console.log(`      Destination: ${params.destinationToken.toString().slice(0, 8)}...`);
+    console.log(
+      `      Input: ${params.inputAmount.toNumber() / LAMPORTS_PER_SOL} SOL`
+    );
+    console.log(
+      `      Destination: ${params.destinationToken.toString().slice(0, 8)}...`
+    );
     console.log(`      Interval: ${params.dcaInterval.toNumber()}s`);
     console.log(`      Swaps: ${params.numberOfSwaps.toNumber()}`);
 
@@ -83,13 +96,17 @@ describeAnchor("Advanced: create_plan Instruction", () => {
     expect(accountInfoBefore).toBeNull();
 
     console.log("   ✓ PDA plan n'existe pas encore (OK)");
-    console.log("   ⚠ Instruction create_plan nécessite le programme initialisé");
-    console.log("   → Test validé en simulation (programme pas encore init sur ce test)");
+    console.log(
+      "   ⚠ Instruction create_plan nécessite le programme initialisé"
+    );
+    console.log(
+      "   → Test validé en simulation (programme pas encore init sur ce test)"
+    );
   });
 
   it("✅ Test 2: Validation des contraintes - Interval minimum", () => {
     const MIN_INTERVAL = 60; // 1 minute
-    
+
     const validIntervals = [60, 3600, 86400];
     const invalidIntervals = [0, 30, 59];
 
@@ -106,7 +123,7 @@ describeAnchor("Advanced: create_plan Instruction", () => {
 
   it("✅ Test 3: Validation des contraintes - Montant minimum", () => {
     const MIN_AMOUNT = 0.01 * LAMPORTS_PER_SOL;
-    
+
     const validAmounts = [0.01, 0.1, 1, 10].map((n) => n * LAMPORTS_PER_SOL);
     const invalidAmounts = [0, 0.001, 0.009].map((n) => n * LAMPORTS_PER_SOL);
 
@@ -126,7 +143,7 @@ describeAnchor("Advanced: create_plan Instruction", () => {
     const requiredAmount = 10 * LAMPORTS_PER_SOL; // 10 SOL
 
     const hasEnoughFunds = userBalance >= requiredAmount;
-    
+
     if (!hasEnoughFunds) {
       console.log(`\n   ⚠ Fonds insuffisants détectés:`);
       console.log(`      Balance: ${userBalance / LAMPORTS_PER_SOL} SOL`);
@@ -157,12 +174,20 @@ describeAnchor("Advanced: create_plan Instruction", () => {
     const planId2 = new BN(12345);
 
     const [pda1] = PublicKey.findProgramAddressSync(
-      [Buffer.from("dca_plan"), userWallet.publicKey.toBuffer(), planId1.toArrayLike(Buffer, "le", 8)],
+      [
+        Buffer.from("dca_plan"),
+        userWallet.publicKey.toBuffer(),
+        planId1.toArrayLike(Buffer, "le", 8),
+      ],
       ROUTER_PROGRAM_ID
     );
 
     const [pda2] = PublicKey.findProgramAddressSync(
-      [Buffer.from("dca_plan"), userWallet.publicKey.toBuffer(), planId2.toArrayLike(Buffer, "le", 8)],
+      [
+        Buffer.from("dca_plan"),
+        userWallet.publicKey.toBuffer(),
+        planId2.toArrayLike(Buffer, "le", 8),
+      ],
       ROUTER_PROGRAM_ID
     );
 
@@ -204,12 +229,16 @@ describeAnchor("Advanced: State Account Validation", () => {
 
   it("✅ State PDA existe sur devnet", async () => {
     const accountInfo = await connection.getAccountInfo(statePda);
-    
+
     if (accountInfo) {
       console.log("\n   ✓ State account trouvé:");
-      console.log(`      Owner: ${accountInfo.owner.toString().slice(0, 8)}...`);
+      console.log(
+        `      Owner: ${accountInfo.owner.toString().slice(0, 8)}...`
+      );
       console.log(`      Data length: ${accountInfo.data.length} bytes`);
-      console.log(`      Lamports: ${accountInfo.lamports / LAMPORTS_PER_SOL} SOL`);
+      console.log(
+        `      Lamports: ${accountInfo.lamports / LAMPORTS_PER_SOL} SOL`
+      );
       expect(accountInfo.owner.toString()).toBe(ROUTER_PROGRAM_ID.toString());
     } else {
       console.log("\n   ⚠ State account pas encore initialisé");

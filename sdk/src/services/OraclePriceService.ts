@@ -182,7 +182,7 @@ export class OraclePriceService {
       }
 
       // Validate price freshness
-  const priceDataRecord = priceData as unknown as Record<string, unknown>;
+      const priceDataRecord = priceData as unknown as Record<string, unknown>;
       const publishTimeCandidateRaw = priceDataRecord.publishTime;
       const timestampCandidateRaw = priceDataRecord.timestamp;
       const publishTimeSeconds = (() => {

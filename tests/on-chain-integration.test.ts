@@ -316,9 +316,8 @@ describeOnChain("On-Chain Integration Tests", () => {
         .rpc();
 
       // Verify program is unpaused
-      const resumedGlobalState = await program.account.globalState.fetch(
-        globalState
-      );
+      const resumedGlobalState =
+        await program.account.globalState.fetch(globalState);
       expect(resumedGlobalState.isPaused).toBe(false);
     });
 

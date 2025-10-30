@@ -26,7 +26,8 @@ export class SwapWebSocketService {
   private readonly connection: Connection;
   private readonly listeners: Set<EventListener> = new Set();
   private readonly activeSignatures: Map<string, number> = new Map(); // signature -> subscriptionId
-  private readonly priceIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
+  private readonly priceIntervals: Map<string, ReturnType<typeof setInterval>> =
+    new Map();
 
   constructor(rpcUrl: string) {
     // Ensure the Connection constructor receives an HTTP/HTTPS URL.
@@ -37,7 +38,9 @@ export class SwapWebSocketService {
     try {
       if (/^wss?:\/\//i.test(rpcUrl)) {
         // convert websocket schemes to http/https
-        normalizedUrl = rpcUrl.replace(/^wss:\/\//i, "https://").replace(/^ws:\/\//i, "http://");
+        normalizedUrl = rpcUrl
+          .replace(/^wss:\/\//i, "https://")
+          .replace(/^ws:\/\//i, "http://");
         console.warn(
           `SwapWebSocketService: converted websocket URL to HTTP for Connection: ${rpcUrl} -> ${normalizedUrl}`
         );
@@ -48,7 +51,9 @@ export class SwapWebSocketService {
       }
     } catch (err) {
       // Re-throw with clearer context for easier debugging in the browser
-      throw new Error(`SwapWebSocketService initialization error: ${err instanceof Error ? err.message : String(err)}`);
+      throw new Error(
+        `SwapWebSocketService initialization error: ${err instanceof Error ? err.message : String(err)}`
+      );
     }
 
     // Connection will internally use websockets where appropriate for subscriptions.
@@ -208,13 +213,15 @@ let wsInstance: SwapWebSocketService | null = null;
 export function getWebSocketService(): SwapWebSocketService {
   // Only initialize on client side
   if (globalThis.window === undefined) {
-    throw new TypeError("WebSocket service can only be initialized on the client side");
+    throw new TypeError(
+      "WebSocket service can only be initialized on the client side"
+    );
   }
 
   if (!wsInstance) {
     // Ensure we have a valid RPC URL
     let rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
-    
+
     // Fallback to devnet if not set or invalid
     if (!rpcUrl || rpcUrl.trim() === "") {
       rpcUrl = "https://api.devnet.solana.com";
@@ -223,10 +230,13 @@ export function getWebSocketService(): SwapWebSocketService {
         rpcUrl
       );
     }
-    
-    console.log("[WebSocket Debug] RPC URL from env:", process.env.NEXT_PUBLIC_SOLANA_RPC_URL);
+
+    console.log(
+      "[WebSocket Debug] RPC URL from env:",
+      process.env.NEXT_PUBLIC_SOLANA_RPC_URL
+    );
     console.log("[WebSocket Debug] Final RPC URL used:", rpcUrl);
-    
+
     wsInstance = new SwapWebSocketService(rpcUrl);
   }
   return wsInstance;

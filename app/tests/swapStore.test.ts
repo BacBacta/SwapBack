@@ -236,7 +236,7 @@ describe("SwapStore", () => {
         ],
       };
 
-  (global.fetch as unknown as Mock).mockResolvedValueOnce({
+      (global.fetch as unknown as Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => mockQuoteResponse,
       });
@@ -303,7 +303,7 @@ describe("SwapStore", () => {
       setInputAmount("1.5");
 
       // Mock fetch error
-  (global.fetch as unknown as Mock).mockResolvedValueOnce({
+      (global.fetch as unknown as Mock).mockResolvedValueOnce({
         ok: false,
         status: 500,
         json: async () => ({ error: "Internal server error" }),
@@ -313,7 +313,7 @@ describe("SwapStore", () => {
 
       const state = useSwapStore.getState().routes;
       expect(state.isLoading).toBe(false);
-  expect(state.error).toBe("Internal server error");
+      expect(state.error).toBe("Internal server error");
       expect(state.routes).toHaveLength(0);
     });
 
@@ -326,7 +326,9 @@ describe("SwapStore", () => {
       setInputAmount("1.5");
 
       // Mock network error
-  (global.fetch as unknown as Mock).mockRejectedValueOnce(new Error("Network error"));
+      (global.fetch as unknown as Mock).mockRejectedValueOnce(
+        new Error("Network error")
+      );
 
       await fetchRoutes();
 

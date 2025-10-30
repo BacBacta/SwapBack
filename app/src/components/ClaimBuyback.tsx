@@ -203,7 +203,9 @@ export default function ClaimBuyback() {
               <div className="stat-icon">🎁</div>
               <div className="stat-content">
                 <p className="stat-label">Buyback Disponible Total</p>
-                <p className="stat-value">{formatNumber(stats.totalAvailable)} BACK</p>
+                <p className="stat-value">
+                  {formatNumber(stats.totalAvailable)} BACK
+                </p>
                 <p className="stat-detail">50% distribués, 50% brûlés</p>
               </div>
             </div>
@@ -212,9 +214,12 @@ export default function ClaimBuyback() {
               <div className="stat-icon">📊</div>
               <div className="stat-content">
                 <p className="stat-label">Votre Boost</p>
-                <p className="stat-value">{(stats.userBoost / 100).toFixed(1)}%</p>
+                <p className="stat-value">
+                  {(stats.userBoost / 100).toFixed(1)}%
+                </p>
                 <p className="stat-detail">
-                  {stats.userBoost.toLocaleString()} BP / {stats.totalCommunityBoost.toLocaleString()} BP total
+                  {stats.userBoost.toLocaleString()} BP /{" "}
+                  {stats.totalCommunityBoost.toLocaleString()} BP total
                 </p>
               </div>
             </div>
@@ -223,7 +228,9 @@ export default function ClaimBuyback() {
               <div className="stat-icon">💎</div>
               <div className="stat-content">
                 <p className="stat-label">Votre Part</p>
-                <p className="stat-value">{formatNumber(stats.userClaimable)} BACK</p>
+                <p className="stat-value">
+                  {formatNumber(stats.userClaimable)} BACK
+                </p>
                 <p className="stat-detail">
                   {buybackCalculation?.sharePercentage.toFixed(3)}% du total
                 </p>
@@ -234,7 +241,9 @@ export default function ClaimBuyback() {
               <div className="stat-icon">🔥</div>
               <div className="stat-content">
                 <p className="stat-label">Brûlés (Deflationary)</p>
-                <p className="stat-value">{formatNumber(stats.totalBurned)} BACK</p>
+                <p className="stat-value">
+                  {formatNumber(stats.totalBurned)} BACK
+                </p>
                 <p className="stat-detail">50% brûlés en permanence</p>
               </div>
             </div>
@@ -249,7 +258,9 @@ export default function ClaimBuyback() {
                   <span className="step-number">1</span>
                   <div className="step-content">
                     <p className="step-label">Total Buyback</p>
-                    <p className="step-value">{formatNumber(buybackCalculation.totalBuyback)} BACK</p>
+                    <p className="step-value">
+                      {formatNumber(buybackCalculation.totalBuyback)} BACK
+                    </p>
                   </div>
                 </div>
 
@@ -259,7 +270,9 @@ export default function ClaimBuyback() {
                   <span className="step-number">2</span>
                   <div className="step-content">
                     <p className="step-label">Distribuable (50%)</p>
-                    <p className="step-value">{formatNumber(buybackCalculation.distributable)} BACK</p>
+                    <p className="step-value">
+                      {formatNumber(buybackCalculation.distributable)} BACK
+                    </p>
                   </div>
                 </div>
 
@@ -268,18 +281,30 @@ export default function ClaimBuyback() {
                 <div className="calc-step">
                   <span className="step-number">3</span>
                   <div className="step-content">
-                    <p className="step-label">Votre Part ({buybackCalculation.sharePercentage.toFixed(2)}%)</p>
-                    <p className="step-value highlight">{formatNumber(buybackCalculation.userShare)} BACK</p>
+                    <p className="step-label">
+                      Votre Part (
+                      {buybackCalculation.sharePercentage.toFixed(2)}%)
+                    </p>
+                    <p className="step-value highlight">
+                      {formatNumber(buybackCalculation.userShare)} BACK
+                    </p>
                   </div>
                 </div>
               </div>
 
               <div className="formula">
-                <p>Formule: user_share = (user_boost / total_boost) × (buyback × 50%)</p>
-                <p className="formula-calc">
-                  = ({stats.userBoost.toLocaleString()} / {stats.totalCommunityBoost.toLocaleString()}) × {formatNumber(buybackCalculation.distributable)} BACK
+                <p>
+                  Formule: user_share = (user_boost / total_boost) × (buyback ×
+                  50%)
                 </p>
-                <p className="formula-result">= {formatNumber(buybackCalculation.userShare)} BACK</p>
+                <p className="formula-calc">
+                  = ({stats.userBoost.toLocaleString()} /{" "}
+                  {stats.totalCommunityBoost.toLocaleString()}) ×{" "}
+                  {formatNumber(buybackCalculation.distributable)} BACK
+                </p>
+                <p className="formula-result">
+                  = {formatNumber(buybackCalculation.userShare)} BACK
+                </p>
               </div>
             </div>
           )}
@@ -304,7 +329,9 @@ export default function ClaimBuyback() {
             </button>
 
             {error && <div className="error-message">❌ {error}</div>}
-            {successMessage && <div className="success-message">{successMessage}</div>}
+            {successMessage && (
+              <div className="success-message">{successMessage}</div>
+            )}
           </div>
 
           {/* Historique */}
@@ -322,11 +349,13 @@ export default function ClaimBuyback() {
                 {claimHistory.map((claim, index) => (
                   <div key={index} className="history-row">
                     <span>{formatDate(claim.timestamp)}</span>
-                    <span className="amount">{formatNumber(claim.amount)} BACK</span>
+                    <span className="amount">
+                      {formatNumber(claim.amount)} BACK
+                    </span>
                     <span>{(claim.boost / 100).toFixed(1)}%</span>
                     <span>{claim.sharePercentage.toFixed(2)}%</span>
                     <a
-                      href={`https://explorer.solana.com/tx/${claim.signature}?cluster=${process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'testnet'}`}
+                      href={`https://explorer.solana.com/tx/${claim.signature}?cluster=${process.env.NEXT_PUBLIC_SOLANA_NETWORK || "testnet"}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="signature-link"
@@ -344,16 +373,21 @@ export default function ClaimBuyback() {
             <h4>ℹ️ Comment ça marche?</h4>
             <ul>
               <li>
-                <strong>Distribution proportionnelle:</strong> Votre part est calculée selon votre boost par rapport au boost total de la communauté
+                <strong>Distribution proportionnelle:</strong> Votre part est
+                calculée selon votre boost par rapport au boost total de la
+                communauté
               </li>
               <li>
-                <strong>Split 50/50:</strong> 50% du buyback est distribué aux holders, 50% est brûlé (déflationniste)
+                <strong>Split 50/50:</strong> 50% du buyback est distribué aux
+                holders, 50% est brûlé (déflationniste)
               </li>
               <li>
-                <strong>Boost dynamique:</strong> Plus vous lockez (montant + durée), plus votre part est importante
+                <strong>Boost dynamique:</strong> Plus vous lockez (montant +
+                durée), plus votre part est importante
               </li>
               <li>
-                <strong>Claim à tout moment:</strong> Réclamez vos tokens quand vous voulez, ils s'accumulent
+                <strong>Claim à tout moment:</strong> Réclamez vos tokens quand
+                vous voulez, ils s'accumulent
               </li>
             </ul>
           </div>
@@ -539,7 +573,9 @@ export default function ClaimBuyback() {
           font-weight: bold;
           border-radius: 8px;
           cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition:
+            transform 0.2s,
+            box-shadow 0.2s;
           display: inline-flex;
           align-items: center;
           gap: 0.5rem;

@@ -57,7 +57,11 @@ function normalizeType(node: unknown): void {
     normalizeType(typed.vec);
   }
 
-  if (typed.array && Array.isArray(typed.array) && typed.array[0] !== undefined) {
+  if (
+    typed.array &&
+    Array.isArray(typed.array) &&
+    typed.array[0] !== undefined
+  ) {
     if (typeof typed.array[0] === "string") {
       typed.array[0] = canonicalizeTypeName(typed.array[0] as string);
     } else {
@@ -83,7 +87,10 @@ export function normalizeIdl<T extends MutableIdl>(idl: T): T {
     instruction.args?.forEach((arg) => normalizeType(arg));
 
     if (!instruction.discriminator && typeof instruction.name === "string") {
-      instruction.discriminator = deriveDiscriminator("global", instruction.name);
+      instruction.discriminator = deriveDiscriminator(
+        "global",
+        instruction.name
+      );
     }
   });
 
@@ -100,7 +107,9 @@ export function normalizeIdl<T extends MutableIdl>(idl: T): T {
     const accountName = accountRecord.name;
 
     if (typeof accountName === "string") {
-      const existingType = types.find((typeDef) => typeDef.name === accountName);
+      const existingType = types.find(
+        (typeDef) => typeDef.name === accountName
+      );
       if (!existingType && accountRecord.type) {
         const accountTypeDef: MutableRecord = {
           name: accountName,
@@ -158,10 +167,7 @@ export function normalizeIdl<T extends MutableIdl>(idl: T): T {
 
 function deriveDiscriminator(namespace: string, name: string): number[] {
   return Array.from(
-    createHash("sha256")
-      .update(`${namespace}:${name}`)
-      .digest()
-      .slice(0, 8)
+    createHash("sha256").update(`${namespace}:${name}`).digest().slice(0, 8)
   );
 }
 
@@ -217,7 +223,9 @@ export function loadProgram({
 
   if (registerWorkspace) {
     const idlName = (idl as MutableRecord).name;
-    const key = workspaceKey ?? toWorkspaceKey(typeof idlName === "string" ? idlName : programName);
+    const key =
+      workspaceKey ??
+      toWorkspaceKey(typeof idlName === "string" ? idlName : programName);
     (anchor.workspace as Record<string, Program>)[key] = program;
   }
 

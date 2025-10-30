@@ -1,5 +1,5 @@
-import { Connection, Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
-import { Program, AnchorProvider, Wallet, type Idl } from '@coral-xyz/anchor';
+import { Connection, Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
+import { Program, AnchorProvider, Wallet, type Idl } from "@coral-xyz/anchor";
 
 // Note: L'IDL sera généré après le build du programme
 // Pour l'instant, on utilise une interface basique
@@ -37,7 +37,7 @@ export class CnftClient {
     authority: Keypair,
     treeConfig: PublicKey
   ): Promise<string> {
-    if (!this.program) throw new Error('Programme non initialisé');
+    if (!this.program) throw new Error("Programme non initialisé");
 
     const tx = await this.program.methods
       .initializeCollection()
@@ -60,22 +60,21 @@ export class CnftClient {
    */
   async mintLevelNft(
     _user: Keypair,
-    _level: 'Bronze' | 'Silver' | 'Gold',
+    _level: "Bronze" | "Silver" | "Gold",
     _amountLocked: number,
     _lockDuration: number
   ): Promise<string> {
     // TODO: Implémenter avec les vraies instructions Bubblegum
-    throw new Error('mintLevelNft nécessite l\'implémentation complète des comptes Bubblegum');
+    throw new Error(
+      "mintLevelNft nécessite l'implémentation complète des comptes Bubblegum"
+    );
   }
 
   /**
    * Met à jour le statut d'un NFT
    */
-  async updateNftStatus(
-    user: Keypair,
-    isActive: boolean
-  ): Promise<string> {
-    if (!this.program) throw new Error('Programme non initialisé');
+  async updateNftStatus(user: Keypair, isActive: boolean): Promise<string> {
+    if (!this.program) throw new Error("Programme non initialisé");
 
     const userNftPDA = this.getUserNftPDA(user.publicKey);
 
@@ -95,7 +94,7 @@ export class CnftClient {
   // Méthodes utilitaires
   private getUserNftPDA(user: PublicKey): PublicKey {
     const [pda] = PublicKey.findProgramAddressSync(
-      [Buffer.from('user_nft'), user.toBuffer()],
+      [Buffer.from("user_nft"), user.toBuffer()],
       this.config.programId
     );
     return pda;
@@ -104,11 +103,11 @@ export class CnftClient {
 
 // Configuration par défaut
 export const DEFAULT_CNFT_CONFIG: CnftConfig = {
-  programId: new PublicKey('HCsNTpvkUGV7XMAw5VsBSR4Kxvt5x59iFDAeucvY4cre'),
+  programId: new PublicKey("HCsNTpvkUGV7XMAw5VsBSR4Kxvt5x59iFDAeucvY4cre"),
   collectionConfig: (() => {
     const [pda] = PublicKey.findProgramAddressSync(
-      [Buffer.from('collection_config')],
-      new PublicKey('HCsNTpvkUGV7XMAw5VsBSR4Kxvt5x59iFDAeucvY4cre')
+      [Buffer.from("collection_config")],
+      new PublicKey("HCsNTpvkUGV7XMAw5VsBSR4Kxvt5x59iFDAeucvY4cre")
     );
     return pda;
   })(),

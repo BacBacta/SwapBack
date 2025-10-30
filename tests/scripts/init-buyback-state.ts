@@ -32,10 +32,10 @@ function readFlag(name: string): string | undefined {
 function expectEnv(name: string, value: string | undefined): string {
   if (!value) {
     throw new Error(
-      `Missing ${name}. Provide it via environment variable or CLI flag (e.g. --${name.replace(
-        /_/g,
-        "-"
-      ).toLowerCase()}=...)`);
+      `Missing ${name}. Provide it via environment variable or CLI flag (e.g. --${name
+        .replace(/_/g, "-")
+        .toLowerCase()}=...)`
+    );
   }
 
   return value;
@@ -107,7 +107,9 @@ async function main(): Promise<void> {
   const minAmountStr =
     process.env.SWAPBACK_BUYBACK_MIN_AMOUNT ?? readFlag("min-amount") ?? "0";
 
-  const usdcMint = new PublicKey(expectEnv("SWAPBACK_BUYBACK_USDC_MINT", usdcMintStr));
+  const usdcMint = new PublicKey(
+    expectEnv("SWAPBACK_BUYBACK_USDC_MINT", usdcMintStr)
+  );
   const minAmount = new BN(minAmountStr);
 
   const [buybackState] = PublicKey.findProgramAddressSync(
@@ -129,7 +131,10 @@ async function main(): Promise<void> {
 
   const accountInfo = await provider.connection.getAccountInfo(buybackState);
   if (accountInfo) {
-    console.log("ℹ️  Buyback state already initialized at", buybackState.toBase58());
+    console.log(
+      "ℹ️  Buyback state already initialized at",
+      buybackState.toBase58()
+    );
     return;
   }
 
@@ -160,7 +165,10 @@ async function main(): Promise<void> {
     console.log("✅ Buyback state initialized successfully!");
     console.log("   Signature:", signature);
   } catch (error) {
-    console.error("❌ Failed to initialize buyback state:", (error as Error).message);
+    console.error(
+      "❌ Failed to initialize buyback state:",
+      (error as Error).message
+    );
     throw error;
   }
 }

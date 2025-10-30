@@ -81,7 +81,10 @@ export interface SwapBackWallet {
   publicKey: PublicKey | null;
   signTransaction: (transaction: Transaction) => Promise<Transaction>;
   signAllTransactions: (transactions: Transaction[]) => Promise<Transaction[]>;
-  sendTransaction: (transaction: Transaction, connection: Connection) => Promise<string>;
+  sendTransaction: (
+    transaction: Transaction,
+    connection: Connection
+  ) => Promise<string>;
 }
 
 /**
@@ -168,10 +171,12 @@ export class SwapBackClient {
       // TODO: Import du IDL une fois les programmes compilés
       // Pour l'instant, on retourne un résultat mock
       // const idl = require("./idl/swapback_router.json");
-      
+
       // NOTE: Return mock data until programs are deployed
-      console.warn("⚠️ SwapBack Router program not yet deployed - returning mock swap result");
-      
+      console.warn(
+        "⚠️ SwapBack Router program not yet deployed - returning mock swap result"
+      );
+
       return {
         signature: "MockSwapSignature" + Date.now(),
         actualOutput: minimumOutput,
@@ -334,7 +339,10 @@ export class SwapBackClient {
 
       // Note: L'instruction lock_tokens doit être ajoutée au programme Solana
       // Pour le MVP, on simule avec une transaction de base
-      console.log("📝 Creating lock instruction for PDA:", userLockPDA.toBase58());
+      console.log(
+        "📝 Creating lock instruction for PDA:",
+        userLockPDA.toBase58()
+      );
 
       // Pour le MVP, on retourne une signature simulée
       console.log("⚠️ Lock tokens not fully implemented in program yet");
@@ -375,7 +383,10 @@ export class SwapBackClient {
 
       // Note: L'instruction unlock_tokens doit être ajoutée au programme Solana
       // Pour le MVP, on simule
-      console.log("📝 Creating unlock instruction for PDA:", userLockPDA.toBase58());
+      console.log(
+        "📝 Creating unlock instruction for PDA:",
+        userLockPDA.toBase58()
+      );
       console.log("⚠️ Unlock tokens not fully implemented in program yet");
 
       const signature = await this.wallet.sendTransaction(
@@ -413,7 +424,10 @@ export class SwapBackClient {
 
       // Note: L'instruction claim_rewards doit être ajoutée au programme Solana
       // Pour le MVP, on simule
-      console.log("📝 Creating claim instruction for PDA:", userRebatePDA.toBase58());
+      console.log(
+        "📝 Creating claim instruction for PDA:",
+        userRebatePDA.toBase58()
+      );
       console.log("⚠️ Claim rewards not fully implemented in program yet");
 
       const signature = await this.wallet.sendTransaction(

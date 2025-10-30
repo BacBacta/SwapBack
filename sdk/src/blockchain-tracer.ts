@@ -526,7 +526,7 @@ export class BlockchainTracer {
   private async createTraceInstruction(
     operationType: OperationType,
     userPubkey: PublicKey,
-  details: TraceOperationDetails
+    details: TraceOperationDetails
   ): Promise<TransactionInstruction> {
     // Sérialiser les détails de l'opération
     const data = Buffer.from(
@@ -565,9 +565,7 @@ export class BlockchainTracer {
       // Décoder les données
       const rawData = instruction.data;
       const serialized =
-        typeof rawData === "string"
-          ? rawData
-          : Buffer.from(rawData).toString();
+        typeof rawData === "string" ? rawData : Buffer.from(rawData).toString();
 
       const decodedData = JSON.parse(serialized) as {
         type: OperationType;
@@ -585,9 +583,10 @@ export class BlockchainTracer {
         id: signature,
         type: decodedData.type,
         status: tx.meta?.err ? OperationStatus.FAILED : OperationStatus.SUCCESS,
-        timestamp: decodedData.timestamp || (blockTime ? blockTime * 1000 : Date.now()),
+        timestamp:
+          decodedData.timestamp || (blockTime ? blockTime * 1000 : Date.now()),
         user: userKey.toBase58(),
-  details: decodedData.details,
+        details: decodedData.details,
         signature,
         slot: tx.slot,
         blockTime: blockTime ?? undefined,

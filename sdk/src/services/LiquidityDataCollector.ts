@@ -164,7 +164,7 @@ export class LiquidityDataCollector {
       totalDepth,
       sources,
       bestSingleVenue,
-  bestCombinedRoute: null, // Will be calculated by optimizer
+      bestCombinedRoute: null, // Will be calculated by optimizer
       fetchedAt: Date.now(),
       staleness: 0,
     };
@@ -250,7 +250,7 @@ export class LiquidityDataCollector {
     return null;
   }
 
-    /**
+  /**
    * Fetch real-time orderbook from Phoenix CLOB
    */
   private async fetchPhoenixOrderbook(
@@ -261,7 +261,7 @@ export class LiquidityDataCollector {
       // TODO: Fix Phoenix integration types
       console.warn("Phoenix orderbook fetch temporarily disabled");
       return null;
-      
+
       /* TEMPORARILY DISABLED
       const marketAddress = getPhoenixMarket(inputMint.toBase58(), outputMint.toBase58());
       if (!marketAddress) {
