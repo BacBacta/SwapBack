@@ -26,17 +26,21 @@ pub const CNFT_PROGRAM_ID: Pubkey = pubkey!("9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJ
 // Oracle constants
 pub const MAX_STALENESS_SECS: i64 = 300; // 5 minutes max staleness
 
-// Rebate configuration (basis points, 10000 = 100%)
-pub const DEFAULT_REBATE_BPS: u16 = 7500; // 75% du NPI redistribué aux utilisateurs (comme l'ancien système)
-pub const DEFAULT_BURN_BPS: u16 = 2500; // 25% du NPI pour le buyback/burn
+// NPI (Routing Profit) allocation configuration (basis points, 10000 = 100%)
+// Total must equal 100% to avoid over-allocation
+pub const DEFAULT_REBATE_BPS: u16 = 6000;        // 60% du NPI → Rebates utilisateurs
+pub const DEFAULT_BUYBACK_BPS: u16 = 2000;       // 20% du NPI → Buyback vault
+pub const PROTOCOL_RESERVE_BPS: u16 = 2000;      // 20% du NPI → Protocol treasury
+// Total: 60% + 20% + 20% = 100% ✅
+
+// Platform fees allocation (basis points, 10000 = 100%)
+pub const PLATFORM_FEE_BPS: u16 = 20;            // 0.2% platform fee (plus compétitif que Raydium 0.25% et Orca 0.30%)
+pub const BUYBACK_FROM_FEES_BPS: u16 = 3000;     // 30% des platform fees → Buyback vault
+// Remaining 70% of platform fees → Protocol treasury
 
 // Security limits
 pub const MAX_VENUES: usize = 10;
 pub const MAX_FALLBACKS: usize = 5;
-
-// Fee configuration (in basis points, 10000 = 100%)
-pub const PLATFORM_FEE_BPS: u16 = 20; // 0.2% platform fee (plus compétitif que Raydium 0.25% et Orca 0.30%)
-pub const BUYBACK_ALLOCATION_BPS: u16 = 3000; // 30% of (fees + routing profit) goes to buyback
 
 #[program]
 pub mod swapback_router {
@@ -45,11 +49,14 @@ pub mod swapback_router {
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         let state = &mut ctx.accounts.state;
         state.authority = ctx.accounts.authority.key();
-        state.rebate_percentage = DEFAULT_REBATE_BPS; // 75% par défaut
-        state.burn_percentage = DEFAULT_BURN_BPS;     // 25% par défaut
+        state.rebate_percentage = DEFAULT_REBATE_BPS;      // 60% du NPI par défaut
+        state.buyback_percentage = DEFAULT_BUYBACK_BPS;    // 20% du NPI par défaut
+        state.protocol_percentage = PROTOCOL_RESERVE_BPS;  // 20% du NPI par défaut
         state.total_volume = 0;
         state.total_npi = 0;
         state.total_rebates_paid = 0;
+        state.total_buyback_from_npi = 0;
+        state.total_protocol_revenue = 0;
         state.bump = ctx.bumps.state;
         Ok(())
     }
@@ -209,11 +216,14 @@ pub struct SwapPlan {
 #[account]
 pub struct RouterState {
     pub authority: Pubkey,
-    pub rebate_percentage: u16,  // Pourcentage du NPI redistribué (en basis points, ex: 7500 = 75%)
-    pub burn_percentage: u16,    // Pourcentage du NPI pour buyback/burn (en basis points, ex: 2500 = 25%)
-    pub total_volume: u64,       // Volume total des swaps
-    pub total_npi: u64,          // NPI total généré
-    pub total_rebates_paid: u64, // Total rebates payés
+    pub rebate_percentage: u16,     // % du NPI pour rebates utilisateurs (basis points, ex: 6000 = 60%)
+    pub buyback_percentage: u16,    // % du NPI pour buyback (basis points, ex: 2000 = 20%)
+    pub protocol_percentage: u16,   // % du NPI pour protocol treasury (basis points, ex: 2000 = 20%)
+    pub total_volume: u64,          // Volume total des swaps
+    pub total_npi: u64,             // NPI total généré
+    pub total_rebates_paid: u64,    // Total rebates payés aux utilisateurs
+    pub total_buyback_from_npi: u64, // Total buyback depuis NPI
+    pub total_protocol_revenue: u64, // Total revenus protocol (fees + NPI)
     pub bump: u8,
 }
 
@@ -383,7 +393,7 @@ pub mod swap_toc_processor {
     use crate::cpi_orca;
     use crate::oracle::{self, OracleObservation};
 
-    pub fn process_swap_toc(ctx: Context<SwapToC>, args: SwapArgs) -> Result<()> {
+    pub fn process_swap_toc(mut ctx: Context<SwapToC>, args: SwapArgs) -> Result<()> {
         // ✅ SECURITY: Validate input parameters
         require!(args.amount_in > 0, ErrorCode::InvalidAmount);
         require!(args.min_out > 0, ErrorCode::InvalidAmount);
@@ -400,7 +410,7 @@ pub mod swap_toc_processor {
         }
 
         if args.use_dynamic_plan {
-            return process_dynamic_plan_swap(&ctx, args, &clock);
+            return process_dynamic_plan_swap(&mut ctx, args, &clock);
         }
 
         let oracle_observation = get_oracle_price(&ctx.accounts.oracle, &clock)?;
@@ -422,7 +432,7 @@ pub mod swap_toc_processor {
     }
 
     fn process_dynamic_plan_swap(
-        ctx: &Context<SwapToC>,
+        ctx: &mut Context<SwapToC>,
         args: SwapArgs,
         clock: &Clock,
     ) -> Result<()> {
@@ -530,7 +540,7 @@ pub mod swap_toc_processor {
     }
 
     fn execute_venues_swap(
-        ctx: &Context<SwapToC>,
+        ctx: &mut Context<SwapToC>,
         venues: &[VenueWeight],
         total_amount_in: u64,
         min_out: u64,
@@ -622,14 +632,34 @@ pub mod swap_toc_processor {
             0
         };
 
-        // Payer le rebate avec boost à l'utilisateur (basé sur le NPI)
+        // Payer le rebate avec boost à l'utilisateur (60% du NPI)
         let rebate_paid = pay_rebate_to_user(ctx, routing_profit, user_boost)?;
 
-        // Calculate buyback deposit (40% of platform_fee + 40% of routing_profit)
-        let fee_for_buyback = calculate_fee(platform_fee, BUYBACK_ALLOCATION_BPS)?;
-        let profit_for_buyback = calculate_fee(routing_profit, BUYBACK_ALLOCATION_BPS)?;
+        // Calculate buyback allocation:
+        // - 30% of platform fees
+        // - 20% of routing profit (NPI)
+        let fee_for_buyback = calculate_fee(platform_fee, BUYBACK_FROM_FEES_BPS)?;
+        let profit_for_buyback = calculate_fee(routing_profit, DEFAULT_BUYBACK_BPS)?;
         let total_buyback_deposit = fee_for_buyback
             .checked_add(profit_for_buyback)
+            .ok_or(ErrorCode::InvalidOraclePrice)?;
+
+        // Calculate protocol revenue:
+        // - 70% of platform fees (remaining after buyback allocation)
+        // - 20% of routing profit (NPI reserve)
+        let protocol_from_fees = calculate_fee(platform_fee, 7000)?; // 70% des fees
+        let protocol_from_npi = calculate_fee(routing_profit, PROTOCOL_RESERVE_BPS)?; // 20% du NPI
+        let total_protocol_revenue = protocol_from_fees
+            .checked_add(protocol_from_npi)
+            .ok_or(ErrorCode::InvalidOraclePrice)?;
+
+        // Update state statistics
+        let state = &mut ctx.accounts.state;
+        state.total_buyback_from_npi = state.total_buyback_from_npi
+            .checked_add(profit_for_buyback)
+            .ok_or(ErrorCode::InvalidOraclePrice)?;
+        state.total_protocol_revenue = state.total_protocol_revenue
+            .checked_add(total_protocol_revenue)
             .ok_or(ErrorCode::InvalidOraclePrice)?;
 
         // Deposit to buyback if accounts are provided and amount > 0
@@ -847,7 +877,7 @@ pub mod swap_toc_processor {
     }
 
     /// Pay rebate to user with boost applied (based on NPI)
-    fn pay_rebate_to_user(ctx: &Context<SwapToC>, npi_amount: u64, boost: u16) -> Result<u64> {
+    fn pay_rebate_to_user(ctx: &mut Context<SwapToC>, npi_amount: u64, boost: u16) -> Result<u64> {
         // Si pas de NPI, pas de rebate
         if npi_amount == 0 {
             return Ok(0);
@@ -963,66 +993,66 @@ mod tests {
     #[test]
     fn test_calculate_boosted_rebate_no_boost() {
         // NPI: 10 USDC (10_000_000 avec 6 decimals)
-        // Rebate: 7500 BP (75%)
+        // Rebate: 6000 BP (60%) - nouvelle allocation
         // Boost: 0 BP (0%)
-        // Expected: 10 × 0.75 × 1.0 = 7.5 USDC
+        // Expected: 10 × 0.60 × 1.0 = 6 USDC
         let npi = 10_000_000u64;
-        let rebate_bps = 7500u16;
+        let rebate_bps = 6000u16;
         let boost = 0u16;
         let result = swap_toc_processor::calculate_boosted_rebate(npi, rebate_bps, boost).unwrap();
-        assert_eq!(result, 7_500_000, "75% of 10 USDC NPI with no boost = 7.5 USDC");
+        assert_eq!(result, 6_000_000, "60% of 10 USDC NPI with no boost = 6 USDC");
     }
 
     #[test]
     fn test_calculate_boosted_rebate_small_boost() {
         // NPI: 10 USDC
-        // Rebate: 7500 BP (75%)
+        // Rebate: 6000 BP (60%)
         // Boost: 500 BP (5%)
-        // Expected: 10 × 0.75 × 1.05 = 7.875 USDC
+        // Expected: 10 × 0.60 × 1.05 = 6.3 USDC
         let npi = 10_000_000u64;
-        let rebate_bps = 7500u16;
+        let rebate_bps = 6000u16;
         let boost = 500u16;
         let result = swap_toc_processor::calculate_boosted_rebate(npi, rebate_bps, boost).unwrap();
-        assert_eq!(result, 7_875_000, "75% of 10 USDC with 5% boost = 7.875 USDC");
+        assert_eq!(result, 6_300_000, "60% of 10 USDC with 5% boost = 6.3 USDC");
     }
 
     #[test]
     fn test_calculate_boosted_rebate_medium_boost() {
         // NPI: 10 USDC
-        // Rebate: 7500 BP (75%)
+        // Rebate: 6000 BP (60%)
         // Boost: 2300 BP (23%)
-        // Expected: 10 × 0.75 × 1.23 = 9.225 USDC
+        // Expected: 10 × 0.60 × 1.23 = 7.38 USDC
         let npi = 10_000_000u64;
-        let rebate_bps = 7500u16;
+        let rebate_bps = 6000u16;
         let boost = 2300u16;
         let result = swap_toc_processor::calculate_boosted_rebate(npi, rebate_bps, boost).unwrap();
-        assert_eq!(result, 9_225_000, "75% of 10 USDC with 23% boost = 9.225 USDC");
+        assert_eq!(result, 7_380_000, "60% of 10 USDC with 23% boost = 7.38 USDC");
     }
 
     #[test]
     fn test_calculate_boosted_rebate_high_boost() {
         // NPI: 10 USDC
-        // Rebate: 7500 BP (75%)
+        // Rebate: 6000 BP (60%)
         // Boost: 8600 BP (86%)
-        // Expected: 10 × 0.75 × 1.86 = 13.95 USDC
+        // Expected: 10 × 0.60 × 1.86 = 11.16 USDC
         let npi = 10_000_000u64;
-        let rebate_bps = 7500u16;
+        let rebate_bps = 6000u16;
         let boost = 8600u16;
         let result = swap_toc_processor::calculate_boosted_rebate(npi, rebate_bps, boost).unwrap();
-        assert_eq!(result, 13_950_000, "75% of 10 USDC with 86% boost = 13.95 USDC");
+        assert_eq!(result, 11_160_000, "60% of 10 USDC with 86% boost = 11.16 USDC");
     }
 
     #[test]
     fn test_calculate_boosted_rebate_maximum_boost() {
         // NPI: 10 USDC
-        // Rebate: 7500 BP (75%)
+        // Rebate: 6000 BP (60%) - nouvelle allocation
         // Boost: 10000 BP (100%)
-        // Expected: 10 × 0.75 × 2.0 = 15 USDC
+        // Expected: 10 × 0.60 × 2.0 = 12 USDC
         let npi = 10_000_000u64;
-        let rebate_bps = 7500u16;
+        let rebate_bps = 6000u16;
         let boost = 10_000u16;
         let result = swap_toc_processor::calculate_boosted_rebate(npi, rebate_bps, boost).unwrap();
-        assert_eq!(result, 15_000_000, "75% of 10 USDC with 100% boost = 15 USDC");
+        assert_eq!(result, 12_000_000, "60% of 10 USDC with 100% boost = 12 USDC");
     }
 
     #[test]
@@ -1035,10 +1065,47 @@ mod tests {
     }
 
     #[test]
-    fn test_buyback_allocation() {
-        // Test buyback allocation (30% = 3000 BP)
-        let platform_fee = 10_000u64; // 0.01 USDC in fees
-        let result = swap_toc_processor::calculate_fee(platform_fee, BUYBACK_ALLOCATION_BPS).unwrap();
-        assert_eq!(result, 3_000, "30% of 10k should be 3k");
+    fn test_complete_revenue_allocation() {
+        // Test de l'allocation complète des revenus (doit totaliser 100%)
+        // Scénario: 20 USDC de platform fees + 50 USDC de NPI
+        
+        let platform_fee = 20_000_000u64; // 20 USDC
+        let npi = 50_000_000u64;          // 50 USDC
+        
+        // PLATFORM FEES (20 USDC):
+        // - 30% buyback = 6 USDC
+        let fee_to_buyback = swap_toc_processor::calculate_fee(platform_fee, BUYBACK_FROM_FEES_BPS).unwrap();
+        assert_eq!(fee_to_buyback, 6_000_000, "30% of 20 USDC fees = 6 USDC");
+        
+        // - 70% protocol = 14 USDC
+        let fee_to_protocol = swap_toc_processor::calculate_fee(platform_fee, 7000).unwrap();
+        assert_eq!(fee_to_protocol, 14_000_000, "70% of 20 USDC fees = 14 USDC");
+        
+        // NPI (50 USDC):
+        // - 60% rebates = 30 USDC
+        let npi_to_rebates = swap_toc_processor::calculate_fee(npi, DEFAULT_REBATE_BPS).unwrap();
+        assert_eq!(npi_to_rebates, 30_000_000, "60% of 50 USDC NPI = 30 USDC");
+        
+        // - 20% buyback = 10 USDC
+        let npi_to_buyback = swap_toc_processor::calculate_fee(npi, DEFAULT_BUYBACK_BPS).unwrap();
+        assert_eq!(npi_to_buyback, 10_000_000, "20% of 50 USDC NPI = 10 USDC");
+        
+        // - 20% protocol = 10 USDC
+        let npi_to_protocol = swap_toc_processor::calculate_fee(npi, PROTOCOL_RESERVE_BPS).unwrap();
+        assert_eq!(npi_to_protocol, 10_000_000, "20% of 50 USDC NPI = 10 USDC");
+        
+        // TOTAUX:
+        let total_buyback = fee_to_buyback + npi_to_buyback;
+        let total_protocol = fee_to_protocol + npi_to_protocol;
+        let total_rebates = npi_to_rebates;
+        
+        assert_eq!(total_buyback, 16_000_000, "Total buyback = 16 USDC (6 + 10)");
+        assert_eq!(total_protocol, 24_000_000, "Total protocol = 24 USDC (14 + 10)");
+        assert_eq!(total_rebates, 30_000_000, "Total rebates = 30 USDC");
+        
+        // Vérifier que tout est bien alloué (70 USDC total)
+        let grand_total = total_buyback + total_protocol + total_rebates;
+        let expected_total = platform_fee + npi;
+        assert_eq!(grand_total, expected_total, "100% of revenue allocated (70 USDC)");
     }
 }
