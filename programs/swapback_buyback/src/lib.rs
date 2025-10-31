@@ -2,8 +2,8 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Burn, Mint, Token, TokenAccount, Transfer};
 use anchor_spl::token_2022::{self, Token2022};
 
-// Program ID déployé sur devnet - 27 Oct 2025 (mis à jour)
-declare_id!("EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf");
+// Program ID déployé sur devnet - 31 Oct 2025 (nouveau déploiement avec Token-2022)
+declare_id!("92znK8METYTFW5dGDJUnHUMqubVGnPBTyjZ4HzjWQzir");
 
 // Program ID du cNFT pour lire GlobalState et UserNft (mis à jour)
 pub const CNFT_PROGRAM_ID: Pubkey = pubkey!("9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw");
@@ -38,14 +38,27 @@ pub mod swapback_buyback {
         require!(amount > 0, ErrorCode::InvalidAmount);
 
         // Transfert des USDC vers le vault
-        let cpi_accounts = Transfer {
-            from: ctx.accounts.source_usdc.to_account_info(),
-            to: ctx.accounts.usdc_vault.to_account_info(),
-            authority: ctx.accounts.depositor.to_account_info(),
-        };
-        let cpi_program = ctx.accounts.token_program.to_account_info();
-        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-        token::transfer(cpi_ctx, amount)?;
+        if ctx.accounts.token_program.key() == token_2022::ID {
+            // Token-2022
+            let cpi_accounts = token_2022::Transfer {
+                from: ctx.accounts.source_usdc.to_account_info(),
+                to: ctx.accounts.usdc_vault.to_account_info(),
+                authority: ctx.accounts.depositor.to_account_info(),
+            };
+            let cpi_program = ctx.accounts.token_program.to_account_info();
+            let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+            token_2022::transfer(cpi_ctx, amount)?;
+        } else {
+            // Token standard
+            let cpi_accounts = Transfer {
+                from: ctx.accounts.source_usdc.to_account_info(),
+                to: ctx.accounts.usdc_vault.to_account_info(),
+                authority: ctx.accounts.depositor.to_account_info(),
+            };
+            let cpi_program = ctx.accounts.token_program.to_account_info();
+            let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+            token::transfer(cpi_ctx, amount)?;
+        }
 
         emit!(USDCDeposited {
             depositor: ctx.accounts.depositor.key(),
@@ -317,7 +330,8 @@ pub struct Initialize<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
 
-    pub token_program: Program<'info, Token>,
+    /// CHECK: Token Program (standard ou 2022)
+    pub token_program: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
 }
@@ -338,7 +352,8 @@ pub struct DepositUSDC<'info> {
     pub usdc_vault: Account<'info, TokenAccount>,
 
     pub depositor: Signer<'info>,
-    pub token_program: Program<'info, Token>,
+    /// CHECK: Token Program (standard ou 2022)
+    pub token_program: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]
@@ -353,7 +368,8 @@ pub struct ExecuteBuyback<'info> {
     pub back_vault: Account<'info, TokenAccount>,
 
     pub authority: Signer<'info>,
-    pub token_program: Program<'info, Token>,
+    /// CHECK: Token Program (standard ou 2022)
+    pub token_program: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]

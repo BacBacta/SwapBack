@@ -24,7 +24,7 @@ const path = require("path");
 
 // Configuration
 const DEVNET_RPC = "https://api.devnet.solana.com";
-const BUYBACK_PROGRAM_ID = new PublicKey("EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf");
+const BUYBACK_PROGRAM_ID = new PublicKey("92znK8METYTFW5dGDJUnHUMqubVGnPBTyjZ4HzjWQzir");
 const BACK_TOKEN_MINT = new PublicKey("3Y6RXZUBHCeUj6VsWuyBY2Zy1RixY6BHkM4tf3euDdrE");
 const USDC_MINT = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
 
