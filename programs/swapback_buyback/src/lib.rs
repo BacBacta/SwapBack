@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
-use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, Burn, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::token_2022::{self, Token2022};
 
 // Program ID déployé sur devnet - 27 Oct 2025 (mis à jour)
 declare_id!("EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf");
@@ -160,14 +160,30 @@ pub mod swapback_buyback {
         let seeds = &[b"buyback_state".as_ref(), &[buyback_state.bump]];
         let signer = &[&seeds[..]];
 
-        let cpi_accounts = Transfer {
-            from: ctx.accounts.back_vault.to_account_info(),
-            to: ctx.accounts.user_back_account.to_account_info(),
-            authority: buyback_state.to_account_info(),
-        };
-        let cpi_program = ctx.accounts.token_program.to_account_info();
-        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
-        token::transfer(cpi_ctx, user_share)?;
+        // Détecter si c'est Token ou Token2022 et utiliser la bonne instruction
+        if ctx.accounts.token_program.key() == token::ID {
+            // Token standard
+            let cpi_accounts = Transfer {
+                from: ctx.accounts.back_vault.to_account_info(),
+                to: ctx.accounts.user_back_account.to_account_info(),
+                authority: buyback_state.to_account_info(),
+            };
+            let cpi_program = ctx.accounts.token_program.to_account_info();
+            let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
+            token::transfer(cpi_ctx, user_share)?;
+        } else if ctx.accounts.token_program.key() == token_2022::ID {
+            // Token-2022 - utiliser transfer (la fonction de base existe encore)
+            let cpi_accounts = token_2022::Transfer {
+                from: ctx.accounts.back_vault.to_account_info(),
+                to: ctx.accounts.user_back_account.to_account_info(),
+                authority: buyback_state.to_account_info(),
+            };
+            let cpi_program = ctx.accounts.token_program.to_account_info();
+            let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
+            token_2022::transfer(cpi_ctx, user_share)?;
+        } else {
+            return err!(ErrorCode::InvalidTokenProgram);
+        }
 
         emit!(BuybackDistributed {
             user: ctx.accounts.user.key(),
@@ -207,14 +223,30 @@ pub mod swapback_buyback {
         let seeds = &[b"buyback_state".as_ref(), &[buyback_state.bump]];
         let signer = &[&seeds[..]];
 
-        let cpi_accounts = Burn {
-            mint: ctx.accounts.back_mint.to_account_info(),
-            from: ctx.accounts.back_vault.to_account_info(),
-            authority: buyback_state.to_account_info(),
-        };
-        let cpi_program = ctx.accounts.token_program.to_account_info();
-        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
-        token::burn(cpi_ctx, amount)?;
+        // Détecter si c'est Token ou Token2022 et utiliser la bonne instruction
+        if ctx.accounts.token_program.key() == token::ID {
+            // Token standard
+            let cpi_accounts = Burn {
+                mint: ctx.accounts.back_mint.to_account_info(),
+                from: ctx.accounts.back_vault.to_account_info(),
+                authority: buyback_state.to_account_info(),
+            };
+            let cpi_program = ctx.accounts.token_program.to_account_info();
+            let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
+            token::burn(cpi_ctx, amount)?;
+        } else if ctx.accounts.token_program.key() == token_2022::ID {
+            // Token-2022 - utiliser burn (la fonction de base existe encore)
+            let cpi_accounts = token_2022::Burn {
+                mint: ctx.accounts.back_mint.to_account_info(),
+                from: ctx.accounts.back_vault.to_account_info(),
+                authority: buyback_state.to_account_info(),
+            };
+            let cpi_program = ctx.accounts.token_program.to_account_info();
+            let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
+            token_2022::burn(cpi_ctx, amount)?;
+        } else {
+            return err!(ErrorCode::InvalidTokenProgram);
+        }
 
         // Mise à jour des statistiques
         buyback_state.total_back_burned = buyback_state
@@ -267,7 +299,8 @@ pub struct Initialize<'info> {
     )]
     pub buyback_state: Account<'info, BuybackState>,
 
-    pub back_mint: Account<'info, Mint>,
+    /// CHECK: Peut être Token standard ou Token-2022
+    pub back_mint: AccountInfo<'info>,
 
     #[account(
         init,
@@ -328,14 +361,15 @@ pub struct BurnBack<'info> {
     #[account(mut, seeds = [b"buyback_state"], bump = buyback_state.bump)]
     pub buyback_state: Account<'info, BuybackState>,
 
-    #[account(mut)]
-    pub back_mint: Account<'info, Mint>,
+    /// CHECK: Peut être Token standard ou Token-2022
+    pub back_mint: AccountInfo<'info>,
 
     #[account(mut)]
     pub back_vault: Account<'info, TokenAccount>,
 
     pub authority: Signer<'info>,
-    pub token_program: Program<'info, Token>,
+    /// CHECK: Token program (either Token or Token2022)
+    pub token_program: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]
@@ -374,7 +408,8 @@ pub struct DistributeBuyback<'info> {
     pub user_back_account: Account<'info, TokenAccount>,
 
     pub user: Signer<'info>,
-    pub token_program: Program<'info, Token>,
+    /// CHECK: Token program (either Token or Token2022)
+    pub token_program: AccountInfo<'info>,
 }
 
 // === COMPTES ===
@@ -473,6 +508,8 @@ pub enum ErrorCode {
     MathOverflow,
     #[msg("Part trop petite")]
     ShareTooSmall,
+    #[msg("Programme token invalide")]
+    InvalidTokenProgram,
 }
 
 #[cfg(test)]

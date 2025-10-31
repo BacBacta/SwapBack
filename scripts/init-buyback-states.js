@@ -28,8 +28,12 @@ const DEVNET_RPC = "https://api.devnet.solana.com";
 const BUYBACK_PROGRAM_ID = new PublicKey("EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf");
 const BACK_TOKEN_MINT = new PublicKey("3Y6RXZUBHCeUj6VsWuyBY2Zy1RixY6BHkM4tf3euDdrE");
 
-// USDC Devnet (Circle)
+// USDC Devnet (Circle) - utilise toujours Token standard
 const USDC_MINT = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
+
+// Programmes token
+const TOKEN_PROGRAM_ID_STANDARD = TOKEN_PROGRAM_ID;
+const TOKEN_PROGRAM_ID_BACK = TOKEN_2022_PROGRAM_ID; // $BACK utilise Token-2022
 
 function getDiscriminator(name) {
   const hash = crypto.createHash("sha256");
