@@ -36,7 +36,7 @@ pub const MAX_FALLBACKS: usize = 5;
 
 // Fee configuration (in basis points, 10000 = 100%)
 pub const PLATFORM_FEE_BPS: u16 = 20; // 0.2% platform fee (plus compétitif que Raydium 0.25% et Orca 0.30%)
-pub const BUYBACK_ALLOCATION_BPS: u16 = 4000; // 40% of (fees + routing profit) goes to buyback
+pub const BUYBACK_ALLOCATION_BPS: u16 = 3000; // 30% of (fees + routing profit) goes to buyback
 
 #[program]
 pub mod swapback_router {
@@ -1036,9 +1036,9 @@ mod tests {
 
     #[test]
     fn test_buyback_allocation() {
-        // Test buyback allocation (40% = 4000 BP)
+        // Test buyback allocation (30% = 3000 BP)
         let platform_fee = 10_000u64; // 0.01 USDC in fees
         let result = swap_toc_processor::calculate_fee(platform_fee, BUYBACK_ALLOCATION_BPS).unwrap();
-        assert_eq!(result, 4_000, "40% of 10k should be 4k");
+        assert_eq!(result, 3_000, "30% of 10k should be 3k");
     }
 }
