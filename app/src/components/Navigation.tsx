@@ -16,6 +16,7 @@ export const Navigation = () => {
 
   const navLinks = [
     { href: "/", label: "Swap" },
+    { href: "/buyback", label: "Buyback", badge: "🔥" },
     { href: "/lock", label: "Lock & Earn" },
     { href: "/stats", label: "Stats" },
     { href: "/docs", label: "Docs" },

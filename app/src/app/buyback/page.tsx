@@ -1,0 +1,187 @@
+import dynamic from 'next/dynamic';
+import { Metadata } from 'next';
+
+// Import BuybackDashboard as client component
+const BuybackDashboard = dynamic(
+  () => import('@/components/BuybackDashboard'),
+  { ssr: false }
+);
+
+export const metadata: Metadata = {
+  title: '$BACK Buyback | SwapBack',
+  description: 'Dashboard du système de buyback et burn automatique du token $BACK',
+};
+
+export default function BuybackPage() {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-5xl font-bold text-white mb-4">
+            🔥 $BACK Buyback & Burn
+          </h1>
+          <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+            Système déflationniste automatique : 25% des frais de swap sont utilisés pour racheter et brûler $BACK
+          </p>
+        </div>
+
+        {/* Main Dashboard */}
+        <div className="max-w-6xl mx-auto">
+          <BuybackDashboard />
+        </div>
+
+        {/* Additional Info Sections */}
+        <div className="max-w-6xl mx-auto mt-12 grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* How It Works */}
+          <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
+            <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+              <span>⚙️</span> Comment ça fonctionne?
+            </h3>
+            <ol className="space-y-3 text-gray-300">
+              <li className="flex gap-3">
+                <span className="text-blue-400 font-bold">1.</span>
+                <span>À chaque swap sur SwapBack, 25% des frais sont collectés en USDC</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="text-blue-400 font-bold">2.</span>
+                <span>Les USDC s'accumulent dans le vault de buyback</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="text-blue-400 font-bold">3.</span>
+                <span>Quand le seuil minimum est atteint, n'importe qui peut exécuter un buyback</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="text-blue-400 font-bold">4.</span>
+                <span>Les tokens $BACK rachetés sont automatiquement brûlés (Token-2022)</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="text-blue-400 font-bold">5.</span>
+                <span>La supply totale diminue, créant une pression haussière</span>
+              </li>
+            </ol>
+          </div>
+
+          {/* Benefits */}
+          <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
+            <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+              <span>💎</span> Avantages
+            </h3>
+            <ul className="space-y-3 text-gray-300">
+              <li className="flex items-start gap-3">
+                <span className="text-green-400">✓</span>
+                <div>
+                  <strong className="text-white">Déflationniste</strong>
+                  <p className="text-sm text-gray-400">Réduction constante de la supply</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="text-green-400">✓</span>
+                <div>
+                  <strong className="text-white">Automatique</strong>
+                  <p className="text-sm text-gray-400">Aucune intervention manuelle requise</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="text-green-400">✓</span>
+                <div>
+                  <strong className="text-white">Transparent</strong>
+                  <p className="text-sm text-gray-400">Toutes les transactions sont publiques</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="text-green-400">✓</span>
+                <div>
+                  <strong className="text-white">Token-2022</strong>
+                  <p className="text-sm text-gray-400">Support natif des extensions Token-2022</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="text-green-400">✓</span>
+                <div>
+                  <strong className="text-white">Participatif</strong>
+                  <p className="text-sm text-gray-400">Tout le monde peut exécuter un buyback</p>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Technical Details */}
+        <div className="max-w-6xl mx-auto mt-6">
+          <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
+            <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+              <span>🔧</span> Détails Techniques
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <div className="text-gray-400 mb-1">Program ID</div>
+                <code className="text-blue-400 break-all">
+                  92znK8METYTFW5dGDJUnHUMqubVGnPBTyjZ4HzjWQzir
+                </code>
+              </div>
+              <div>
+                <div className="text-gray-400 mb-1">$BACK Mint (Token-2022)</div>
+                <code className="text-green-400 break-all">
+                  3Y6RXZUBHCeUj6VsWuyBY2Zy1RixY6BHkM4tf3euDdrE
+                </code>
+              </div>
+              <div>
+                <div className="text-gray-400 mb-1">Réseau</div>
+                <code className="text-orange-400">Solana Devnet</code>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* FAQ */}
+        <div className="max-w-6xl mx-auto mt-12 mb-8">
+          <h2 className="text-3xl font-bold text-white mb-6 text-center">
+            ❓ Questions Fréquentes
+          </h2>
+          <div className="space-y-4">
+            <details className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 cursor-pointer">
+              <summary className="text-white font-semibold">
+                Qui peut exécuter un buyback?
+              </summary>
+              <p className="text-gray-400 mt-2">
+                N'importe qui peut exécuter un buyback une fois que le seuil minimum d'USDC dans le vault est atteint. 
+                Vous vendez vos $BACK contre l'USDC du vault, et vos tokens sont automatiquement brûlés.
+              </p>
+            </details>
+
+            <details className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 cursor-pointer">
+              <summary className="text-white font-semibold">
+                Quel est le prix du buyback?
+              </summary>
+              <p className="text-gray-400 mt-2">
+                Le prix est calculé en temps réel selon un oracle de prix ou un AMM. Le taux peut inclure une prime 
+                pour inciter les utilisateurs à participer au mécanisme déflationniste.
+              </p>
+            </details>
+
+            <details className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 cursor-pointer">
+              <summary className="text-white font-semibold">
+                Pourquoi mes tokens sont-ils brûlés?
+              </summary>
+              <p className="text-gray-400 mt-2">
+                Le burn automatique réduit la supply totale de $BACK, créant un effet déflationniste qui bénéficie 
+                à tous les détenteurs en augmentant la rareté du token.
+              </p>
+            </details>
+
+            <details className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 cursor-pointer">
+              <summary className="text-white font-semibold">
+                Comment les USDC arrivent-ils dans le vault?
+              </summary>
+              <p className="text-gray-400 mt-2">
+                25% de chaque frais de swap sur SwapBack est automatiquement déposé dans le vault de buyback. 
+                Plus il y a de volume de trading, plus le vault se remplit rapidement.
+              </p>
+            </details>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
