@@ -10,12 +10,13 @@ import {
 } from '@solana/web3.js';
 import {
   TOKEN_PROGRAM_ID,
+  TOKEN_2022_PROGRAM_ID,
   getAssociatedTokenAddress,
   createAssociatedTokenAccountInstruction,
   createMintToInstruction,
   getAccount,
 } from '@solana/spl-token';
-import { BN } from '@coral-xyz/anchor';
+import { AnchorProvider, Program, BN, Wallet } from '@coral-xyz/anchor';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -25,9 +26,9 @@ const BUYBACK_PROGRAM_ID = new PublicKey('92znK8METYTFW5dGDJUnHUMqubVGnPBTyjZ4Hz
 const BACK_TOKEN_MINT = new PublicKey('3Y6RXZUBHCeUj6VsWuyBY2Zy1RixY6BHkM4tf3euDdrE');
 const USDC_MINT = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
 
-// Discriminators
-const DEPOSIT_USDC_DISCRIMINATOR = Buffer.from([242, 35, 198, 137, 82, 225, 242, 182]);
-const EXECUTE_BUYBACK_DISCRIMINATOR = Buffer.from([238, 194, 144, 180, 105, 2, 209, 111]);
+// Load IDL
+const idlPath = '/workspaces/SwapBack/target/idl/swapback_buyback.json';
+const idl = JSON.parse(fs.readFileSync(idlPath, 'utf-8'));
 
 // PDAs
 const [buybackStatePDA] = PublicKey.findProgramAddressSync(
@@ -44,6 +45,7 @@ describe('E2E: Complete Buyback Flow', () => {
   let connection: Connection;
   let payer: Keypair;
   let user: Keypair;
+  let program: Program;
 
   beforeAll(async () => {
     connection = new Connection(DEVNET_RPC, 'confirmed');
@@ -52,6 +54,11 @@ describe('E2E: Complete Buyback Flow', () => {
     const defaultPath = path.join(require('os').homedir(), '.config/solana/id.json');
     const walletData = JSON.parse(fs.readFileSync(defaultPath, 'utf8'));
     payer = Keypair.fromSecretKey(new Uint8Array(walletData));
+
+    // Create Anchor provider and program
+    const wallet = new Wallet(payer);
+    const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' });
+    program = new Program(idl, provider);
 
     // Create a test user
     user = Keypair.generate();
@@ -196,30 +203,22 @@ describe('E2E: Complete Buyback Flow', () => {
       return; // Skip if no balance
     }
 
-    const depositAmount = 10 * 1e6; // 10 USDC
-
-    const data = Buffer.concat([
-      DEPOSIT_USDC_DISCRIMINATOR,
-      Buffer.alloc(8)
-    ]);
-    new BN(depositAmount).toArrayLike(Buffer, 'le', 8).copy(data, 8);
-
-    const instruction = new TransactionInstruction({
-      keys: [
-        { pubkey: buybackStatePDA, isSigner: false, isWritable: true },
-        { pubkey: userUsdcAccount, isSigner: false, isWritable: true },
-        { pubkey: usdcVaultPDA, isSigner: false, isWritable: true },
-        { pubkey: user.publicKey, isSigner: true, isWritable: false },
-        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      ],
-      programId: BUYBACK_PROGRAM_ID,
-      data,
-    });
+    const depositAmount = new BN(10 * 1e6); // 10 USDC
 
     const vaultBalanceBefore = await connection.getTokenAccountBalance(usdcVaultPDA);
 
-    const tx = new Transaction().add(instruction);
-    const sig = await sendAndConfirmTransaction(connection, tx, [user]);
+    // ✅ FIX #3: Use Anchor SDK instead of manual discriminator
+    const sig = await (program.methods as any)
+      .depositUsdc(depositAmount)
+      .accounts({
+        buybackState: buybackStatePDA,
+        userUsdcAccount,
+        usdcVault: usdcVaultPDA,
+        user: user.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .signers([user])
+      .rpc();
 
     const vaultBalanceAfter = await connection.getTokenAccountBalance(usdcVaultPDA);
     const userBalanceAfter = await connection.getTokenAccountBalance(userUsdcAccount);
@@ -241,8 +240,8 @@ describe('E2E: Complete Buyback Flow', () => {
     const accountInfo = await connection.getAccountInfo(buybackStatePDA);
     const data = accountInfo!.data;
 
-    // Parse min_buyback_amount (at offset 120, 8 bytes)
-    const minBuybackAmount = new BN(data.slice(120, 128), 'le').toNumber() / 1e6;
+    // ✅ FIX: Parse min_buyback_amount (at offset 104, 8 bytes)
+    const minBuybackAmount = new BN(data.slice(104, 112), 'le').toNumber() / 1e6;
     
     const vaultBalance = await connection.getTokenAccountBalance(usdcVaultPDA);
     const currentBalance = vaultBalance.value.uiAmount !== null ? Number(vaultBalance.value.uiAmount) : 0;
@@ -263,20 +262,25 @@ describe('E2E: Complete Buyback Flow', () => {
   it('✅ Test 8: Create user $BACK token account', async () => {
     console.log('\n📋 Test 8: Création du compte $BACK utilisateur');
     
+    // ✅ FIX: Utiliser TOKEN_2022_PROGRAM_ID pour $BACK (Token-2022)
     const userBackAccount = await getAssociatedTokenAddress(
       BACK_TOKEN_MINT,
-      user.publicKey
+      user.publicKey,
+      false,
+      TOKEN_2022_PROGRAM_ID  // ✅ Crucial: Token-2022, pas Token standard
     );
 
     try {
-      await getAccount(connection, userBackAccount);
+      await getAccount(connection, userBackAccount, 'confirmed', TOKEN_2022_PROGRAM_ID);
       console.log('   ✓ Compte $BACK existe déjà');
     } catch {
+      // ✅ FIX: Spécifier TOKEN_2022_PROGRAM_ID dans l'instruction
       const createAtaIx = createAssociatedTokenAccountInstruction(
         payer.publicKey,
         userBackAccount,
         user.publicKey,
-        BACK_TOKEN_MINT
+        BACK_TOKEN_MINT,
+        TOKEN_2022_PROGRAM_ID  // ✅ FIX APPLIQUÉ
       );
 
       const tx = new Transaction().add(createAtaIx);
@@ -296,7 +300,7 @@ describe('E2E: Complete Buyback Flow', () => {
 
     const accountInfo = await connection.getAccountInfo(buybackStatePDA);
     const data = accountInfo!.data;
-    const minBuybackAmount = new BN(data.slice(120, 128), 'le').toNumber() / 1e6;
+    const minBuybackAmount = new BN(data.slice(104, 112), 'le').toNumber() / 1e6; // ✅ FIX: correct offset
 
     if (currentBalance < minBuybackAmount) {
       console.log('   ⚠️ Seuil non atteint - Test skippé');
@@ -305,37 +309,33 @@ describe('E2E: Complete Buyback Flow', () => {
       return;
     }
 
+    // ✅ FIX #2: Use TOKEN_2022_PROGRAM_ID for $BACK token
     const userBackAccount = await getAssociatedTokenAddress(
       BACK_TOKEN_MINT,
-      user.publicKey
+      user.publicKey,
+      false,
+      TOKEN_2022_PROGRAM_ID
     );
 
-    const buybackUsdcAmount = 5 * 1e6; // Use 5 USDC for buyback
-
-    const data2 = Buffer.concat([
-      EXECUTE_BUYBACK_DISCRIMINATOR,
-      Buffer.alloc(8)
-    ]);
-    new BN(buybackUsdcAmount).toArrayLike(Buffer, 'le', 8).copy(data2, 8);
-
-    const instruction = new TransactionInstruction({
-      keys: [
-        { pubkey: buybackStatePDA, isSigner: false, isWritable: true },
-        { pubkey: usdcVaultPDA, isSigner: false, isWritable: true },
-        { pubkey: BACK_TOKEN_MINT, isSigner: false, isWritable: true },
-        { pubkey: userBackAccount, isSigner: false, isWritable: true },
-        { pubkey: user.publicKey, isSigner: true, isWritable: false },
-        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      ],
-      programId: BUYBACK_PROGRAM_ID,
-      data: data2,
-    });
+    const buybackUsdcAmount = new BN(5 * 1e6); // Use 5 USDC for buyback
+    const minBackAmount = new BN(0); // No minimum for test
 
     const vaultBalanceBefore = vaultBalance.value.uiAmount !== null ? Number(vaultBalance.value.uiAmount) : 0;
 
     try {
-      const tx = new Transaction().add(instruction);
-      const sig = await sendAndConfirmTransaction(connection, tx, [user]);
+      // ✅ FIX #3: Use Anchor SDK instead of manual discriminator
+      const sig = await (program.methods as any)
+        .executeBuyback(buybackUsdcAmount, minBackAmount)
+        .accounts({
+          buybackState: buybackStatePDA,
+          usdcVault: usdcVaultPDA,
+          backMint: BACK_TOKEN_MINT,
+          userBackAccount,
+          executor: user.publicKey,
+          tokenProgram: TOKEN_2022_PROGRAM_ID, // ✅ FIX #2: Use Token-2022
+        })
+        .signers([user])
+        .rpc();
 
       const vaultBalanceAfter = await connection.getTokenAccountBalance(usdcVaultPDA);
       const userBackBalance = await connection.getTokenAccountBalance(userBackAccount);
@@ -362,16 +362,20 @@ describe('E2E: Complete Buyback Flow', () => {
     const accountInfo = await connection.getAccountInfo(buybackStatePDA);
     const data = accountInfo!.data;
 
-    // Parse state fields
-    const totalUsdcCollected = new BN(data.slice(104, 112), 'le').toNumber() / 1e6;
-    const totalBackBurned = new BN(data.slice(112, 120), 'le').toNumber() / 1e9;
-    const lastBuybackTime = new BN(data.slice(128, 136), 'le').toNumber();
+    // ✅ FIX: Parse state fields with correct offsets
+    // min_buyback_amount: offset 104-112
+    // total_usdc_spent: offset 112-120
+    // total_back_burned: offset 120-128
+    // buyback_count: offset 128-136
+    const totalUsdcSpent = new BN(data.slice(112, 120), 'le').toNumber() / 1e6;
+    const totalBackBurned = new BN(data.slice(120, 128), 'le').toNumber() / 1e9;
+    const buybackCount = new BN(data.slice(128, 136), 'le').toNumber();
 
-    console.log(`   ✓ Total USDC collecté: ${totalUsdcCollected.toFixed(2)} USDC`);
+    console.log(`   ✓ Total USDC dépensé: ${totalUsdcSpent.toFixed(2)} USDC`);
     console.log(`   ✓ Total $BACK brûlé: ${totalBackBurned.toFixed(2)} $BACK`);
-    console.log(`   ✓ Dernier buyback: ${new Date(lastBuybackTime * 1000).toLocaleString()}`);
+    console.log(`   ✓ Nombre de buybacks: ${buybackCount}`);
 
-    expect(totalUsdcCollected).toBeGreaterThanOrEqual(0);
+    expect(totalUsdcSpent).toBeGreaterThanOrEqual(0);
     expect(totalBackBurned).toBeGreaterThanOrEqual(0);
   });
 });
@@ -379,12 +383,18 @@ describe('E2E: Complete Buyback Flow', () => {
 describe('E2E: Error Cases', () => {
   let connection: Connection;
   let payer: Keypair;
+  let program: Program;
 
   beforeAll(() => {
     connection = new Connection(DEVNET_RPC, 'confirmed');
     const defaultPath = path.join(require('os').homedir(), '.config/solana/id.json');
     const walletData = JSON.parse(fs.readFileSync(defaultPath, 'utf8'));
     payer = Keypair.fromSecretKey(new Uint8Array(walletData));
+
+    // Create Anchor provider and program
+    const wallet = new Wallet(payer);
+    const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' });
+    program = new Program(idl, provider);
   });
 
   it('❌ Test 11: Deposit with insufficient balance should fail', async () => {
@@ -410,25 +420,7 @@ describe('E2E: Error Cases', () => {
       [payer]
     );
 
-    const depositAmount = 1000 * 1e6; // 1000 USDC (more than balance)
-
-    const data = Buffer.concat([
-      DEPOSIT_USDC_DISCRIMINATOR,
-      Buffer.alloc(8)
-    ]);
-    new BN(depositAmount).toArrayLike(Buffer, 'le', 8).copy(data, 8);
-
-    const instruction = new TransactionInstruction({
-      keys: [
-        { pubkey: buybackStatePDA, isSigner: false, isWritable: true },
-        { pubkey: poorUserUsdcAccount, isSigner: false, isWritable: true },
-        { pubkey: usdcVaultPDA, isSigner: false, isWritable: true },
-        { pubkey: poorUser.publicKey, isSigner: true, isWritable: false },
-        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      ],
-      programId: BUYBACK_PROGRAM_ID,
-      data,
-    });
+    const depositAmount = new BN(1000 * 1e6); // 1000 USDC (more than balance)
 
     // Fund user with SOL for fees
     await sendAndConfirmTransaction(
@@ -444,8 +436,18 @@ describe('E2E: Error Cases', () => {
     );
 
     try {
-      const tx = new Transaction().add(instruction);
-      await sendAndConfirmTransaction(connection, tx, [poorUser]);
+      // ✅ FIX #3: Use Anchor SDK instead of manual discriminator
+      await (program.methods as any)
+        .depositUsdc(depositAmount)
+        .accounts({
+          buybackState: buybackStatePDA,
+          userUsdcAccount: poorUserUsdcAccount,
+          usdcVault: usdcVaultPDA,
+          user: poorUser.publicKey,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .signers([poorUser])
+        .rpc();
       
       // Should not reach here
       expect(true).toBe(false);
@@ -461,7 +463,7 @@ describe('E2E: Error Cases', () => {
     
     const accountInfo = await connection.getAccountInfo(buybackStatePDA);
     const data = accountInfo!.data;
-    const minBuybackAmount = new BN(data.slice(120, 128), 'le').toNumber() / 1e6;
+    const minBuybackAmount = new BN(data.slice(104, 112), 'le').toNumber() / 1e6; // ✅ FIX: correct offset
 
     const vaultBalance = await connection.getTokenAccountBalance(usdcVaultPDA);
     const currentBalance = vaultBalance.value.uiAmount !== null ? Number(vaultBalance.value.uiAmount) : 0;
