@@ -4,6 +4,7 @@ import { PublicKey } from '@solana/web3.js';
 import { AnchorProvider, Program, BN, Wallet } from '@coral-xyz/anchor';
 import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
 import { toast } from 'react-hot-toast';
+import { trackBuyback } from '@/lib/analytics';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -80,6 +81,14 @@ export function useExecuteBuyback() {
         .rpc();
 
       console.log('✅ Buyback executed:', signature);
+
+      // Track buyback analytics
+      trackBuyback({
+        usdcAmount: usdcAmountBN.toNumber(),
+        backBurned: 0, // TODO: Parse from transaction logs
+        executor: wallet.publicKey.toString(),
+        signature,
+      });
 
       return {
         signature,

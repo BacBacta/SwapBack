@@ -1,35 +1,95 @@
-import dynamic from 'next/dynamic';
-import { Metadata } from 'next';
+'use client';
 
-// Import BuybackDashboard as client component
-const BuybackDashboard = dynamic(
-  () => import('@/components/BuybackDashboard'),
-  { ssr: false }
-);
-
-export const metadata: Metadata = {
-  title: '$BACK Buyback | SwapBack',
-  description: 'Dashboard du système de buyback et burn automatique du token $BACK',
-};
+import { useBuybackState } from '@/hooks/useBuybackState';
+import BuybackStats from './components/BuybackStats';
+import BuybackProgressBar from './components/BuybackProgressBar';
+import ExecuteBuybackButton from './components/ExecuteBuybackButton';
+import BuybackChart from './components/BuybackChart';
+import RecentBuybacks from './components/RecentBuybacks';
 
 export default function BuybackPage() {
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold text-white mb-4">
-            🔥 $BACK Buyback & Burn
-          </h1>
-          <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-            Système déflationniste automatique : 25% des frais de swap sont utilisés pour racheter et brûler $BACK
+  const { buybackState, isLoading, error } = useBuybackState();
+
+  if (error) {
+    return (
+      <div className="container mx-auto p-6 max-w-7xl">
+        <div className="bg-red-500/10 border-2 border-red-500/50 backdrop-blur-sm p-4">
+          <p className="font-bold terminal-text uppercase tracking-wider text-red-400">
+            ❌ Error loading buyback data
+          </p>
+          <p className="text-sm text-red-400/70 mt-1 font-mono">
+            {error.message}
           </p>
         </div>
+      </div>
+    );
+  }
 
-        {/* Main Dashboard */}
-        <div className="max-w-6xl mx-auto">
-          <BuybackDashboard />
+  if (isLoading || !buybackState) {
+    return (
+      <div className="container mx-auto p-6 max-w-7xl">
+        <div className="animate-pulse">
+          <div className="h-12 bg-[var(--primary)]/20 border-2 border-[var(--primary)]/30 w-96 mb-6"></div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="h-40 bg-[var(--primary)]/10 border-2 border-[var(--primary)]/20"></div>
+            <div className="h-40 bg-[var(--primary)]/10 border-2 border-[var(--primary)]/20"></div>
+            <div className="h-40 bg-[var(--primary)]/10 border-2 border-[var(--primary)]/20"></div>
+          </div>
         </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto p-6 max-w-7xl">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold terminal-text terminal-glow uppercase tracking-wider text-[var(--primary)] mb-2 flex items-center gap-3">
+          <span>💰</span>
+          <span>Buyback Dashboard</span>
+        </h1>
+        <p className="text-[var(--primary)]/70 font-mono text-sm uppercase tracking-wider">
+          Track $BACK token buyback and burn statistics
+        </p>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <BuybackStats
+          totalUsdcSpent={buybackState.totalUsdcSpent}
+          totalBackBurned={buybackState.totalBackBurned}
+          buybackCount={buybackState.buybackCount}
+        />
+      </div>
+
+      {/* Progress Bar */}
+      <div className="mb-6">
+        <BuybackProgressBar
+          currentBalance={buybackState.vaultBalance || 0}
+          threshold={buybackState.minBuybackAmount}
+          progressPercent={buybackState.progressPercent || 0}
+        />
+      </div>
+
+      {/* Execute Button (only show if threshold met) */}
+      {buybackState.canExecute && (
+        <div className="mb-6">
+          <ExecuteBuybackButton />
+        </div>
+      )}
+
+      {/* Historical Chart */}
+      <div className="mb-6">
+        <BuybackChart />
+      </div>
+
+      {/* Recent Transactions */}
+      <div className="mb-6">
+        <RecentBuybacks />
+      </div>
+
+      {/* Info Section */}
+      <div>
 
         {/* Additional Info Sections */}
         <div className="max-w-6xl mx-auto mt-12 grid grid-cols-1 md:grid-cols-2 gap-6">

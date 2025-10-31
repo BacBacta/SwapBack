@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import custom animations */
+@import '../styles/animations.css';
+
 :root {
   /* Terminal Hacker Theme Colors */
   --background: #0C0C0C; /* Noir terminal */

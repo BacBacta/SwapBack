@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { ArrowDownUp, Settings, TrendingUp, Zap, Info, ChevronDown } from "lucide-react";
 import { useTokenData } from "../hooks/useTokenData";
 import { TokenSelector } from "./TokenSelector";
+import { depositToBuybackVault, BuybackDepositResult } from "../lib/buybackIntegration";
+import { trackSwap } from "../lib/analytics";
+import toast from "react-hot-toast";
 
 interface RouteStep {
   label: string;
@@ -38,6 +41,8 @@ interface RouteOption {
 
 export const SwapInterface = () => {
   const { connected, publicKey } = useWallet();
+  const { connection } = useConnection();
+  const wallet = useWallet();
 
   const [inputAmount, setInputAmount] = useState("");
   const [outputAmount, setOutputAmount] = useState("");
@@ -56,6 +61,7 @@ export const SwapInterface = () => {
   const [routeOptions, setRouteOptions] = useState<RouteOption[]>([]);
   const [showRouteComparison, setShowRouteComparison] = useState(false);
   const [showPriceImpactModal, setShowPriceImpactModal] = useState(false);
+  const [buybackDeposit, setBuybackDeposit] = useState<BuybackDepositResult | null>(null);
 
   const tokenAddresses: { [key: string]: string } = {
     SOL: "So11111111111111111111111111111111111111112",
@@ -177,13 +183,52 @@ export const SwapInterface = () => {
 
   const executeSwap = async () => {
     setLoading(true);
+    setBuybackDeposit(null); // Reset previous result
+    
     try {
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      alert(
-        `✅ Swap exécuté avec succès!\n\n` +
-        `${inputAmount} ${inputToken} → ${outputAmount} ${outputToken}`
+      // Simulate swap fee calculation (0.3% of input amount)
+      const swapFee = parseFloat(inputAmount) * 0.003 * 1e6; // Convert to lamports
+      
+      // Try to deposit 25% of fees to buyback vault (non-blocking)
+      if (connection && wallet && swapFee > 0) {
+        try {
+          const depositResult = await depositToBuybackVault(connection, wallet, swapFee);
+          setBuybackDeposit(depositResult);
+          
+          if (!depositResult.skipped) {
+            toast.success(
+              `🔥 Buyback: ${(depositResult.amount / 1e6).toFixed(2)} USDC deposited!`,
+              { duration: 5000 }
+            );
+          }
+        } catch (error) {
+          console.warn('Buyback deposit error (non-blocking):', error);
+          setBuybackDeposit({
+            skipped: true,
+            amount: Math.floor(swapFee * 0.25),
+            reason: 'Failed to execute deposit',
+          });
+        }
+      }
+      
+      toast.success(
+        `✅ Swap successful!\n${inputAmount} ${inputToken} → ${outputAmount} ${outputToken}`,
+        { duration: 4000 }
       );
+
+      // Track swap analytics
+      trackSwap({
+        inputToken,
+        outputToken,
+        inputAmount: parseFloat(inputAmount) * 1e6,
+        outputAmount: parseFloat(outputAmount) * 1e6,
+        fee: swapFee,
+        route: selectedRouter,
+        buybackDeposit: buybackDeposit?.amount || 0,
+        walletAddress: wallet.publicKey?.toString(),
+      });
       
       setInputAmount("");
       setOutputAmount("");
@@ -191,6 +236,7 @@ export const SwapInterface = () => {
       setShowPriceImpactModal(false);
     } catch (error) {
       console.error("Error:", error);
+      toast.error('❌ Swap failed');
     } finally {
       setLoading(false);
     }
@@ -601,6 +647,41 @@ export const SwapInterface = () => {
               </span>
             )}
           </button>
+
+          {/* Buyback Deposit Result */}
+          {buybackDeposit && !buybackDeposit.skipped && (
+            <div className="mt-4 p-4 bg-green-500/10 border-2 border-green-500/50 backdrop-blur-sm">
+              <div className="flex items-start gap-3">
+                <div className="text-2xl">🔥</div>
+                <div className="flex-1">
+                  <p className="font-bold terminal-text uppercase tracking-wider text-green-400 mb-1">
+                    Buyback Contribution
+                  </p>
+                  <p className="text-sm text-[var(--primary)]">
+                    {(buybackDeposit.amount / 1e6).toFixed(2)} USDC deposited for $BACK buyback
+                  </p>
+                  {buybackDeposit.signature && (
+                    <a
+                      href={`https://explorer.solana.com/tx/${buybackDeposit.signature}?cluster=devnet`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-[var(--secondary)] hover:underline mt-1 inline-block"
+                    >
+                      View transaction ↗
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {buybackDeposit && buybackDeposit.skipped && (
+            <div className="mt-4 p-3 bg-black/40 border-2 border-[var(--primary)]/20 backdrop-blur-sm">
+              <p className="text-xs text-[var(--primary)]/70">
+                ℹ️ Buyback deposit skipped: {buybackDeposit.reason}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Advantages Banner - Style moderne */}
