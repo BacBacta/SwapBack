@@ -1,9 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
-import { EnhancedSwapInterface } from "@/components/EnhancedSwapInterface";
-import { Dashboard } from "@/components/Dashboard";
+
+// Performance: Lazy load heavy components
+const EnhancedSwapInterface = lazy(() => import("@/components/EnhancedSwapInterface").then(mod => ({ default: mod.EnhancedSwapInterface })));
+const Dashboard = lazy(() => import("@/components/Dashboard").then(mod => ({ default: mod.Dashboard })));
+
+// Loading fallback component
+function ComponentLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-[500px]">
+      <div className="terminal-box p-8 text-center">
+        <div className="animate-pulse">
+          <div className="text-4xl mb-4">⚡</div>
+          <div className="terminal-text text-[var(--primary)]">LOADING...</div>
+          <div className="mt-4 flex justify-center gap-2">
+            <span className="w-2 h-2 bg-[var(--primary)] animate-bounce"></span>
+            <span className="w-2 h-2 bg-[var(--primary)] animate-bounce" style={{ animationDelay: '0.2s' }}></span>
+            <span className="w-2 h-2 bg-[var(--primary)] animate-bounce" style={{ animationDelay: '0.4s' }}></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<"swap" | "dashboard">("swap");
@@ -96,13 +117,17 @@ export default function Home() {
         <div className="max-w-7xl mx-auto">
           {activeTab === "swap" && (
             <div className="animate-fade-in">
-              <EnhancedSwapInterface />
+              <Suspense fallback={<ComponentLoader />}>
+                <EnhancedSwapInterface />
+              </Suspense>
             </div>
           )}
           
           {activeTab === "dashboard" && (
             <div className="animate-fade-in">
-              <Dashboard />
+              <Suspense fallback={<ComponentLoader />}>
+                <Dashboard />
+              </Suspense>
             </div>
           )}
         </div>
