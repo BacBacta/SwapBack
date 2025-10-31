@@ -715,7 +715,265 @@ html {
 }
 
 @keyframes loading {
-  0% { width: 0%; }
-  50% { width: 100%; }
-  100% { width: 0%; }
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* ===== TODO #10: UX/UI Polish Additions ===== */
+
+/* Screen Reader Only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.sr-only:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: inherit;
+  margin: inherit;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+/* Skeleton Loading Animation */
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-pulse {
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  background: linear-gradient(
+    90deg,
+    rgba(var(--primary-rgb), 0.05) 0%,
+    rgba(var(--primary-rgb), 0.1) 50%,
+    rgba(var(--primary-rgb), 0.05) 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* Mobile Slide-Up Animation */
+@keyframes slide-up-mobile {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up-mobile 0.3s ease-out;
+}
+
+/* Focus Visible Styles (Better Keyboard Navigation) */
+*:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(var(--primary-rgb), 0.1);
+}
+
+/* Touch Target Minimum Size (44x44px for accessibility) */
+@media (hover: none) and (pointer: coarse) {
+  button,
+  a,
+  input[type="button"],
+  input[type="submit"],
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  .terminal-box,
+  .stat-card,
+  .glass-effect {
+    border-width: 3px;
+  }
+  
+  .terminal-text {
+    font-weight: 600;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Dark Mode Enhancements (Always dark for terminal theme) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .terminal-box,
+  .stat-card {
+    border: 2px solid black;
+    background: white;
+    color: black;
+  }
+  
+  .terminal-text {
+    color: black;
+  }
+  
+  nav,
+  footer,
+  .no-print {
+    display: none;
+  }
+}
+
+/* Mobile-Specific Optimizations */
+@media (max-width: 768px) {
+  /* Larger touch targets */
+  .terminal-button,
+  .terminal-button-secondary {
+    min-height: 48px;
+    padding: 12px 24px;
+    font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+  
+  /* Prevent iOS zoom on input focus */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  
+  /* Better spacing on mobile */
+  .terminal-box {
+    padding: 16px;
+  }
+  
+  /* Responsive grid adjustments */
+  .grid {
+    gap: 12px;
+  }
+}
+
+/* Loading State Utilities */
+.is-loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.is-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin-top: -10px;
+  margin-left: -10px;
+  border: 2px solid var(--primary);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Error State Styling */
+.error-state {
+  border-color: var(--error) !important;
+  box-shadow: 0 0 0 3px rgba(255, 0, 64, 0.1);
+}
+
+.error-state:focus {
+  box-shadow: 0 0 0 3px rgba(255, 0, 64, 0.2);
+}
+
+/* Success State Styling */
+.success-state {
+  border-color: var(--success) !important;
+  box-shadow: 0 0 0 3px rgba(0, 255, 65, 0.1);
+}
+
+/* Warning State Styling */
+.warning-state {
+  border-color: var(--warning) !important;
+  box-shadow: 0 0 0 3px rgba(255, 170, 0, 0.1);
+}
+
+/* Smooth Scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Custom Scrollbar (WebKit browsers) */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 6px;
+  border: 2px solid rgba(0, 0, 0, 0.3);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-hover);
+}
+
+/* Firefox Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) rgba(0, 0, 0, 0.3);
 }

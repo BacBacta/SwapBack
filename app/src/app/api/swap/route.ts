@@ -5,8 +5,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { Connection } from "@solana/web3.js";
-import { checkRateLimit, getClientIdentifier } from "@/lib/rateLimit";
-import { sanitizeAmount, isValidPublicKey } from "@/lib/validation";
+import { checkRateLimit, getClientIdentifier } from "../../../lib/rateLimit";
+import { sanitizeAmount, isValidPublicKey } from "../../../lib/validation";
 
 const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||

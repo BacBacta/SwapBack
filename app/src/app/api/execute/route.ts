@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { Connection, VersionedTransaction } from "@solana/web3.js";
-import { checkRateLimit, getClientIdentifier } from "@/lib/rateLimit";
+import { checkRateLimit, getClientIdentifier } from "../../../lib/rateLimit";
 
 // ============================================================================
 // CONFIGURATION
