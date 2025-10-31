@@ -18,7 +18,7 @@ solana-sdk = "=1.18.22"
 
 # Contraintes pour compatibilité Rust 1.79 (Solana toolchain)
 indexmap = "=2.6.0"
-toml_edit = "=0.22.22"
+toml_edit = "=0.23.7"
 toml_datetime = "=0.6.8"
 
 [profile.release]
