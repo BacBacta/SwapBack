@@ -129,6 +129,8 @@ async function initializeOptimized() {
   ]);
   data.writeBigUInt64LE(BigInt(minBuybackAmount), 8);
 
+  const SYSVAR_RENT_PUBKEY = new PublicKey('SysvarRent111111111111111111111111111111111');
+
   const instruction = new TransactionInstruction({
     keys: [
       { pubkey: buybackStatePDA, isSigner: false, isWritable: true },
@@ -138,6 +140,7 @@ async function initializeOptimized() {
       { pubkey: authority.publicKey, isSigner: true, isWritable: true },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
     ],
     programId: BUYBACK_PROGRAM_ID,
     data,
