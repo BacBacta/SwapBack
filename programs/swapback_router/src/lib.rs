@@ -26,8 +26,9 @@ pub const CNFT_PROGRAM_ID: Pubkey = pubkey!("9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJ
 // Oracle constants
 pub const MAX_STALENESS_SECS: i64 = 300; // 5 minutes max staleness
 
-// Rebate configuration
-pub const BASE_REBATE_USDC: u64 = 3_000_000; // 3 USDC base rebate (6 decimals)
+// Rebate configuration (basis points, 10000 = 100%)
+pub const DEFAULT_REBATE_BPS: u16 = 7500; // 75% du NPI redistribué aux utilisateurs (comme l'ancien système)
+pub const DEFAULT_BURN_BPS: u16 = 2500; // 25% du NPI pour le buyback/burn
 
 // Security limits
 pub const MAX_VENUES: usize = 10;
@@ -44,6 +45,11 @@ pub mod swapback_router {
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         let state = &mut ctx.accounts.state;
         state.authority = ctx.accounts.authority.key();
+        state.rebate_percentage = DEFAULT_REBATE_BPS; // 75% par défaut
+        state.burn_percentage = DEFAULT_BURN_BPS;     // 25% par défaut
+        state.total_volume = 0;
+        state.total_npi = 0;
+        state.total_rebates_paid = 0;
         state.bump = ctx.bumps.state;
         Ok(())
     }
@@ -203,6 +209,11 @@ pub struct SwapPlan {
 #[account]
 pub struct RouterState {
     pub authority: Pubkey,
+    pub rebate_percentage: u16,  // Pourcentage du NPI redistribué (en basis points, ex: 7500 = 75%)
+    pub burn_percentage: u16,    // Pourcentage du NPI pour buyback/burn (en basis points, ex: 2500 = 25%)
+    pub total_volume: u64,       // Volume total des swaps
+    pub total_npi: u64,          // NPI total généré
+    pub total_rebates_paid: u64, // Total rebates payés
     pub bump: u8,
 }
 
@@ -264,7 +275,8 @@ pub struct SwapCompleted {
 #[event]
 pub struct RebatePaid {
     pub user: Pubkey,
-    pub base_rebate: u64,       // Rebate de base (3 USDC)
+    pub npi_amount: u64,        // NPI (routing profit) réalisé
+    pub base_rebate: u64,       // Rebate de base (75% du NPI)
     pub boost: u16,             // Boost appliqué (basis points)
     pub total_rebate: u64,      // Rebate total après boost
     pub timestamp: i64,
@@ -594,13 +606,10 @@ pub mod swap_toc_processor {
             0 // Pas de NFT, pas de boost
         };
 
-        // Payer le rebate avec boost à l'utilisateur
-        let rebate_paid = pay_rebate_to_user(ctx, user_boost)?;
-
         // Calculate platform fee (0.2% of amount_out - plus bas que Raydium 0.25% et Orca 0.30%)
         let platform_fee = calculate_fee(total_amount_out, PLATFORM_FEE_BPS)?;
         
-        // Calculate routing profit (amount_out - min_out - platform_fee)
+        // Calculate routing profit (NPI = amount_out - min_out - platform_fee)
         let net_amount_out = total_amount_out
             .checked_sub(platform_fee)
             .ok_or(ErrorCode::InvalidOraclePrice)?;
@@ -612,6 +621,9 @@ pub mod swap_toc_processor {
         } else {
             0
         };
+
+        // Payer le rebate avec boost à l'utilisateur (basé sur le NPI)
+        let rebate_paid = pay_rebate_to_user(ctx, routing_profit, user_boost)?;
 
         // Calculate buyback deposit (40% of platform_fee + 40% of routing_profit)
         let fee_for_buyback = calculate_fee(platform_fee, BUYBACK_ALLOCATION_BPS)?;
@@ -805,10 +817,20 @@ pub mod swap_toc_processor {
         Ok(fee)
     }
 
-    /// Calculate boosted rebate based on user's cNFT boost
-    /// Formula: rebate = base_rebate * (1 + boost/10000)
-    /// Example: base 3 USDC, boost 2300 BP (23%) = 3 * 1.23 = 3.69 USDC
-    pub fn calculate_boosted_rebate(base_rebate: u64, boost_bp: u16) -> Result<u64> {
+    /// Calculate boosted rebate based on NPI and user's cNFT boost
+    /// Formula: rebate = (NPI * rebate_percentage / 10000) * (1 + boost/10000)
+    /// Example: NPI 10 USDC, 75% rebate, boost 2300 BP (23%)
+    ///          base_rebate = 10 * 0.75 = 7.5 USDC
+    ///          boosted = 7.5 * 1.23 = 9.225 USDC
+    pub fn calculate_boosted_rebate(npi_amount: u64, rebate_bps: u16, boost_bp: u16) -> Result<u64> {
+        // Calculer le rebate de base (pourcentage du NPI)
+        let base_rebate = (npi_amount as u128)
+            .checked_mul(rebate_bps as u128)
+            .ok_or(ErrorCode::InvalidOraclePrice)?
+            .checked_div(10_000)
+            .ok_or(ErrorCode::InvalidOraclePrice)? as u64;
+
+        // Appliquer le boost
         // Multiplier = 10000 (100%) + boost_bp
         // Example: 10000 + 2300 = 12300 (123%)
         let multiplier = 10_000u128
@@ -824,23 +846,48 @@ pub mod swap_toc_processor {
         Ok(boosted)
     }
 
-    /// Pay rebate to user with boost applied
-    fn pay_rebate_to_user(ctx: &Context<SwapToC>, boost: u16) -> Result<u64> {
+    /// Pay rebate to user with boost applied (based on NPI)
+    fn pay_rebate_to_user(ctx: &Context<SwapToC>, npi_amount: u64, boost: u16) -> Result<u64> {
+        // Si pas de NPI, pas de rebate
+        if npi_amount == 0 {
+            return Ok(0);
+        }
+
         // Si pas de compte rebate, pas de paiement
         let _user_rebate_account = match &ctx.accounts.user_rebate_account {
             Some(acc) => acc,
             None => return Ok(0),
         };
 
+        // Obtenir le pourcentage de rebate depuis le state
+        let rebate_percentage = ctx.accounts.state.rebate_percentage;
+
+        // Calculer le rebate de base (% du NPI)
+        let base_rebate = (npi_amount as u128)
+            .checked_mul(rebate_percentage as u128)
+            .ok_or(ErrorCode::InvalidOraclePrice)?
+            .checked_div(10_000)
+            .ok_or(ErrorCode::InvalidOraclePrice)? as u64;
+
         // Calculer le rebate avec boost
-        let boosted_rebate = calculate_boosted_rebate(BASE_REBATE_USDC, boost)?;
+        let boosted_rebate = calculate_boosted_rebate(npi_amount, rebate_percentage, boost)?;
+
+        // Mettre à jour les statistiques du state
+        let state = &mut ctx.accounts.state;
+        state.total_npi = state.total_npi
+            .checked_add(npi_amount)
+            .ok_or(ErrorCode::InvalidOraclePrice)?;
+        state.total_rebates_paid = state.total_rebates_paid
+            .checked_add(boosted_rebate)
+            .ok_or(ErrorCode::InvalidOraclePrice)?;
 
         // TODO: Transférer les USDC depuis le vault vers le compte utilisateur
         // Pour l'instant, juste émettre l'événement
 
         emit!(RebatePaid {
             user: ctx.accounts.user.key(),
-            base_rebate: BASE_REBATE_USDC,
+            npi_amount,
+            base_rebate,
             boost,
             total_rebate: boosted_rebate,
             timestamp: Clock::get()?.unix_timestamp,
@@ -915,57 +962,67 @@ mod tests {
 
     #[test]
     fn test_calculate_boosted_rebate_no_boost() {
-        // Base: 3 USDC (3_000_000 avec 6 decimals)
+        // NPI: 10 USDC (10_000_000 avec 6 decimals)
+        // Rebate: 7500 BP (75%)
         // Boost: 0 BP (0%)
-        // Expected: 3 USDC
-        let base = 3_000_000u64;
+        // Expected: 10 × 0.75 × 1.0 = 7.5 USDC
+        let npi = 10_000_000u64;
+        let rebate_bps = 7500u16;
         let boost = 0u16;
-        let result = swap_toc_processor::calculate_boosted_rebate(base, boost).unwrap();
-        assert_eq!(result, 3_000_000, "No boost should return base amount");
+        let result = swap_toc_processor::calculate_boosted_rebate(npi, rebate_bps, boost).unwrap();
+        assert_eq!(result, 7_500_000, "75% of 10 USDC NPI with no boost = 7.5 USDC");
     }
 
     #[test]
     fn test_calculate_boosted_rebate_small_boost() {
-        // Base: 3 USDC
-        // Boost: 350 BP (3.5%)
-        // Expected: 3 × 1.035 = 3.105 USDC
-        let base = 3_000_000u64;
-        let boost = 350u16;
-        let result = swap_toc_processor::calculate_boosted_rebate(base, boost).unwrap();
-        assert_eq!(result, 3_105_000, "3.5% boost should give 3.105 USDC");
+        // NPI: 10 USDC
+        // Rebate: 7500 BP (75%)
+        // Boost: 500 BP (5%)
+        // Expected: 10 × 0.75 × 1.05 = 7.875 USDC
+        let npi = 10_000_000u64;
+        let rebate_bps = 7500u16;
+        let boost = 500u16;
+        let result = swap_toc_processor::calculate_boosted_rebate(npi, rebate_bps, boost).unwrap();
+        assert_eq!(result, 7_875_000, "75% of 10 USDC with 5% boost = 7.875 USDC");
     }
 
     #[test]
     fn test_calculate_boosted_rebate_medium_boost() {
-        // Base: 3 USDC
+        // NPI: 10 USDC
+        // Rebate: 7500 BP (75%)
         // Boost: 2300 BP (23%)
-        // Expected: 3 × 1.23 = 3.69 USDC
-        let base = 3_000_000u64;
+        // Expected: 10 × 0.75 × 1.23 = 9.225 USDC
+        let npi = 10_000_000u64;
+        let rebate_bps = 7500u16;
         let boost = 2300u16;
-        let result = swap_toc_processor::calculate_boosted_rebate(base, boost).unwrap();
-        assert_eq!(result, 3_690_000, "23% boost should give 3.69 USDC");
+        let result = swap_toc_processor::calculate_boosted_rebate(npi, rebate_bps, boost).unwrap();
+        assert_eq!(result, 9_225_000, "75% of 10 USDC with 23% boost = 9.225 USDC");
     }
 
     #[test]
     fn test_calculate_boosted_rebate_high_boost() {
-        // Base: 3 USDC
+        // NPI: 10 USDC
+        // Rebate: 7500 BP (75%)
         // Boost: 8600 BP (86%)
-        // Expected: 3 × 1.86 = 5.58 USDC
-        let base = 3_000_000u64;
+        // Expected: 10 × 0.75 × 1.86 = 13.95 USDC
+        let npi = 10_000_000u64;
+        let rebate_bps = 7500u16;
         let boost = 8600u16;
-        let result = swap_toc_processor::calculate_boosted_rebate(base, boost).unwrap();
-        assert_eq!(result, 5_580_000, "86% boost should give 5.58 USDC");
+        let result = swap_toc_processor::calculate_boosted_rebate(npi, rebate_bps, boost).unwrap();
+        assert_eq!(result, 13_950_000, "75% of 10 USDC with 86% boost = 13.95 USDC");
     }
 
     #[test]
     fn test_calculate_boosted_rebate_maximum_boost() {
-        // Base: 3 USDC
+        // NPI: 10 USDC
+        // Rebate: 7500 BP (75%)
         // Boost: 10000 BP (100%)
-        // Expected: 3 × 2 = 6 USDC
-        let base = 3_000_000u64;
+        // Expected: 10 × 0.75 × 2.0 = 15 USDC
+        let npi = 10_000_000u64;
+        let rebate_bps = 7500u16;
         let boost = 10_000u16;
-        let result = swap_toc_processor::calculate_boosted_rebate(base, boost).unwrap();
-        assert_eq!(result, 6_000_000, "100% boost should double the rebate to 6 USDC");
+        let result = swap_toc_processor::calculate_boosted_rebate(npi, rebate_bps, boost).unwrap();
+        assert_eq!(result, 15_000_000, "75% of 10 USDC with 100% boost = 15 USDC");
     }
 
     #[test]
