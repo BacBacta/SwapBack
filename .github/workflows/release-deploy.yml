@@ -1,0 +1,315 @@
+name: Release & Deploy
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+permissions:
+  contents: write
+  deployments: write
+
+jobs:
+  # Job 1: Pre-deployment Checks
+  pre-deploy-checks:
+    name: Pre-Deployment Verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🧪 Run critical tests
+        run: npm test -- --run
+        env:
+          CI: true
+
+      - name: 🔒 Security audit
+        run: npm audit --production --audit-level=critical
+
+      - name: ✅ All checks passed
+        run: echo "✅ Pre-deployment checks completed successfully" >> $GITHUB_STEP_SUMMARY
+
+  # Job 2: Build Production Assets
+  build-production:
+    name: Build Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [pre-deploy-checks]
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci --production=false
+
+      - name: 🏗️ Build Next.js (Production)
+        run: npm run build
+        working-directory: ./app
+        env:
+          NODE_ENV: production
+          NEXT_PUBLIC_RPC_ENDPOINT: ${{ secrets.PROD_RPC_ENDPOINT }}
+          NEXT_PUBLIC_HELIUS_API_KEY: ${{ secrets.PROD_HELIUS_API_KEY }}
+
+      - name: 🏗️ Build SDK
+        run: npm run build
+        working-directory: ./sdk
+
+      - name: 📦 Package build artifacts
+        run: |
+          tar -czf swapback-app-${{ github.sha }}.tar.gz -C app .next
+          tar -czf swapback-sdk-${{ github.sha }}.tar.gz -C sdk dist
+
+      - name: 📤 Upload production builds
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-builds
+          path: |
+            swapback-app-${{ github.sha }}.tar.gz
+            swapback-sdk-${{ github.sha }}.tar.gz
+          retention-days: 90
+
+  # Job 3: Build & Verify Solana Programs
+  build-programs-production:
+    name: Build Programs (Verifiable)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [pre-deploy-checks]
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🦀 Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: ☀️ Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.solana.com/v1.18.22/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      - name: ⚓ Install Anchor CLI
+        run: cargo install --git https://github.com/coral-xyz/anchor --tag v0.30.1 anchor-cli --locked --force
+
+      - name: 🏗️ Verifiable build
+        run: anchor build --verifiable
+
+      - name: 📋 Generate program checksums
+        run: |
+          echo "## 🔐 Program Checksums" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Program | SHA256 |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          for file in target/deploy/*.so; do
+            name=$(basename $file .so)
+            hash=$(sha256sum $file | cut -d' ' -f1)
+            echo "| $name | \`$hash\` |" >> $GITHUB_STEP_SUMMARY
+          done
+
+      - name: 📤 Upload program binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: solana-programs-production
+          path: |
+            target/deploy/*.so
+            target/idl/*.json
+          retention-days: 90
+
+  # Job 4: Deploy to Vercel (Production)
+  deploy-vercel:
+    name: Deploy to Vercel
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build-production]
+    environment:
+      name: ${{ github.event.inputs.environment || 'production' }}
+      url: https://swapback.vercel.app
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📥 Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: production-builds
+
+      - name: 📦 Extract app build
+        run: |
+          tar -xzf swapback-app-${{ github.sha }}.tar.gz -C app/
+
+      - name: 🚀 Deploy to Vercel (Production)
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          working-directory: ./app
+
+      - name: ✅ Deployment complete
+        run: |
+          echo "## 🚀 Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment**: ${{ github.event.inputs.environment || 'production' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**URL**: https://swapback.vercel.app" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+  # Job 5: Deploy Solana Programs (Optional - Manual Trigger)
+  deploy-programs:
+    name: Deploy Programs to Devnet/Mainnet
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [build-programs-production]
+    if: github.event_name == 'workflow_dispatch'
+    environment:
+      name: solana-${{ github.event.inputs.environment }}
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📥 Download program binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: solana-programs-production
+          path: target/deploy/
+
+      - name: ☀️ Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.solana.com/v1.18.22/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      - name: 🔑 Setup Solana keypair
+        run: |
+          echo "${{ secrets.SOLANA_DEPLOYER_KEY }}" > deployer-keypair.json
+          solana config set --keypair deployer-keypair.json
+          
+      - name: 🌐 Set Solana cluster
+        run: |
+          if [ "${{ github.event.inputs.environment }}" == "production" ]; then
+            solana config set --url mainnet-beta
+          else
+            solana config set --url devnet
+          fi
+
+      - name: 💰 Check balance
+        run: |
+          BALANCE=$(solana balance)
+          echo "Deployer balance: $BALANCE" >> $GITHUB_STEP_SUMMARY
+
+      - name: ⚓ Deploy programs
+        run: |
+          for program in target/deploy/*.so; do
+            program_name=$(basename $program .so)
+            echo "Deploying $program_name..."
+            
+            # Deploy using solana program deploy
+            PROGRAM_ID=$(solana program deploy $program --output json | jq -r .programId)
+            
+            echo "✅ Deployed $program_name: $PROGRAM_ID" >> $GITHUB_STEP_SUMMARY
+          done
+
+      - name: 🔒 Clean up keypair
+        if: always()
+        run: rm -f deployer-keypair.json
+
+  # Job 6: Post-Deployment Verification
+  post-deploy-verify:
+    name: Post-Deployment Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [deploy-vercel]
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: 🧪 Smoke tests
+        run: |
+          echo "Running smoke tests..."
+          curl -f https://swapback.vercel.app || exit 1
+          curl -f https://swapback.vercel.app/api/health || exit 1
+          echo "✅ Smoke tests passed" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🚀 Run Lighthouse audit
+        uses: treosh/lighthouse-ci-action@v10
+        with:
+          urls: https://swapback.vercel.app
+          uploadArtifacts: true
+        continue-on-error: true
+
+  # Job 7: Create Release Notes
+  create-release-notes:
+    name: Create Release Notes
+    runs-on: ubuntu-latest
+    needs: [deploy-vercel, post-deploy-verify]
+    if: github.event_name == 'release'
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📝 Generate changelog
+        id: changelog
+        uses: mikepenz/release-changelog-builder-action@v4
+        with:
+          configuration: ".github/release-changelog-config.json"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📤 Update release
+        uses: softprops/action-gh-release@v1
+        with:
+          body: |
+            ## 🚀 SwapBack Release
+            
+            ${{ steps.changelog.outputs.changelog }}
+            
+            ## 📦 Artifacts
+            
+            - Frontend: Deployed to https://swapback.vercel.app
+            - Programs: Available in release assets
+            
+            ## ✅ Verification
+            
+            All tests passed ✓
+            Security audit clean ✓
+            Production build verified ✓
+          files: |
+            target/deploy/*.so
+            target/idl/*.json

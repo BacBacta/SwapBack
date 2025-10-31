@@ -1,0 +1,114 @@
+version: 2
+
+updates:
+  # NPM Dependencies - Frontend App
+  - package-ecosystem: "npm"
+    directory: "/app"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "SwapBack/core-team"
+    labels:
+      - "dependencies"
+      - "npm"
+      - "automated"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    versioning-strategy: increase
+    groups:
+      # Group React-related updates
+      react:
+        patterns:
+          - "react*"
+          - "@types/react*"
+      # Group Next.js related
+      nextjs:
+        patterns:
+          - "next"
+          - "@next/*"
+      # Group testing libraries
+      testing:
+        patterns:
+          - "vitest"
+          - "@testing-library/*"
+          - "@vitest/*"
+      # Group wallet adapters
+      solana-wallets:
+        patterns:
+          - "@solana/wallet-adapter-*"
+          - "@solana/web3.js"
+      # Group dev dependencies
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # NPM Dependencies - SDK
+  - package-ecosystem: "npm"
+    directory: "/sdk"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "SwapBack/core-team"
+    labels:
+      - "dependencies"
+      - "npm"
+      - "sdk"
+      - "automated"
+    commit-message:
+      prefix: "chore(sdk-deps)"
+    versioning-strategy: increase
+
+  # Cargo Dependencies
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "10:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "SwapBack/core-team"
+    labels:
+      - "dependencies"
+      - "rust"
+      - "automated"
+    commit-message:
+      prefix: "chore(rust-deps)"
+    groups:
+      # Group Anchor dependencies
+      anchor:
+        patterns:
+          - "anchor-*"
+      # Group Solana dependencies
+      solana:
+        patterns:
+          - "solana-*"
+      # Group dev dependencies
+      dev-dependencies:
+        dependency-type: "development"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "11:00"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "SwapBack/core-team"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "automated"
+    commit-message:
+      prefix: "chore(actions)"

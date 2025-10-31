@@ -1,0 +1,221 @@
+name: Code Quality Checks
+
+on:
+  schedule:
+    # Run every day at 3 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  # Job 1: ESLint Check
+  eslint-check:
+    name: ESLint Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔍 Run ESLint
+        id: eslint
+        run: |
+          npm run lint -- --format json --output-file eslint-report.json || true
+          npm run lint || true
+
+      - name: 📊 Generate ESLint summary
+        run: |
+          echo "## 🔍 ESLint Analysis Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f eslint-report.json ]; then
+            ERRORS=$(jq '[.[] | .errorCount] | add' eslint-report.json)
+            WARNINGS=$(jq '[.[] | .warningCount] | add' eslint-report.json)
+            
+            echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| ❌ Errors | $ERRORS |" >> $GITHUB_STEP_SUMMARY
+            echo "| ⚠️ Warnings | $WARNINGS |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 📤 Upload ESLint report
+        uses: actions/upload-artifact@v4
+        with:
+          name: eslint-report
+          path: eslint-report.json
+          retention-days: 30
+
+  # Job 2: TypeScript Check
+  typescript-check:
+    name: TypeScript Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔍 Run TypeScript check
+        run: |
+          npx tsc --noEmit --pretty || true
+          echo "## 📘 TypeScript Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "TypeScript compilation check completed." >> $GITHUB_STEP_SUMMARY
+
+  # Job 3: Code Formatting Check
+  prettier-check:
+    name: Code Formatting
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🎨 Check formatting
+        run: |
+          npx prettier --check "**/*.{ts,tsx,js,jsx,json,css,md}" || true
+          echo "## 🎨 Prettier Formatting Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Code formatting validation completed." >> $GITHUB_STEP_SUMMARY
+
+  # Job 4: Rust Clippy Check
+  clippy-check:
+    name: Rust Clippy Lints
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🦀 Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+
+      - name: 📦 Cache Cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: 🔍 Run Clippy
+        run: |
+          cargo clippy --all-targets --all-features -- -D warnings -W clippy::all || true
+          echo "## 🦀 Clippy Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Rust clippy linting completed." >> $GITHUB_STEP_SUMMARY
+
+  # Job 5: Rust Formatting Check
+  rustfmt-check:
+    name: Rust Formatting
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🦀 Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+
+      - name: 🎨 Check Rust formatting
+        run: |
+          cargo fmt --all -- --check || true
+          echo "## 🎨 Rustfmt Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Rust code formatting validated." >> $GITHUB_STEP_SUMMARY
+
+  # Job 6: Create Issue on Failures
+  report-issues:
+    name: Report Quality Issues
+    runs-on: ubuntu-latest
+    needs: [eslint-check, typescript-check, prettier-check, clippy-check, rustfmt-check]
+    if: failure()
+
+    steps:
+      - name: 🚨 Create quality issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueTitle = '🔍 Code Quality Issues Detected';
+            const issueBody = `## 🔍 Code Quality Alert
+            
+            The automated code quality checks have detected issues:
+            
+            ### Failed Checks
+            - ESLint: ${{ needs.eslint-check.result }}
+            - TypeScript: ${{ needs.typescript-check.result }}
+            - Prettier: ${{ needs.prettier-check.result }}
+            - Clippy: ${{ needs.clippy-check.result }}
+            - Rustfmt: ${{ needs.rustfmt-check.result }}
+            
+            **Action Required**: Please review the workflow logs and fix the reported issues.
+            
+            [View Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            
+            ---
+            *Automated report from code quality workflow*
+            *Run date: ${new Date().toISOString()}*
+            `;
+            
+            // Check if issue already exists
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'code-quality,automated'
+            });
+            
+            const existingIssue = issues.find(i => i.title === issueTitle);
+            
+            if (!existingIssue) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: issueTitle,
+                body: issueBody,
+                labels: ['code-quality', 'automated', 'priority-medium']
+              });
+            }

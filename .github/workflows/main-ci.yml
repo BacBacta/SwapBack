@@ -1,0 +1,261 @@
+name: CI/CD - Main Branch
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Job 1: Full Test Suite
+  test:
+    name: Complete Test Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better analysis
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔍 Run linter
+        run: npm run lint
+
+      - name: 🧪 Run full test suite
+        run: npm test -- --coverage --run
+        env:
+          CI: true
+
+      - name: 📊 Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/coverage-final.json
+          flags: unittests
+          name: codecov-main
+
+      - name: 📤 Upload test artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-coverage-main
+          path: coverage/
+          retention-days: 30
+
+  # Job 2: Build & Deploy Preview
+  build-and-deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [test]
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🏗️ Build Next.js app
+        run: npm run build
+        working-directory: ./app
+        env:
+          NEXT_PUBLIC_RPC_ENDPOINT: ${{ secrets.NEXT_PUBLIC_RPC_ENDPOINT }}
+          NEXT_PUBLIC_HELIUS_API_KEY: ${{ secrets.NEXT_PUBLIC_HELIUS_API_KEY }}
+
+      - name: 📏 Analyze bundle size
+        run: |
+          echo "## 📦 Bundle Size Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Total build size:" >> $GITHUB_STEP_SUMMARY
+          du -sh .next/ >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Route sizes:" >> $GITHUB_STEP_SUMMARY
+          du -sh .next/static/chunks/pages/* >> $GITHUB_STEP_SUMMARY
+        working-directory: ./app
+
+      - name: 🚀 Deploy to Vercel (Preview)
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: ./app
+          scope: ${{ secrets.VERCEL_ORG_ID }}
+        continue-on-error: true
+
+  # Job 3: Build Solana Programs
+  build-programs:
+    name: Build & Verify Programs
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🦀 Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: ☀️ Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.solana.com/v1.18.22/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      - name: ⚓ Install Anchor CLI
+        run: |
+          cargo install --git https://github.com/coral-xyz/anchor --tag v0.30.1 anchor-cli --locked --force
+
+      - name: 🏗️ Build all programs
+        run: anchor build
+
+      - name: 🔍 Verify program builds
+        run: |
+          echo "## ⚓ Anchor Programs Build" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Program | Size | Hash |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|------|------|" >> $GITHUB_STEP_SUMMARY
+          for file in target/deploy/*.so; do
+            name=$(basename $file .so)
+            size=$(du -h $file | cut -f1)
+            hash=$(sha256sum $file | cut -d' ' -f1 | cut -c1-8)
+            echo "| $name | $size | $hash |" >> $GITHUB_STEP_SUMMARY
+          done
+
+      - name: 📤 Upload program artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: solana-programs
+          path: target/deploy/*.so
+          retention-days: 30
+
+  # Job 4: Security Audit
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔒 Run npm audit (production)
+        run: |
+          npm audit --production --audit-level=moderate > audit-results.txt || true
+          cat audit-results.txt
+
+      - name: 📝 Create security summary
+        run: |
+          echo "## 🔒 Security Audit Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cat audit-results.txt >> $GITHUB_STEP_SUMMARY
+
+      - name: 📤 Upload audit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-audit
+          path: audit-results.txt
+          retention-days: 30
+
+  # Job 5: Performance Monitoring
+  performance:
+    name: Performance Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [build-and-deploy]
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🚀 Run Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v10
+        with:
+          urls: |
+            http://localhost:3000
+            http://localhost:3000/swap
+            http://localhost:3000/dashboard
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+        continue-on-error: true
+
+  # Job 6: Release Notes
+  release-notes:
+    name: Generate Release Notes
+    runs-on: ubuntu-latest
+    needs: [test, build-and-deploy, build-programs, security-audit]
+    if: success()
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📝 Generate changelog
+        id: changelog
+        run: |
+          echo "## 📋 Changes in this push" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          git log --oneline --no-merges -n 10 >> $GITHUB_STEP_SUMMARY
+
+      - name: 🏷️ Create Git Tag (if semantic commit)
+        run: |
+          LAST_COMMIT=$(git log -1 --pretty=%B)
+          if [[ $LAST_COMMIT == feat:* ]] || [[ $LAST_COMMIT == fix:* ]] || [[ $LAST_COMMIT == perf:* ]]; then
+            VERSION=$(date +%Y.%m.%d)-$(git rev-parse --short HEAD)
+            git tag -a v$VERSION -m "Auto-generated tag: $VERSION"
+            git push origin v$VERSION
+            echo "✅ Created tag: v$VERSION" >> $GITHUB_STEP_SUMMARY
+          fi
+        continue-on-error: true
+
+  # Job 7: Notification
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [test, build-and-deploy, build-programs]
+    if: always()
+
+    steps:
+      - name: 📧 Send deployment notification
+        run: |
+          STATUS="${{ needs.test.result == 'success' && needs.build-and-deploy.result == 'success' && needs.build-programs.result == 'success' && '✅ SUCCESS' || '❌ FAILED' }}"
+          echo "Deployment status: $STATUS"
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status**: $STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Author**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp**: $(date -u)" >> $GITHUB_STEP_SUMMARY

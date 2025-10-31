@@ -1,0 +1,248 @@
+name: Dependency Management
+
+on:
+  schedule:
+    # Run every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # Job 1: Update Dependencies
+  update-dependencies:
+    name: Update NPM Dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 📦 Update dependencies
+        run: |
+          npm update
+          npm outdated || true
+
+      - name: 🧪 Run tests
+        run: npm test -- --run
+        continue-on-error: true
+
+      - name: 📝 Create PR for dependency updates
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: update npm dependencies'
+          title: '🔄 Weekly Dependency Updates'
+          body: |
+            ## 🔄 Automated Dependency Updates
+            
+            This PR contains automated dependency updates from the weekly maintenance workflow.
+            
+            ### 📦 Changes
+            - Updated NPM dependencies to latest compatible versions
+            
+            ### ✅ Checklist
+            - [ ] All tests pass
+            - [ ] No breaking changes detected
+            - [ ] Security vulnerabilities addressed
+            
+            **Note**: This PR was automatically created by the dependency management workflow.
+          branch: deps/weekly-update-${{ github.run_number }}
+          delete-branch: true
+          labels: dependencies, automated
+
+  # Job 2: Security Audit
+  security-audit:
+    name: Security Vulnerability Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔒 Run npm audit
+        id: audit
+        run: |
+          npm audit --json > audit-results.json || true
+          cat audit-results.json
+
+      - name: 📊 Parse audit results
+        run: |
+          echo "## 🔒 Security Audit Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          CRITICAL=$(jq '.metadata.vulnerabilities.critical' audit-results.json)
+          HIGH=$(jq '.metadata.vulnerabilities.high' audit-results.json)
+          MODERATE=$(jq '.metadata.vulnerabilities.moderate' audit-results.json)
+          LOW=$(jq '.metadata.vulnerabilities.low' audit-results.json)
+          
+          echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔴 Critical | $CRITICAL |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟠 High | $HIGH |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟡 Moderate | $MODERATE |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟢 Low | $LOW |" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🚨 Create issue if vulnerabilities found
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const audit = JSON.parse(fs.readFileSync('audit-results.json', 'utf8'));
+            const vulns = audit.metadata.vulnerabilities;
+            
+            if (vulns.critical > 0 || vulns.high > 0) {
+              const issueTitle = '🚨 Security Vulnerabilities Detected';
+              const issueBody = `## 🔒 Security Audit Alert
+              
+              Automated security scan detected vulnerabilities:
+              
+              | Severity | Count |
+              |----------|-------|
+              | 🔴 Critical | ${vulns.critical} |
+              | 🟠 High | ${vulns.high} |
+              | 🟡 Moderate | ${vulns.moderate} |
+              | 🟢 Low | ${vulns.low} |
+              
+              **Action Required**: Please review and update vulnerable dependencies.
+              
+              Run \`npm audit fix\` to automatically fix issues where possible.
+              
+              ---
+              *Automated report from dependency management workflow*
+              *Run date: ${new Date().toISOString()}*
+              `;
+              
+              // Check if issue already exists
+              const { data: issues } = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                labels: 'security,automated'
+              });
+              
+              const existingIssue = issues.find(i => i.title === issueTitle);
+              
+              if (!existingIssue) {
+                await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: issueTitle,
+                  body: issueBody,
+                  labels: ['security', 'automated', 'priority-high']
+                });
+              }
+            }
+
+  # Job 3: Rust Dependencies Update
+  update-rust-deps:
+    name: Update Cargo Dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - name: 🦀 Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: 📦 Install cargo-update
+        run: cargo install cargo-update
+
+      - name: 🔄 Update Cargo dependencies
+        run: |
+          cargo update
+          cargo outdated || true
+
+      - name: 🏗️ Test build
+        run: cargo build
+        continue-on-error: true
+
+      - name: 📝 Create PR for Rust updates
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: update Cargo dependencies'
+          title: '🦀 Weekly Rust Dependency Updates'
+          body: |
+            ## 🦀 Automated Rust Dependency Updates
+            
+            This PR contains automated Cargo dependency updates.
+            
+            ### 📦 Changes
+            - Updated Cargo.lock with latest compatible versions
+            
+            ### ✅ Checklist
+            - [ ] Programs build successfully
+            - [ ] All tests pass
+            - [ ] No breaking changes
+            
+            **Note**: Auto-generated by dependency management workflow.
+          branch: deps/rust-update-${{ github.run_number }}
+          delete-branch: true
+          labels: dependencies, rust, automated
+
+  # Job 4: License Compliance Check
+  license-check:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 📜 Check licenses
+        run: |
+          npx license-checker --summary > license-summary.txt || true
+          cat license-summary.txt
+
+      - name: 📊 Generate license report
+        run: |
+          echo "## 📜 License Compliance Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cat license-summary.txt >> $GITHUB_STEP_SUMMARY
+
+      - name: 📤 Upload license report
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report
+          path: license-summary.txt
+          retention-days: 30
