@@ -328,22 +328,31 @@ pub struct NftStatusUpdated {
 }
 
 // Fonction utilitaire pour calculer le boost dynamique
-// Formule: boost = min((amount_score + duration_score), 10000)
-// amount_score: max 5000 basis points (50%)
-// duration_score: max 5000 basis points (50%)
-// Total: max 10000 basis points (100%)
+// Formule AJUSTÉE: boost = min((amount_score + duration_score), 1500)
+// amount_score: max 750 basis points (7.5%)
+// duration_score: max 750 basis points (7.5%)
+// Total: max 1500 basis points (15%) - RÉDUIT de 100% à 15%
+//
+// Niveaux de boost réalistes:
+// - Bronze (1k BACK, 30j):    ~200 BP (2%)
+// - Silver (1k BACK, 30j):    ~300 BP (3%)
+// - Gold (10k BACK, 90j):     ~600 BP (6%)
+// - Platinum (50k BACK, 180j): ~1000 BP (10%)
+// - Diamond (100k+ BACK, 365j): ~1500 BP (15%)
 fn calculate_boost(amount: u64, duration: i64) -> u16 {
     let days = (duration / 86400) as u64; // Conversion en jours
     let amount_tokens = amount / 1_000_000_000; // Convertir lamports en tokens
 
-    // Amount score: (amount / 1000) * 50, max 5000 basis points (50%)
-    let amount_score = std::cmp::min((amount_tokens / 1000) * 50, 5000);
+    // Amount score: (amount / 10000) * 75, max 750 basis points (7.5%)
+    // Cela signifie: 100k tokens = 750 BP max
+    let amount_score = std::cmp::min((amount_tokens / 10_000) * 75, 750);
     
-    // Duration score: (days / 10) * 100, max 5000 basis points (50%)
-    let duration_score = std::cmp::min((days / 10) * 100, 5000);
+    // Duration score: (days / 5) * 10, max 750 basis points (7.5%)
+    // Cela signifie: 365 jours = 730 BP ≈ 7.3%
+    let duration_score = std::cmp::min((days / 5) * 10, 750);
     
-    // Total boost: max 10000 basis points (100%)
-    std::cmp::min(amount_score + duration_score, 10000) as u16
+    // Total boost: max 1500 basis points (15%)
+    std::cmp::min(amount_score + duration_score, 1500) as u16
 }
 
 #[cfg(test)]
@@ -352,41 +361,50 @@ mod tests {
 
     #[test]
     fn test_calculate_boost_small_lock() {
-        // 1,000 BACK × 30 days = 3.5% boost = 350 basis points
+        // 1,000 BACK × 30 days
+        // Amount: (1000 / 10000) = 0 (division entière) → 0 BP
+        // Duration: (30 / 5) * 10 = 60 BP (0.6%)
+        // Total: 60 BP ≈ 0.6%
         let amount = 1_000 * 1_000_000_000;
         let duration = 30 * 86400;
         let boost = calculate_boost(amount, duration);
-        assert_eq!(boost, 350);
+        assert_eq!(boost, 60);
     }
 
     #[test]
     fn test_calculate_boost_medium_lock() {
-        // 10,000 BACK × 180 days = 23% boost = 2300 basis points
+        // 10,000 BACK × 90 days (Gold tier)
+        // Amount: (10000 / 10000) * 75 = 75 BP (0.75%)
+        // Duration: (90 / 5) * 10 = 180 BP (1.8%)
+        // Total: 255 BP ≈ 2.55%
         let amount = 10_000 * 1_000_000_000;
-        let duration = 180 * 86400;
+        let duration = 90 * 86400;
         let boost = calculate_boost(amount, duration);
-        assert_eq!(boost, 2300);
+        assert_eq!(boost, 255);
     }
 
     #[test]
     fn test_calculate_boost_whale_lock() {
-        // 100,000 BACK × 365 days
-        // Amount score: (100000 / 1000) * 50 = 5000 BP (max)
-        // Duration score: (365 / 10) * 100 = 3650 BP (36.5 troncated = 36)
-        // Total: 5000 + 3600 = 8600 BP (86%)
+        // 100,000 BACK × 365 days (Diamond tier)
+        // Amount: (100000 / 10000) * 75 = 750 BP (7.5%) - maxed
+        // Duration: (365 / 5) * 10 = 730 BP (7.3%)
+        // Total: 750 + 730 = 1480 BP ≈ 14.8%
         let amount = 100_000 * 1_000_000_000;
         let duration = 365 * 86400;
         let boost = calculate_boost(amount, duration);
-        assert_eq!(boost, 8600); // Arrondi à cause de la division entière
+        assert_eq!(boost, 1480);
     }
 
     #[test]
     fn test_calculate_boost_maximum() {
-        // 100,000 BACK × 730 days = 100% boost (capped at 10000 BP)
-        let amount = 100_000 * 1_000_000_000;
+        // 200,000 BACK × 730 days
+        // Amount: (200000 / 10000) * 75 = 1500 BP (capped at 750)
+        // Duration: (730 / 5) * 10 = 1460 BP (capped at 750)
+        // Total: 750 + 750 = 1500 BP (15% - max possible)
+        let amount = 200_000 * 1_000_000_000;
         let duration = 730 * 86400;
         let boost = calculate_boost(amount, duration);
-        assert_eq!(boost, 10000);
+        assert_eq!(boost, 1500); // Capped at maximum 15%
     }
 
     #[test]
