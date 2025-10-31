@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
-// Program ID déployé sur devnet - 27 Oct 2025 (mis à jour)
-declare_id!("9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw");
+// Program ID déployé sur devnet - 31 Oct 2025 (nouvelle version avec fix bump)
+declare_id!("2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G");
 
 #[program]
 pub mod swapback_cnft {
@@ -59,6 +59,7 @@ pub mod swapback_cnft {
         user_nft.boost = boost;
         user_nft.mint_time = Clock::get()?.unix_timestamp;
         user_nft.is_active = true;
+        user_nft.bump = ctx.bumps.user_nft; // 🔧 FIX: Stocker le bump canonical
 
         // Mettre à jour les statistiques globales
         collection_config.total_minted = collection_config.total_minted.checked_add(1).unwrap();

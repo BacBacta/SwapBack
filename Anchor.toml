@@ -3,7 +3,8 @@ cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [toolchain]
-anchor_version = "0.30.1"
+# anchor_version = "0.31.0"
+solana_version = "2.1.2"
 
 [features]
 resolution = true
@@ -15,7 +16,7 @@ swapback_cnft = "CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH"
 swapback_router = "Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa"
 
 [programs.devnet]
-swapback_cnft = "9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw"
+swapback_cnft = "2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G"
 swapback_router = "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
 swapback_buyback = "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"
 

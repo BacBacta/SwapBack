@@ -12,7 +12,7 @@
   },
   "rust-analyzer.checkOnSave": true,
   "rust-analyzer.check.command": "clippy",
-  
+
   // FIX: Variables gRPC pour nouvelle infrastructure Codespaces
   "terminal.integrated.env.linux": {
     "GRPC_VERBOSITY": "error",
@@ -20,7 +20,7 @@
     "GRPC_TRACE": "",
     "NO_PROXY": "localhost,127.0.0.1"
   },
-  
+
   // Optimisations pour Codespaces - prévention des déconnexions
   "remote.SSH.connectTimeout": 600,
   "remote.SSH.serverAliveInterval": 60,
@@ -36,7 +36,7 @@
   "extensions.autoUpdate": false,
   "update.mode": "none",
   "telemetry.telemetryLevel": "off",
-  
+
   // Optimisation CPU + mémoire rust-analyzer
   "rust-analyzer.server.extraEnv": {
     "RA_LOG": "error",
@@ -51,7 +51,7 @@
   "rust-analyzer.completion.autoimport.enable": false,
   "rust-analyzer.cargo.autoreload": false,
   "rust-analyzer.procMacro.enable": false,
-  
+
   // Optimisation CPU TypeScript
   "typescript.tsserver.maxTsServerMemory": 2048,
   "typescript.tsserver.useSeparateSyntaxServer": false,
@@ -59,15 +59,15 @@
   "typescript.surveys.enabled": false,
   "typescript.updateImportsOnFileMove.enabled": "never",
   "typescript.suggest.enabled": false,
-  
+
   // Configuration SonarLint
   "sonarlint.disableTelemetry": true,
   "sonarlint.ls.javaHome": "/usr/lib/jvm/java-21-openjdk-amd64",
-  
+
   // Auto-save pour éviter les pertes lors des déconnexions
   "files.autoSave": "afterDelay",
   "files.autoSaveDelay": 1000,
-  
+
   "files.exclude": {
     "**/.git": true,
     "**/.DS_Store": true,
@@ -75,7 +75,7 @@
     "**/target": true,
     "**/.anchor": true
   },
-  
+
   // Optimisations CPU supplémentaires
   "files.watcherExclude": {
     "**/.git/objects/**": true,
@@ -96,7 +96,7 @@
     "**/build": true,
     "**/*.lock": true
   },
-  
+
   // Désactiver features gourmandes CPU
   "editor.suggest.showStatusBar": false,
   "editor.quickSuggestions": {
@@ -114,24 +114,25 @@
   "editor.bracketPairColorization.enabled": false,
   "editor.guides.bracketPairs": false,
   "editor.guides.indentation": false,
-  
+
   // Désactiver Copilot suggestions inline (garde chat)
   "github.copilot.enable": {
     "*": false,
     "plaintext": false,
     "markdown": false,
-    "scminput": false
+    "scminput": false,
+    "toml": true
   },
-  
+
   // Désactiver ESLint auto-fix sur save (garde validation)
   "eslint.format.enable": false,
-  
+
   // Git optimizations
   "git.enabled": true,
   "git.autorefresh": false,
   "git.autofetch": false,
   "git.postCommitCommand": "none",
-  
+
   // Terminal optimizations
   "terminal.integrated.gpuAcceleration": "off",
   "terminal.integrated.enableFileLinks": "off"
