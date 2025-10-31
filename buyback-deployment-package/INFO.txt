@@ -1,0 +1,20 @@
+SwapBack Buyback Programme - Token-2022 Support
+================================================
+
+Programme ID: 92znK8METYTFW5dGDJUnHUMqubVGnPBTyjZ4HzjWQzir
+Réseau: Solana Devnet
+Date: Fri Oct 31 03:14:17 PM UTC 2025
+Support Token-2022: ✅ Activé
+
+Fichiers inclus:
+- program-keypair.json : Keypair du programme
+- program.so : Binaire compilé (368 KB)
+- quick-deploy.sh : Script de déploiement rapide
+- deploy.sh : Script de déploiement complet
+- README.md : Documentation détaillée
+
+Déploiement rapide:
+  ./quick-deploy.sh
+
+Plus d'informations:
+  Voir README.md
