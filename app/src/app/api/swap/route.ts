@@ -5,6 +5,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { Connection } from "@solana/web3.js";
+import { checkRateLimit, getClientIdentifier } from "@/lib/rateLimit";
+import { sanitizeAmount, isValidPublicKey } from "@/lib/validation";
 
 const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
@@ -12,6 +14,27 @@ const RPC_ENDPOINT =
 
 export async function POST(request: NextRequest) {
   try {
+    // Security: Rate limiting (30 requests per minute)
+    const clientId = getClientIdentifier(request.headers);
+    const rateLimit = checkRateLimit(clientId, { maxRequests: 30, windowMs: 60000 });
+    
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { 
+          error: "Rate limit exceeded. Please try again later.",
+          retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
+        },
+        { 
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': '30',
+            'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+            'X-RateLimit-Reset': rateLimit.resetAt.toString(),
+          },
+        }
+      );
+    }
+
     const {
       inputMint,
       outputMint,
@@ -19,12 +42,33 @@ export async function POST(request: NextRequest) {
       useMEVProtection = true,
     } = await request.json();
 
-    // Validate inputs
+    // Security: Validate inputs
     if (!inputMint || !outputMint || !inputAmount) {
       return NextResponse.json(
         {
           error: "Missing required fields: inputMint, outputMint, inputAmount",
         },
+        { status: 400 }
+      );
+    }
+
+    // Security: Validate public keys
+    if (!isValidPublicKey(inputMint) || !isValidPublicKey(outputMint)) {
+      return NextResponse.json(
+        { error: "Invalid token mint address" },
+        { status: 400 }
+      );
+    }
+
+    // Security: Validate amount
+    const validatedAmount = sanitizeAmount(inputAmount.toString(), {
+      min: 0.000001,
+      max: 1e12,
+    });
+
+    if (validatedAmount === null) {
+      return NextResponse.json(
+        { error: "Invalid input amount" },
         { status: 400 }
       );
     }
