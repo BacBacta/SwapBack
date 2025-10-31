@@ -1,84 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useConnection } from '@solana/wallet-adapter-react';
-
-interface BuybackTransaction {
-  signature: string;
-  timestamp: number;
-  usdcAmount: number;
-  backBurned: number;
-  executor: string;
-}
+import { useRecentBuybacks } from '@/hooks/useRecentBuybacks';
 
 export default function RecentBuybacks() {
-  const { connection } = useConnection();
-  const [transactions, setTransactions] = useState<BuybackTransaction[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function fetchRecentBuybacks() {
-      try {
-        setLoading(true);
-        setError(null);
-
-        // TODO: Replace with actual Helius API call
-        // const heliusApiKey = process.env.NEXT_PUBLIC_HELIUS_API_KEY;
-        // const response = await fetch(`https://api.helius.xyz/v0/addresses/${BUYBACK_PROGRAM_ID}/transactions?api-key=${heliusApiKey}`);
-        
-        // For now, generate mock data to demonstrate the UI
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API delay
-        
-        const mockTransactions: BuybackTransaction[] = [
-          {
-            signature: '5KJp7...xYz',
-            timestamp: Date.now() - 3600000,
-            usdcAmount: 125.50,
-            backBurned: 98420,
-            executor: '7XaB...mN9',
-          },
-          {
-            signature: '2Hgf9...wQr',
-            timestamp: Date.now() - 7200000,
-            usdcAmount: 89.30,
-            backBurned: 71440,
-            executor: '9KpL...tR4',
-          },
-          {
-            signature: '8Nqw2...pLm',
-            timestamp: Date.now() - 14400000,
-            usdcAmount: 203.75,
-            backBurned: 165012,
-            executor: '4VcD...hS2',
-          },
-          {
-            signature: '3Mjk7...vFg',
-            timestamp: Date.now() - 21600000,
-            usdcAmount: 156.20,
-            backBurned: 124960,
-            executor: '6WnE...kP8',
-          },
-          {
-            signature: '9Lrt4...bHn',
-            timestamp: Date.now() - 28800000,
-            usdcAmount: 78.90,
-            backBurned: 63120,
-            executor: '2FqM...zL1',
-          },
-        ];
-
-        setTransactions(mockTransactions);
-      } catch (err) {
-        console.error('Error fetching buyback transactions:', err);
-        setError('Failed to load transaction history');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchRecentBuybacks();
-  }, [connection]);
+  const { data: transactions = [], isLoading: loading, error } = useRecentBuybacks();
 
   const formatTimestamp = (timestamp: number) => {
     const diff = Date.now() - timestamp;
@@ -114,7 +39,7 @@ export default function RecentBuybacks() {
       {error && (
         <div className="flex flex-col items-center justify-center py-8 bg-black/60 border-2 border-red-500/20">
           <div className="text-4xl mb-3">⚠️</div>
-          <p className="text-red-400 font-mono text-sm">{error}</p>
+          <p className="text-red-400 font-mono text-sm">{error.message || 'Failed to load transactions'}</p>
         </div>
       )}
 
@@ -174,8 +99,8 @@ export default function RecentBuybacks() {
       )}
 
       <div className="mt-2 text-xs font-mono text-[var(--primary)]/50 flex items-center gap-2">
-        <span className="w-3 h-3 bg-orange-500 rounded-full animate-pulse"></span>
-        <span>Mock data (TODO: Connect Helius API with NEXT_PUBLIC_HELIUS_API_KEY)</span>
+        <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
+        <span>Live data from Helius API • Refreshes every 30s</span>
       </div>
     </div>
   );

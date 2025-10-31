@@ -72,6 +72,60 @@ pub mod swapback_router {
     pub fn swap_toc(ctx: Context<SwapToC>, args: SwapArgs) -> Result<()> {
         swap_toc_processor::process_swap_toc(ctx, args)
     }
+
+    /// Claim accumulated rebates
+    /// Transfers unclaimed USDC rebates from vault to user
+    pub fn claim_rewards(ctx: Context<ClaimRewards>) -> Result<()> {
+        let user_rebate = &mut ctx.accounts.user_rebate;
+        
+        // Verify there are rewards to claim
+        require!(
+            user_rebate.unclaimed_rebate > 0,
+            ErrorCode::NoRewardsToClaim
+        );
+
+        // Verify vault has sufficient balance
+        require!(
+            ctx.accounts.rebate_vault.amount >= user_rebate.unclaimed_rebate,
+            ErrorCode::InsufficientVaultBalance
+        );
+
+        let claimed_amount = user_rebate.unclaimed_rebate;
+
+        // Transfer USDC from vault to user using PDA signer
+        let seeds = &[b"rebate_vault".as_ref(), &[ctx.accounts.state.bump]];
+        let signer = &[&seeds[..]];
+
+        let cpi_accounts = token::Transfer {
+            from: ctx.accounts.rebate_vault.to_account_info(),
+            to: ctx.accounts.user_usdc_account.to_account_info(),
+            authority: ctx.accounts.state.to_account_info(),
+        };
+
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
+
+        token::transfer(cpi_ctx, claimed_amount)?;
+
+        // Update user rebate account
+        user_rebate.unclaimed_rebate = 0;
+        user_rebate.total_claimed = user_rebate
+            .total_claimed
+            .checked_add(claimed_amount)
+            .ok_or(ErrorCode::MathOverflow)?;
+        user_rebate.last_claim_timestamp = Clock::get()?.unix_timestamp;
+
+        // Emit event
+        emit!(RewardsClaimed {
+            user: ctx.accounts.user.key(),
+            amount: claimed_amount,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        msg!("✅ Rewards claimed: {} USDC", claimed_amount / 1_000_000);
+
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -174,6 +228,37 @@ pub struct SwapToC<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Claim accumulated rebates context
+#[derive(Accounts)]
+pub struct ClaimRewards<'info> {
+    #[account(mut)]
+    pub state: Account<'info, RouterState>,
+
+    #[account(
+        mut,
+        seeds = [b"user_rebate", user.key().as_ref()],
+        bump
+    )]
+    pub user_rebate: Account<'info, UserRebate>,
+
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    /// User's USDC token account to receive rebates
+    #[account(mut)]
+    pub user_usdc_account: Account<'info, TokenAccount>,
+
+    /// Rebate vault PDA holding USDC for rebates
+    #[account(
+        mut,
+        seeds = [b"rebate_vault"],
+        bump
+    )]
+    pub rebate_vault: Account<'info, TokenAccount>,
+
+    pub token_program: Program<'info, Token>,
+}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct SwapArgs {
     pub amount_in: u64,
@@ -225,6 +310,29 @@ pub struct RouterState {
     pub total_buyback_from_npi: u64, // Total buyback depuis NPI
     pub total_protocol_revenue: u64, // Total revenus protocol (fees + NPI)
     pub bump: u8,
+}
+
+/// User rebate tracking account
+#[account]
+pub struct UserRebate {
+    pub user: Pubkey,              // User who owns this rebate account
+    pub unclaimed_rebate: u64,     // Unclaimed USDC rebates (in lamports)
+    pub total_claimed: u64,        // Total USDC claimed historically
+    pub total_swaps: u64,          // Number of swaps completed
+    pub last_swap_timestamp: i64,  // Last swap timestamp
+    pub last_claim_timestamp: i64, // Last claim timestamp
+    pub bump: u8,
+}
+
+impl UserRebate {
+    pub const LEN: usize = 8 + // discriminator
+        32 + // user
+        8 +  // unclaimed_rebate
+        8 +  // total_claimed
+        8 +  // total_swaps
+        8 +  // last_swap_timestamp
+        8 +  // last_claim_timestamp
+        1;   // bump
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
@@ -299,6 +407,13 @@ pub struct BuybackDeposit {
     pub timestamp: i64,
 }
 
+#[event]
+pub struct RewardsClaimed {
+    pub user: Pubkey,
+    pub amount: u64,
+    pub timestamp: i64,
+}
+
 // Structure UserNft importée du programme cNFT pour vérification du boost
 #[account]
 #[derive(Default)]
@@ -352,6 +467,12 @@ pub enum ErrorCode {
     InvalidAmount,
     #[msg("Slippage tolerance too high - max 10%")]
     SlippageTooHigh,
+    #[msg("No rewards to claim")]
+    NoRewardsToClaim,
+    #[msg("Insufficient vault balance")]
+    InsufficientVaultBalance,
+    #[msg("Math overflow")]
+    MathOverflow,
 }
 
 pub mod create_plan_processor {

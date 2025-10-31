@@ -23,6 +23,7 @@
     "@types/lodash": "^4.17.20",
     "axios": "^1.7.0",
     "chart.js": "^4.5.1",
+    "date-fns": "^4.1.0",
     "lodash": "^4.17.21",
     "lucide-react": "^0.548.0",
     "mixpanel-browser": "^2.71.1",

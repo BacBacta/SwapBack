@@ -5,6 +5,7 @@ import { AnchorProvider, Program, BN, Wallet } from '@coral-xyz/anchor';
 import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
 import { toast } from 'react-hot-toast';
 import { trackBuyback } from '@/lib/analytics';
+import { parseBuybackTransaction } from '@/lib/parsers';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -82,10 +83,30 @@ export function useExecuteBuyback() {
 
       console.log('✅ Buyback executed:', signature);
 
-      // Track buyback analytics
+      // Fetch transaction to parse logs and get actual BACK burned amount
+      let backBurned = 0;
+      try {
+        const tx = await connection.getTransaction(signature, {
+          commitment: 'confirmed',
+          maxSupportedTransactionVersion: 0,
+        });
+        
+        if (tx && tx.meta && tx.meta.logMessages) {
+          const parsed = parseBuybackTransaction(tx.meta.logMessages);
+          if (parsed.success) {
+            backBurned = parsed.backBurned;
+            console.log(`🔥 Parsed from logs: ${backBurned} BACK burned`);
+          }
+        }
+      } catch (logError) {
+        console.warn('Could not parse transaction logs:', logError);
+        // Continue with default value
+      }
+
+      // Track buyback analytics with actual values
       trackBuyback({
         usdcAmount: usdcAmountBN.toNumber(),
-        backBurned: 0, // TODO: Parse from transaction logs
+        backBurned, // ✅ Real value parsed from logs
         executor: wallet.publicKey.toString(),
         signature,
       });
@@ -93,12 +114,17 @@ export function useExecuteBuyback() {
       return {
         signature,
         usdcAmount,
+        backBurned, // Include in return value
         explorerUrl: `https://explorer.solana.com/tx/${signature}?cluster=devnet`,
       };
     },
     onSuccess: (data) => {
+      const burnedText = data.backBurned > 0 
+        ? ` • 🔥 ${data.backBurned.toLocaleString()} BACK burned` 
+        : '';
+      
       toast.success(
-        `🔥 Buyback executed! ${data.usdcAmount} USDC used. Tx: ${data.signature.slice(0, 8)}...`,
+        `Buyback executed! ${data.usdcAmount} USDC used${burnedText}`,
         { duration: 5000 }
       );
 
