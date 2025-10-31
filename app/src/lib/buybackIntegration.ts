@@ -1,9 +1,6 @@
-import { Connection, PublicKey } from '@solana/web3.js';
-import { getAssociatedTokenAddress } from '@solana/spl-token';
+import { Connection } from '@solana/web3.js';
 import { WalletContextState } from '@solana/wallet-adapter-react';
-
-// PDAs and constants (will be used when program integration is complete)
-const USDC_MINT = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
+import { depositUsdc } from '@swapback/sdk/src/buyback';
 
 const MIN_DEPOSIT_AMOUNT = 1_000_000; // 1 USDC minimum
 
@@ -49,18 +46,22 @@ export async function depositToBuybackVault(
   }
 
   try {
-    // For now, use direct token transfer instead of program call
-    // This will be replaced with actual Anchor program call when integrated
-    await getAssociatedTokenAddress(USDC_MINT, wallet.publicKey);
-
-    console.log(`💰 Preparing to deposit ${(depositAmount / 1e6).toFixed(2)} USDC to buyback vault...`);
+    console.log(`💰 Depositing ${(depositAmount / 1e6).toFixed(2)} USDC to buyback vault...`);
     
-    // TODO: Replace with actual Anchor program.methods.depositUsdc() call
-    // For now, we return a simulated success to test integration
-    console.log('⚠️  Using simulated deposit (replace with actual program call)');
+    // Use real Anchor SDK function
+    const signature = await depositUsdc(
+      connection,
+      {
+        publicKey: wallet.publicKey,
+        signTransaction: wallet.signTransaction,
+      },
+      depositAmount
+    );
+
+    console.log(`✅ Buyback deposit successful: ${signature}`);
 
     return {
-      signature: 'simulated_deposit_signature',
+      signature,
       amount: depositAmount,
       skipped: false,
     };

@@ -2,12 +2,10 @@
  * Analytics Module for SwapBack
  * Tracks user interactions, swaps, and buyback events
  * 
- * Note: This is a lightweight wrapper. In production, integrate with:
- * - Mixpanel
- * - Amplitude
- * - PostHog
- * - Google Analytics 4
+ * Production-ready integration with Mixpanel
  */
+
+import mixpanel from 'mixpanel-browser';
 
 interface SwapEvent {
   inputToken: string;
@@ -36,13 +34,31 @@ interface PageViewEvent {
 export class Analytics {
   private static instance: Analytics;
   private enabled: boolean;
+  private mixpanelInitialized: boolean = false;
 
   private constructor() {
     // Check if analytics should be enabled (opt-in for privacy)
     this.enabled = typeof window !== 'undefined' && process.env.NEXT_PUBLIC_ANALYTICS_ENABLED === 'true';
     
-    if (this.enabled) {
-      console.log('📊 Analytics enabled');
+    if (this.enabled && typeof window !== 'undefined') {
+      const mixpanelToken = process.env.NEXT_PUBLIC_MIXPANEL_TOKEN;
+      
+      if (mixpanelToken) {
+        try {
+          mixpanel.init(mixpanelToken, {
+            debug: process.env.NODE_ENV === 'development',
+            track_pageview: true,
+            persistence: 'localStorage',
+          });
+          this.mixpanelInitialized = true;
+          console.log('📊 Analytics enabled (Mixpanel)');
+        } catch (error) {
+          console.error('Failed to initialize Mixpanel:', error);
+          this.mixpanelInitialized = false;
+        }
+      } else {
+        console.warn('📊 Analytics enabled but NEXT_PUBLIC_MIXPANEL_TOKEN not set - using console logging only');
+      }
     }
   }
 
@@ -59,25 +75,28 @@ export class Analytics {
   trackSwap(event: SwapEvent) {
     if (!this.enabled) return;
 
+    const eventData = {
+      input_token: event.inputToken,
+      output_token: event.outputToken,
+      input_amount: event.inputAmount / 1e6,
+      output_amount: event.outputAmount / 1e6,
+      fee: event.fee / 1e6,
+      buyback_contribution: event.buybackDeposit / 1e6,
+      route: event.route,
+      wallet: event.walletAddress,
+    };
+
     console.log('📊 Analytics: Swap', {
-      input: `${(event.inputAmount / 1e6).toFixed(2)} ${event.inputToken}`,
-      output: `${(event.outputAmount / 1e6).toFixed(2)} ${event.outputToken}`,
-      fee: `${(event.fee / 1e6).toFixed(4)} USDC`,
-      buyback: `${(event.buybackDeposit / 1e6).toFixed(4)} USDC`,
+      input: `${eventData.input_amount.toFixed(2)} ${event.inputToken}`,
+      output: `${eventData.output_amount.toFixed(2)} ${event.outputToken}`,
+      fee: `${eventData.fee.toFixed(4)} USDC`,
+      buyback: `${eventData.buyback_contribution.toFixed(4)} USDC`,
       route: event.route,
     });
 
-    // TODO: Send to analytics platform
-    // Example for Mixpanel:
-    // mixpanel.track('Swap Executed', {
-    //   input_token: event.inputToken,
-    //   output_token: event.outputToken,
-    //   input_amount_usd: event.inputAmount / 1e6,
-    //   output_amount_usd: event.outputAmount / 1e6,
-    //   fee_usd: event.fee / 1e6,
-    //   buyback_contribution_usd: event.buybackDeposit / 1e6,
-    //   route: event.route,
-    // });
+    if (this.mixpanelInitialized) {
+      mixpanel.track('Swap Executed', eventData);
+    }
   }
 
   /**
@@ -86,14 +105,23 @@ export class Analytics {
   trackBuyback(event: BuybackEvent) {
     if (!this.enabled) return;
 
+    const eventData = {
+      usdc_amount: event.usdcAmount / 1e6,
+      back_burned: event.backBurned / 1e6,
+      executor: event.executor,
+      signature: event.signature,
+    };
+
     console.log('📊 Analytics: Buyback', {
-      usdc: `${(event.usdcAmount / 1e6).toFixed(2)} USDC`,
-      burned: `${(event.backBurned / 1e6).toFixed(2)} BACK`,
+      usdc: `${eventData.usdc_amount.toFixed(2)} USDC`,
+      burned: `${eventData.back_burned.toFixed(2)} BACK`,
       executor: event.executor.slice(0, 8) + '...',
       tx: event.signature.slice(0, 8) + '...',
     });
 
-    // TODO: Send to analytics platform
+    if (this.mixpanelInitialized) {
+      mixpanel.track('Buyback Executed', eventData);
+    }
   }
 
   /**
@@ -107,7 +135,13 @@ export class Analytics {
       referrer: event.referrer,
     });
 
-    // TODO: Send to analytics platform
+    if (this.mixpanelInitialized) {
+      mixpanel.track('Page View', {
+        page: event.page,
+        referrer: event.referrer,
+        timestamp: event.timestamp,
+      });
+    }
   }
 
   /**
@@ -120,7 +154,16 @@ export class Analytics {
       wallet: walletAddress.slice(0, 8) + '...',
     });
 
-    // TODO: Send to analytics platform
+    if (this.mixpanelInitialized) {
+      mixpanel.track('Wallet Connected', {
+        wallet_address: walletAddress,
+      });
+      mixpanel.identify(walletAddress);
+      mixpanel.people.set({
+        $last_login: new Date().toISOString(),
+        wallet_address: walletAddress,
+      });
+    }
   }
 
   /**
@@ -131,7 +174,10 @@ export class Analytics {
 
     console.log('📊 Analytics: Wallet Disconnected');
 
-    // TODO: Send to analytics platform
+    if (this.mixpanelInitialized) {
+      mixpanel.track('Wallet Disconnected');
+      mixpanel.reset(); // Clear user identity
+    }
   }
 
   /**
@@ -146,7 +192,13 @@ export class Analytics {
       ...context,
     });
 
-    // TODO: Send to error tracking service (e.g., Sentry)
+    if (this.mixpanelInitialized) {
+      mixpanel.track('Error', {
+        error_message: error.message,
+        error_stack: error.stack,
+        ...context,
+      });
+    }
   }
 
   /**
@@ -157,7 +209,9 @@ export class Analytics {
 
     console.log('📊 Analytics: User Properties', properties);
 
-    // TODO: Send to analytics platform
+    if (this.mixpanelInitialized) {
+      mixpanel.people.set(properties);
+    }
   }
 }
 
@@ -169,6 +223,7 @@ export const trackSwap = (event: SwapEvent) => analytics.trackSwap(event);
 export const trackBuyback = (event: BuybackEvent) => analytics.trackBuyback(event);
 export const trackPageView = (page: string, referrer?: string) => 
   analytics.trackPageView({ page, referrer, timestamp: Date.now() });
+
 export const trackWalletConnect = (walletAddress: string) => 
   analytics.trackWalletConnect(walletAddress);
 export const trackWalletDisconnect = () => analytics.trackWalletDisconnect();

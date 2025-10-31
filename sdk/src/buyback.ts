@@ -374,3 +374,76 @@ export function formatBuybackStats(stats: BuybackState | null) {
     minBuybackAmount: (stats.minBuybackAmount.toNumber() / 1e6).toFixed(2),
   };
 }
+
+/**
+ * Dépose des USDC dans le vault de buyback
+ * Utilisé pour accumuler des fonds pour les futurs buybacks
+ * 
+ * @param connection - Connexion Solana RPC
+ * @param payer - Wallet qui paie la transaction
+ * @param amount - Montant USDC à déposer (en lamports, 6 decimals)
+ * @returns Signature de la transaction
+ */
+export async function depositUsdc(
+  connection: Connection,
+  payer: Keypair | { publicKey: PublicKey; signTransaction: (tx: Transaction) => Promise<Transaction> },
+  amount: number
+): Promise<string> {
+  try {
+    const [buybackStatePDA] = getBuybackStatePDA();
+    const [usdcVaultPDA] = getUsdcVaultPDA();
+
+    // Get user's USDC token account
+    const userUsdcAccount = await getAssociatedTokenAddress(
+      USDC_MINT,
+      payer.publicKey
+    );
+
+    // Create deposit_usdc instruction
+    // Discriminator for deposit_usdc: [242, 35, 198, 137, 82, 225, 242, 182]
+    const discriminator = Buffer.from([242, 35, 198, 137, 82, 225, 242, 182]);
+    const amountBuffer = Buffer.alloc(8);
+    amountBuffer.writeBigUInt64LE(BigInt(amount));
+    
+    const instructionData = Buffer.concat([discriminator, amountBuffer]);
+
+    const instruction = new TransactionInstruction({
+      keys: [
+        { pubkey: buybackStatePDA, isSigner: false, isWritable: false },
+        { pubkey: userUsdcAccount, isSigner: false, isWritable: true },
+        { pubkey: usdcVaultPDA, isSigner: false, isWritable: true },
+        { pubkey: payer.publicKey, isSigner: true, isWritable: false },
+        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      ],
+      programId: BUYBACK_PROGRAM_ID,
+      data: instructionData,
+    });
+
+    const transaction = new Transaction().add(instruction);
+    transaction.feePayer = payer.publicKey;
+    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+    // Sign and send
+    let signature: string;
+    if ('secretKey' in payer) {
+      // Keypair case
+      signature = await connection.sendTransaction(transaction, [payer as Keypair]);
+    } else {
+      // Wallet adapter case
+      const signedTx = await payer.signTransaction(transaction);
+      signature = await connection.sendRawTransaction(signedTx.serialize());
+    }
+
+    console.log(`✅ USDC deposited to buyback vault: ${signature}`);
+    console.log(`   Amount: ${(amount / 1e6).toFixed(2)} USDC`);
+
+    // Wait for confirmation
+    await connection.confirmTransaction(signature, 'confirmed');
+
+    return signature;
+  } catch (error) {
+    console.error('Error depositing USDC to buyback vault:', error);
+    throw error;
+  }
+}
+
