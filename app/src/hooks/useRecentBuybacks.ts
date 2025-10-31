@@ -57,11 +57,25 @@ const fetchRecentBuybacks = async (): Promise<BuybackTransaction[]> => {
     
     const data = await response.json();
     
+    interface HeliusTransaction {
+      signature: string;
+      timestamp: number;
+      type?: string;
+      feePayer?: string;
+      instructions?: Array<{
+        programId: string;
+        data?: string;
+      }>;
+      meta?: {
+        logMessages?: string[];
+      };
+    }
+    
     // Filter for execute_buyback instructions
-    const buybackTxs = data
-      .filter((tx: any) => {
+    const buybackTxs = (data as HeliusTransaction[])
+      .filter((tx) => {
         // Check if transaction contains buyback instruction
-        return tx.instructions?.some((ix: any) => 
+        return tx.instructions?.some((ix) => 
           ix.programId === BUYBACK_PROGRAM_ID &&
           (ix.data?.includes('execute_buyback') || tx.type === 'SWAP')
         );
@@ -69,7 +83,7 @@ const fetchRecentBuybacks = async (): Promise<BuybackTransaction[]> => {
       .slice(0, 10); // Get last 10 transactions
     
     // Parse and format transactions
-    const formattedTxs: BuybackTransaction[] = buybackTxs.map((tx: any) => {
+    const formattedTxs: BuybackTransaction[] = buybackTxs.map((tx) => {
       const logs = tx.meta?.logMessages || [];
       
       return {

@@ -1,6 +1,5 @@
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { PublicKey } from '@solana/web3.js';
 import { AnchorProvider, Program, BN, Wallet } from '@coral-xyz/anchor';
 import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
 import { toast } from 'react-hot-toast';
@@ -10,7 +9,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import {
-  BUYBACK_PROGRAM_ID,
   BUYBACK_STATE_PDA,
   USDC_VAULT_PDA,
   BACK_TOKEN_MINT,
@@ -69,7 +67,15 @@ export function useExecuteBuyback() {
       });
 
       // Execute buyback transaction
-      const signature = await (program.methods as any)
+      interface BuybackMethods {
+        executeBuyback: (usdcAmount: BN, minBackAmount: BN) => {
+          accounts: (accounts: Record<string, unknown>) => {
+            rpc: () => Promise<string>;
+          };
+        };
+      }
+      
+      const signature = await (program.methods as unknown as BuybackMethods)
         .executeBuyback(usdcAmountBN, minBackAmountBN)
         .accounts({
           buybackState: BUYBACK_STATE_PDA,
@@ -118,7 +124,7 @@ export function useExecuteBuyback() {
         explorerUrl: `https://explorer.solana.com/tx/${signature}?cluster=devnet`,
       };
     },
-    onSuccess: (data) => {
+    onSuccess: (data: { signature: string; usdcAmount: number; backBurned: number; explorerUrl: string }) => {
       const burnedText = data.backBurned > 0 
         ? ` • 🔥 ${data.backBurned.toLocaleString()} BACK burned` 
         : '';

@@ -1,8 +1,9 @@
 'use client';
 
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { PublicKey, Transaction, TransactionInstruction, SystemProgram } from '@solana/web3.js';
+import { PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token';
 import { BN } from '@coral-xyz/anchor';
 
@@ -53,7 +54,7 @@ export default function BuybackDashboard() {
     loadBuybackState();
     const interval = setInterval(loadBuybackState, 10000); // Refresh toutes les 10s
     return () => clearInterval(interval);
-  }, [connection]);
+  }, [connection, loadBuybackState]);
 
   const loadBuybackState = async () => {
     try {
@@ -138,9 +139,10 @@ export default function BuybackDashboard() {
       loadBuybackState();
       
       setTimeout(() => setTxStatus(''), 5000);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error depositing USDC:', error);
-      setTxStatus(`❌ Erreur: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setTxStatus(`❌ Erreur: ${errorMessage}`);
       setTimeout(() => setTxStatus(''), 5000);
     } finally {
       setLoading(false);
@@ -195,9 +197,10 @@ export default function BuybackDashboard() {
       loadBuybackState();
       
       setTimeout(() => setTxStatus(''), 5000);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error executing buyback:', error);
-      setTxStatus(`❌ Erreur: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setTxStatus(`❌ Erreur: ${errorMessage}`);
       setTimeout(() => setTxStatus(''), 5000);
     } finally {
       setLoading(false);

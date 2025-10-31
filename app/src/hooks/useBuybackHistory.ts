@@ -58,9 +58,22 @@ const fetchBuybackHistory = async (): Promise<DailyBuyback[]> => {
     
     const transactions = await response.json();
     
+    interface HeliusTransaction {
+      signature: string;
+      timestamp: number;
+      type?: string;
+      instructions?: Array<{
+        programId: string;
+        data?: string;
+      }>;
+      meta?: {
+        logMessages?: string[];
+      };
+    }
+    
     // Filter buyback transactions
-    const buybacks = transactions.filter((tx: any) => 
-      tx.instructions?.some((ix: any) => 
+    const buybacks = (transactions as HeliusTransaction[]).filter((tx) => 
+      tx.instructions?.some((ix) => 
         ix.programId === BUYBACK_PROGRAM_ID &&
         (ix.data?.includes('execute_buyback') || tx.type === 'SWAP')
       )
@@ -69,7 +82,7 @@ const fetchBuybackHistory = async (): Promise<DailyBuyback[]> => {
     // Group by day
     const dailyMap = new Map<string, { usdc: number; back: number }>();
     
-    buybacks.forEach((tx: any) => {
+    buybacks.forEach((tx) => {
       const date = format(new Date(tx.timestamp * 1000), 'yyyy-MM-dd');
       const logs = tx.meta?.logMessages || [];
       
