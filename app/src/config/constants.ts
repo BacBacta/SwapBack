@@ -6,7 +6,7 @@ import { PublicKey } from '@solana/web3.js';
  */
 
 // ============================================
-// PROGRAM IDs (Testnet - Deployed Oct 28, 2025)
+// PROGRAM IDs (Devnet - Updated Oct 31, 2025)
 // ============================================
 
 export const ROUTER_PROGRAM_ID = new PublicKey(
@@ -18,15 +18,15 @@ export const BUYBACK_PROGRAM_ID = new PublicKey(
 );
 
 export const CNFT_PROGRAM_ID = new PublicKey(
-  '9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw'
+  '2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G' // Fixed bump initialization
 );
 
 // ============================================
-// TOKEN MINTS
+// TOKEN MINTS (Devnet - Created Oct 31, 2025)
 // ============================================
 
 export const BACK_TOKEN_MINT = new PublicKey(
-  '862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux'
+  '3Y6RXZUBHCeUj6VsWuyBY2Zy1RixY6BHkM4tf3euDdrE' // Token-2022
 );
 
 // Tokens communs sur Solana (pour référence future)

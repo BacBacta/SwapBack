@@ -10,10 +10,10 @@ import { BN } from "@coral-xyz/anchor";
 import type { Idl } from "@coral-xyz/anchor";
 import cnftIdl from "@/../public/idl/swapback_cnft.json";
 
-// Program ID du programme swapback_cnft déployé
+// Program ID du programme swapback_cnft déployé (Devnet - Updated Oct 31, 2025)
 export const CNFT_PROGRAM_ID = new PublicKey(
   process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID ||
-    "9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw"
+    "2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G" // Nouveau program ID avec fix bump
 );
 
 type AnchorInstruction = {
