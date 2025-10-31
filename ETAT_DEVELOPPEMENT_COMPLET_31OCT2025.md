@@ -78,12 +78,30 @@ SwapBack/
 - ✅ Oracle Switchboard (prix réels)
 - ✅ Orca Whirlpool (swap execution)
 
-**Calculs automatiques:**
+**Calculs automatiques (Allocation 100%):**
 ```rust
-platform_fee = amount * 0.003          // 0.3% frais plateforme
-routing_profit = prix_obtenu - prix_oracle
-buyback_allocation = fees * 0.25       // 25% vers buyback vault
-user_rebate = profit * boost_multiplier
+// REVENUS TOTAUX
+platform_fee = amount * 0.003              // 0.3% frais plateforme
+routing_profit = prix_obtenu - prix_oracle // NPI (Net Positive Income)
+
+// ALLOCATION DU NPI (100% distribué)
+base_rebate = routing_profit * 0.60        // 60% → utilisateurs (base)
+boost_amount = base_rebate * (boost / 10000) // Boost appliqué sur le rebate
+total_rebate = base_rebate + boost_amount  // Total utilisateur
+
+buyback_from_npi = (routing_profit * 0.20) - boost_amount  // 20% - boost → buyback
+protocol_revenue = routing_profit * 0.20   // 20% → protocole (toujours protégé)
+
+// ALLOCATION DES FEES (100% distribuée)
+buyback_from_fees = platform_fee * 0.30    // 30% → buyback
+protocol_from_fees = platform_fee * 0.70   // 70% → protocole
+
+// LE BOOST EST PAYÉ UNIQUEMENT PAR LE BUYBACK, PAS LE PROTOCOLE
+// Exemple: 50 USDC NPI, boost 17.3%
+//   User: 35.19 USDC (30 + 5.19 boost)
+//   Buyback: 4.81 USDC (10 - 5.19 qui paye le boost)
+//   Protocol: 10 USDC (inchangé, protégé)
+//   Total: 50 USDC ✓
 ```
 
 **Events émis:**
@@ -152,19 +170,36 @@ DEFAULT_THRESHOLD: u64 = 500_000_000  // 500 USDC default
 ✅ lock_state()           // État du lock (pour router)
 ```
 
-**Niveaux & Boosts:**
-```rust
-enum Level {
-    Bronze,  // +5% rebate boost
-    Silver,  // +10% rebate boost  
-    Gold,    // +20% rebate boost
-}
+**Niveaux & Boosts (Système Dynamique - Max 20%):**
 
-Requirements:
-- Bronze: 100 $BACK locked for 30 days
-- Silver: 500 $BACK locked for 60 days
-- Gold: 1000 $BACK locked for 90 days
+Le boost est calculé de manière **dynamique** selon la formule :
+```rust
+boost_total = min(amount_score + duration_score, 2000 BP)
+
+// Amount Score: max 1000 BP (10%)
+amount_score = min((tokens_lockés / 10_000) × 100, 1000)
+
+// Duration Score: max 1000 BP (10%)  
+duration_score = min((jours_lockés / 5) × 10, 1000)
 ```
+
+**Tiers de Boost (exemples réalistes):**
+| Tier | BACK Min | Durée Min | Boost Approximatif |
+|------|----------|-----------|-------------------|
+| **Bronze** | 1 000 | 30 jours | ~60 BP (0.6%) |
+| **Silver** | 1 000 | 30 jours | ~60 BP (0.6%) |
+| **Gold** | 10 000 | 90 jours | ~280 BP (2.8%) |
+| **Platinum** | 50 000 | 180 jours | ~860 BP (8.6%) |
+| **Diamond** | 100 000+ | 365 jours | ~1730 BP (17.3%) |
+| **Maximum** | 200 000+ | 730 jours | **2000 BP (20%)** 💎 |
+
+**Caractéristiques:**
+- ✅ **Dynamique:** Le boost est recalculé à chaque lock en fonction du montant ET de la durée
+- ✅ **Progressif:** Plus tu lock de tokens et longtemps, plus ton boost augmente
+- ✅ **Plafonné:** Maximum 2000 BP (20%) pour garantir la soutenabilité
+- ✅ **Fair:** Formule transparente et linéaire, pas de paliers arbitraires
+
+**Documentation complète:** Voir `FORMULE_BOOST_COMPLETE.md`
 
 **Bug corrigé (31 oct):**
 ```rust
@@ -1174,6 +1209,15 @@ try {
 - **PDA derivation:** ✅ Secure
 - **CPI context:** ✅ Validated
 - **Reentrancy guards:** ✅ Present
+
+### Boost System (Mis à jour 31 Oct 2025)
+- **Formula:** Dynamique basée sur montant + durée
+- **Maximum boost:** 2000 BP (20%)
+- **Amount score max:** 1000 BP (10%) atteint à 100k tokens
+- **Duration score max:** 1000 BP (10%) atteint à 500 jours
+- **Allocation:** Boost payé par buyback uniquement, protocole protégé
+- **Tests:** 26/26 unit tests passing ✅
+- **Documentation:** `FORMULE_BOOST_COMPLETE.md` avec exemples détaillés
 
 ---
 
