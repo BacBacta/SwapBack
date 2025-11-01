@@ -93,15 +93,27 @@ jobs:
           du -sh .next/static/chunks/pages/* >> $GITHUB_STEP_SUMMARY
         working-directory: ./app
 
-      - name: 🚀 Deploy to Vercel (Preview)
+      - name: 🚀 Deploy to Vercel (Production)
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
           working-directory: ./app
           scope: ${{ secrets.VERCEL_ORG_ID }}
         continue-on-error: true
+        
+      - name: 📝 Deployment Summary
+        if: success()
+        run: |
+          echo "## 🚀 Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment**: Production" >> $GITHUB_STEP_SUMMARY
+          echo "**URL**: https://swapback.vercel.app" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Frontend deployed successfully!" >> $GITHUB_STEP_SUMMARY
 
   # Job 3: Build Solana Programs
   build-programs:
