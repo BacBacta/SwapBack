@@ -217,10 +217,13 @@ export const useSwapStore = create<SwapStore>()(
             }
 
             const data = await response.json();
+            
+            // API returns {success: true, quote: {...}, routeInfo: {...}}
+            if (!data.success || !data.quote) {
+              throw new Error(data.error || "Invalid API response");
+            }
 
-            // Transform Jupiter quote into our route format
-            // Direct API returns quote directly (not wrapped in {quote: ...})
-            const quote = data.quote || data;
+            const quote = data.quote;
             
             if (quote && quote.outAmount) {
               // Parse price impact (peut être string ou number)
