@@ -11,17 +11,7 @@ echo "📂 Initial directory:"
 pwd
 echo ""
 
-# Change to app directory
-echo "📂 Changing to app directory..."
-if ! cd app; then
-  echo "❌ ERROR: Failed to change to app directory"
-  exit 1
-fi
-echo "📂 Current directory:"
-pwd
-echo ""
-
-echo "📋 Node version:"
+echo " Node version:"
 node --version
 echo ""
 
@@ -30,15 +20,15 @@ npm --version
 echo ""
 
 echo "📦 Package.json location:"
-if [ ! -f "package.json" ]; then
+if [ ! -f "app/package.json" ]; then
   echo "❌ ERROR: package.json not found in app directory"
   exit 1
 fi
-ls -la package.json
+ls -la app/package.json
 echo ""
 
 echo "🧹 Cleaning previous build..."
-rm -rf .next
+rm -rf app/.next
 rm -rf node_modules/.cache
 echo "✅ Clean complete"
 echo ""
@@ -66,7 +56,7 @@ echo "NODE_OPTIONS: ${NODE_OPTIONS:-NOT SET}"
 echo ""
 
 echo "🏗️  Starting Next.js build..."
-if ! npm run build; then
+if ! npm run build --prefix app; then
   echo "❌ ERROR: Next.js build failed"
   exit 1
 fi
@@ -74,4 +64,4 @@ echo "✅ Build complete!"
 echo ""
 
 echo "📊 Build output:"
-ls -la .next || echo "❌ .next directory not found!"
+ls -la app/.next || echo "❌ .next directory not found!"
