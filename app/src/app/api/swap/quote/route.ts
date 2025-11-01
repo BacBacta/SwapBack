@@ -18,8 +18,8 @@ import { getTokenByMint } from "@/constants/tokens";
 
 /**
  * Jupiter API Base URL
- * New API: https://lite-api.jup.ag/ultra/v1
- * Old API (deprecated): https://quote-api.jup.ag/v6
+ * Working API: https://quote-api.jup.ag/v6 (stable, public)
+ * Note: lite-api.jup.ag requires authentication token
  */
 const JUPITER_API =
   process.env.JUPITER_API_URL || "https://quote-api.jup.ag/v6";
@@ -293,7 +293,8 @@ export async function POST(request: NextRequest) {
       headers: {
         Accept: "application/json",
       },
-      cache: "no-store",
+      // Ne pas spécifier 'cache' ET 'next.revalidate' en même temps
+      // On utilise seulement next.revalidate pour Next.js
       next: { revalidate: 0 },
     });
 
