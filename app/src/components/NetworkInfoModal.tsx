@@ -25,7 +25,7 @@ const NETWORK_INFO = {
 
 export const NetworkInfoModal = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'devnet' | 'mainnet'>('devnet');
+  const [activeTab, setActiveTab] = useState<'devnet' | 'mainnet'>('mainnet');
 
   const currentNetwork = NETWORK_INFO[activeTab];
 

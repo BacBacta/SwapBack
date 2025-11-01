@@ -6,6 +6,7 @@ import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token';
 import { BN } from '@coral-xyz/anchor';
+import { getExplorerAddressUrl } from '@/utils/explorer';
 
 // Program IDs et constants
 const BUYBACK_PROGRAM_ID = new PublicKey('92znK8METYTFW5dGDJUnHUMqubVGnPBTyjZ4HzjWQzir');
@@ -347,7 +348,7 @@ export default function BuybackDashboard() {
       {/* Program Info */}
       <div className="mt-4 text-center">
         <a 
-          href={`https://explorer.solana.com/address/${BUYBACK_PROGRAM_ID.toBase58()}?cluster=devnet`}
+          href={getExplorerAddressUrl(BUYBACK_PROGRAM_ID.toBase58())}
           target="_blank"
           rel="noopener noreferrer"
           className="text-blue-400 hover:text-blue-300 text-sm"

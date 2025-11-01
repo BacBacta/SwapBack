@@ -6,6 +6,7 @@ import BuybackProgressBar from './components/BuybackProgressBar';
 import ExecuteBuybackButton from './components/ExecuteBuybackButton';
 import BuybackChart from './components/BuybackChart';
 import RecentBuybacks from './components/RecentBuybacks';
+import { getNetworkLabel } from '@/utils/explorer';
 
 export default function BuybackPage() {
   const { buybackState, isLoading, error } = useBuybackState();
@@ -188,7 +189,7 @@ export default function BuybackPage() {
               </div>
               <div>
                 <div className="text-gray-400 mb-1">Réseau</div>
-                <code className="text-orange-400">Solana Devnet</code>
+                <code className="text-green-400">Solana {getNetworkLabel()}</code>
               </div>
             </div>
           </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { getExplorerTxUrl, getSolscanTxUrl, getXrayTxUrl, getNetworkLabel } from "@/utils/explorer";
 
 interface Transaction {
   id: string;
@@ -278,7 +279,7 @@ export const TransactionHistory = ({
                               </div>
                               <div className="flex flex-wrap gap-2">
                                 <a
-                                  href={`https://explorer.solana.com/tx/${tx.signature}?cluster=devnet`}
+                                  href={getExplorerTxUrl(tx.signature)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   onClick={(e) => e.stopPropagation()}
@@ -287,7 +288,7 @@ export const TransactionHistory = ({
                                   [SOLANA_EXPLORER]
                                 </a>
                                 <a
-                                  href={`https://solscan.io/tx/${tx.signature}?cluster=devnet`}
+                                  href={getSolscanTxUrl(tx.signature)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   onClick={(e) => e.stopPropagation()}
@@ -296,7 +297,7 @@ export const TransactionHistory = ({
                                   [SOLSCAN]
                                 </a>
                                 <a
-                                  href={`https://xray.helius.xyz/tx/${tx.signature}?network=devnet`}
+                                  href={getXrayTxUrl(tx.signature)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   onClick={(e) => e.stopPropagation()}
@@ -316,7 +317,7 @@ export const TransactionHistory = ({
                               <div className="grid grid-cols-2 gap-2 text-xs terminal-text">
                                 <div>
                                   <span className="opacity-70">NETWORK:</span>{" "}
-                                  DEVNET
+                                  {getNetworkLabel()}
                                 </div>
                                 <div>
                                   <span className="opacity-70">TIMESTAMP:</span>{" "}
@@ -443,7 +444,7 @@ export const addLockTransaction = (
     lockLevel: params.lockLevel,
     lockBoost: params.lockBoost,
     status: params.status || "success",
-    explorerUrl: `https://solscan.io/tx/${params.signature}?cluster=devnet`,
+    explorerUrl: getSolscanTxUrl(params.signature),
   });
 };
 
@@ -467,7 +468,7 @@ export const addUnlockTransaction = (
     outputAmount: params.outputAmount,
     lockLevel: params.lockLevel,
     status: params.status || "success",
-    explorerUrl: `https://solscan.io/tx/${params.signature}?cluster=devnet`,
+    explorerUrl: getSolscanTxUrl(params.signature),
   });
 };
 
@@ -498,6 +499,6 @@ export const addDCATransaction = (
     dcaSwapsExecuted: params.dcaSwapsExecuted,
     dcaTotalSwaps: params.dcaTotalSwaps,
     status: params.status || "success",
-    explorerUrl: `https://solscan.io/tx/${params.signature}?cluster=devnet`,
+    explorerUrl: getSolscanTxUrl(params.signature),
   });
 };

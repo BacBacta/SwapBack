@@ -5,6 +5,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { getNetworkLabel, isMainnet } from "@/utils/explorer";
 
 export const Navigation = () => {
   const pathname = usePathname();
@@ -168,10 +169,10 @@ export const Navigation = () => {
               </div>
 
               {/* Network indicator */}
-              <div className="flex items-center gap-2 px-4 py-3 border-2 border-[var(--secondary)] mb-6">
-                <span className="w-2 h-2 bg-orange-500 animate-pulse"></span>
+              <div className={`flex items-center gap-2 px-4 py-3 border-2 mb-6 ${isMainnet() ? 'border-green-500' : 'border-orange-500'}`}>
+                <span className={`w-2 h-2 animate-pulse ${isMainnet() ? 'bg-green-500' : 'bg-orange-500'}`}></span>
                 <span className="text-xs terminal-text uppercase tracking-wider">
-                  [DEVNET - TEST NETWORK]
+                  [{getNetworkLabel()}{!isMainnet() ? ' - TEST NETWORK' : ''}]
                 </span>
               </div>
 

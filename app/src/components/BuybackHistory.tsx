@@ -1,6 +1,7 @@
 'use client';
 
 import { useBuybackHistory } from '@/hooks/useBuyback';
+import { getExplorerTxUrl } from '@/utils/explorer';
 
 export default function BuybackHistory() {
   const { history, loading } = useBuybackHistory(10);
@@ -71,7 +72,7 @@ export default function BuybackHistory() {
                 </span>
               </div>
               <a
-                href={`https://explorer.solana.com/tx/${item.signature}?cluster=devnet`}
+                href={getExplorerTxUrl(item.signature)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-400 hover:text-blue-300"

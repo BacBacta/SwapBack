@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useJupiter } from "../hooks/useJupiter";
 import { JupiterRouteDisplay } from "./JupiterRouteDisplay";
 import type { JupiterQuote, RouteInfo } from "@swapback/sdk";
+import { getSolscanTxUrl } from "@/utils/explorer";
 
 // Tokens populaires pour les tests
 const POPULAR_TOKENS = [
@@ -321,7 +322,7 @@ export const JupiterSwapWidget: React.FC = () => {
         <div className="bg-green-50 border border-green-200 rounded p-3 space-y-2">
           <p className="text-sm text-green-800 font-medium">✅ Swap réussi !</p>
           <a
-            href={`https://solscan.io/tx/${swapSuccess}?cluster=devnet`}
+            href={getSolscanTxUrl(swapSuccess)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs text-blue-600 hover:underline block"

@@ -7,6 +7,7 @@ import { useTokenData } from "../hooks/useTokenData";
 import { TokenSelector } from "./TokenSelector";
 import { depositToBuybackVault, BuybackDepositResult } from "../lib/buybackIntegration";
 import { trackSwap } from "../lib/analytics";
+import { getExplorerTxUrl } from "../utils/explorer";
 import toast from "react-hot-toast";
 
 interface RouteStep {
@@ -662,7 +663,7 @@ export const SwapInterface = () => {
                   </p>
                   {buybackDeposit.signature && (
                     <a
-                      href={`https://explorer.solana.com/tx/${buybackDeposit.signature}?cluster=devnet`}
+                      href={getExplorerTxUrl(buybackDeposit.signature)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs text-[var(--secondary)] hover:underline mt-1 inline-block"

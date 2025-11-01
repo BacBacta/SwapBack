@@ -5,6 +5,7 @@ import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID } from '@solana/spl-to
 import { toast } from 'react-hot-toast';
 import { trackBuyback } from '@/lib/analytics';
 import { parseBuybackTransaction } from '@/lib/parsers';
+import { getExplorerTxUrl } from '@/utils/explorer';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -121,7 +122,7 @@ export function useExecuteBuyback() {
         signature,
         usdcAmount,
         backBurned, // Include in return value
-        explorerUrl: `https://explorer.solana.com/tx/${signature}?cluster=devnet`,
+        explorerUrl: getExplorerTxUrl(signature),
       };
     },
     onSuccess: (data: { signature: string; usdcAmount: number; backBurned: number; explorerUrl: string }) => {
