@@ -1,8 +1,9 @@
 {
-  "buildCommand": "cd app && bash build.sh",
-  "outputDirectory": "app/.next",
-  "installCommand": "npm install --prefix app --legacy-peer-deps",
+  "buildCommand": "bash build.sh",
+  "outputDirectory": ".next",
+  "installCommand": "npm install --legacy-peer-deps",
   "framework": "nextjs",
+  "rootDirectory": "app",
   "env": {
     "NEXT_PUBLIC_SOLANA_NETWORK": "mainnet-beta",
     "NODE_OPTIONS": "--max-old-space-size=4096",
