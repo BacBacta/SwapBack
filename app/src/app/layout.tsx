@@ -4,6 +4,9 @@ import "./globals.css";
 import { ClientWalletProvider } from "@/components/ClientWalletProvider";
 import { QueryProvider } from "@/components/QueryProvider";
 import { Toaster } from "react-hot-toast";
+import { WalletConnectionGuide } from "@/components/WalletConnectionGuide";
+import { NetworkStatusIndicator } from "@/components/NetworkStatusIndicator";
+import { NetworkInfoModal } from "@/components/NetworkInfoModal";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -31,6 +34,9 @@ export default function RootLayout({
         <QueryProvider>
           <ClientWalletProvider>
             {children}
+            <WalletConnectionGuide />
+            <NetworkStatusIndicator />
+            <NetworkInfoModal />
             <Toaster
               position="bottom-right"
               toastOptions={{

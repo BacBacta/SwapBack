@@ -1,6 +1,7 @@
 "use client";
 
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { useWallet } from "@solana/wallet-adapter-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -9,6 +10,7 @@ export const Navigation = () => {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const { connected } = useWallet();
 
   useEffect(() => {
     setIsMounted(true);
@@ -71,9 +73,26 @@ export const Navigation = () => {
                 </span>
               </div>
 
-              {/* Wallet button - hidden on mobile to save space */}
-              <div className="hidden sm:block">
-                {isMounted ? <WalletMultiButton /> : null}
+              {/* Wallet button avec indicateur de réseau */}
+              <div className="hidden sm:flex items-center space-x-3">
+                {/* Indicateur de réseau */}
+                <div className="text-xs text-gray-400 bg-gray-800 px-2 py-1 rounded terminal-text">
+                  DEVNET
+                </div>
+
+                {/* Bouton wallet */}
+                {isMounted ? (
+                  <WalletMultiButton
+                    className="!bg-[var(--primary)] hover:!bg-[var(--primary-hover)] !text-black !font-bold !rounded !px-4 !py-2 !transition-colors"
+                    style={{
+                      backgroundColor: 'var(--primary)',
+                      border: 'none',
+                      fontFamily: 'var(--font-mono)',
+                    }}
+                  />
+                ) : (
+                  <div className="w-32 h-10 bg-gray-700 rounded animate-pulse"></div>
+                )}
               </div>
 
               {/* Mobile menu button */}
@@ -150,15 +169,26 @@ export const Navigation = () => {
 
               {/* Network indicator */}
               <div className="flex items-center gap-2 px-4 py-3 border-2 border-[var(--secondary)] mb-6">
-                <span className="w-2 h-2 bg-[var(--secondary)] animate-pulse"></span>
+                <span className="w-2 h-2 bg-orange-500 animate-pulse"></span>
                 <span className="text-xs terminal-text uppercase tracking-wider">
-                  [SOLANA NETWORK]
+                  [DEVNET - TEST NETWORK]
                 </span>
               </div>
 
               {/* Wallet button for mobile */}
               <div className="mt-auto">
-                {isMounted ? <WalletMultiButton className="!w-full" /> : null}
+                {isMounted ? (
+                  <WalletMultiButton
+                    className="!w-full !bg-[var(--primary)] hover:!bg-[var(--primary-hover)] !text-black !font-bold !rounded !px-4 !py-3 !transition-colors"
+                    style={{
+                      backgroundColor: 'var(--primary)',
+                      border: 'none',
+                      fontFamily: 'var(--font-mono)',
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-12 bg-gray-700 rounded animate-pulse"></div>
+                )}
               </div>
             </div>
           </div>

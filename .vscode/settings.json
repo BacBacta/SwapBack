@@ -117,11 +117,12 @@
 
   // Désactiver Copilot suggestions inline (garde chat)
   "github.copilot.enable": {
-    "*": false,
+    "*": true,
     "plaintext": false,
     "markdown": false,
     "scminput": false,
-    "toml": true
+    "toml": true,
+    "typescript": true
   },
 
   // Désactiver ESLint auto-fix sur save (garde validation)
