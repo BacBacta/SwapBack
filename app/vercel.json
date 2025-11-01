@@ -1,5 +1,5 @@
 {
-  "buildCommand": "bash build.sh",
+  "buildCommand": "cd app && bash build.sh",
   "outputDirectory": ".next",
   "framework": "nextjs",
   "env": {
