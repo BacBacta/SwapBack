@@ -28,10 +28,17 @@ rm -rf node_modules/.cache
 echo "✅ Clean complete"
 echo ""
 
-echo "📦 Re-installing dependencies to ensure Tailwind CSS is present..."
-rm -rf node_modules
-npm install --legacy-peer-deps
-echo "✅ Dependencies installed"
+echo "📦 Re-installing dependencies with --legacy-peer-deps..."
+# Vercel already ran `npm install`, but we need --legacy-peer-deps
+# So we force a clean install
+if [ ! -d "node_modules/tailwindcss" ]; then
+  echo "⚠️  Tailwind CSS missing, forcing full reinstall..."
+  rm -rf node_modules
+  npm install --legacy-peer-deps
+else
+  echo "✅ Dependencies already installed (Tailwind found)"
+fi
+echo "✅ Dependencies ready"
 echo ""
 
 echo "🔧 Environment variables check:"
