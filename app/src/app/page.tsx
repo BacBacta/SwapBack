@@ -2,6 +2,7 @@
 
 import { useState, lazy, Suspense } from "react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { getNetworkLabel, isMainnet } from "@/utils/explorer";
 
 // Performance: Lazy load heavy components
 const EnhancedSwapInterface = lazy(() => import("@/components/EnhancedSwapInterface").then(mod => ({ default: mod.EnhancedSwapInterface })));
@@ -77,10 +78,10 @@ export default function Home() {
       <div className="border-b-2 border-[var(--primary)]/30 bg-black">
         <div className="max-w-7xl mx-auto px-6 py-12">
           <div className="text-center">
-            <div className="inline-flex items-center gap-2 border-2 border-[var(--secondary)] px-4 py-2 mb-6">
-              <span className="w-2 h-2 bg-[var(--secondary)] animate-pulse"></span>
+            <div className={`inline-flex items-center gap-2 border-2 px-4 py-2 mb-6 ${isMainnet() ? 'border-green-500' : 'border-[var(--secondary)]'}`}>
+              <span className={`w-2 h-2 animate-pulse ${isMainnet() ? 'bg-green-500' : 'bg-[var(--secondary)]'}`}></span>
               <span className="text-sm font-bold terminal-text uppercase tracking-wider">
-                [LIVE_ON_SOLANA_TESTNET]
+                [LIVE_ON_SOLANA_{getNetworkLabel()}]
               </span>
             </div>
             <h1 className="text-5xl md:text-6xl font-bold terminal-text terminal-glow mb-6 uppercase tracking-wider">

@@ -51,12 +51,6 @@ export default function BuybackDashboard() {
   );
 
   // Charger l'état du buyback
-  useEffect(() => {
-    loadBuybackState();
-    const interval = setInterval(loadBuybackState, 10000); // Refresh toutes les 10s
-    return () => clearInterval(interval);
-  }, [connection, loadBuybackState]);
-
   const loadBuybackState = async () => {
     try {
       // Charger le compte buyback state
@@ -92,6 +86,12 @@ export default function BuybackDashboard() {
       console.error('Error loading buyback state:', error);
     }
   };
+
+  useEffect(() => {
+    loadBuybackState();
+    const interval = setInterval(loadBuybackState, 10000); // Refresh toutes les 10s
+    return () => clearInterval(interval);
+  }, [connection]);
 
   // Déposer USDC
   const handleDepositUSDC = async () => {
