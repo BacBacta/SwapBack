@@ -28,8 +28,9 @@ rm -rf node_modules/.cache
 echo "✅ Clean complete"
 echo ""
 
-echo "📦 Installing dependencies..."
-npm install --ignore-scripts
+echo "📦 Re-installing dependencies to ensure Tailwind CSS is present..."
+rm -rf node_modules
+npm install --legacy-peer-deps
 echo "✅ Dependencies installed"
 echo ""
 
