@@ -1,0 +1,1000 @@
+{
+  "address": "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt",
+  "metadata": {
+    "name": "swapback_router",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Programme de routage de swap avancé avec oracle et TWAP"
+  },
+  "instructions": [
+    {
+      "name": "create_plan",
+      "discriminator": [
+        77,
+        43,
+        141,
+        254,
+        212,
+        118,
+        41,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "plan",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  119,
+                  97,
+                  112,
+                  95,
+                  112,
+                  108,
+                  97,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "plan_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "plan_data",
+          "type": {
+            "defined": {
+              "name": "CreatePlanArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  116,
+                  101,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "swap_toc",
+      "discriminator": [
+        187,
+        201,
+        212,
+        51,
+        16,
+        155,
+        236,
+        60
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "oracle"
+        },
+        {
+          "name": "user_token_account_a",
+          "writable": true
+        },
+        {
+          "name": "user_token_account_b",
+          "writable": true
+        },
+        {
+          "name": "vault_token_account_a",
+          "writable": true
+        },
+        {
+          "name": "vault_token_account_b",
+          "writable": true
+        },
+        {
+          "name": "plan",
+          "optional": true
+        },
+        {
+          "name": "user_nft",
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  110,
+                  102,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                124,
+                45,
+                158,
+                158,
+                92,
+                135,
+                224,
+                116,
+                248,
+                16,
+                39,
+                58,
+                34,
+                244,
+                202,
+                44,
+                102,
+                6,
+                204,
+                163,
+                239,
+                199,
+                66,
+                159,
+                53,
+                48,
+                132,
+                82,
+                220,
+                77,
+                191,
+                36
+              ]
+            }
+          }
+        },
+        {
+          "name": "buyback_program",
+          "optional": true,
+          "address": "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"
+        },
+        {
+          "name": "buyback_usdc_vault",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "buyback_state",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "user_rebate_account",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "SwapArgs"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "RouterState",
+      "discriminator": [
+        141,
+        157,
+        194,
+        155,
+        75,
+        208,
+        200,
+        27
+      ]
+    },
+    {
+      "name": "SwapPlan",
+      "discriminator": [
+        95,
+        158,
+        185,
+        29,
+        164,
+        35,
+        247,
+        120
+      ]
+    },
+    {
+      "name": "UserNft",
+      "discriminator": [
+        118,
+        117,
+        125,
+        216,
+        67,
+        180,
+        173,
+        226
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "BundleHint",
+      "discriminator": [
+        3,
+        135,
+        72,
+        172,
+        33,
+        245,
+        206,
+        18
+      ]
+    },
+    {
+      "name": "BuybackDeposit",
+      "discriminator": [
+        106,
+        22,
+        95,
+        53,
+        81,
+        147,
+        98,
+        59
+      ]
+    },
+    {
+      "name": "FallbackTriggered",
+      "discriminator": [
+        21,
+        209,
+        182,
+        128,
+        159,
+        103,
+        5,
+        186
+      ]
+    },
+    {
+      "name": "OracleChecked",
+      "discriminator": [
+        193,
+        167,
+        49,
+        84,
+        65,
+        125,
+        123,
+        219
+      ]
+    },
+    {
+      "name": "PriorityFeeSet",
+      "discriminator": [
+        248,
+        95,
+        248,
+        74,
+        82,
+        156,
+        86,
+        30
+      ]
+    },
+    {
+      "name": "RebatePaid",
+      "discriminator": [
+        240,
+        119,
+        234,
+        76,
+        110,
+        156,
+        152,
+        192
+      ]
+    },
+    {
+      "name": "SwapCompleted",
+      "discriminator": [
+        118,
+        93,
+        218,
+        77,
+        215,
+        165,
+        112,
+        76
+      ]
+    },
+    {
+      "name": "VenueExecuted",
+      "discriminator": [
+        27,
+        84,
+        176,
+        235,
+        53,
+        181,
+        178,
+        38
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "SlippageExceeded",
+      "msg": "Slippage tolerance exceeded"
+    },
+    {
+      "code": 6001,
+      "name": "StaleOracleData",
+      "msg": "Oracle price data is stale"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidOraclePrice",
+      "msg": "Invalid oracle price"
+    },
+    {
+      "code": 6003,
+      "name": "TwapSliceTooSmall",
+      "msg": "TWAP slice amount too small"
+    },
+    {
+      "code": 6004,
+      "name": "PlanExpired",
+      "msg": "Swap plan has expired"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidPlanWeights",
+      "msg": "Invalid plan weights - must sum to 10000"
+    },
+    {
+      "code": 6006,
+      "name": "PlanAmountMismatch",
+      "msg": "Plan amount mismatch"
+    },
+    {
+      "code": 6007,
+      "name": "UnauthorizedPlanAccess",
+      "msg": "Unauthorized access to swap plan"
+    },
+    {
+      "code": 6008,
+      "name": "UnknownDex",
+      "msg": "Unknown DEX or not yet implemented"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidTokenAccount",
+      "msg": "Invalid token account"
+    },
+    {
+      "code": 6010,
+      "name": "DexNotImplemented"
+    },
+    {
+      "code": 6011,
+      "name": "DexExecutionFailed",
+      "msg": "DEX execution failed"
+    },
+    {
+      "code": 6012,
+      "name": "InvalidAmount",
+      "msg": "Invalid amount - must be greater than 0"
+    },
+    {
+      "code": 6013,
+      "name": "SlippageTooHigh",
+      "msg": "Slippage tolerance too high - max 10%"
+    }
+  ],
+  "types": [
+    {
+      "name": "BundleHint",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "priority_fee",
+            "type": "u64"
+          },
+          {
+            "name": "n_instructions",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BuybackDeposit",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "source",
+            "type": "string"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreatePlanArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "plan_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "token_in",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_out",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_in",
+            "type": "u64"
+          },
+          {
+            "name": "min_out",
+            "type": "u64"
+          },
+          {
+            "name": "venues",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "VenueWeight"
+                }
+              }
+            }
+          },
+          {
+            "name": "fallback_plans",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "FallbackPlan"
+                }
+              }
+            }
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FallbackPlan",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "venues",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "VenueWeight"
+                }
+              }
+            }
+          },
+          {
+            "name": "min_out",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FallbackTriggered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "plan_index",
+            "type": "u8"
+          },
+          {
+            "name": "reason",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LockLevel",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Bronze"
+          },
+          {
+            "name": "Silver"
+          },
+          {
+            "name": "Gold"
+          },
+          {
+            "name": "Platinum"
+          },
+          {
+            "name": "Diamond"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OracleChecked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "feed",
+            "type": "pubkey"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "confidence",
+            "type": "u64"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "oracle_type",
+            "type": {
+              "defined": {
+                "name": "OracleType"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OracleType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Switchboard"
+          },
+          {
+            "name": "Pyth"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriorityFeeSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "compute_unit_limit",
+            "type": "u32"
+          },
+          {
+            "name": "compute_unit_price",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RebatePaid",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "base_rebate",
+            "type": "u64"
+          },
+          {
+            "name": "boost",
+            "type": "u16"
+          },
+          {
+            "name": "total_rebate",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RouterState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SwapArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount_in",
+            "type": "u64"
+          },
+          {
+            "name": "min_out",
+            "type": "u64"
+          },
+          {
+            "name": "slippage_tolerance",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "twap_slices",
+            "type": {
+              "option": "u8"
+            }
+          },
+          {
+            "name": "use_dynamic_plan",
+            "type": "bool"
+          },
+          {
+            "name": "plan_account",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "use_bundle",
+            "type": "bool"
+          },
+          {
+            "name": "oracle_account",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SwapCompleted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_in",
+            "type": "u64"
+          },
+          {
+            "name": "amount_out",
+            "type": "u64"
+          },
+          {
+            "name": "platform_fee",
+            "type": "u64"
+          },
+          {
+            "name": "routing_profit",
+            "type": "u64"
+          },
+          {
+            "name": "buyback_deposit",
+            "type": "u64"
+          },
+          {
+            "name": "user_boost",
+            "type": "u16"
+          },
+          {
+            "name": "rebate_amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SwapPlan",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "plan_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_in",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_out",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_in",
+            "type": "u64"
+          },
+          {
+            "name": "min_out",
+            "type": "u64"
+          },
+          {
+            "name": "venues",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "VenueWeight"
+                }
+              }
+            }
+          },
+          {
+            "name": "fallback_plans",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "FallbackPlan"
+                }
+              }
+            }
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UserNft",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "level",
+            "type": {
+              "defined": {
+                "name": "LockLevel"
+              }
+            }
+          },
+          {
+            "name": "amount_locked",
+            "type": "u64"
+          },
+          {
+            "name": "lock_duration",
+            "type": "i64"
+          },
+          {
+            "name": "boost",
+            "type": "u16"
+          },
+          {
+            "name": "mint_time",
+            "type": "i64"
+          },
+          {
+            "name": "is_active",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VenueExecuted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "venue",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_in",
+            "type": "u64"
+          },
+          {
+            "name": "amount_out",
+            "type": "u64"
+          },
+          {
+            "name": "success",
+            "type": "bool"
+          },
+          {
+            "name": "fallback_used",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VenueWeight",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "venue",
+            "type": "pubkey"
+          },
+          {
+            "name": "weight",
+            "type": "u16"
+          }
+        ]
+      }
+    }
+  ]
+}

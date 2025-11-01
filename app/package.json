@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "build:clean": "rm -rf .next && next build",
+    "build": "npm run copy-idl && next build",
+    "build:clean": "rm -rf .next && npm run copy-idl && next build",
+    "copy-idl": "mkdir -p src/idl && (cp -f ../target/idl/*.json src/idl/ 2>/dev/null || cp -f public/idl/*.json src/idl/ 2>/dev/null || true)",
     "start": "next start",
     "lint": "next lint",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\"",

@@ -19,8 +19,9 @@ target/
 **/*.rs.bk
 test-ledger/
 
-# IDL
-*.json
+# IDL (ignore generated IDL in target, but keep source IDL in app/src/idl)
+target/idl/
+!app/src/idl/*.json
 
 # Environment variables
 .env
@@ -65,3 +66,4 @@ Thumbs.db
 !tsconfig.json
 !Anchor.toml
 Cargo.lock
+.vercel

@@ -8,7 +8,7 @@ import {
 import { WalletContextState } from "@solana/wallet-adapter-react";
 import { BN } from "@coral-xyz/anchor";
 import type { Idl } from "@coral-xyz/anchor";
-import cnftIdl from "@/../public/idl/swapback_cnft.json";
+import cnftIdl from "@/idl/swapback_cnft.json";
 
 // Program ID du programme swapback_cnft déployé (Devnet - Updated Oct 31, 2025)
 export const CNFT_PROGRAM_ID = new PublicKey(
