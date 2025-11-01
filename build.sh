@@ -1,13 +1,12 @@
 #!/bin/bash
 
-# Remove set -e to prevent script from exiting on first error
-# set -e  # Exit on error - COMMENTED OUT FOR DEBUGGING
+set -e  # Exit on error
 
-echo "🔍 SwapBack Build Script - Detailed Logging"
-echo "=========================================="
+echo "🔍 SwapBack Build Script - Vercel Compatible"
+echo "=============================================="
 echo ""
 
-echo "📂 Initial directory:"
+echo "📂 Working directory:"
 pwd
 echo ""
 
@@ -19,59 +18,52 @@ echo "📋 npm version:"
 npm --version
 echo ""
 
-echo "📦 Package.json location:"
-if [ ! -f "app/package.json" ]; then
-  echo "❌ ERROR: package.json not found in app directory"
-  exit 1
+# Detect if we're in the app directory (Vercel) or root (local)
+if [ -f "package.json" ] && grep -q "@swapback/app" package.json 2>/dev/null; then
+  echo "📍 Running in app directory (Vercel mode)"
+  APP_DIR="."
+  ROOT_DIR=".."
+else
+  echo "📍 Running in root directory (Local mode)"
+  APP_DIR="app"
+  ROOT_DIR="."
 fi
-ls -la app/package.json
-echo ""
 
 echo "🧹 Cleaning previous build..."
-rm -rf app/.next
-rm -rf node_modules/.cache
+rm -rf "${APP_DIR}/.next"
+rm -rf "${APP_DIR}/node_modules/.cache"
 echo "✅ Clean complete"
 echo ""
 
 echo "📦 Checking dependencies..."
-# Check if essential dependencies are installed
-if [ ! -d "node_modules/tailwindcss" ] || [ ! -d "node_modules/next" ] || [ ! -d "node_modules/react" ]; then
-  echo "⚠️  Essential dependencies missing, forcing full reinstall..."
-  rm -rf node_modules
-  echo "📦 Running npm install --legacy-peer-deps..."
-  if ! npm install --legacy-peer-deps; then
-    echo "❌ ERROR: npm install failed"
-    exit 1
-  fi
-  echo "✅ npm install completed"
+# Check if dependencies are installed in app directory
+if [ ! -d "${APP_DIR}/node_modules/next" ] || [ ! -d "${APP_DIR}/node_modules/react" ] || [ ! -d "${APP_DIR}/node_modules/tailwindcss" ]; then
+  echo "⚠️  Dependencies missing in app directory"
+  
+  # Install in app directory
+  echo "📦 Installing dependencies in ${APP_DIR}..."
+  cd "${APP_DIR}"
+  npm install --legacy-peer-deps
+  cd - > /dev/null
+  echo "✅ Dependencies installed"
 else
-  echo "✅ Dependencies already installed correctly"
+  echo "✅ Dependencies already installed"
 fi
-echo "✅ Dependencies ready"
 echo ""
 
-echo "🔧 Environment variables check:"
+echo "🔧 Environment variables:"
 echo "NEXT_PUBLIC_SOLANA_NETWORK: ${NEXT_PUBLIC_SOLANA_NETWORK:-NOT SET}"
 echo "NODE_OPTIONS: ${NODE_OPTIONS:-NOT SET}"
 echo ""
 
-echo "🔗 Creating symlink for node_modules in app directory..."
-# Create symlink from app/node_modules to root node_modules
-if [ -d "app/node_modules" ]; then
-  rm -rf app/node_modules
-fi
-ln -s ../node_modules app/node_modules
-echo "✅ Symlink created"
-echo ""
-
-echo "🏗️  Starting Next.js build..."
-cd app
-if ! npm run build; then
-  echo "❌ ERROR: Next.js build failed"
-  exit 1
-fi
+echo "🏗️  Building Next.js app..."
+cd "${APP_DIR}"
+npm run build
 echo "✅ Build complete!"
 echo ""
 
 echo "📊 Build output:"
-ls -la .next || echo "❌ .next directory not found!"
+ls -la .next 2>/dev/null || echo "⚠️  .next directory not found!"
+echo ""
+
+echo "✅ All done!"

@@ -1,7 +1,7 @@
 {
-  "buildCommand": "bash build.sh",
+  "buildCommand": "npm run build",
   "installCommand": "npm install --legacy-peer-deps",
-  "outputDirectory": "app/.next",
+  "outputDirectory": ".next",
   "framework": "nextjs",
   "env": {
     "NEXT_PUBLIC_SOLANA_NETWORK": "mainnet-beta",
