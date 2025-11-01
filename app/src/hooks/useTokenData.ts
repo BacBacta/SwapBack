@@ -14,9 +14,13 @@ export const useTokenData = (tokenMint: string) => {
 
   // Récupérer la balance
   useEffect(() => {
-    const fetchBalance = async () => {
-      if (!publicKey || !tokenMint) return;
+    if (!publicKey || !tokenMint) {
+      setBalance(0);
+      setLoading(false);
+      return;
+    }
 
+    const fetchBalance = async () => {
       try {
         setLoading(true);
 
@@ -57,7 +61,8 @@ export const useTokenData = (tokenMint: string) => {
     // Rafraîchir toutes les 30 secondes
     const interval = setInterval(fetchBalance, 30000);
     return () => clearInterval(interval);
-  }, [publicKey, tokenMint, connection]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publicKey, tokenMint]); // connection est stable, pas besoin de le mettre en dépendance
 
   // Récupérer le prix USD
   useEffect(() => {

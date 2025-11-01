@@ -103,9 +103,12 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
 
   // Récupérer le solde de $BACK
   useEffect(() => {
-    const fetchBalance = async () => {
-      if (!publicKey) return;
+    if (!publicKey) {
+      setBalance(0);
+      return;
+    }
 
+    const fetchBalance = async () => {
       try {
         const ata = await getAssociatedTokenAddress(
           BACK_TOKEN_MINT,
@@ -122,7 +125,12 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
     };
 
     fetchBalance();
-  }, [publicKey, connection]);
+    
+    // Rafraîchir toutes les 30 secondes
+    const interval = setInterval(fetchBalance, 30000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publicKey]); // connection est stable
 
   // Amount validation
   const amountError = useMemo(() => {
