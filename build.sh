@@ -11,7 +11,7 @@ echo "📂 Initial directory:"
 pwd
 echo ""
 
-echo " Node version:"
+echo "📋 Node version:"
 node --version
 echo ""
 
@@ -55,8 +55,18 @@ echo "NEXT_PUBLIC_SOLANA_NETWORK: ${NEXT_PUBLIC_SOLANA_NETWORK:-NOT SET}"
 echo "NODE_OPTIONS: ${NODE_OPTIONS:-NOT SET}"
 echo ""
 
+echo "🔗 Creating symlink for node_modules in app directory..."
+# Create symlink from app/node_modules to root node_modules
+if [ -d "app/node_modules" ]; then
+  rm -rf app/node_modules
+fi
+ln -s ../node_modules app/node_modules
+echo "✅ Symlink created"
+echo ""
+
 echo "🏗️  Starting Next.js build..."
-if ! npm run build --prefix app; then
+cd app
+if ! npm run build; then
   echo "❌ ERROR: Next.js build failed"
   exit 1
 fi
@@ -64,4 +74,4 @@ echo "✅ Build complete!"
 echo ""
 
 echo "📊 Build output:"
-ls -la app/.next || echo "❌ .next directory not found!"
+ls -la .next || echo "❌ .next directory not found!"
