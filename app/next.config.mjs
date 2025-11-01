@@ -1,8 +1,16 @@
-import bundleAnalyzer from '@next/bundle-analyzer';
+// Import bundle analyzer only if ANALYZE=true is set
+let withBundleAnalyzer = (config) => config; // Default: no-op
 
-const withBundleAnalyzer = bundleAnalyzer({
-  enabled: process.env.ANALYZE === 'true',
-});
+if (process.env.ANALYZE === 'true') {
+  try {
+    const bundleAnalyzer = await import('@next/bundle-analyzer');
+    withBundleAnalyzer = bundleAnalyzer.default({
+      enabled: true,
+    });
+  } catch (error) {
+    console.warn('⚠️  @next/bundle-analyzer not found. Bundle analysis disabled.');
+  }
+}
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

@@ -30,7 +30,6 @@ echo ""
 
 echo "📦 Installing dependencies..."
 npm install --ignore-scripts
-npm install --save-dev @next/bundle-analyzer
 echo "✅ Dependencies installed"
 echo ""
 
