@@ -199,42 +199,49 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Ensure tokens are supported before querying Jupiter
-    const [inputTokenStatus, outputTokenStatus] = await Promise.all([
-      validateTokenSupport(inputMint),
-      validateTokenSupport(outputMint),
-    ]);
+    // Token validation désactivée en production
+    // Jupiter API valide déjà les tokens - pas besoin de double validation
+    // qui cause des erreurs réseau ENOTFOUND dans Vercel
+    const SKIP_TOKEN_VALIDATION = process.env.SKIP_TOKEN_VALIDATION !== "false";
+    
+    if (!SKIP_TOKEN_VALIDATION) {
+      // Validation optionnelle (activée uniquement si SKIP_TOKEN_VALIDATION=false)
+      const [inputTokenStatus, outputTokenStatus] = await Promise.all([
+        validateTokenSupport(inputMint),
+        validateTokenSupport(outputMint),
+      ]);
 
-    if (inputTokenStatus !== "supported") {
-      const statusCode = inputTokenStatus === "unknown" ? 503 : 400;
-      const errorMessage =
-        inputTokenStatus === "unknown"
-          ? "Unable to validate input token support"
-          : "Unsupported input token";
+      if (inputTokenStatus !== "supported") {
+        const statusCode = inputTokenStatus === "unknown" ? 503 : 400;
+        const errorMessage =
+          inputTokenStatus === "unknown"
+            ? "Unable to validate input token support"
+            : "Unsupported input token";
 
-      return NextResponse.json(
-        {
-          error: errorMessage,
-          mint: inputMint,
-        },
-        withNoStore({ status: statusCode })
-      );
-    }
+        return NextResponse.json(
+          {
+            error: errorMessage,
+            mint: inputMint,
+          },
+          withNoStore({ status: statusCode })
+        );
+      }
 
-    if (outputTokenStatus !== "supported") {
-      const statusCode = outputTokenStatus === "unknown" ? 503 : 400;
-      const errorMessage =
-        outputTokenStatus === "unknown"
-          ? "Unable to validate output token support"
-          : "Unsupported output token";
+      if (outputTokenStatus !== "supported") {
+        const statusCode = outputTokenStatus === "unknown" ? 503 : 400;
+        const errorMessage =
+          outputTokenStatus === "unknown"
+            ? "Unable to validate output token support"
+            : "Unsupported output token";
 
-      return NextResponse.json(
-        {
-          error: errorMessage,
-          mint: outputMint,
-        },
-        withNoStore({ status: statusCode })
-      );
+        return NextResponse.json(
+          {
+            error: errorMessage,
+            mint: outputMint,
+          },
+          withNoStore({ status: statusCode })
+        );
+      }
     }
 
     // Build Jupiter API URL
