@@ -1,9 +1,15 @@
 {
-  "buildCommand": "cd app && npm run build",
+  "buildCommand": "cd app && rm -rf .next node_modules/.cache && npm run build",
   "installCommand": "cd app && npm install --ignore-scripts",
   "outputDirectory": "app/.next",
   "framework": "nextjs",
   "env": {
-    "NEXT_PUBLIC_SOLANA_NETWORK": "mainnet-beta"
+    "NEXT_PUBLIC_SOLANA_NETWORK": "mainnet-beta",
+    "NODE_OPTIONS": "--max-old-space-size=4096"
+  },
+  "functions": {
+    "app/src/app/**/*.tsx": {
+      "maxDuration": 30
+    }
   }
 }
