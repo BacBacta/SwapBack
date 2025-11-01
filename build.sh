@@ -1,6 +1,7 @@
 #!/bin/bash
 
-set -e  # Exit on error
+# Remove set -e to prevent script from exiting on first error
+# set -e  # Exit on error - COMMENTED OUT FOR DEBUGGING
 
 echo "🔍 SwapBack Build Script - Detailed Logging"
 echo "=========================================="
@@ -12,7 +13,10 @@ echo ""
 
 # Change to app directory
 echo "📂 Changing to app directory..."
-cd app
+if ! cd app; then
+  echo "❌ ERROR: Failed to change to app directory"
+  exit 1
+fi
 echo "📂 Current directory:"
 pwd
 echo ""
@@ -26,7 +30,11 @@ npm --version
 echo ""
 
 echo "📦 Package.json location:"
-ls -la package.json || echo "❌ package.json not found!"
+if [ ! -f "package.json" ]; then
+  echo "❌ ERROR: package.json not found in app directory"
+  exit 1
+fi
+ls -la package.json
 echo ""
 
 echo "🧹 Cleaning previous build..."
@@ -40,7 +48,12 @@ echo "📦 Checking dependencies..."
 if [ ! -d "node_modules/tailwindcss" ] || [ ! -d "node_modules/next" ] || [ ! -d "node_modules/react" ]; then
   echo "⚠️  Essential dependencies missing, forcing full reinstall..."
   rm -rf node_modules
-  npm install --legacy-peer-deps
+  echo "📦 Running npm install --legacy-peer-deps..."
+  if ! npm install --legacy-peer-deps; then
+    echo "❌ ERROR: npm install failed"
+    exit 1
+  fi
+  echo "✅ npm install completed"
 else
   echo "✅ Dependencies already installed correctly"
 fi
@@ -53,7 +66,10 @@ echo "NODE_OPTIONS: ${NODE_OPTIONS:-NOT SET}"
 echo ""
 
 echo "🏗️  Starting Next.js build..."
-npm run build
+if ! npm run build; then
+  echo "❌ ERROR: Next.js build failed"
+  exit 1
+fi
 echo "✅ Build complete!"
 echo ""
 
