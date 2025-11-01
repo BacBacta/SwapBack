@@ -91,6 +91,8 @@ const validateTokenSupport = async (
     return cachedStatus;
   }
 
+  // FALLBACK: Si la validation externe échoue, on accepte le token (permissive mode)
+  // Cela permet de fonctionner même si token.jup.ag est inaccessible
   const controller = new AbortController();
   const timeoutId = setTimeout(
     () => controller.abort(),
@@ -134,7 +136,13 @@ const validateTokenSupport = async (
     } else {
       console.error("❌ Token validation failed:", normalizedMint, error);
     }
-    return "unknown";
+    
+    // FALLBACK: En cas d'erreur réseau (ENOTFOUND, timeout, etc.), 
+    // on accepte le token par défaut (permissive mode pour Vercel)
+    // Cela permet à l'app de fonctionner même si token.jup.ag est down
+    console.warn("⚠️ Falling back to 'supported' due to network error");
+    tokenValidationCache.set(normalizedMint, "supported");
+    return "supported";
   }
 };
 
