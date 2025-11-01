@@ -33,9 +33,9 @@ const nextConfig = {
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline'", // Next.js requires unsafe-eval
-              "style-src 'self' 'unsafe-inline'", // Tailwind requires unsafe-inline
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", // Tailwind + Google Fonts
               "img-src 'self' data: https:",
-              "font-src 'self' data:",
+              "font-src 'self' data: https://fonts.gstatic.com", // Google Fonts
               "connect-src 'self' https://*.helius-rpc.com https://*.solana.com https://api.devnet.solana.com https://api.mainnet-beta.solana.com wss://*.helius-rpc.com wss://*.solana.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",

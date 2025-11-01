@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { WalletProvider } from "@/components/WalletProvider";
+import { ClientWalletProvider } from "@/components/ClientWalletProvider";
 import { QueryProvider } from "@/components/QueryProvider";
 import { Toaster } from "react-hot-toast";
 
@@ -29,7 +29,7 @@ export default function RootLayout({
           Skip to main content
         </a>
         <QueryProvider>
-          <WalletProvider>
+          <ClientWalletProvider>
             {children}
             <Toaster
               position="bottom-right"
@@ -53,7 +53,7 @@ export default function RootLayout({
                 },
               }}
             />
-          </WalletProvider>
+          </ClientWalletProvider>
         </QueryProvider>
       </body>
     </html>

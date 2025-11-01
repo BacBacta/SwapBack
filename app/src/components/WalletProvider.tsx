@@ -9,7 +9,7 @@ import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import {
   PhantomWalletAdapter,
-  SolflareWalletAdapter,
+  // SolflareWalletAdapter retiré - il s'enregistre automatiquement comme Standard Wallet
 } from "@solana/wallet-adapter-wallets";
 import { clusterApiUrl } from "@solana/web3.js";
 
@@ -22,8 +22,12 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const endpoint = useMemo(() => clusterApiUrl(network), [network]);
 
   // Configuration des wallets supportés
+  // Note: Solflare s'enregistre automatiquement via le standard wallet
   const wallets = useMemo(
-    () => [new PhantomWalletAdapter(), new SolflareWalletAdapter()],
+    () => [
+      new PhantomWalletAdapter(),
+      // SolflareWalletAdapter retiré pour éviter la duplication
+    ],
     []
   );
 
