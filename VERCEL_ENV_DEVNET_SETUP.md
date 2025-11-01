@@ -1,7 +1,13 @@
-# Configuration Vercel - Variables d'Environnement DEVNET
+# Configuration Vercel - Variables d'Environnement MAINNET
 
 ## 🎯 Objectif
-Configurer les variables d'environnement sur Vercel pour que l'application affiche correctement les soldes de tokens $BACK et USDC sur DEVNET.
+Configurer les variables d'environnement sur Vercel pour que l'application fonctionne avec Jupiter API sur MAINNET.
+
+## ⚠️ Pourquoi MAINNET ?
+
+**Jupiter ne supporte pas devnet/testnet** - il fonctionne uniquement sur mainnet où il y a de la vraie liquidité.
+
+Voir: [`DEVNET_NO_ROUTES_SOLUTION.md`](DEVNET_NO_ROUTES_SOLUTION.md) pour plus de détails.
 
 ## 📝 Instructions
 
@@ -17,10 +23,15 @@ Ajouter **chacune** des variables suivantes :
 
 | Variable | Valeur | Environnement |
 |----------|--------|---------------|
-| `NEXT_PUBLIC_SOLANA_NETWORK` | `devnet` | Production, Preview, Development |
-| `NEXT_PUBLIC_SOLANA_RPC_URL` | `https://api.devnet.solana.com` | Production, Preview, Development |
-| `NEXT_PUBLIC_BACK_MINT` | `14rtHCJVvU7NKeFJotJsHdbsQGajnNmoQ7MHid41RLTa` | Production, Preview, Development |
-| `NEXT_PUBLIC_USDC_MINT` | `BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR` | Production, Preview, Development |
+| `NEXT_PUBLIC_SOLANA_NETWORK` | `mainnet-beta` | Production, Preview, Development |
+| `NEXT_PUBLIC_SOLANA_RPC_URL` | `https://api.mainnet-beta.solana.com` | Production, Preview, Development |
+| `NEXT_PUBLIC_BACK_MINT` | `So11111111111111111111111111111111111111112` | Production, Preview, Development |
+| `NEXT_PUBLIC_USDC_MINT` | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` | Production, Preview, Development |
+
+**Note sur les tokens:**
+- `NEXT_PUBLIC_BACK_MINT` : Actuellement configuré avec SOL pour les tests
+- `NEXT_PUBLIC_USDC_MINT` : USDC officiel sur mainnet
+- Remplacez `NEXT_PUBLIC_BACK_MINT` par votre token $BACK quand il sera déployé sur mainnet
 
 ### 3. Redéployer l'Application
 
@@ -42,26 +53,26 @@ git push origin main
 
 1. Ouvrir : https://swap-back-app-4ewf.vercel.app
 2. Connecter le wallet Phantom/Solflare
-3. **Changer le réseau vers DEVNET** dans le wallet
-4. Importer le wallet de test :
-   - Clé privée : voir `devnet-keypair-base58.txt`
-   - Adresse : `3PiZ1xdHbPbj1UaPS8pfzKnHpmQQLfR8zrhy5RcksqAt`
+3. **Assurez-vous d'être sur MAINNET** dans le wallet
+4. Les routes Jupiter devraient s'afficher pour les swaps SOL ↔ USDC
 
-### 5. Vérifier les Soldes
+### 5. Vérifier les Routes
 
-Les soldes devraient maintenant s'afficher :
-- ✅ **$BACK** : 999,999,900 tokens
-- ✅ **USDC** : 999,990 tokens
+L'application devrait maintenant :
+- ✅ Afficher "MAINNET" comme réseau
+- ✅ Trouver des routes Jupiter pour les swaps
+- ✅ Afficher les vrais prix de marché
+- ✅ Permettre des swaps réels (avec de vrais frais)
 
 ## 🔧 Dépannage
 
-### Les soldes s'affichent toujours à zéro ?
+### Les routes ne s'affichent toujours pas ?
 
 **Vérifications :**
 
-1. **Le wallet est-il sur DEVNET ?**
-   - Dans Phantom : Settings → Change Network → Devnet
-   - Dans Solflare : Settings → Network → Devnet
+1. **Le wallet est-il sur MAINNET ?**
+   - Dans Phantom : Settings → Change Network → Mainnet Beta
+   - Dans Solflare : Settings → Network → Mainnet Beta
 
 2. **Les variables d'environnement sont-elles bien configurées ?**
    ```bash
@@ -77,19 +88,21 @@ Les soldes devraient maintenant s'afficher :
    - Dashboard → Deployments → Dernier déploiement → Build Logs
    - Chercher : "Environments: .env.local"
 
-### Le wallet de test n'apparaît pas ?
+### L'affichage montre toujours "TESTNET" ou "DEVNET" ?
 
-```bash
-# Vérifier le solde sur devnet
-spl-token accounts --owner 3PiZ1xdHbPbj1UaPS8pfzKnHpmQQLfR8zrhy5RcksqAt --url devnet
-```
+Le composant `NetworkStatusIndicator` détecte automatiquement le réseau via le genesis hash.
+- Si votre **wallet** est sur devnet, il affichera "DEVNET"
+- Changez le réseau du wallet vers **Mainnet Beta**
+- L'indicateur se mettra à jour automatiquement
 
 ## 📚 Ressources
 
 - [Vercel Environment Variables](https://vercel.com/docs/environment-variables)
 - [Next.js Environment Variables](https://nextjs.org/docs/app/building-your-application/configuring/environment-variables)
-- [Solana Devnet Faucet](https://faucet.solana.com/)
+- [Jupiter API Documentation](https://station.jup.ag/docs/apis/swap-api)
+- [Pourquoi pas DEVNET ?](DEVNET_NO_ROUTES_SOLUTION.md)
 
 ---
 
-**Dernière mise à jour** : 1er novembre 2025
+**Dernière mise à jour** : 1er novembre 2025  
+**Note** : Ce fichier a été mis à jour pour refléter la migration vers MAINNET (Jupiter ne supporte pas devnet/testnet)

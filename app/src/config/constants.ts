@@ -79,9 +79,10 @@ export const LEVEL_COLORS: Record<CNFTLevel, string> = {
 // SOLANA NETWORK
 // ============================================
 
-export const SOLANA_NETWORK = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'testnet';
+export const SOLANA_NETWORK = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'mainnet-beta';
 
 export const SOLANA_RPC_ENDPOINTS = {
+  'mainnet-beta': 'https://api.mainnet-beta.solana.com',
   mainnet: 'https://api.mainnet-beta.solana.com',
   devnet: 'https://api.devnet.solana.com',
   testnet: 'https://api.testnet.solana.com',
