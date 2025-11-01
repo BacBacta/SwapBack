@@ -1,7 +1,7 @@
 {
-  "buildCommand": "cd app && rm -rf .next node_modules/.cache && npm run build",
-  "installCommand": "cd app && npm install --ignore-scripts",
+  "buildCommand": "cd app && bash build.sh",
   "outputDirectory": "app/.next",
+  "installCommand": "npm install --prefix app --legacy-peer-deps",
   "framework": "nextjs",
   "env": {
     "NEXT_PUBLIC_SOLANA_NETWORK": "mainnet-beta",
@@ -20,10 +20,5 @@
     "NEXT_PUBLIC_COLLECTION_CONFIG": "4zhpvzBMqvGoM7j9RAaAF5ZizwDUAtgYr5Pnzn8uRh5s",
     "NEXT_PUBLIC_PLATFORM_FEE_BPS": "20",
     "NEXT_PUBLIC_PLATFORM_FEE_PERCENT": "0.20"
-  },
-  "functions": {
-    "app/src/app/**/*.tsx": {
-      "maxDuration": 30
-    }
   }
 }

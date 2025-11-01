@@ -1,0 +1,13 @@
+# Ignore root level files and folders
+/programs
+/tests
+/sdk
+/oracle
+/target
+*.md
+!app/**
+Cargo.toml
+Anchor.toml
+*.log
+*.csv
+*.sh
