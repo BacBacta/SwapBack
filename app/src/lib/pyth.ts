@@ -23,9 +23,13 @@ const MANUAL_BACK_PRICE = parseFloat(process.env.NEXT_PUBLIC_BACK_MANUAL_PRICE |
  * Récupère le prix $BACK/USD depuis Pyth Oracle
  * Fallback sur prix manuel si feed non disponible
  */
-export async function fetchBackPrice(network: 'mainnet' | 'devnet' = 'devnet'): Promise<number> {
+export async function fetchBackPrice(network?: 'mainnet' | 'devnet' | 'mainnet-beta'): Promise<number> {
   try {
-    const priceServiceUrl = network === 'mainnet' 
+    // Utiliser le réseau de l'environnement par défaut
+    const defaultNetwork = (process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'mainnet-beta') as 'mainnet' | 'devnet' | 'mainnet-beta';
+    const actualNetwork = network || defaultNetwork;
+    
+    const priceServiceUrl = (actualNetwork === 'mainnet' || actualNetwork === 'mainnet-beta')
       ? PYTH_PRICE_SERVICE_MAINNET 
       : PYTH_PRICE_SERVICE_DEVNET;
     
@@ -72,10 +76,13 @@ export async function fetchBackPrice(network: 'mainnet' | 'devnet' = 'devnet'): 
  */
 export async function getPriceUpdateAccount(
   connection: Connection,
-  network: 'mainnet' | 'devnet' = 'devnet'
+  network?: 'mainnet' | 'devnet' | 'mainnet-beta'
 ): Promise<PublicKey> {
   try {
-    const priceServiceUrl = network === 'mainnet' 
+    const defaultNetwork = (process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'mainnet-beta') as 'mainnet' | 'devnet' | 'mainnet-beta';
+    const actualNetwork = network || defaultNetwork;
+    
+    const priceServiceUrl = (actualNetwork === 'mainnet' || actualNetwork === 'mainnet-beta')
       ? PYTH_PRICE_SERVICE_MAINNET 
       : PYTH_PRICE_SERVICE_DEVNET;
     
@@ -116,9 +123,12 @@ export async function getPriceUpdateAccount(
 export async function calculateMinBackAmount(
   usdcAmount: number,
   slippageBps: number = 100, // 1% par défaut
-  network: 'mainnet' | 'devnet' = 'devnet'
+  network?: 'mainnet' | 'devnet' | 'mainnet-beta'
 ): Promise<bigint> {
-  const backPrice = await fetchBackPrice(network);
+  const defaultNetwork = (process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'mainnet-beta') as 'mainnet' | 'devnet' | 'mainnet-beta';
+  const actualNetwork = network || defaultNetwork;
+  
+  const backPrice = await fetchBackPrice(actualNetwork);
   
   // Calculer combien de $BACK peut être acheté
   // back_amount = usdc_amount / back_price

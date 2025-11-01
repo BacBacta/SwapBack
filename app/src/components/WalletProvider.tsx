@@ -17,11 +17,32 @@ import { clusterApiUrl } from "@solana/web3.js";
 import "@solana/wallet-adapter-react-ui/styles.css";
 
 export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  // Configuration du réseau (devnet pour développement)
-  // Note: Pour une meilleure compatibilité avec Phantom, on pourrait utiliser mainnet
-  // mais on garde devnet pour les tests
-  const network = WalletAdapterNetwork.Devnet;
-  const endpoint = useMemo(() => clusterApiUrl(network), [network]);
+  // Configuration du réseau - MAINNET pour production
+  // Le réseau est déterminé par NEXT_PUBLIC_SOLANA_NETWORK dans .env.local
+  const networkEnv = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'mainnet-beta';
+  
+  // Map network string to WalletAdapterNetwork enum
+  const getNetwork = () => {
+    switch (networkEnv) {
+      case 'devnet':
+        return WalletAdapterNetwork.Devnet;
+      case 'testnet':
+        return WalletAdapterNetwork.Testnet;
+      case 'mainnet-beta':
+      case 'mainnet':
+      default:
+        return WalletAdapterNetwork.Mainnet;
+    }
+  };
+  
+  const network = getNetwork();
+  const endpoint = useMemo(() => {
+    // Utiliser la RPC URL de l'environnement si disponible
+    if (process.env.NEXT_PUBLIC_SOLANA_RPC_URL) {
+      return process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
+    }
+    return clusterApiUrl(network);
+  }, [network]);
 
   // Configuration des wallets supportés
   // Phantom et Solflare sont les plus populaires

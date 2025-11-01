@@ -91,12 +91,19 @@ export function getTimeRemaining(unlockTimestamp: number): string {
 }
 
 /**
- * Format explorer URL for transaction
+ * Get Solana Explorer URL for a transaction
  * @param signature Transaction signature
  * @param cluster Solana cluster (mainnet/devnet/testnet)
  */
-export function getExplorerUrl(signature: string, cluster: 'mainnet' | 'devnet' | 'testnet' = 'devnet'): string {
-  const clusterParam = cluster === 'mainnet' ? '' : `?cluster=${cluster}`;
+export function getExplorerUrl(signature: string, cluster?: 'mainnet' | 'devnet' | 'testnet' | 'mainnet-beta'): string {
+  // Utiliser le réseau de l'environnement par défaut
+  const defaultCluster = (process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'mainnet-beta') as 'mainnet' | 'devnet' | 'testnet' | 'mainnet-beta';
+  const actualCluster = cluster || defaultCluster;
+  
+  // Normaliser mainnet-beta vers mainnet pour l'URL
+  const normalizedCluster = actualCluster === 'mainnet-beta' ? 'mainnet' : actualCluster;
+  const clusterParam = normalizedCluster === 'mainnet' ? '' : `?cluster=${normalizedCluster}`;
+  
   return `https://explorer.solana.com/tx/${signature}${clusterParam}`;
 }
 

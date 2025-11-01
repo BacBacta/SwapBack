@@ -1,4 +1,6 @@
-// Constantes pour le token $BACK sur Devnet
+// Constantes pour le token $BACK (multi-réseau)
+// Note: Ces adresses sont pour référence, utilisez process.env.NEXT_PUBLIC_* pour la configuration actuelle
+
 export const BACK_TOKEN_DEVNET = {
   name: "SwapBack Token",
   symbol: "BACK",
@@ -6,16 +8,16 @@ export const BACK_TOKEN_DEVNET = {
   mint: "3Y6RXZUBHCeUj6VsWuyBY2Zy1RixY6BHkM4tf3euDdrE",
   program: "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", // Token-2022
   network: "devnet",
-  logo: "/logo-back.png", // À ajouter
+  logo: "/logo-back.png",
 } as const;
 
-// IDs des programmes SwapBack sur Devnet
+// IDs des programmes SwapBack sur Devnet (pour référence)
 export const PROGRAM_IDS_DEVNET = {
   router: "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt",
   buyback: "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf",
   cnft: "2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G",
 } as const;
 
-// Cluster Solana
-export const SOLANA_CLUSTER = "devnet";
-export const SOLANA_RPC_URL = "https://api.devnet.solana.com";
+// Configuration du cluster - utilise les variables d'environnement
+export const SOLANA_CLUSTER = process.env.NEXT_PUBLIC_SOLANA_NETWORK || "mainnet-beta";
+export const SOLANA_RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
