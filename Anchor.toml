@@ -1,6 +1,6 @@
 [provider]
 cluster = "devnet"
-wallet = "~/.config/solana/id.json"
+wallet = "devnet-keypair.json"
 
 [toolchain]
 # anchor_version = "0.31.0"
@@ -17,7 +17,7 @@ swapback_router = "Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa"
 
 [programs.devnet]
 swapback_cnft = "2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G"
-swapback_router = "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
+swapback_router = "BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz"
 swapback_buyback = "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"
 
 [programs.mainnet]
