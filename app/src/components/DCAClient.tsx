@@ -4,11 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useTokenData } from "../hooks/useTokenData";
 import { DCASimulator } from "./DCASimulator";
-import { AnchorProvider, Program, BN } from "@coral-xyz/anchor";
-import { PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { ROUTER_IDL } from "../idl/router_idl";
-import { ROUTER_PROGRAM_ID } from "../constants/programIds";
-import { getTokenMint, frequencyToSeconds } from "../utils/tokenHelpers";
 
 interface DCAOrder {
   id: string;
@@ -62,7 +57,7 @@ const TOKEN_MINTS: Record<string, string> = {
 };
 
 export const DCAClient = () => {
-  const { connected, publicKey, sendTransaction } = useWallet();
+  const { connected, publicKey } = useWallet();
   const { connection } = useConnection();
   const [activeTab, setActiveTab] = useState<"create" | "orders" | "simulator">(
     "create"
@@ -128,7 +123,7 @@ export const DCAClient = () => {
     }
   };
 
-  // 🔄 PHASE 2: Load on-chain DCA plans
+  // 🔄 PHASE 2: Load on-chain DCA plans (EN DÉVELOPPEMENT)
   const loadOnChainPlans = useCallback(async () => {
     if (!publicKey || !connected) {
       return;
@@ -137,33 +132,17 @@ export const DCAClient = () => {
     try {
       console.log("🔍 Chargement des plans DCA on-chain...");
 
-      // 1️⃣ Créer le provider
-      const provider = new AnchorProvider(
-        connection,
-        {
-          publicKey,
-          signTransaction: async (tx) => {
-            await sendTransaction(tx, connection);
-            return tx;
-          },
-          signAllTransactions: async (txs) => txs,
-        },
-        { commitment: "confirmed" }
-      );
-
-      // 2️⃣ Charger le programme
-      const program = new Program(ROUTER_IDL, provider);
-
-      // 3️⃣ Récupérer tous les comptes SwapPlan de l'utilisateur
-      // NOTE: Pour l'instant, on utilise une approche simplifiée car l'IDL n'expose pas correctement les comptes
-      // TODO: Corriger la récupération des plans on-chain quand l'IDL sera correctement configuré
+      // NOTE: Fonctionnalité en développement
+      // Le programme on-chain nécessite une instruction DCA dédiée
+      // Pour l'instant, utilisation du stockage local uniquement
       
-      console.log(`✓ Chargement des plans DCA on-chain - Fonctionnalité en développement`);
+      console.log(`ℹ️  Chargement des plans DCA on-chain - Fonctionnalité en développement`);
+      console.log(`   Les plans sont stockés localement pour le moment`);
       
       // Version temporaire: retourner un tableau vide
       const onChainOrders: DCAOrder[] = [];
 
-      // 5️⃣ Fusionner avec les ordres locaux (éviter les doublons)
+      // Fusionner avec les ordres locaux (éviter les doublons)
       setDcaOrders((prevOrders) => {
         const localOrders = prevOrders.filter(
           (order) => !onChainOrders.find((onChain) => onChain.id === order.id)
@@ -171,12 +150,12 @@ export const DCAClient = () => {
         return [...onChainOrders, ...localOrders];
       });
 
-      console.log("✅ Plans DCA on-chain chargés avec succès");
+      console.log("✅ Plans DCA chargés (stockage local)");
     } catch (error) {
-      console.error("❌ Erreur lors du chargement des plans on-chain:", error);
+      console.error("❌ Erreur lors du chargement des plans:", error);
       // Ne pas bloquer l'UI en cas d'erreur
     }
-  }, [publicKey, connected, connection, sendTransaction]);
+  }, [publicKey, connected]);
 
   // Load DCA orders from localStorage
   useEffect(() => {
@@ -230,7 +209,7 @@ export const DCAClient = () => {
     Number.parseFloat(amountPerOrder || "0") *
     Number.parseInt(totalOrders || "0");
 
-  // Create DCA Order (ON-CHAIN)
+  // Create DCA Order (LOCAL STORAGE ONLY - ON-CHAIN EN DÉVELOPPEMENT)
   const handleCreateDCA = async () => {
     if (!connected || !publicKey) {
       alert("Veuillez connecter votre wallet");
@@ -259,97 +238,18 @@ export const DCAClient = () => {
         return;
       }
 
-      console.log("🚀 Création d'un plan DCA on-chain...");
+      console.log("🚀 Création d'un plan DCA (stockage local)...");
       
-      // 1️⃣ Créer le provider Anchor
-      const provider = new AnchorProvider(
-        connection,
-        {
-          publicKey,
-          signTransaction: async (tx) => {
-            await sendTransaction(tx, connection);
-            return tx;
-          },
-          signAllTransactions: async (txs) => txs,
-        },
-        { commitment: "confirmed" }
-      );
-
-      // 2️⃣ Charger le programme
-      const program = new Program(ROUTER_IDL, provider);
-      console.log("✓ Programme chargé:", program.programId.toString());
-
-      // 3️⃣ Générer un ID unique pour le plan
-      const planId = new BN(Date.now());
-      console.log("✓ Plan ID:", planId.toString());
-
-      // 4️⃣ Dériver le PDA du plan DCA
-      const [dcaPlanPda] = PublicKey.findProgramAddressSync(
-        [
-          Buffer.from("dca_plan"),
-          publicKey.toBuffer(),
-          planId.toArrayLike(Buffer, "le", 8),
-        ],
-        ROUTER_PROGRAM_ID
-      );
-      console.log("✓ DCA Plan PDA:", dcaPlanPda.toString());
-
-      // 5️⃣ Dériver le PDA du Router State
-      const [statePda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("router_state")],
-        ROUTER_PROGRAM_ID
-      );
-      console.log("✓ State PDA:", statePda.toString());
-
-      // 6️⃣ Préparer les arguments pour create_dca_plan
-      const planIdArray = Array.from(planId.toArray("le", 8)).concat(Array(24).fill(0)); // 32 bytes
+      // Générer un ID unique pour le plan
+      const planId = Date.now().toString();
+      const planPdaSimulated = `DCA_${publicKey.toString().slice(0, 8)}_${planId}`;
       
-      // Convertir les montants
-      const inputAmountLamports = new BN(
-        Math.floor(Number.parseFloat(amountPerOrder) * LAMPORTS_PER_SOL)
-      );
-      const dcaIntervalSeconds = new BN(frequencyToSeconds(frequency));
-      const minOutputAmount = new BN(0); // Pas de slippage limite pour l'instant
+      console.log("✓ Plan ID:", planId);
+      console.log("✓ PDA simulé:", planPdaSimulated);
 
-      const createDcaArgs = {
-        tokenIn: getTokenMint(inputToken),
-        tokenOut: getTokenMint(outputToken),
-        amountPerSwap: inputAmountLamports,
-        totalSwaps: Number.parseInt(totalOrders),
-        intervalSeconds: dcaIntervalSeconds,
-        minOutPerSwap: minOutputAmount,
-        expiresAt: new BN(0), // Pas d'expiration pour l'instant
-      };
-
-      console.log("✓ Arguments createDcaPlan:", {
-        planId: planIdArray,
-        tokenIn: createDcaArgs.tokenIn.toString(),
-        tokenOut: createDcaArgs.tokenOut.toString(),
-        amountPerSwap: createDcaArgs.amountPerSwap.toString(),
-        totalSwaps: createDcaArgs.totalSwaps,
-        intervalSeconds: createDcaArgs.intervalSeconds.toString(),
-      });
-
-      // 7️⃣ Créer la transaction
-      console.log("📝 Envoi de la transaction...");
-      const tx = await program.methods
-        .createDcaPlan(
-          planIdArray,
-          createDcaArgs
-        )
-        .accounts({
-          dcaPlan: dcaPlanPda,
-          state: statePda,
-          user: publicKey,
-          systemProgram: SystemProgram.programId,
-        })
-        .rpc();
-
-      console.log("✅ Plan DCA créé on-chain! Signature:", tx);
-
-      // 9️⃣ Créer l'ordre local pour le tracking UI
+      // Créer l'ordre local pour le tracking UI
       const newOrder: DCAOrder = {
-        id: dcaPlanPda.toString(), // Utiliser le PDA comme ID
+        id: planPdaSimulated,
         inputToken,
         outputToken,
         amountPerOrder: Number.parseFloat(amountPerOrder),
@@ -366,7 +266,7 @@ export const DCAClient = () => {
       const updatedOrders = [...dcaOrders, newOrder];
       setDcaOrders(updatedOrders);
 
-      // Sauvegarder dans localStorage pour le tracking
+      // Sauvegarder dans localStorage
       const storageKey = `swapback_dca_${publicKey.toString()}`;
       localStorage.setItem(storageKey, JSON.stringify(updatedOrders));
 
@@ -377,13 +277,14 @@ export const DCAClient = () => {
       // Afficher la notification de succès
       alert(
         `✅ Plan DCA créé avec succès!\n\n` +
-        `Transaction: ${tx.slice(0, 8)}...${tx.slice(-8)}\n\n` +
+        `⚠️ Note: Stocké localement (on-chain en développement)\n\n` +
         `Montant par ordre: ${amountPerOrder} ${inputToken}\n` +
         `Fréquence: ${frequency}\n` +
         `Nombre d'ordres: ${totalOrders}\n\n` +
-        `Voir sur Solana Explorer:\n` +
-        `https://explorer.solana.com/tx/${tx}?cluster=devnet`
+        `Les ordres seront exécutés automatiquement selon la fréquence choisie.`
       );
+      
+      console.log("✅ Plan DCA créé localement!");
     } catch (error) {
       console.error("❌ Erreur création DCA:", error);
       const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
