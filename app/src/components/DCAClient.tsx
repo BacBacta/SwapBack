@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useTokenData } from "../hooks/useTokenData";
 import { DCASimulator } from "./DCASimulator";
@@ -128,6 +128,91 @@ export const DCAClient = () => {
     }
   };
 
+  // 🔄 PHASE 2: Load on-chain DCA plans
+  const loadOnChainPlans = useCallback(async () => {
+    if (!publicKey || !connected) {
+      return;
+    }
+
+    try {
+      console.log("🔍 Chargement des plans DCA on-chain...");
+
+      // 1️⃣ Créer le provider
+      const provider = new AnchorProvider(
+        connection,
+        {
+          publicKey,
+          signTransaction: async (tx) => {
+            await sendTransaction(tx, connection);
+            return tx;
+          },
+          signAllTransactions: async (txs) => txs,
+        },
+        { commitment: "confirmed" }
+      );
+
+      // 2️⃣ Charger le programme
+      const program = new Program(ROUTER_IDL, provider);
+
+      // 3️⃣ Récupérer tous les comptes SwapPlan de l'utilisateur
+      // Filtre par le champ 'user' dans la structure du compte
+      const plans = await program.account.swapPlan.all([
+        {
+          memcmp: {
+            offset: 8 + 32, // Discriminator (8 bytes) + planId (32 bytes)
+            bytes: publicKey.toBase58(),
+          },
+        },
+      ]);
+
+      console.log(`✓ ${plans.length} plan(s) DCA trouvé(s) on-chain`);
+
+      if (plans.length === 0) {
+        return;
+      }
+
+      // 4️⃣ Convertir les plans on-chain en format UI
+      const onChainOrders: DCAOrder[] = plans.map((planAccount) => {
+        const plan = planAccount.account;
+        
+        // Extraire les données du plan
+        const amountIn = (plan.amountIn as BN).toNumber() / LAMPORTS_PER_SOL;
+        const createdAt = new Date((plan.createdAt as BN).toNumber() * 1000);
+        const expiresAt = new Date((plan.expiresAt as BN).toNumber() * 1000);
+
+        // Pour l'instant, on utilise des valeurs par défaut car le smart contract
+        // n'a pas encore les champs DCA complets (interval, numberOfSwaps, etc.)
+        return {
+          id: planAccount.publicKey.toString(),
+          inputToken: (plan.tokenIn as PublicKey).toString(),
+          outputToken: (plan.tokenOut as PublicKey).toString(),
+          amountPerOrder: amountIn, // TODO: diviser par numberOfSwaps quand disponible
+          frequency: "daily", // TODO: calculer depuis interval quand disponible
+          totalOrders: 10, // TODO: récupérer depuis numberOfSwaps
+          executedOrders: 0, // TODO: récupérer depuis executedSwaps
+          nextExecution: new Date(Date.now() + 86400000), // +1 jour par défaut
+          status: expiresAt > new Date() ? "active" : "completed",
+          createdAt,
+          totalInvested: 0,
+          averagePrice: 0,
+        };
+      });
+
+      // 5️⃣ Fusionner avec les ordres locaux (éviter les doublons)
+      setDcaOrders((prevOrders) => {
+        const localOrders = prevOrders.filter(
+          (order) => !onChainOrders.find((onChain) => onChain.id === order.id)
+        );
+        return [...onChainOrders, ...localOrders];
+      });
+
+      console.log("✅ Plans DCA on-chain chargés avec succès");
+    } catch (error) {
+      console.error("❌ Erreur lors du chargement des plans on-chain:", error);
+      // Ne pas bloquer l'UI en cas d'erreur
+    }
+  }, [publicKey, connected, connection, sendTransaction]);
+
   // Load DCA orders from localStorage
   useEffect(() => {
     if (connected && publicKey) {
@@ -152,8 +237,11 @@ export const DCAClient = () => {
           console.error("Error loading DCA orders:", e);
         }
       }
+
+      // Load on-chain DCA plans
+      loadOnChainPlans();
     }
-  }, [connected, publicKey]);
+  }, [connected, publicKey, loadOnChainPlans]);
 
   // Calculate next execution time
   const calculateNextExecution = (freq: string): Date => {
@@ -632,6 +720,19 @@ export const DCAClient = () => {
       {/* Orders Tab */}
       {activeTab === "orders" && (
         <div className="space-y-4">
+          {/* Refresh Button */}
+          {connected && (
+            <div className="flex justify-end mb-4">
+              <button
+                onClick={loadOnChainPlans}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold terminal-text rounded transition-colors flex items-center gap-2"
+              >
+                <span className="terminal-prefix">&gt;</span>
+                <span>🔄 RAFRAÎCHIR</span>
+              </button>
+            </div>
+          )}
+
           {!connected ? (
             <div className="text-center py-12">
               <p className="text-gray-400 terminal-text mb-4">
@@ -681,32 +782,48 @@ export const DCAClient = () => {
               </div>
 
               {/* Orders List */}
-              {dcaOrders.map((order) => (
-                <div
-                  key={order.id}
-                  className="bg-gray-900/50 border border-gray-700 rounded-lg p-6"
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h4 className="text-lg font-bold terminal-text">
-                        <span className="terminal-prefix">&gt;</span> [{order.inputToken} → {order.outputToken}]
-                      </h4>
-                      <p className="text-sm text-gray-400 mt-1">
-                        Créé le {order.createdAt.toLocaleDateString()}
-                      </p>
+              {dcaOrders.map((order) => {
+                // Détecter si c'est un ordre on-chain (PDA valide) ou local
+                const isOnChain = order.id.length >= 32 && !order.id.startsWith("dca_local_");
+                
+                return (
+                  <div
+                    key={order.id}
+                    className="bg-gray-900/50 border border-gray-700 rounded-lg p-6"
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="text-lg font-bold terminal-text">
+                            <span className="terminal-prefix">&gt;</span> [{order.inputToken} → {order.outputToken}]
+                          </h4>
+                          {isOnChain && (
+                            <span className="px-2 py-1 bg-purple-500/20 text-purple-300 text-xs font-bold rounded border border-purple-500/50">
+                              ⛓️ ON-CHAIN
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-400">
+                          Créé le {order.createdAt.toLocaleDateString()}
+                        </p>
+                        {isOnChain && (
+                          <p className="text-xs text-gray-500 font-mono mt-1">
+                            ID: {order.id.slice(0, 8)}...{order.id.slice(-8)}
+                          </p>
+                        )}
+                      </div>
+                      <div className={`px-3 py-1 rounded text-sm font-bold ${
+                        order.status === "active"
+                          ? "bg-green-500/20 text-green-400"
+                          : order.status === "paused"
+                          ? "bg-yellow-500/20 text-yellow-400"
+                          : order.status === "completed"
+                          ? "bg-blue-500/20 text-blue-400"
+                          : "bg-red-500/20 text-red-400"
+                      }`}>
+                        {order.status.toUpperCase()}
+                      </div>
                     </div>
-                    <div className={`px-3 py-1 rounded text-sm font-bold ${
-                      order.status === "active"
-                        ? "bg-green-500/20 text-green-400"
-                        : order.status === "paused"
-                        ? "bg-yellow-500/20 text-yellow-400"
-                        : order.status === "completed"
-                        ? "bg-blue-500/20 text-blue-400"
-                        : "bg-red-500/20 text-red-400"
-                    }`}>
-                      {order.status.toUpperCase()}
-                    </div>
-                  </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                     <div>
@@ -760,7 +877,8 @@ export const DCAClient = () => {
                     </div>
                   )}
                 </div>
-              ))}
+              );
+            })}
             </>
           )}
         </div>

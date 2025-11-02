@@ -5,7 +5,7 @@ export const ROUTER_PROGRAM_ID = new PublicKey(
   process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
 );
 
-// IDL minimal pour create_plan
+// IDL minimal pour create_plan et accounts
 export const ROUTER_IDL = {
   address: ROUTER_PROGRAM_ID.toString(),
   metadata: {
@@ -31,6 +31,25 @@ export const ROUTER_IDL = {
         { name: "numberOfSwaps", type: "u64" },
         { name: "minOutputAmount", type: "u64" },
       ],
+    },
+  ],
+  accounts: [
+    {
+      name: "SwapPlan",
+      type: {
+        kind: "struct",
+        fields: [
+          { name: "planId", type: { array: ["u8", 32] } },
+          { name: "user", type: "publicKey" },
+          { name: "tokenIn", type: "publicKey" },
+          { name: "tokenOut", type: "publicKey" },
+          { name: "amountIn", type: "u64" },
+          { name: "minOut", type: "u64" },
+          { name: "expiresAt", type: "i64" },
+          { name: "createdAt", type: "i64" },
+          { name: "bump", type: "u8" },
+        ],
+      },
     },
   ],
 } as unknown as Idl;
