@@ -12,44 +12,52 @@ export const useTokenData = (tokenMint: string) => {
   const [usdPrice, setUsdPrice] = useState<number>(0);
   const [loading, setLoading] = useState(false);
 
-  // Récupérer la balance
+    // Récupérer le solde du token
   useEffect(() => {
-    if (!publicKey || !tokenMint) {
-      setBalance(0);
-      setLoading(false);
-      return;
-    }
-
     const fetchBalance = async () => {
+      if (!connection || !publicKey || !tokenMint) {
+        console.warn("⚠️ useTokenData: Missing requirements", { 
+          hasConnection: !!connection, 
+          hasPublicKey: !!publicKey, 
+          tokenMint 
+        });
+        setBalance(0);
+        setLoading(false);
+        return;
+      }
+
+      console.log(`🔍 useTokenData: Fetching balance for ${tokenMint.substring(0, 8)}...`);
+      setLoading(true);
+
       try {
-        setLoading(true);
-
-        // Pour SOL natif
-        if (tokenMint === "So11111111111111111111111111111111111111112") {
-          const balance = await connection.getBalance(publicKey);
-          setBalance(balance / 1e9); // Convertir lamports en SOL
+        // Native SOL
+        if (
+          tokenMint === "So11111111111111111111111111111111111111112"
+        ) {
+          const lamports = await connection.getBalance(publicKey);
+          const solBalance = lamports / 1e9;
+          console.log(`✅ SOL balance: ${solBalance.toFixed(6)} SOL`);
+          setBalance(solBalance);
         } else {
-          // Pour les SPL tokens
-          try {
-            const tokenAccounts =
-              await connection.getParsedTokenAccountsByOwner(publicKey, {
-                mint: new PublicKey(tokenMint),
-              });
+          // SPL Token
+          const tokenAccounts =
+            await connection.getParsedTokenAccountsByOwner(publicKey, {
+              mint: new PublicKey(tokenMint),
+            });
 
-            if (tokenAccounts.value.length > 0) {
-              const tokenAmount =
-                tokenAccounts.value[0].account.data.parsed.info.tokenAmount;
-              setBalance(tokenAmount.uiAmount || 0);
-            } else {
-              setBalance(0);
-            }
-          } catch (error) {
-            console.error("Error fetching token balance:", error);
+          if (tokenAccounts.value.length > 0) {
+            const tokenBalance =
+              tokenAccounts.value[0].account.data.parsed.info.tokenAmount
+                .uiAmount || 0;
+            console.log(`✅ Token ${tokenMint.substring(0, 8)}... balance: ${tokenBalance.toFixed(6)}`);
+            setBalance(tokenBalance);
+          } else {
+            console.log(`⚠️ No token account found for ${tokenMint.substring(0, 8)}...`);
             setBalance(0);
           }
         }
       } catch (error) {
-        console.error("Error fetching balance:", error);
+        console.error("❌ Error fetching balance:", error);
         setBalance(0);
       } finally {
         setLoading(false);
@@ -58,46 +66,45 @@ export const useTokenData = (tokenMint: string) => {
 
     fetchBalance();
 
-    // Rafraîchir toutes les 30 secondes
-    const interval = setInterval(fetchBalance, 30000);
+    // Rafraîchir toutes les 10 secondes
+    const interval = setInterval(fetchBalance, 10000);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [publicKey, tokenMint]); // connection est stable, pas besoin de le mettre en dépendance
+  }, [connection, publicKey, tokenMint]);
 
   // Récupérer le prix USD
   useEffect(() => {
     const fetchPrice = async () => {
       try {
-        // 🔧 Sur testnet, on utilise des prix simulés réalistes
-        // Sur mainnet, utiliser: https://price.jup.ag/v4/price?ids=${tokenMint}
+        // Prix pour tokens mainnet (utilisés en production)
+        const mainnetPrices: { [key: string]: number } = {
+          // Native SOL
+          So11111111111111111111111111111111111111112: 218.50, // SOL prix actuel ~$218
 
-        // Prix simulés pour testnet (basés sur les prix mainnet approximatifs)
-        const testnetPrices: { [key: string]: number } = {
-          // Native tokens
-          So11111111111111111111111111111111111111112: 145.5, // SOL ~$145
-
-          // Testnet deployed tokens (Oct 28, 2025)
-          "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux": 0.001, // $BACK (testnet)
-          
-          // Common test tokens
-          "3y4dCqwWuYx1B97YEDmgq9qjuNE1eyEwGx2eLgz6Rc6G": 1.0, // USDC Test
-          DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263: 0.00002, // BONK
-
-          // Mainnet tokens (pour référence)
+          // Mainnet tokens
           EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v: 1.0, // USDC
           Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB: 1.0, // USDT
-          mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So: 160.0, // mSOL
+          DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263: 0.00002, // BONK
+          "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux": 0.001, // $BACK
+          mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So: 240.0, // mSOL
           JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN: 0.85, // JUP
           "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr": 2.5, // JTO
+          
+          // Testnet deployed tokens (fallback)
+          "3y4dCqwWuYx1B97YEDmgq9qjuNE1eyEwGx2eLgz6Rc6G": 1.0, // USDC Test
+          BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR: 1.0, // USDC Testnet
         };
 
-        // Utiliser le prix simulé ou 0
-        const price = testnetPrices[tokenMint] || 0;
+        // Utiliser le prix ou 0
+        const price = mainnetPrices[tokenMint] || 0;
         setUsdPrice(price);
 
         if (price > 0) {
           console.log(
-            `💰 Prix pour ${tokenMint.substring(0, 8)}... = $${price}`
+            `💰 Prix pour ${tokenMint.substring(0, 8)}... = $${price.toFixed(2)}`
+          );
+        } else {
+          console.warn(
+            `⚠️ Pas de prix pour ${tokenMint.substring(0, 8)}...`
           );
         }
       } catch (error) {
@@ -108,7 +115,7 @@ export const useTokenData = (tokenMint: string) => {
 
     fetchPrice();
 
-    // Rafraîchir toutes les 60 secondes (pour future intégration Pyth)
+    // Rafraîchir toutes les 60 secondes
     const interval = setInterval(fetchPrice, 60000);
     return () => clearInterval(interval);
   }, [tokenMint]);

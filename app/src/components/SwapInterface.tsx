@@ -66,15 +66,28 @@ export const SwapInterface = () => {
 
   const tokenAddresses: { [key: string]: string } = {
     SOL: "So11111111111111111111111111111111111111112",
-  BACK: process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
-    USDC: process.env.NEXT_PUBLIC_USDC_MINT || "BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR",
+    BACK: process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
+    USDC: process.env.NEXT_PUBLIC_USDC_MINT || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
     BONK: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
     USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+    JUP: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+    JTO: "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr",
+    mSOL: "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
   };
 
+  // Helper function to get token mint address
+  // Si le token est déjà une adresse mint (commence par lettre/chiffre de 32-44 chars), l'utiliser directement
+  const getTokenMint = (token: string): string => {
+    // Si c'est déjà une adresse valide Solana (32-44 chars base58)
+    if (token.length >= 32 && token.length <= 44 && /^[1-9A-HJ-NP-Za-km-z]+$/.test(token)) {
+      return token;
+    }
+    // Sinon chercher dans notre mapping
+    return tokenAddresses[token] || token;
+  };
 
-  const inputTokenData = useTokenData(tokenAddresses[inputToken]);
-  const outputTokenData = useTokenData(tokenAddresses[outputToken]);
+  const inputTokenData = useTokenData(getTokenMint(inputToken));
+  const outputTokenData = useTokenData(getTokenMint(outputToken));
 
   // Fetch real quote from Jupiter API
   const fetchRealQuote = useCallback(async () => {
@@ -248,6 +261,12 @@ export const SwapInterface = () => {
   const setMaxBalance = () => {
     if (inputTokenData.balance > 0) {
       setInputAmount(inputTokenData.balance.toString());
+    }
+  };
+
+  const setHalfBalance = () => {
+    if (inputTokenData.balance > 0) {
+      setInputAmount((inputTokenData.balance / 2).toString());
     }
   };
 
@@ -435,12 +454,23 @@ export const SwapInterface = () => {
                 Vous payez
               </span>
               {connected && (
-                <button
-                  onClick={setMaxBalance}
-                  className="text-xs font-bold terminal-text uppercase tracking-wider text-[var(--primary)] hover:text-[var(--accent)] transition-colors"
-                >
-                  Balance: {inputTokenData.loading ? "..." : inputTokenData.balance.toFixed(4)}
-                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold terminal-text uppercase tracking-wider text-[var(--primary)]/70">
+                    Balance: {inputTokenData.loading ? "..." : inputTokenData.balance.toFixed(6)}
+                  </span>
+                  <button
+                    onClick={setHalfBalance}
+                    className="px-2 py-1 text-xs font-bold terminal-text uppercase tracking-wider bg-[var(--primary)]/10 border border-[var(--primary)]/50 hover:bg-[var(--primary)]/20 transition-colors"
+                  >
+                    HALF
+                  </button>
+                  <button
+                    onClick={setMaxBalance}
+                    className="px-2 py-1 text-xs font-bold terminal-text uppercase tracking-wider bg-[var(--primary)]/10 border border-[var(--primary)]/50 hover:bg-[var(--primary)]/20 transition-colors"
+                  >
+                    MAX
+                  </button>
+                </div>
               )}
             </div>
             
