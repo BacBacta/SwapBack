@@ -155,48 +155,13 @@ export const DCAClient = () => {
       const program = new Program(ROUTER_IDL, provider);
 
       // 3️⃣ Récupérer tous les comptes SwapPlan de l'utilisateur
-      // Filtre par le champ 'user' dans la structure du compte
-      const plans = await program.account.swapPlan.all([
-        {
-          memcmp: {
-            offset: 8 + 32, // Discriminator (8 bytes) + planId (32 bytes)
-            bytes: publicKey.toBase58(),
-          },
-        },
-      ]);
-
-      console.log(`✓ ${plans.length} plan(s) DCA trouvé(s) on-chain`);
-
-      if (plans.length === 0) {
-        return;
-      }
-
-      // 4️⃣ Convertir les plans on-chain en format UI
-      const onChainOrders: DCAOrder[] = plans.map((planAccount) => {
-        const plan = planAccount.account;
-        
-        // Extraire les données du plan
-        const amountIn = (plan.amountIn as BN).toNumber() / LAMPORTS_PER_SOL;
-        const createdAt = new Date((plan.createdAt as BN).toNumber() * 1000);
-        const expiresAt = new Date((plan.expiresAt as BN).toNumber() * 1000);
-
-        // Pour l'instant, on utilise des valeurs par défaut car le smart contract
-        // n'a pas encore les champs DCA complets (interval, numberOfSwaps, etc.)
-        return {
-          id: planAccount.publicKey.toString(),
-          inputToken: (plan.tokenIn as PublicKey).toString(),
-          outputToken: (plan.tokenOut as PublicKey).toString(),
-          amountPerOrder: amountIn, // TODO: diviser par numberOfSwaps quand disponible
-          frequency: "daily", // TODO: calculer depuis interval quand disponible
-          totalOrders: 10, // TODO: récupérer depuis numberOfSwaps
-          executedOrders: 0, // TODO: récupérer depuis executedSwaps
-          nextExecution: new Date(Date.now() + 86400000), // +1 jour par défaut
-          status: expiresAt > new Date() ? "active" : "completed",
-          createdAt,
-          totalInvested: 0,
-          averagePrice: 0,
-        };
-      });
+      // NOTE: Pour l'instant, on utilise une approche simplifiée car l'IDL n'expose pas correctement les comptes
+      // TODO: Corriger la récupération des plans on-chain quand l'IDL sera correctement configuré
+      
+      console.log(`✓ Chargement des plans DCA on-chain - Fonctionnalité en développement`);
+      
+      // Version temporaire: retourner un tableau vide
+      const onChainOrders: DCAOrder[] = [];
 
       // 5️⃣ Fusionner avec les ordres locaux (éviter les doublons)
       setDcaOrders((prevOrders) => {
@@ -336,38 +301,46 @@ export const DCAClient = () => {
       );
       console.log("✓ State PDA:", statePda.toString());
 
-      // 6️⃣ Convertir les montants
+      // 6️⃣ Préparer les arguments pour create_dca_plan
+      const planIdArray = Array.from(planId.toArray("le", 8)).concat(Array(24).fill(0)); // 32 bytes
+      
+      // Convertir les montants
       const inputAmountLamports = new BN(
         Math.floor(Number.parseFloat(amountPerOrder) * LAMPORTS_PER_SOL)
       );
       const dcaIntervalSeconds = new BN(frequencyToSeconds(frequency));
-      const numSwaps = new BN(Number.parseInt(totalOrders));
       const minOutputAmount = new BN(0); // Pas de slippage limite pour l'instant
 
-      console.log("✓ Paramètres:", {
-        inputAmount: inputAmountLamports.toString(),
-        interval: dcaIntervalSeconds.toString(),
-        swaps: numSwaps.toString(),
+      const createDcaArgs = {
+        tokenIn: getTokenMint(inputToken),
+        tokenOut: getTokenMint(outputToken),
+        amountPerSwap: inputAmountLamports,
+        totalSwaps: Number.parseInt(totalOrders),
+        intervalSeconds: dcaIntervalSeconds,
+        minOutPerSwap: minOutputAmount,
+        expiresAt: new BN(0), // Pas d'expiration pour l'instant
+      };
+
+      console.log("✓ Arguments createDcaPlan:", {
+        planId: planIdArray,
+        tokenIn: createDcaArgs.tokenIn.toString(),
+        tokenOut: createDcaArgs.tokenOut.toString(),
+        amountPerSwap: createDcaArgs.amountPerSwap.toString(),
+        totalSwaps: createDcaArgs.totalSwaps,
+        intervalSeconds: createDcaArgs.intervalSeconds.toString(),
       });
 
-      // 7️⃣ Obtenir les adresses des tokens
-      const outputTokenMint = getTokenMint(outputToken);
-      console.log("✓ Token de sortie:", outputTokenMint.toString());
-
-      // 8️⃣ Créer la transaction
+      // 7️⃣ Créer la transaction
       console.log("📝 Envoi de la transaction...");
       const tx = await program.methods
-        .createPlan(
-          inputAmountLamports,
-          outputTokenMint,
-          dcaIntervalSeconds,
-          numSwaps,
-          minOutputAmount
+        .createDcaPlan(
+          planIdArray,
+          createDcaArgs
         )
         .accounts({
           dcaPlan: dcaPlanPda,
-          authority: publicKey,
           state: statePda,
+          user: publicKey,
           systemProgram: SystemProgram.programId,
         })
         .rpc();
