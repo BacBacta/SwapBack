@@ -1,0 +1,81 @@
+              {dcaOrders.map((order) => (
+              <div
+                key={order.id}
+                className="bg-gray-900/50 border border-gray-700 rounded-lg p-6"
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h4 className="text-lg font-bold terminal-text">
+                      <span className="terminal-prefix">&gt;</span> [{order.inputToken} → {order.outputToken}]
+                    </h4>
+                    <p className="text-sm text-gray-400 mt-1">
+                      Créé le {order.createdAt.toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className={`px-3 py-1 rounded text-sm font-bold ${
+                    order.status === "active"
+                      ? "bg-green-500/20 text-green-400"
+                      : order.status === "paused"
+                      ? "bg-yellow-500/20 text-yellow-400"
+                      : order.status === "completed"
+                      ? "bg-blue-500/20 text-blue-400"
+                      : "bg-red-500/20 text-red-400"
+                  }`}>
+                    {order.status.toUpperCase()}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div>
+                    <p className="text-xs text-gray-400">MONTANT/ORDRE</p>
+                    <p className="font-bold">{order.amountPerOrder} {order.inputToken}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400">FRÉQUENCE</p>
+                    <p className="font-bold">{order.frequency.toUpperCase()}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400">ORDRES EXÉCUTÉS</p>
+                    <p className="font-bold">{order.executedOrders}/{order.totalOrders}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400">PROCHAINE EXÉCUTION</p>
+                    <p className="font-bold text-sm">
+                      {order.nextExecution.toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <p className="text-xs text-gray-400">TOTAL INVESTI</p>
+                    <p className="font-bold">{order.totalInvested.toFixed(4)} {order.inputToken}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400">PRIX MOYEN</p>
+                    <p className="font-bold">
+                      {order.averagePrice > 0 ? `$${order.averagePrice.toFixed(4)}` : "N/A"}
+                    </p>
+                  </div>
+                </div>
+
+                {order.status !== "completed" && order.status !== "cancelled" && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handlePauseResumeDCA(order.id)}
+                      className="flex-1 px-4 py-2 border-2 border-[var(--primary)] text-[var(--primary)] terminal-text font-bold hover:bg-[var(--primary)]/20 transition-all"
+                    >
+                      <span className="terminal-prefix">&gt;</span> [
+                        {order.status === "active" ? "PAUSE" : "RESUME"}]
+                    </button>
+                    <button
+                      onClick={() => handleCancelDCA(order.id)}
+                      className="flex-1 px-4 py-2 border-2 border-red-500 text-red-500 terminal-text font-bold hover:bg-red-500/20 transition-all"
+                    >
+                      <span className="terminal-prefix">&gt;</span> [CANCEL]
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))
+            </>
