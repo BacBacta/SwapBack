@@ -3,10 +3,23 @@ use anchor_spl::token::{self, Token, TokenAccount};
 
 mod cpi_orca;
 mod oracle;
+pub mod state;
+pub mod instructions;
+pub mod error;
 
 // Custom getrandom stub for Solana BPF target
 #[cfg(target_os = "solana")]
 mod getrandom_stub;
+
+// Re-export for external use
+pub use state::{DcaPlan, RouterState, UserRebate};
+pub use error::SwapbackError;
+
+// Import instruction account structs for use in #[program] module
+use instructions::{
+    CreateDcaPlan, CreateDcaPlanArgs, ExecuteDcaSwap, 
+    PauseDcaPlan, ResumeDcaPlan, CancelDcaPlan
+};
 
 // Program ID déployé sur devnet - 27 Oct 2025 (mis à jour)
 declare_id!("GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt");
@@ -71,6 +84,47 @@ pub mod swapback_router {
 
     pub fn swap_toc(ctx: Context<SwapToC>, args: SwapArgs) -> Result<()> {
         swap_toc_processor::process_swap_toc(ctx, args)
+    }
+
+    // ============================
+    // 🔄 DCA INSTRUCTIONS
+    // ============================
+    
+    /// Create a new DCA plan
+    pub fn create_dca_plan(
+        ctx: Context<CreateDcaPlan>,
+        plan_id: [u8; 32],
+        args: CreateDcaPlanArgs,
+    ) -> Result<()> {
+        instructions::create_dca_plan::handler(ctx, plan_id, args)
+    }
+    
+    /// Execute a single swap in a DCA plan
+    pub fn execute_dca_swap(
+        ctx: Context<ExecuteDcaSwap>,
+    ) -> Result<()> {
+        instructions::execute_dca_swap::handler(ctx)
+    }
+    
+    /// Pause a DCA plan
+    pub fn pause_dca_plan(
+        ctx: Context<PauseDcaPlan>,
+    ) -> Result<()> {
+        instructions::pause_dca_plan::handler(ctx)
+    }
+    
+    /// Resume a paused DCA plan
+    pub fn resume_dca_plan(
+        ctx: Context<ResumeDcaPlan>,
+    ) -> Result<()> {
+        instructions::resume_dca_plan::handler(ctx)
+    }
+    
+    /// Cancel and close a DCA plan
+    pub fn cancel_dca_plan(
+        ctx: Context<CancelDcaPlan>,
+    ) -> Result<()> {
+        instructions::cancel_dca_plan::handler(ctx)
     }
 
     /// Claim accumulated rebates
@@ -298,32 +352,36 @@ pub struct SwapPlan {
     pub bump: u8,                          // PDA bump
 }
 
+// NOTE: RouterState and UserRebate have been moved to state/router_state.rs
+// Keeping these comments here for reference during migration
+/*
 #[account]
 pub struct RouterState {
     pub authority: Pubkey,
-    pub rebate_percentage: u16,     // % du NPI pour rebates utilisateurs (basis points, ex: 6000 = 60%)
-    pub buyback_percentage: u16,    // % du NPI pour buyback (basis points, ex: 2000 = 20%)
-    pub protocol_percentage: u16,   // % du NPI pour protocol treasury (basis points, ex: 2000 = 20%)
-    pub total_volume: u64,          // Volume total des swaps
-    pub total_npi: u64,             // NPI total généré
-    pub total_rebates_paid: u64,    // Total rebates payés aux utilisateurs
-    pub total_buyback_from_npi: u64, // Total buyback depuis NPI
-    pub total_protocol_revenue: u64, // Total revenus protocol (fees + NPI)
+    pub rebate_percentage: u16,
+    pub buyback_percentage: u16,
+    pub protocol_percentage: u16,
+    pub total_volume: u64,
+    pub total_npi: u64,
+    pub total_rebates_paid: u64,
+    pub total_buyback_from_npi: u64,
+    pub total_protocol_revenue: u64,
     pub bump: u8,
 }
 
-/// User rebate tracking account
 #[account]
 pub struct UserRebate {
-    pub user: Pubkey,              // User who owns this rebate account
-    pub unclaimed_rebate: u64,     // Unclaimed USDC rebates (in lamports)
-    pub total_claimed: u64,        // Total USDC claimed historically
-    pub total_swaps: u64,          // Number of swaps completed
-    pub last_swap_timestamp: i64,  // Last swap timestamp
-    pub last_claim_timestamp: i64, // Last claim timestamp
+    pub user: Pubkey,
+    pub unclaimed_rebate: u64,
+    pub total_claimed: u64,
+    pub total_swaps: u64,
+    pub last_swap_timestamp: i64,
+    pub last_claim_timestamp: i64,
     pub bump: u8,
 }
+*/
 
+/* Moved to state/router_state.rs
 impl UserRebate {
     pub const LEN: usize = 8 + // discriminator
         32 + // user
@@ -334,6 +392,7 @@ impl UserRebate {
         8 +  // last_claim_timestamp
         1;   // bump
 }
+*/
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
 pub enum OracleType {
