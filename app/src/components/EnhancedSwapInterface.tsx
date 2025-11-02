@@ -9,9 +9,7 @@ import { useState, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useSwapStore } from "@/store/swapStore";
 import { useSwapWebSocket } from "@/hooks/useSwapWebSocket";
-import { SwapInterface } from "./SwapInterface";
 import { ClientOnlyConnectionStatus } from "./ClientOnlyConnectionStatus";
-import { NetworkInfoModal } from "./NetworkInfoModal";
 import { TokenSelector } from "./TokenSelector";
 // import { debounce } from "lodash"; // Désactivé - Pas d'auto-fetch
 

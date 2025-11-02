@@ -254,7 +254,7 @@ export async function submitBetaFeedback(
       feedback_type: feedback.type,
       feedback_category: feedback.category,
       has_screenshot: !!feedback.screenshot,
-      rating: feedback.rating,
+      rating: feedback.rating ?? 0, // Utiliser 0 si undefined
     });
 
     // Update feedback count
