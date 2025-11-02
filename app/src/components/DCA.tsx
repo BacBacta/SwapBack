@@ -2,8 +2,24 @@
 
 import dynamic from "next/dynamic";
 
+// Helper to safely load DCAClient with defensive error handling
+async function loadDCAClient() {
+  const module = await import("@/components/DCAClient");
+
+  // Prefer named export, fallback to default export
+  const DCAClient = module.DCAClient || module.default;
+
+  if (!DCAClient) {
+    throw new Error(
+      'DCAClient component not found. Expected named export "DCAClient" or default export in @/components/DCAClient'
+    );
+  }
+
+  return { default: DCAClient };
+}
+
 // Client-only DCA component with SSR disabled
-const DCAClient = dynamic(() => import("@/components/DCAClient"), {
+const DCAClient = dynamic(loadDCAClient, {
   ssr: false,
   loading: () => (
     <div className="min-h-[400px] flex items-center justify-center">
