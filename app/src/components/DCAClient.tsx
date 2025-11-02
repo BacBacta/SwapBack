@@ -530,3 +530,6 @@ export const DCAClient = () => {
     </div>
   );
 };
+
+// Default export for dynamic imports (Next.js best practice)
+export default DCAClient;

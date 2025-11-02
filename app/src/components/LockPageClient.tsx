@@ -188,4 +188,8 @@ function LockPageClient() {
   );
 }
 
+// Named export for compatibility
 export { LockPageClient };
+
+// Default export for dynamic imports (Next.js best practice)
+export default LockPageClient;

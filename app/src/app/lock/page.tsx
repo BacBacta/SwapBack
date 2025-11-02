@@ -2,9 +2,9 @@
 
 import dynamic from 'next/dynamic';
 
-// Client-only Lock page component
+// Client-only Lock page component with SSR disabled
 const LockPageClientDynamic = dynamic(
-  () => import('@/components/LockPageClient').then(mod => ({ default: mod.LockPageClient })),
+  () => import('@/components/LockPageClient'),
   {
     ssr: false,
     loading: () => (

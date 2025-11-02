@@ -2,8 +2,8 @@
 
 import dynamic from "next/dynamic";
 
-// Client-only DCA component
-const DCAClient = dynamic(() => import("./DCAClient").then(mod => ({ default: mod.DCAClient })), {
+// Client-only DCA component with SSR disabled
+const DCAClient = dynamic(() => import("@/components/DCAClient"), {
   ssr: false,
   loading: () => (
     <div className="min-h-[400px] flex items-center justify-center">
