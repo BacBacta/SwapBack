@@ -1,19 +1,14 @@
 "use client";
 
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { getNetworkLabel, isMainnet } from "@/utils/explorer";
+import { ClientOnlyWallet } from "./ClientOnlyWallet";
 
 export const Navigation = () => {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   const navLinks = [
     { href: "/", label: "Swap" },
@@ -79,19 +74,8 @@ export const Navigation = () => {
                   DEVNET
                 </div>
 
-                {/* Bouton wallet */}
-                {isMounted ? (
-                  <WalletMultiButton
-                    className="!bg-[var(--primary)] hover:!bg-[var(--primary-hover)] !text-black !font-bold !rounded !px-4 !py-2 !transition-colors"
-                    style={{
-                      backgroundColor: 'var(--primary)',
-                      border: 'none',
-                      fontFamily: 'var(--font-mono)',
-                    }}
-                  />
-                ) : (
-                  <div className="w-32 h-10 bg-gray-700 rounded animate-pulse"></div>
-                )}
+                {/* Bouton wallet - Client-only pour éviter erreurs SSR */}
+                <ClientOnlyWallet />
               </div>
 
               {/* Mobile menu button */}
@@ -174,20 +158,9 @@ export const Navigation = () => {
                 </span>
               </div>
 
-              {/* Wallet button for mobile */}
+              {/* Wallet button for mobile - Client-only pour éviter erreurs SSR */}
               <div className="mt-auto">
-                {isMounted ? (
-                  <WalletMultiButton
-                    className="!w-full !bg-[var(--primary)] hover:!bg-[var(--primary-hover)] !text-black !font-bold !rounded !px-4 !py-3 !transition-colors"
-                    style={{
-                      backgroundColor: 'var(--primary)',
-                      border: 'none',
-                      fontFamily: 'var(--font-mono)',
-                    }}
-                  />
-                ) : (
-                  <div className="w-full h-12 bg-gray-700 rounded animate-pulse"></div>
-                )}
+                <ClientOnlyWallet />
               </div>
             </div>
           </div>
