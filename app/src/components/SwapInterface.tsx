@@ -76,69 +76,6 @@ export const SwapInterface = () => {
   const inputTokenData = useTokenData(tokenAddresses[inputToken]);
   const outputTokenData = useTokenData(tokenAddresses[outputToken]);
 
-  const simulateQuote = useCallback(async () => {
-    setLoading(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      // Calculate exchange rate
-      const rate = parseFloat(inputAmount) > 0 ? (parseFloat(inputAmount) * 0.005) / parseFloat(inputAmount) : 0;
-      setExchangeRate(rate);
-
-      // Simulate 24h price change (-5% to +5%)
-      const change24h = (Math.random() - 0.5) * 10;
-      setPriceChange24h(change24h);
-
-      // Generate 3 route options
-      const baseOutput = parseFloat(inputAmount) * 0.005;
-      const routes: RouteOption[] = [
-        {
-          name: "SwapBack Optimized",
-          output: baseOutput * 1.02,
-          rebate: baseOutput * 0.015,
-          gas: 0.000012,
-          timeEstimate: "~5s",
-          badge: "Best Price"
-        },
-        {
-          name: "Jupiter Aggregator",
-          output: baseOutput * 0.98,
-          rebate: 0,
-          gas: 0.000008,
-          timeEstimate: "~3s",
-          badge: "Fastest"
-        },
-        {
-          name: "Direct Route",
-          output: baseOutput * 0.95,
-          rebate: 0,
-          gas: 0.000005,
-          timeEstimate: "~4s",
-          badge: "Lowest Gas"
-        }
-      ];
-      setRouteOptions(routes);
-
-      const mockRoute: RouteInfo = {
-        type: "Aggregator",
-        estimatedOutput: baseOutput,
-        nonOptimizedOutput: parseFloat(inputAmount) * 0.0045,
-        npi: parseFloat(inputAmount) * 0.002,
-        rebate: parseFloat(inputAmount) * 0.0015,
-        burn: parseFloat(inputAmount) * 0.0005,
-        fees: parseFloat(inputAmount) * 0.001,
-        priceImpact: 0.12,
-      };
-
-      setRouteInfo(mockRoute);
-      setOutputAmount(mockRoute.estimatedOutput.toFixed(6));
-    } catch (error) {
-      console.error("Error:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [inputAmount]);
-
   // Fetch real quote from Jupiter API
   const fetchRealQuote = useCallback(async () => {
     if (!inputAmount || inputAmount === "" || parseFloat(inputAmount) <= 0) {
@@ -148,6 +85,7 @@ export const SwapInterface = () => {
       return;
     }
 
+    console.log("🚀 [REAL DATA] Fetching real quote from Jupiter API...");
     setLoading(true);
     try {
       // Get token mint addresses
@@ -166,6 +104,8 @@ export const SwapInterface = () => {
                               inputToken === "USDC" || inputToken === "USDT" ? parseFloat(inputAmount) * 1e6 :
                               parseFloat(inputAmount); // Assume 1e6 for other tokens
 
+      console.log("📊 Request params:", { inputToken, outputToken, inputAmount, amountInLamports });
+
       // Call our API endpoint
       const response = await fetch('/api/swap/quote', {
         method: 'POST',
@@ -181,10 +121,13 @@ export const SwapInterface = () => {
       });
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        const errorText = await response.text();
+        console.error("❌ API Error:", response.status, errorText);
+        throw new Error(`API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
+      console.log("✅ [REAL DATA] Received quote:", data);
 
       if (data.success && data.quote) {
         const quote = data.quote;
@@ -193,6 +136,8 @@ export const SwapInterface = () => {
         // Set output amount
         const outputAmountValue = parseFloat(quote.outAmount) /
           (outputToken === "SOL" ? 1e9 : outputToken === "USDC" || outputToken === "USDT" ? 1e6 : 1e6);
+        
+        console.log(`💰 [REAL DATA] Output: ${outputAmountValue} ${outputToken} (from ${inputAmount} ${inputToken})`);
         setOutputAmount(outputAmountValue.toFixed(6));
 
         // Set route info
@@ -246,17 +191,33 @@ export const SwapInterface = () => {
         setPriceChange24h(change24h);
 
       } else {
+        console.error("❌ Invalid response structure:", data);
         throw new Error(data.error || 'Failed to get quote');
       }
     } catch (error) {
-      console.error("Error fetching real quote:", error);
+      console.error("❌ Error fetching real quote:", error);
+      // Show error to user
+      toast.error(`Impossible d'obtenir un prix réel: ${error instanceof Error ? error.message : 'Erreur réseau'}`);
       // Fallback to mock data if API fails
       console.log("🔄 Falling back to mock data due to API error");
-      await simulateQuote();
+      
+      // Mock fallback (minimal)
+      const baseOutput = parseFloat(inputAmount) * 0.005;
+      setOutputAmount(baseOutput.toFixed(6));
+      setRouteInfo({
+        type: "Aggregator",
+        estimatedOutput: baseOutput,
+        nonOptimizedOutput: baseOutput * 0.98,
+        npi: baseOutput * 0.002,
+        rebate: baseOutput * 0.0015,
+        burn: baseOutput * 0.0005,
+        fees: baseOutput * 0.001,
+        priceImpact: 0.12,
+      });
     } finally {
       setLoading(false);
     }
-  }, [inputAmount, inputToken, outputToken, simulateQuote]);
+  }, [inputAmount, inputToken, outputToken]);
 
 
   // Simulate price calculation with debounce
