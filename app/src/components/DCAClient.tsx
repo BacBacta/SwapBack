@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useTokenData } from "../hooks/useTokenData";
 import { DCASimulator } from "./DCASimulator";
-import { Connection, clusterApiUrl } from "@solana/web3.js";
 
 interface DCAOrder {
   id: string;
@@ -59,6 +58,7 @@ const TOKEN_MINTS: Record<string, string> = {
 
 export const DCAClient = () => {
   const { connected, publicKey } = useWallet();
+  const { connection } = useConnection();
   const [activeTab, setActiveTab] = useState<"create" | "orders" | "simulator">(
     "create"
   );
@@ -105,21 +105,16 @@ export const DCAClient = () => {
   // Test RPC connectivity
   const testRpcConnection = async (): Promise<boolean> => {
     try {
-      const connection = new Connection(
-        process.env.NEXT_PUBLIC_SOLANA_RPC_URL || clusterApiUrl("mainnet-beta"),
-        "confirmed"
-      );
-
-      // Simple test: get recent blockhash
-      await connection.getRecentBlockhash();
+      await connection.getLatestBlockhash();
       setRpcError(null);
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("RPC Connection test failed:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
 
-      if (error.message?.includes("403") || error.message?.includes("forbidden")) {
+      if (errorMessage.includes("403") || errorMessage.includes("forbidden")) {
         setRpcError("Accès RPC refusé (403). Vérifiez votre configuration réseau.");
-      } else if (error.message?.includes("429")) {
+      } else if (errorMessage.includes("429")) {
         setRpcError("Limite de taux RPC atteinte. Réessayez plus tard.");
       } else {
         setRpcError("Erreur de connexion RPC. Vérifiez votre réseau.");
@@ -177,7 +172,7 @@ export const DCAClient = () => {
     Number.parseFloat(amountPerOrder || "0") *
     Number.parseInt(totalOrders || "0");
 
-  // Create DCA Order
+  // Create DCA Order (ON-CHAIN)
   const handleCreateDCA = async () => {
     if (!connected || !publicKey) {
       alert("Veuillez connecter votre wallet");
@@ -205,8 +200,26 @@ export const DCAClient = () => {
         return;
       }
 
+      // TODO: Complete on-chain DCA implementation
+      // For now, this creates a local order for UI tracking only
+      // See SwapBackInterface.tsx for the working on-chain implementation
+      
+      alert(
+        "⚠️ FONCTIONNALITÉ EN DÉVELOPPEMENT\n\n" +
+        "La création de plans DCA on-chain est en cours d'implémentation.\n\n" +
+        "✅ Ce qui existe actuellement :\n" +
+        "• Smart contract DCA déployé (create_plan)\n" +
+        "• Interface de création dans SwapBackInterface.tsx\n" +
+        "• Tests on-chain validés\n\n" +
+        "🔧 À faire :\n" +
+        "• Intégration complète dans cet interface\n" +
+        "• Exécution automatique des ordres\n" +
+        "• Dashboard de suivi des plans\n\n" +
+        "Pour l'instant, un ordre local sera créé pour démonstration."
+      );
+
       const newOrder: DCAOrder = {
-        id: `dca_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: `dca_local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         inputToken,
         outputToken,
         amountPerOrder: Number.parseFloat(amountPerOrder),
@@ -223,7 +236,7 @@ export const DCAClient = () => {
       const updatedOrders = [...dcaOrders, newOrder];
       setDcaOrders(updatedOrders);
 
-      // Save to localStorage
+      // Save to localStorage for UI tracking
       const storageKey = `swapback_dca_${publicKey.toString()}`;
       localStorage.setItem(storageKey, JSON.stringify(updatedOrders));
 
@@ -231,10 +244,12 @@ export const DCAClient = () => {
       setAmountPerOrder("");
       setTotalOrders("10");
 
-      alert("Ordre DCA créé avec succès !");
+      console.log("✓ Ordre DCA local créé (démo):", newOrder.id);
     } catch (error) {
-      console.error("Error creating DCA:", error);
-      alert("Erreur lors de la création de l'ordre DCA");
+      console.error("❌ Error creating DCA:", error);
+      const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
+      alert(`Erreur lors de la création:\n${errorMessage}`);
+      setRpcError(errorMessage);
     } finally {
       setLoading(false);
     }
