@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { TrendingUp, Star, Clock, Search } from "lucide-react";
+import { TrendingUp, Star, Clock, Search, Plus } from "lucide-react";
+import { CustomTokenImport } from "./CustomTokenImport";
 
 interface Token {
   address: string;
@@ -108,10 +109,11 @@ export const TokenSelector = ({
   onClose,
 }: TokenSelectorProps) => {
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"all" | "recent">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "recent" | "import">("all");
   const { connection } = useConnection();
   const { publicKey } = useWallet();
   const [tokenBalances, setTokenBalances] = useState<Record<string, number>>({});
+  const [importedTokens, setImportedTokens] = useState<Token[]>([]);
 
   // Load recent tokens from localStorage
   const [recentTokens, setRecentTokens] = useState<string[]>([]);
@@ -120,6 +122,12 @@ export const TokenSelector = ({
     const recent = localStorage.getItem("recentTokens");
     if (recent) {
       setRecentTokens(JSON.parse(recent));
+    }
+
+    // Load imported tokens
+    const imported = localStorage.getItem("importedTokens");
+    if (imported) {
+      setImportedTokens(JSON.parse(imported));
     }
   }, []);
 
@@ -157,8 +165,9 @@ export const TokenSelector = ({
     fetchBalances();
   }, [publicKey, connection]);
 
-  // Filter tokens with enhanced search
-  const filteredTokens = POPULAR_TOKENS.filter(
+  // Filter tokens with enhanced search (include imported tokens)
+  const allTokens = [...POPULAR_TOKENS, ...importedTokens];
+  const filteredTokens = allTokens.filter(
     (token) =>
       token.symbol.toLowerCase().includes(search.toLowerCase()) ||
       token.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -246,7 +255,7 @@ export const TokenSelector = ({
                   : "bg-[var(--primary)]/10 terminal-text hover:bg-[var(--primary)]/20"
               }`}
             >
-              All Tokens
+              All
             </button>
             <button
               onClick={() => setActiveTab("recent")}
@@ -258,6 +267,17 @@ export const TokenSelector = ({
             >
               <Clock size={14} />
               Recent
+            </button>
+            <button
+              onClick={() => setActiveTab("import")}
+              className={`flex-1 py-2 px-4 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+                activeTab === "import"
+                  ? "bg-[var(--primary)] text-black"
+                  : "bg-[var(--primary)]/10 terminal-text hover:bg-[var(--primary)]/20"
+              }`}
+            >
+              <Plus size={14} />
+              Import
             </button>
           </div>
 
@@ -352,6 +372,17 @@ export const TokenSelector = ({
                   ))
                 )}
               </>
+            )}
+
+            {/* Import Token Tab */}
+            {activeTab === "import" && (
+              <CustomTokenImport
+                onImport={(token) => {
+                  setImportedTokens((prev) => [...prev, token]);
+                  handleSelectToken(token);
+                }}
+                onClose={onClose}
+              />
             )}
           </div>
         </div>
