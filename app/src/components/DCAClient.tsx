@@ -4,6 +4,11 @@ import { useState, useEffect } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useTokenData } from "../hooks/useTokenData";
 import { DCASimulator } from "./DCASimulator";
+import { AnchorProvider, Program, BN } from "@coral-xyz/anchor";
+import { PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { ROUTER_IDL } from "../idl/router_idl";
+import { ROUTER_PROGRAM_ID } from "../constants/programIds";
+import { getTokenMint, frequencyToSeconds } from "../utils/tokenHelpers";
 
 interface DCAOrder {
   id: string;
@@ -57,7 +62,7 @@ const TOKEN_MINTS: Record<string, string> = {
 };
 
 export const DCAClient = () => {
-  const { connected, publicKey } = useWallet();
+  const { connected, publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const [activeTab, setActiveTab] = useState<"create" | "orders" | "simulator">(
     "create"
@@ -197,29 +202,93 @@ export const DCAClient = () => {
       const rpcOk = await testRpcConnection();
       if (!rpcOk) {
         alert("Problème de connexion réseau. Veuillez réessayer.");
+        setLoading(false);
         return;
       }
 
-      // TODO: Complete on-chain DCA implementation
-      // For now, this creates a local order for UI tracking only
-      // See SwapBackInterface.tsx for the working on-chain implementation
+      console.log("🚀 Création d'un plan DCA on-chain...");
       
-      alert(
-        "⚠️ FONCTIONNALITÉ EN DÉVELOPPEMENT\n\n" +
-        "La création de plans DCA on-chain est en cours d'implémentation.\n\n" +
-        "✅ Ce qui existe actuellement :\n" +
-        "• Smart contract DCA déployé (create_plan)\n" +
-        "• Interface de création dans SwapBackInterface.tsx\n" +
-        "• Tests on-chain validés\n\n" +
-        "🔧 À faire :\n" +
-        "• Intégration complète dans cet interface\n" +
-        "• Exécution automatique des ordres\n" +
-        "• Dashboard de suivi des plans\n\n" +
-        "Pour l'instant, un ordre local sera créé pour démonstration."
+      // 1️⃣ Créer le provider Anchor
+      const provider = new AnchorProvider(
+        connection,
+        {
+          publicKey,
+          signTransaction: async (tx) => {
+            await sendTransaction(tx, connection);
+            return tx;
+          },
+          signAllTransactions: async (txs) => txs,
+        },
+        { commitment: "confirmed" }
       );
 
+      // 2️⃣ Charger le programme
+      const program = new Program(ROUTER_IDL, provider);
+      console.log("✓ Programme chargé:", program.programId.toString());
+
+      // 3️⃣ Générer un ID unique pour le plan
+      const planId = new BN(Date.now());
+      console.log("✓ Plan ID:", planId.toString());
+
+      // 4️⃣ Dériver le PDA du plan DCA
+      const [dcaPlanPda] = PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("dca_plan"),
+          publicKey.toBuffer(),
+          planId.toArrayLike(Buffer, "le", 8),
+        ],
+        ROUTER_PROGRAM_ID
+      );
+      console.log("✓ DCA Plan PDA:", dcaPlanPda.toString());
+
+      // 5️⃣ Dériver le PDA du Router State
+      const [statePda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("router_state")],
+        ROUTER_PROGRAM_ID
+      );
+      console.log("✓ State PDA:", statePda.toString());
+
+      // 6️⃣ Convertir les montants
+      const inputAmountLamports = new BN(
+        Math.floor(Number.parseFloat(amountPerOrder) * LAMPORTS_PER_SOL)
+      );
+      const dcaIntervalSeconds = new BN(frequencyToSeconds(frequency));
+      const numSwaps = new BN(Number.parseInt(totalOrders));
+      const minOutputAmount = new BN(0); // Pas de slippage limite pour l'instant
+
+      console.log("✓ Paramètres:", {
+        inputAmount: inputAmountLamports.toString(),
+        interval: dcaIntervalSeconds.toString(),
+        swaps: numSwaps.toString(),
+      });
+
+      // 7️⃣ Obtenir les adresses des tokens
+      const outputTokenMint = getTokenMint(outputToken);
+      console.log("✓ Token de sortie:", outputTokenMint.toString());
+
+      // 8️⃣ Créer la transaction
+      console.log("📝 Envoi de la transaction...");
+      const tx = await program.methods
+        .createPlan(
+          inputAmountLamports,
+          outputTokenMint,
+          dcaIntervalSeconds,
+          numSwaps,
+          minOutputAmount
+        )
+        .accounts({
+          dcaPlan: dcaPlanPda,
+          authority: publicKey,
+          state: statePda,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+
+      console.log("✅ Plan DCA créé on-chain! Signature:", tx);
+
+      // 9️⃣ Créer l'ordre local pour le tracking UI
       const newOrder: DCAOrder = {
-        id: `dca_local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: dcaPlanPda.toString(), // Utiliser le PDA comme ID
         inputToken,
         outputToken,
         amountPerOrder: Number.parseFloat(amountPerOrder),
@@ -236,7 +305,7 @@ export const DCAClient = () => {
       const updatedOrders = [...dcaOrders, newOrder];
       setDcaOrders(updatedOrders);
 
-      // Save to localStorage for UI tracking
+      // Sauvegarder dans localStorage pour le tracking
       const storageKey = `swapback_dca_${publicKey.toString()}`;
       localStorage.setItem(storageKey, JSON.stringify(updatedOrders));
 
@@ -244,11 +313,20 @@ export const DCAClient = () => {
       setAmountPerOrder("");
       setTotalOrders("10");
 
-      console.log("✓ Ordre DCA local créé (démo):", newOrder.id);
+      // Afficher la notification de succès
+      alert(
+        `✅ Plan DCA créé avec succès!\n\n` +
+        `Transaction: ${tx.slice(0, 8)}...${tx.slice(-8)}\n\n` +
+        `Montant par ordre: ${amountPerOrder} ${inputToken}\n` +
+        `Fréquence: ${frequency}\n` +
+        `Nombre d'ordres: ${totalOrders}\n\n` +
+        `Voir sur Solana Explorer:\n` +
+        `https://explorer.solana.com/tx/${tx}?cluster=devnet`
+      );
     } catch (error) {
-      console.error("❌ Error creating DCA:", error);
+      console.error("❌ Erreur création DCA:", error);
       const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
-      alert(`Erreur lors de la création:\n${errorMessage}`);
+      alert(`❌ Erreur lors de la création du plan DCA:\n\n${errorMessage}`);
       setRpcError(errorMessage);
     } finally {
       setLoading(false);
