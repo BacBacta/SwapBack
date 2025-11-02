@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, lazy, Suspense } from "react";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { getNetworkLabel, isMainnet } from "@/utils/explorer";
+import { ClientOnlyWallet } from "@/components/ClientOnlyWallet";
 
 // Performance: Lazy load heavy components
 const EnhancedSwapInterface = lazy(() => import("@/components/EnhancedSwapInterface").then(mod => ({ default: mod.EnhancedSwapInterface })));
@@ -68,7 +68,7 @@ export default function Home() {
 
             {/* Wallet Button */}
             <div className="flex items-center">
-              <WalletMultiButton />
+              <ClientOnlyWallet />
             </div>
           </div>
         </div>

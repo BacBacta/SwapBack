@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useTokenData } from "../hooks/useTokenData";
 import { DCASimulator } from "./DCASimulator";
-import { addDCATransaction } from "./TransactionHistory";
 
 interface DCAOrder {
   id: string;
@@ -209,9 +208,10 @@ export const DCAClient = () => {
   const handlePauseResumeDCA = (orderId: string) => {
     const updatedOrders = dcaOrders.map((order) => {
       if (order.id === orderId) {
+        const newStatus: "active" | "paused" = order.status === "active" ? "paused" : "active";
         return {
           ...order,
-          status: order.status === "active" ? "paused" : "active",
+          status: newStatus,
           nextExecution:
             order.status === "paused"
               ? calculateNextExecution(order.frequency)
