@@ -15,12 +15,6 @@ mod getrandom_stub;
 pub use state::{DcaPlan, RouterState, UserRebate};
 pub use error::SwapbackError;
 
-// Import instruction account structs for use in #[program] module
-use instructions::{
-    CreateDcaPlan, CreateDcaPlanArgs, ExecuteDcaSwap, 
-    PauseDcaPlan, ResumeDcaPlan, CancelDcaPlan
-};
-
 // Program ID déployé sur devnet - 27 Oct 2025 (mis à jour)
 declare_id!("GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt");
 
@@ -54,6 +48,141 @@ pub const BUYBACK_FROM_FEES_BPS: u16 = 3000;     // 30% des platform fees → Bu
 // Security limits
 pub const MAX_VENUES: usize = 10;
 pub const MAX_FALLBACKS: usize = 5;
+
+// DCA Account Structures (moved here for Anchor compatibility)
+#[derive(Accounts)]
+#[instruction(plan_id: [u8; 32])]
+pub struct CreateDcaPlan<'info> {
+    #[account(
+        init,
+        payer = user,
+        space = DcaPlan::LEN,
+        seeds = [b"dca_plan", user.key().as_ref(), &plan_id],
+        bump
+    )]
+    pub dca_plan: Account<'info, DcaPlan>,
+    
+    #[account(
+        seeds = [b"router_state"],
+        bump = state.bump
+    )]
+    pub state: Account<'info, RouterState>,
+    
+    #[account(mut)]
+    pub user: Signer<'info>,
+    
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ExecuteDcaSwap<'info> {
+    #[account(
+        mut,
+        seeds = [b"dca_plan", dca_plan.user.as_ref(), &dca_plan.plan_id],
+        bump = dca_plan.bump
+    )]
+    pub dca_plan: Account<'info, DcaPlan>,
+    
+    #[account(
+        mut,
+        seeds = [b"router_state"],
+        bump = state.bump
+    )]
+    pub state: Account<'info, RouterState>,
+    
+    /// User's input token account (source)
+    #[account(
+        mut,
+        constraint = user_token_in.owner == dca_plan.user,
+        constraint = user_token_in.mint == dca_plan.token_in
+    )]
+    pub user_token_in: Account<'info, anchor_spl::token::TokenAccount>,
+    
+    /// User's output token account (destination)
+    #[account(
+        mut,
+        constraint = user_token_out.owner == dca_plan.user,
+        constraint = user_token_out.mint == dca_plan.token_out
+    )]
+    pub user_token_out: Account<'info, anchor_spl::token::TokenAccount>,
+    
+    /// CHECK: User that owns the DCA plan (for CPI signing if needed)
+    #[account(
+        constraint = user.key() == dca_plan.user
+    )]
+    pub user: AccountInfo<'info>,
+    
+    /// Executor that calls this instruction (can be bot or user)
+    pub executor: Signer<'info>,
+    
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct PauseDcaPlan<'info> {
+    #[account(
+        mut,
+        seeds = [b"dca_plan", user.key().as_ref(), &dca_plan.plan_id],
+        bump = dca_plan.bump,
+        has_one = user
+    )]
+    pub dca_plan: Account<'info, DcaPlan>,
+    
+    pub user: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct ResumeDcaPlan<'info> {
+    #[account(
+        mut,
+        seeds = [b"dca_plan", user.key().as_ref(), &dca_plan.plan_id],
+        bump = dca_plan.bump,
+        has_one = user
+    )]
+    pub dca_plan: Account<'info, DcaPlan>,
+    
+    pub user: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct CancelDcaPlan<'info> {
+    #[account(
+        mut,
+        seeds = [b"dca_plan", user.key().as_ref(), &dca_plan.plan_id],
+        bump = dca_plan.bump,
+        has_one = user,
+        close = user
+    )]
+    pub dca_plan: Account<'info, DcaPlan>,
+    
+    #[account(mut)]
+    pub user: Signer<'info>,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct CreateDcaPlanArgs {
+    /// Input token mint
+    pub token_in: Pubkey,
+    
+    /// Output token mint
+    pub token_out: Pubkey,
+    
+    /// Amount per swap (in lamports/smallest unit)
+    pub amount_per_swap: u64,
+    
+    /// Total number of swaps
+    pub total_swaps: u32,
+    
+    /// Interval between swaps (in seconds)
+    pub interval_seconds: i64,
+    
+    /// Minimum output per swap (slippage protection)
+    pub min_out_per_swap: u64,
+    
+    /// Optional expiry timestamp (0 = no expiry)
+    pub expires_at: i64,
+}
 
 #[program]
 pub mod swapback_router {
@@ -96,35 +225,180 @@ pub mod swapback_router {
         plan_id: [u8; 32],
         args: CreateDcaPlanArgs,
     ) -> Result<()> {
-        instructions::create_dca_plan::handler(ctx, plan_id, args)
+        // Inline handler for CreateDcaPlan
+        let dca_plan = &mut ctx.accounts.dca_plan;
+        let clock = Clock::get()?;
+        
+        // Validation
+        require!(args.amount_per_swap > 0, error::SwapbackError::InvalidAmount);
+        require!(args.total_swaps > 0, error::SwapbackError::InvalidSwapCount);
+        require!(args.total_swaps <= 10000, error::SwapbackError::TooManySwaps);
+        require!(args.interval_seconds >= 3600, error::SwapbackError::IntervalTooShort);
+        require!(args.interval_seconds <= 31536000, error::SwapbackError::IntervalTooLong);
+        
+        // If expiry is set, must be in the future
+        if args.expires_at > 0 {
+            require!(
+                args.expires_at > clock.unix_timestamp,
+                error::SwapbackError::InvalidExpiry
+            );
+        }
+        
+        // Initialize DCA plan
+        dca_plan.plan_id = plan_id;
+        dca_plan.user = ctx.accounts.user.key();
+        dca_plan.token_in = args.token_in;
+        dca_plan.token_out = args.token_out;
+        dca_plan.amount_per_swap = args.amount_per_swap;
+        dca_plan.total_swaps = args.total_swaps;
+        dca_plan.executed_swaps = 0;
+        dca_plan.interval_seconds = args.interval_seconds;
+        dca_plan.next_execution = clock.unix_timestamp + args.interval_seconds;
+        dca_plan.min_out_per_swap = args.min_out_per_swap;
+        dca_plan.created_at = clock.unix_timestamp;
+        dca_plan.expires_at = args.expires_at;
+        dca_plan.is_active = true;
+        dca_plan.total_invested = 0;
+        dca_plan.total_received = 0;
+        dca_plan.bump = ctx.bumps.dca_plan;
+        
+        msg!("✅ DCA Plan created successfully!");
+        msg!("Plan ID: {:?}", plan_id);
+        msg!("Token pair: {} → {}", args.token_in, args.token_out);
+        msg!("Amount per swap: {}", args.amount_per_swap);
+        msg!("Total swaps: {}", args.total_swaps);
+        msg!("Interval: {} seconds", args.interval_seconds);
+        msg!("Next execution: {}", dca_plan.next_execution);
+        
+        Ok(())
     }
     
     /// Execute a single swap in a DCA plan
     pub fn execute_dca_swap(
         ctx: Context<ExecuteDcaSwap>,
     ) -> Result<()> {
-        instructions::execute_dca_swap::handler(ctx)
+        // Inline handler for ExecuteDcaSwap
+        let dca_plan = &mut ctx.accounts.dca_plan;
+        let clock = Clock::get()?;
+        
+        // Validation
+        require!(dca_plan.is_active, error::SwapbackError::PlanNotActive);
+        require!(!dca_plan.is_completed(), error::SwapbackError::PlanCompleted);
+        require!(
+            !dca_plan.is_expired(clock.unix_timestamp),
+            error::SwapbackError::PlanExpired
+        );
+        require!(
+            dca_plan.is_ready_for_execution(clock.unix_timestamp),
+            error::SwapbackError::NotReadyForExecution
+        );
+        
+        // Verify user has sufficient balance
+        require!(
+            ctx.accounts.user_token_in.amount >= dca_plan.amount_per_swap,
+            error::SwapbackError::InsufficientBalance
+        );
+        
+        msg!("🔄 Executing DCA swap #{}", dca_plan.executed_swaps + 1);
+        msg!("Amount: {}", dca_plan.amount_per_swap);
+        msg!("Min output: {}", dca_plan.min_out_per_swap);
+        
+        // TODO: Actual swap logic will go here
+        // For now, this is a placeholder that will be integrated with the router
+        // The actual implementation will:
+        // 1. Call swap_toc with the plan parameters
+        // 2. Verify min_out_per_swap slippage protection
+        // 3. Update total_invested and total_received
+        
+        // For demonstration, we'll just transfer tokens
+        // In production, this would be replaced with actual swap logic
+        let amount_received = dca_plan.amount_per_swap; // Placeholder: 1:1 swap
+        
+        require!(
+            amount_received >= dca_plan.min_out_per_swap,
+            error::SwapbackError::SlippageExceeded
+        );
+        
+        // Update plan state
+        dca_plan.executed_swaps += 1;
+        dca_plan.total_invested += dca_plan.amount_per_swap;
+        dca_plan.total_received += amount_received;
+        dca_plan.next_execution = dca_plan.calculate_next_execution();
+        
+        // If all swaps completed, mark as inactive
+        if dca_plan.is_completed() {
+            dca_plan.is_active = false;
+            msg!("✅ DCA Plan completed!");
+        }
+        
+        msg!("Progress: {}/{} swaps", dca_plan.executed_swaps, dca_plan.total_swaps);
+        msg!("Next execution: {}", dca_plan.next_execution);
+        msg!("Total invested: {}", dca_plan.total_invested);
+        msg!("Total received: {}", dca_plan.total_received);
+        
+        Ok(())
     }
     
     /// Pause a DCA plan
     pub fn pause_dca_plan(
         ctx: Context<PauseDcaPlan>,
     ) -> Result<()> {
-        instructions::pause_dca_plan::handler(ctx)
+        // Inline handler for PauseDcaPlan
+        let dca_plan = &mut ctx.accounts.dca_plan;
+        
+        require!(dca_plan.is_active, error::SwapbackError::AlreadyPaused);
+        require!(!dca_plan.is_completed(), error::SwapbackError::PlanCompleted);
+        
+        dca_plan.is_active = false;
+        
+        msg!("⏸️  DCA Plan paused");
+        msg!("Plan ID: {:?}", dca_plan.plan_id);
+        
+        Ok(())
     }
     
     /// Resume a paused DCA plan
     pub fn resume_dca_plan(
         ctx: Context<ResumeDcaPlan>,
     ) -> Result<()> {
-        instructions::resume_dca_plan::handler(ctx)
+        // Inline handler for ResumeDcaPlan
+        let dca_plan = &mut ctx.accounts.dca_plan;
+        let clock = Clock::get()?;
+        
+        require!(!dca_plan.is_active, error::SwapbackError::AlreadyActive);
+        require!(!dca_plan.is_completed(), error::SwapbackError::PlanCompleted);
+        require!(!dca_plan.is_expired(clock.unix_timestamp), error::SwapbackError::PlanExpired);
+        
+        dca_plan.is_active = true;
+        
+        // Update next execution to avoid immediate execution after resume
+        if dca_plan.next_execution < clock.unix_timestamp {
+            dca_plan.next_execution = clock.unix_timestamp + dca_plan.interval_seconds;
+        }
+        
+        msg!("▶️  DCA Plan resumed");
+        msg!("Plan ID: {:?}", dca_plan.plan_id);
+        msg!("Next execution: {}", dca_plan.next_execution);
+        
+        Ok(())
     }
     
     /// Cancel and close a DCA plan
     pub fn cancel_dca_plan(
         ctx: Context<CancelDcaPlan>,
     ) -> Result<()> {
-        instructions::cancel_dca_plan::handler(ctx)
+        // Inline handler for CancelDcaPlan
+        let dca_plan = &ctx.accounts.dca_plan;
+        
+        msg!("❌ DCA Plan cancelled and closed");
+        msg!("Plan ID: {:?}", dca_plan.plan_id);
+        msg!("Swaps executed: {}/{}", dca_plan.executed_swaps, dca_plan.total_swaps);
+        msg!("Total invested: {}", dca_plan.total_invested);
+        msg!("Total received: {}", dca_plan.total_received);
+        
+        // Account will be closed automatically and rent refunded to user
+        
+        Ok(())
     }
 
     /// Claim accumulated rebates
