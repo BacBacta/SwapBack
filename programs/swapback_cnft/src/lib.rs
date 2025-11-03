@@ -1,7 +1,9 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token_2022::{Token2022, TransferChecked, transfer_checked};
+use anchor_spl::token_interface::{TokenAccount, Mint};
 
-// Program ID déployé sur devnet - 31 Oct 2025 (nouvelle version avec fix bump)
-declare_id!("2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G");
+// Program ID déployé sur devnet - 3 Nov 2025 (version avec lock_tokens/unlock_tokens)
+declare_id!("9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq");
 
 #[program]
 pub mod swapback_cnft {
@@ -89,6 +91,149 @@ pub mod swapback_cnft {
             boost,
             boost / 100
         );
+        Ok(())
+    }
+
+    /// Lock des tokens BACK avec transfert vers un PDA
+    /// Cette instruction combine le mint du cNFT ET le transfert des tokens
+    pub fn lock_tokens(
+        ctx: Context<LockTokens>,
+        amount: u64,
+        lock_duration: i64,
+    ) -> Result<()> {
+        let collection_config = &mut ctx.accounts.collection_config;
+        let global_state = &mut ctx.accounts.global_state;
+        let user_nft = &mut ctx.accounts.user_nft;
+
+        // Calculer le boost dynamique
+        let boost = calculate_boost(amount, lock_duration);
+        
+        // Déterminer le niveau automatiquement
+        let duration_days = (lock_duration / 86400) as u64;
+        let level = LockLevel::from_lock_params(amount, duration_days);
+
+        // Enregistrer le NFT de l'utilisateur
+        user_nft.user = ctx.accounts.user.key();
+        user_nft.level = level;
+        user_nft.amount_locked = amount;
+        user_nft.lock_duration = lock_duration;
+        user_nft.boost = boost;
+        user_nft.mint_time = Clock::get()?.unix_timestamp;
+        user_nft.is_active = true;
+        user_nft.bump = ctx.bumps.user_nft;
+
+        // Mettre à jour les statistiques globales
+        collection_config.total_minted = collection_config.total_minted.checked_add(1).unwrap();
+        global_state.total_community_boost = global_state.total_community_boost
+            .checked_add(boost as u64)
+            .ok_or(ErrorCode::MathOverflow)?;
+        global_state.active_locks_count = global_state.active_locks_count
+            .checked_add(1)
+            .ok_or(ErrorCode::MathOverflow)?;
+        global_state.total_value_locked = global_state.total_value_locked
+            .checked_add(amount)
+            .ok_or(ErrorCode::MathOverflow)?;
+
+        // Transférer les tokens BACK vers le vault PDA
+        let cpi_accounts = TransferChecked {
+            from: ctx.accounts.user_token_account.to_account_info(),
+            to: ctx.accounts.vault_token_account.to_account_info(),
+            authority: ctx.accounts.user.to_account_info(),
+            mint: ctx.accounts.back_mint.to_account_info(),
+        };
+        
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+        
+        transfer_checked(cpi_ctx, amount, ctx.accounts.back_mint.decimals)?;
+
+        emit!(TokensLocked {
+            user: ctx.accounts.user.key(),
+            amount,
+            level,
+            boost,
+            unlock_time: Clock::get()?.unix_timestamp + lock_duration,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        msg!(
+            "🔒 {} tokens BACK verrouillés - Niveau: {:?} - Boost: {}%",
+            amount / 1_000_000_000,
+            level,
+            boost / 100
+        );
+
+        Ok(())
+    }
+
+    /// Unlock des tokens BACK et retour vers l'utilisateur
+    pub fn unlock_tokens(ctx: Context<UnlockTokens>) -> Result<()> {
+        let user_nft = &mut ctx.accounts.user_nft;
+        let global_state = &mut ctx.accounts.global_state;
+        
+        // Vérifier que c'est bien le propriétaire
+        require!(
+            ctx.accounts.user.key() == user_nft.user,
+            ErrorCode::Unauthorized
+        );
+
+        // Vérifier que la période de lock est terminée
+        let current_time = Clock::get()?.unix_timestamp;
+        let unlock_time = user_nft.mint_time + user_nft.lock_duration;
+        require!(
+            current_time >= unlock_time,
+            ErrorCode::LockNotExpired
+        );
+
+        // Vérifier que le NFT est actif
+        require!(user_nft.is_active, ErrorCode::AlreadyUnlocked);
+
+        // Décrémenter les stats globales
+        global_state.total_community_boost = global_state.total_community_boost
+            .checked_sub(user_nft.boost as u64)
+            .ok_or(ErrorCode::MathOverflow)?;
+        global_state.active_locks_count = global_state.active_locks_count
+            .checked_sub(1)
+            .ok_or(ErrorCode::MathOverflow)?;
+        global_state.total_value_locked = global_state.total_value_locked
+            .checked_sub(user_nft.amount_locked)
+            .ok_or(ErrorCode::MathOverflow)?;
+
+        // Transférer les tokens du vault vers l'utilisateur
+        let bump = ctx.bumps.vault_authority;
+        let seeds: &[&[u8]] = &[
+            b"vault_authority",
+            &[bump],
+        ];
+        let signer_seeds = &[seeds];
+
+        let cpi_accounts = TransferChecked {
+            from: ctx.accounts.vault_token_account.to_account_info(),
+            to: ctx.accounts.user_token_account.to_account_info(),
+            authority: ctx.accounts.vault_authority.to_account_info(),
+            mint: ctx.accounts.back_mint.to_account_info(),
+        };
+        
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
+        
+        transfer_checked(cpi_ctx, user_nft.amount_locked, ctx.accounts.back_mint.decimals)?;
+
+        // Désactiver le NFT
+        user_nft.is_active = false;
+
+        emit!(TokensUnlocked {
+            user: ctx.accounts.user.key(),
+            amount: user_nft.amount_locked,
+            timestamp: current_time,
+        });
+
+        msg!(
+            "🔓 {} tokens BACK déverrouillés pour {}",
+            user_nft.amount_locked / 1_000_000_000,
+            ctx.accounts.user.key()
+        );
+
         Ok(())
     }
 
@@ -276,6 +421,105 @@ pub struct UpdateNftStatus<'info> {
     pub user: Signer<'info>,
 }
 
+/// Contexte pour verrouiller des tokens BACK
+#[derive(Accounts)]
+pub struct LockTokens<'info> {
+    #[account(
+        mut,
+        seeds = [b"collection_config"],
+        bump
+    )]
+    pub collection_config: Account<'info, CollectionConfig>,
+
+    #[account(
+        mut,
+        seeds = [b"global_state"],
+        bump
+    )]
+    pub global_state: Account<'info, GlobalState>,
+
+    #[account(
+        init,
+        payer = user,
+        space = 8 + UserNft::INIT_SPACE,
+        seeds = [b"user_nft", user.key().as_ref()],
+        bump
+    )]
+    pub user_nft: Account<'info, UserNft>,
+
+    /// Token Account de l'utilisateur (source)
+    #[account(mut)]
+    pub user_token_account: InterfaceAccount<'info, TokenAccount>,
+
+    /// Vault PDA pour stocker les tokens verrouillés
+    #[account(
+        init_if_needed,
+        payer = user,
+        token::mint = back_mint,
+        token::authority = vault_authority,
+        token::token_program = token_program,
+    )]
+    pub vault_token_account: InterfaceAccount<'info, TokenAccount>,
+
+    /// Autorité du vault (PDA)
+    /// CHECK: PDA utilisé comme autorité du vault
+    #[account(
+        seeds = [b"vault_authority"],
+        bump
+    )]
+    pub vault_authority: AccountInfo<'info>,
+
+    /// Mint du token BACK (Token-2022)
+    pub back_mint: InterfaceAccount<'info, Mint>,
+
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    pub token_program: Program<'info, Token2022>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Contexte pour déverrouiller des tokens BACK
+#[derive(Accounts)]
+pub struct UnlockTokens<'info> {
+    #[account(
+        mut,
+        seeds = [b"user_nft", user.key().as_ref()],
+        bump = user_nft.bump
+    )]
+    pub user_nft: Account<'info, UserNft>,
+
+    #[account(
+        mut,
+        seeds = [b"global_state"],
+        bump
+    )]
+    pub global_state: Account<'info, GlobalState>,
+
+    /// Token Account de l'utilisateur (destination)
+    #[account(mut)]
+    pub user_token_account: InterfaceAccount<'info, TokenAccount>,
+
+    /// Vault PDA qui contient les tokens verrouillés
+    #[account(mut)]
+    pub vault_token_account: InterfaceAccount<'info, TokenAccount>,
+
+    /// Autorité du vault (PDA)
+    /// CHECK: PDA utilisé comme autorité du vault
+    #[account(
+        seeds = [b"vault_authority"],
+        bump
+    )]
+    pub vault_authority: AccountInfo<'info>,
+
+    /// Mint du token BACK (Token-2022)
+    pub back_mint: InterfaceAccount<'info, Mint>,
+
+    pub user: Signer<'info>,
+
+    pub token_program: Program<'info, Token2022>,
+}
+
 #[account]
 #[derive(InitSpace)]
 pub struct CollectionConfig {
@@ -438,6 +682,23 @@ mod tests {
     }
 }
 
+#[event]
+pub struct TokensLocked {
+    pub user: Pubkey,
+    pub amount: u64,
+    pub level: LockLevel,
+    pub boost: u16,
+    pub unlock_time: i64,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct TokensUnlocked {
+    pub user: Pubkey,
+    pub amount: u64,
+    pub timestamp: i64,
+}
+
 #[error_code]
 pub enum ErrorCode {
     #[msg("Boost insuffisant pour ce niveau")]
@@ -446,4 +707,8 @@ pub enum ErrorCode {
     Unauthorized,
     #[msg("Dépassement arithmétique")]
     MathOverflow,
+    #[msg("Période de verrouillage non expirée")]
+    LockNotExpired,
+    #[msg("Déjà déverrouillé")]
+    AlreadyUnlocked,
 }

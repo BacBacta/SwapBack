@@ -3,8 +3,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
-import { getAssociatedTokenAddress } from '@solana/spl-token';
-import { createLockTransaction } from '@/lib/cnft';
+import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
+import { createLockTokensTransaction } from '@/lib/lockTokens';
+// Fallback: import { createLockTransaction } from '@/lib/cnft';
 
 // Configuration du token $BACK - Utilise les variables d'environnement
 const BACK_TOKEN_MINT = new PublicKey(
@@ -112,7 +113,9 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
       try {
         const ata = await getAssociatedTokenAddress(
           BACK_TOKEN_MINT,
-          publicKey
+          publicKey,
+          false, // allowOwnerOffCurve
+          TOKEN_2022_PROGRAM_ID // Token-2022 pour BACK
         );
 
         const tokenAccount = await connection.getTokenAccountBalance(ata);
@@ -177,7 +180,9 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
 
     try {
       const durationSeconds = days * 24 * 60 * 60;
-      const { transaction } = await createLockTransaction(connection, wallet, {
+      
+      // Utiliser la nouvelle fonction avec transfert de tokens
+      const transaction = await createLockTokensTransaction(connection, wallet, {
         amount: amt,
         duration: durationSeconds,
       });
@@ -193,7 +198,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
       }, 'confirmed');
 
       setSuccess(
-        `✅ Lock successful! Signature: ${signature.slice(0, 8)}...`
+        `✅ Lock réussi ! ${amt} BACK verrouillés pour ${days} jours. Signature: ${signature.slice(0, 8)}...`
       );
       setAmount('');
 
@@ -231,6 +236,19 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         <h2 className="card-title">
           Lock $BACK
         </h2>
+      </div>
+
+      {/* Avertissement Lock avec transfert on-chain */}
+      <div className="mb-6 p-4 glass-effect rounded-lg border border-green-500/30 bg-green-500/5">
+        <div className="flex items-start gap-3">
+          <span className="text-2xl">✅</span>
+          <div className="flex-1">
+            <h3 className="text-green-400 font-bold mb-1">Lock avec transfert on-chain</h3>
+            <p className="text-gray-300 text-sm">
+              Les tokens BACK sont transférés vers un PDA de verrouillage sécurisé. Vous pourrez les récupérer après la période de lock.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Balance display */}

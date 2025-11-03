@@ -17,7 +17,7 @@ export const Dashboard = () => {
   const [activeTab, setActiveTab] = useState<"dca" | "lock-unlock" | "overview" | "analytics">("dca");
 
   const { cnftData, levelName } = useCNFT();
-  const { userStats, globalStats, loading } = useRealtimeStats(publicKey?.toString());
+  const { userStats, globalStats, loading, refresh, lastRefresh } = useRealtimeStats(publicKey?.toString());
 
   // Mock chart data
   const volumeData = {
@@ -62,9 +62,34 @@ export const Dashboard = () => {
       <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-white" id="protocol-stats-heading">Protocol Statistics</h2>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-900 rounded-lg border border-[var(--secondary)]/30">
-            <span className="w-2 h-2 bg-[var(--secondary)] rounded-full animate-pulse" aria-hidden="true"></span>
-            <span className="text-xs text-gray-400">Live</span>
+          <div className="flex items-center gap-3">
+            {/* Bouton de rafraîchissement manuel */}
+            <button
+              onClick={refresh}
+              disabled={loading}
+              className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg border border-[var(--primary)]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Rafraîchir les statistiques"
+            >
+              <svg 
+                className={`w-4 h-4 text-[var(--primary)] ${loading ? 'animate-spin' : ''}`}
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span className="text-xs text-gray-400">
+                {loading ? 'Chargement...' : 'Rafraîchir'}
+              </span>
+            </button>
+            
+            {/* Indicateur Live */}
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-900 rounded-lg border border-[var(--secondary)]/30">
+              <span className="w-2 h-2 bg-[var(--secondary)] rounded-full" aria-hidden="true"></span>
+              <span className="text-xs text-gray-400">
+                {lastRefresh ? `Mis à jour il y a ${Math.floor((Date.now() - lastRefresh) / 1000)}s` : 'Auto-refresh: 5min'}
+              </span>
+            </div>
           </div>
         </div>
         <div 

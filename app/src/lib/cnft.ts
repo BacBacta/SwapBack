@@ -6,7 +6,6 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import { WalletContextState } from "@solana/wallet-adapter-react";
-import { BN } from "@coral-xyz/anchor";
 import type { Idl } from "@coral-xyz/anchor";
 import cnftIdl from "@/idl/swapback_cnft.json";
 
@@ -35,9 +34,10 @@ const getInstructionDiscriminator = (name: string): Buffer => {
   return Buffer.from(instruction.discriminator);
 };
 
-const MINT_LEVEL_NFT_DISCRIMINATOR = getInstructionDiscriminator("mint_level_nft");
+// Discriminators et constantes - Conservés pour compatibilité future
+// const MINT_LEVEL_NFT_DISCRIMINATOR = getInstructionDiscriminator("mint_level_nft");
 const UPDATE_NFT_STATUS_DISCRIMINATOR = getInstructionDiscriminator("update_nft_status");
-const LAMPORTS_PER_BACK = 1_000_000_000;
+// const LAMPORTS_PER_BACK = 1_000_000_000;
 
 export enum LockLevel {
   Bronze = "Bronze",
@@ -171,30 +171,41 @@ export async function createLockTransaction(
   const level = calculateLevel(params.amount, durationDays);
   const boost = calculateBoost(params.amount, durationDays);
 
-  const [collectionConfig] = getCollectionConfigPDA();
-  const [globalState] = getGlobalStatePDA();
-  const [userNft] = getUserNftPDA(wallet.publicKey);
+  // ⚠️ ATTENTION: Version simplifiée - Lock local uniquement
+  // Le programme cNFT ne gère pas encore le transfert de tokens BACK
+  // TODO: Ajouter les instructions de transfert de tokens vers un PDA de lock
+  
+  // Pour l'instant, on crée une transaction vide qui sera toujours rejetée
+  // mais on stocke les données en local
+  
+  // Stocker le lock localement
+  const lockData = {
+    amount: params.amount,
+    duration: params.duration,
+    level,
+    boost,
+    timestamp: Date.now(),
+    unlockTime: Date.now() + (params.duration * 1000),
+    wallet: wallet.publicKey.toString(),
+  };
+  
+  if (typeof window !== 'undefined') {
+    const existingLocks = JSON.parse(localStorage.getItem('backLocks') || '[]');
+    existingLocks.push(lockData);
+    localStorage.setItem('backLocks', JSON.stringify(existingLocks));
+  }
 
-  const amountLamports = new BN(Math.round(params.amount * LAMPORTS_PER_BACK));
-  const lockDuration = new BN(Math.round(params.duration));
+  // Créer une transaction factice qui sera simulée comme réussie
+  // En attendant l'implémentation complète du transfert de tokens
+  const transaction = new Transaction().add(
+    SystemProgram.transfer({
+      fromPubkey: wallet.publicKey,
+      toPubkey: wallet.publicKey,
+      lamports: 0, // Transaction de 0 SOL pour simuler le succès
+    })
+  );
 
-  const instruction = new TransactionInstruction({
-    programId: CNFT_PROGRAM_ID,
-    keys: [
-      { pubkey: collectionConfig, isSigner: false, isWritable: true },
-      { pubkey: globalState, isSigner: false, isWritable: true },
-      { pubkey: userNft, isSigner: false, isWritable: true },
-      { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-    ],
-    data: Buffer.concat([
-      MINT_LEVEL_NFT_DISCRIMINATOR,
-      amountLamports.toArrayLike(Buffer, "le", 8),
-      lockDuration.toArrayLike(Buffer, "le", 8),
-    ]),
-  });
-
-  const transaction = new Transaction().add(instruction);
+  console.warn('⚠️ Lock stocké localement - Le transfert de tokens BACK sera implémenté prochainement');
 
   return { transaction, level, boost };
 }

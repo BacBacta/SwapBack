@@ -35,7 +35,7 @@ interface GlobalStats {
 
 export const useRealtimeStats = (publicKey: string | undefined) => {
   const [userStats, setUserStats] = useState<RealtimeStats | null>(null);
-  const [globalStats, setGlobalStats] = useState<GlobalStats>({
+  const [globalStats] = useState<GlobalStats>({
     totalVolume: 1234567,
     totalBurned: 45678,
     totalRebates: 98765,
@@ -44,6 +44,60 @@ export const useRealtimeStats = (publicKey: string | undefined) => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
+
+  // Fonction de rafraîchissement manuel
+  const refresh = async () => {
+    if (!publicKey) return;
+    
+    setLoading(true);
+    try {
+      // Fetch stats logic here (moved from useEffect)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const mockStats: RealtimeStats = {
+        totalSwaps: 23,
+        totalVolume: 15420,
+        totalNPI: 308.4,
+        totalRebates: 231.3,
+        pendingRebates: 12.45,
+        lockedAmount: 1000,
+        rebateBoost: 25,
+        recentSwaps: [
+          {
+            id: "1",
+            timestamp: Date.now() - 3600000,
+            inputToken: "USDC",
+            outputToken: "SOL",
+            inputAmount: 100,
+            outputAmount: 1.2,
+            npi: 2.5,
+            rebate: 1.8,
+            type: "swap",
+          },
+          {
+            id: "2",
+            timestamp: Date.now() - 7200000,
+            inputToken: "SOL",
+            outputToken: "USDT",
+            inputAmount: 2,
+            outputAmount: 200,
+            npi: 4.2,
+            rebate: 3.1,
+            type: "swap",
+          },
+        ],
+      };
+
+      setUserStats(mockStats);
+      setLastRefresh(Date.now());
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch stats");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!publicKey) {
@@ -52,75 +106,16 @@ export const useRealtimeStats = (publicKey: string | undefined) => {
       return;
     }
 
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        
-        // Simuler API call - à remplacer par vraie API
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Mock data avec activités récentes
-        const mockStats: RealtimeStats = {
-          totalSwaps: 23,
-          totalVolume: 15420,
-          totalNPI: 308.4,
-          totalRebates: 231.3,
-          pendingRebates: 12.45,
-          lockedAmount: 1000,
-          rebateBoost: 25,
-          recentSwaps: [
-            {
-              id: "1",
-              timestamp: Date.now() - 3600000,
-              inputToken: "USDC",
-              outputToken: "SOL",
-              inputAmount: 100,
-              outputAmount: 1.2,
-              npi: 2.5,
-              rebate: 1.8,
-              type: "swap",
-            },
-            {
-              id: "2",
-              timestamp: Date.now() - 7200000,
-              inputToken: "SOL",
-              outputToken: "USDT",
-              inputAmount: 2,
-              outputAmount: 200,
-              npi: 4.2,
-              rebate: 3.1,
-              type: "swap",
-            },
-          ],
-        };
+    // Appeler refresh au montage initial
+    refresh();
 
-        setUserStats(mockStats);
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to fetch stats");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStats();
-
-    // Auto-refresh toutes les 30 secondes
-    const interval = setInterval(fetchStats, 30000);
-
-    // Simuler WebSocket updates (à remplacer par vrai WebSocket)
-    const wsInterval = setInterval(() => {
-      setGlobalStats(prev => ({
-        ...prev,
-        totalVolume: prev.totalVolume + Math.random() * 100,
-        swapsLast24h: prev.swapsLast24h + Math.floor(Math.random() * 3),
-      }));
-    }, 5000);
+    // Auto-refresh uniquement toutes les 5 minutes pour éviter les rafraîchissements fréquents
+    const interval = setInterval(refresh, 300000);
 
     return () => {
       clearInterval(interval);
-      clearInterval(wsInterval);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [publicKey]);
 
   return {
@@ -128,5 +123,7 @@ export const useRealtimeStats = (publicKey: string | undefined) => {
     globalStats,
     loading,
     error,
+    refresh, // Exposer la fonction refresh pour rafraîchissement manuel
+    lastRefresh,
   };
 };
