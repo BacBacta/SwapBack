@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::{Token2022, TransferChecked, transfer_checked};
 use anchor_spl::token_interface::{TokenAccount, Mint};
+use anchor_spl::associated_token::AssociatedToken;
 
 // Program ID déployé sur devnet - 3 Nov 2025 (version avec lock_tokens/unlock_tokens)
 declare_id!("9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq");
@@ -455,9 +456,9 @@ pub struct LockTokens<'info> {
     #[account(
         init_if_needed,
         payer = user,
-        token::mint = back_mint,
-        token::authority = vault_authority,
-        token::token_program = token_program,
+        associated_token::mint = back_mint,
+        associated_token::authority = vault_authority,
+        associated_token::token_program = token_program,
     )]
     pub vault_token_account: InterfaceAccount<'info, TokenAccount>,
 
@@ -476,6 +477,7 @@ pub struct LockTokens<'info> {
     pub user: Signer<'info>,
 
     pub token_program: Program<'info, Token2022>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
 

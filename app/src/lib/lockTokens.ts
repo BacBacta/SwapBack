@@ -7,10 +7,15 @@ import {
   PublicKey,
   Transaction,
   SystemProgram,
+  SYSVAR_RENT_PUBKEY,
 } from "@solana/web3.js";
 import { WalletContextState } from "@solana/wallet-adapter-react";
 import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
-import { TOKEN_2022_PROGRAM_ID, getAssociatedTokenAddress } from "@solana/spl-token";
+import { 
+  TOKEN_2022_PROGRAM_ID, 
+  getAssociatedTokenAddress,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
 import cnftIdl from "@/idl/swapback_cnft.json";
 import type { Idl } from "@coral-xyz/anchor";
 
@@ -106,6 +111,7 @@ export async function createLockTokensTransaction(
       backMint: BACK_MINT,
       user: wallet.publicKey,
       tokenProgram: TOKEN_2022_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
     })
     .instruction();
