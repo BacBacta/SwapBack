@@ -19,7 +19,7 @@ export const Dashboard = () => {
   const { connected, publicKey } = useWallet();
   const [activeTab, setActiveTab] = useState<"dca" | "lock-unlock" | "overview" | "analytics">("dca");
 
-  const { cnftData, levelName } = useCNFT();
+  const { cnftData } = useCNFT();
   const { userStats, globalStats, loading, refresh, lastRefresh } = useRealtimeStats(publicKey?.toString());
 
   // Mock chart data
@@ -137,12 +137,12 @@ export const Dashboard = () => {
       {/* cNFT Card */}
       {cnftData && cnftData.exists && cnftData.isActive && (
         <CNFTCard
-          level={levelName || "Bronze"}
-          boost={cnftData.boost}
+          level={cnftData.level === "Bronze" || cnftData.level === "Silver" || cnftData.level === "Gold" ? cnftData.level : "Bronze"}
+          boost={cnftData.boostBps}
           lockedAmount={cnftData.lockedAmount}
           lockDuration={cnftData.lockDuration}
           isActive={cnftData.isActive}
-          unlockDate={cnftData.unlockDate}
+          unlockDate={new Date(cnftData.unlockTime)}
         />
       )}
 

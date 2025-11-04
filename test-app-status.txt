@@ -1,0 +1,3 @@
+Test de l'application SwapBack - Tue Nov  4 09:19:11 PM UTC 2025
+✅ Build réussi
+✅ Serveur démarre

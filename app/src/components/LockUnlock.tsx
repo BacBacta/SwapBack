@@ -99,11 +99,11 @@ export const LockUnlock = () => {
     }
 
     const now = Date.now();
-    if (cnftData.unlockDate && now < cnftData.unlockDate.getTime()) {
+    if (new Date(cnftData.unlockTime) && now < new Date(cnftData.unlockTime).getTime()) {
       alert(
         `⚠️ Tokens still locked!\n\n` +
-          `Unlock date: ${cnftData.unlockDate.toLocaleDateString()}\n` +
-          `Time remaining: ${Math.ceil((cnftData.unlockDate.getTime() - now) / (1000 * 60 * 60 * 24))} days`
+          `Unlock date: ${new Date(cnftData.unlockTime).toLocaleDateString()}\n` +
+          `Time remaining: ${Math.ceil((new Date(cnftData.unlockTime).getTime() - now) / (1000 * 60 * 60 * 24))} days`
       );
       return;
     }
@@ -285,14 +285,14 @@ export const LockUnlock = () => {
                 <div className="flex justify-between">
                   <span className="opacity-70">CURRENT_BOOST:</span>
                   <span className="text-[var(--primary)] font-bold">
-                    +{cnftData.boost}%
+                    +{cnftData.boostBps}%
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="opacity-70">UNLOCK_DATE:</span>
                   <span>
-                    {cnftData.unlockDate
-                      ? cnftData.unlockDate.toLocaleDateString()
+                    {new Date(cnftData.unlockTime)
+                      ? new Date(cnftData.unlockTime).toLocaleDateString()
                       : "N/A"}
                   </span>
                 </div>
@@ -300,14 +300,14 @@ export const LockUnlock = () => {
                   <span className="opacity-70">STATUS:</span>
                   <span
                     className={
-                      cnftData.unlockDate &&
-                      Date.now() >= cnftData.unlockDate.getTime()
+                      new Date(cnftData.unlockTime) &&
+                      Date.now() >= new Date(cnftData.unlockTime).getTime()
                         ? "text-[var(--primary)]"
                         : "text-yellow-500"
                     }
                   >
-                    {cnftData.unlockDate &&
-                    Date.now() >= cnftData.unlockDate.getTime()
+                    {new Date(cnftData.unlockTime) &&
+                    Date.now() >= new Date(cnftData.unlockTime).getTime()
                       ? "[UNLOCKABLE]"
                       : "[LOCKED]"}
                   </span>
@@ -321,8 +321,8 @@ export const LockUnlock = () => {
               disabled={
                 !connected ||
                 loading ||
-                !cnftData.unlockDate ||
-                Date.now() < cnftData.unlockDate.getTime()
+                !new Date(cnftData.unlockTime) ||
+                Date.now() < new Date(cnftData.unlockTime).getTime()
               }
               className="btn-primary w-full"
             >
