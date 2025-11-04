@@ -276,6 +276,11 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
       const durationSeconds = days * 24 * 60 * 60;
       console.log('🔍 [LOCK DEBUG] Duration in seconds:', durationSeconds);
       
+      // Obtenir le blockhash AVANT de créer la transaction
+      console.log('🔍 [LOCK DEBUG] Getting latest blockhash...');
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+      console.log('✅ [LOCK DEBUG] Blockhash obtained:', blockhash.slice(0, 8) + '...');
+      
       // Utiliser la nouvelle fonction avec transfert de tokens
       console.log('🔍 [LOCK DEBUG] Creating lock transaction...');
       const transaction = await createLockTokensTransaction(connection, wallet, {
@@ -284,15 +289,17 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
       });
       console.log('✅ [LOCK DEBUG] Transaction created successfully');
 
+      // Définir le feePayer et le recentBlockhash
+      transaction.feePayer = publicKey;
+      transaction.recentBlockhash = blockhash;
+      console.log('✅ [LOCK DEBUG] Transaction configured with blockhash and feePayer');
+
       console.log('🔍 [LOCK DEBUG] Sending transaction...');
       const signature = await sendTransaction(transaction, connection);
       console.log('✅ [LOCK DEBUG] Transaction sent:', signature);
 
-      console.log('✅ [LOCK DEBUG] Transaction sent:', signature);
-
       // Attendre la confirmation (méthode moderne)
       console.log('🔍 [LOCK DEBUG] Waiting for confirmation...');
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
       await connection.confirmTransaction({
         signature,
         blockhash,
@@ -320,24 +327,32 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
       }, 2000);
     } catch (err: unknown) {
       console.error('❌ [LOCK ERROR] Error during lock:', err);
+      console.error('❌ [LOCK ERROR] Error type:', typeof err);
       console.error('❌ [LOCK ERROR] Error stack:', err instanceof Error ? err.stack : 'No stack');
       
       let message = 'Lock failed. Please try again.';
       
       if (err instanceof Error) {
-        message = err.message;
-        console.error('❌ [LOCK ERROR] Error message:', message);
+        console.error('❌ [LOCK ERROR] Error message:', err.message);
+        console.error('❌ [LOCK ERROR] Error name:', err.name);
         
-        // Vérifier les erreurs spécifiques
-        if (message.includes('User rejected')) {
+        // Afficher l'erreur complète pour debug
+        message = `❌ ${err.message}`;
+        
+        // Vérifier les erreurs spécifiques pour des messages plus clairs
+        if (err.message.includes('User rejected')) {
           message = '❌ Transaction cancelled by user';
-        } else if (message.includes('insufficient')) {
+        } else if (err.message.includes('insufficient')) {
           message = '❌ Insufficient balance';
-        } else if (message.includes('AccountNotFound')) {
+        } else if (err.message.includes('AccountNotFound')) {
           message = '❌ Token account not found. Do you have BACK tokens?';
-        } else if (message.includes('0x1')) {
+        } else if (err.message.includes('0x1')) {
           message = '❌ Program error: Account not initialized. Please contact support.';
         }
+      } else {
+        // Si ce n'est pas une Error standard, afficher l'objet complet
+        console.error('❌ [LOCK ERROR] Non-Error object:', JSON.stringify(err, null, 2));
+        message = `❌ Unexpected error: ${JSON.stringify(err)}`;
       }
       
       setError(message);
