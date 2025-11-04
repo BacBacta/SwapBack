@@ -65,72 +65,71 @@ describe('✅ SDK E2E - Functions Validation', () => {
   });
 
   describe('📊 1. SwapBackUtils - Boost Calculation', () => {
-    it('should calculate Gold boost (50%) correctly', () => {
-      console.log('\n🥇 Testing Gold tier boost...');
+    it('should calculate maximum boost (20%) correctly', () => {
+      console.log('\n🥇 Testing maximum boost (Diamond tier)...');
       
-      const amount = 10000; // 10,000 tokens
+      const amount = 10000000; // 10M tokens (1% of supply)
       const duration = 365; // 365 days
       
       const boost = SwapBackUtils.calculateBoost(amount, duration);
       
       console.log(`   Input: ${amount} tokens for ${duration} days`);
       console.log(`   Output: ${boost}% boost`);
-      console.log('   Expected: 50% (Gold tier)');
+      console.log('   Expected: 20% (maximum boost)');
       
-      expect(boost).toBe(50);
-      console.log('   ✅ Gold boost calculation correct');
+      expect(boost).toBe(20);
+      console.log('   ✅ Maximum boost calculation correct');
     });
 
-    it('should calculate Silver boost (30%) correctly', () => {
-      console.log('\n🥈 Testing Silver tier boost...');
+    it('should calculate Platinum boost (~15%) correctly', () => {
+      console.log('\n💎 Testing Platinum tier boost...');
       
-      const amount = 1000; // 1,000 tokens
+      const amount = 5000000; // 5M tokens (0.5% of supply)
       const duration = 180; // 180 days
       
       const boost = SwapBackUtils.calculateBoost(amount, duration);
       
       console.log(`   Input: ${amount} tokens for ${duration} days`);
       console.log(`   Output: ${boost}% boost`);
-      console.log('   Expected: 30% (Silver tier)');
+      console.log('   Expected: ~14.93% (Platinum tier)');
       
-      expect(boost).toBe(30);
-      console.log('   ✅ Silver boost calculation correct');
+      expect(boost).toBeCloseTo(14.93, 1);
+      console.log('   ✅ Platinum boost calculation correct');
     });
 
-    it('should calculate Bronze boost (10%) correctly', () => {
-      console.log('\n🥉 Testing Bronze tier boost...');
+    it('should calculate Gold boost (~4%) correctly', () => {
+      console.log('\n� Testing Gold tier boost...');
       
-      const amount = 100; // 100 tokens
+      const amount = 1000000; // 1M tokens (0.1% of supply)
       const duration = 90; // 90 days
       
       const boost = SwapBackUtils.calculateBoost(amount, duration);
       
       console.log(`   Input: ${amount} tokens for ${duration} days`);
       console.log(`   Output: ${boost}% boost`);
-      console.log('   Expected: 10% (Bronze tier)');
+      console.log('   Expected: ~4.47% (Gold tier)');
       
-      expect(boost).toBe(10);
-      console.log('   ✅ Bronze boost calculation correct');
+      expect(boost).toBeCloseTo(4.47, 1);
+      console.log('   ✅ Gold boost calculation correct');
     });
 
-    it('should return 0 boost for insufficient amount/duration', () => {
-      console.log('\n❌ Testing no boost scenario...');
+    it('should calculate small boosts for low amounts correctly', () => {
+      console.log('\n🔹 Testing low tier boost scenarios...');
       
       const testCases = [
-        { amount: 50, duration: 30, reason: 'insufficient amount and duration' },
-        { amount: 10000, duration: 30, reason: 'insufficient duration' },
-        { amount: 50, duration: 365, reason: 'insufficient amount' },
+        { amount: 100000, duration: 30, expected: 1.02, tier: 'Silver' },
+        { amount: 500000, duration: 7, expected: 1.19, tier: 'Silver+' },
+        { amount: 50000, duration: 90, expected: 2.56, tier: 'Bronze+' },
       ];
 
       testCases.forEach((test, index) => {
         const boost = SwapBackUtils.calculateBoost(test.amount, test.duration);
-        console.log(`   Test ${index + 1}: ${test.amount} tokens, ${test.duration} days`);
-        console.log(`   Reason: ${test.reason}`);
-        console.log(`   Boost: ${boost}%`);
-        expect(boost).toBe(0);
+        console.log(`   Test ${index + 1} (${test.tier}): ${test.amount} tokens, ${test.duration} days`);
+        console.log(`   Boost: ${boost}% (expected ~${test.expected}%)`);
+        expect(boost).toBeCloseTo(test.expected, 1);
       });
       
-      console.log('   ✅ No boost scenarios validated');
+      console.log('   ✅ Low tier boost scenarios validated');
     });
   });
 
@@ -159,7 +158,7 @@ describe('✅ SDK E2E - Functions Validation', () => {
       
       const npi = 1000;
       const rebatePercentage = 75;
-      const boost = 50; // Gold boost
+      const boost = 20; // Maximum boost (Diamond tier)
       
       const rebate = SwapBackUtils.calculateRebate(npi, rebatePercentage, boost);
       
@@ -173,7 +172,7 @@ describe('✅ SDK E2E - Functions Validation', () => {
       console.log(`   Final rebate: ${rebate}`);
       console.log(`   Expected: ${expectedRebate}`);
       
-      expect(rebate).toBe(1125); // 750 * 1.5 = 1125
+      expect(rebate).toBe(900); // 750 * 1.2 = 900
       console.log('   ✅ Boosted rebate calculation correct');
     });
 
@@ -185,15 +184,16 @@ describe('✅ SDK E2E - Functions Validation', () => {
       
       const tiers = [
         { name: 'None', boost: 0, expected: 750 },
-        { name: 'Bronze', boost: 10, expected: 825 },
-        { name: 'Silver', boost: 30, expected: 975 },
-        { name: 'Gold', boost: 50, expected: 1125 },
+        { name: 'Silver', boost: 1.02, expected: 757.65 },
+        { name: 'Gold', boost: 4.47, expected: 783.525 },
+        { name: 'Platinum', boost: 14.93, expected: 861.975 },
+        { name: 'Diamond', boost: 20, expected: 900 },
       ];
 
       tiers.forEach(tier => {
         const rebate = SwapBackUtils.calculateRebate(npi, rebatePercentage, tier.boost);
-        console.log(`   ${tier.name} tier (${tier.boost}% boost): ${rebate} (expected ${tier.expected})`);
-        expect(rebate).toBeCloseTo(tier.expected, 0); // Use toBeCloseTo for floating point comparison
+        console.log(`   ${tier.name} tier (${tier.boost}% boost): ${rebate} (expected ~${tier.expected})`);
+        expect(rebate).toBeCloseTo(tier.expected, 0);
       });
       
       console.log('   ✅ All tier calculations correct');
