@@ -100,45 +100,28 @@ const nextConfig = {
       { module: /@walletconnect/ },
     ];
     
-    // Performance: Code splitting optimization
+    // Performance: Code splitting optimization - Simplified to avoid chunk loading errors
     if (!isServer) {
       config.optimization = {
         ...config.optimization,
         splitChunks: {
           chunks: 'all',
+          maxSize: 244000, // Limit chunk size to avoid loading issues
           cacheGroups: {
-            default: false,
-            vendors: false,
-            // Vendor chunk for react/react-dom
-            framework: {
-              name: 'framework',
-              chunks: 'all',
-              test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/,
-              priority: 40,
-              enforce: true,
+            // Keep default behavior but with size limits
+            defaultVendors: {
+              test: /[\\/]node_modules[\\/]/,
+              priority: -10,
+              reuseExistingChunk: true,
+              name(module, chunks, cacheGroupKey) {
+                const allChunksNames = chunks.map((chunk) => chunk.name).join('~');
+                return `vendors-${allChunksNames}`;
+              },
             },
-            // Solana SDK chunk
-            solana: {
-              name: 'solana',
-              chunks: 'all',
-              test: /[\\/]node_modules[\\/](@solana|@coral-xyz|@metaplex-foundation)[\\/]/,
-              priority: 30,
-              enforce: true,
-            },
-            // Chart libraries
-            charts: {
-              name: 'charts',
-              chunks: 'all',
-              test: /[\\/]node_modules[\\/](chart\.js|react-chartjs-2|recharts)[\\/]/,
-              priority: 25,
-              enforce: true,
-            },
-            // Common utilities
-            commons: {
-              name: 'commons',
-              chunks: 'all',
+            default: {
               minChunks: 2,
-              priority: 20,
+              priority: -20,
+              reuseExistingChunk: true,
             },
           },
         },

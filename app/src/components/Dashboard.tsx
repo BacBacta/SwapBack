@@ -1,7 +1,7 @@
 "use client";
 
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useState, lazy, Suspense } from "react";
+import { useState } from "react";
 import { CNFTCard } from "./CNFTCard";
 import { useCNFT } from "../hooks/useCNFT";
 import { useRealtimeStats } from "../hooks/useRealtimeStats";
@@ -10,14 +10,8 @@ import { NoActivityState, NoConnectionState } from "./EmptyState";
 import { SwapBackDashboard } from "./SwapBackDashboard";
 import LockInterface from "./LockInterface";
 import UnlockInterface from "./UnlockInterface";
-
-// Lazy load heavy chart components
-const VolumeChart = lazy(() =>
-  import("./Charts").then((mod) => ({ default: mod.VolumeChart }))
-);
-const ActivityChart = lazy(() =>
-  import("./Charts").then((mod) => ({ default: mod.ActivityChart }))
-);
+// Import charts directly instead of lazy loading to avoid chunk errors
+import { VolumeChart, ActivityChart } from "./Charts";
 
 export const Dashboard = () => {
   const { connected, publicKey } = useWallet();
@@ -353,15 +347,7 @@ export const Dashboard = () => {
               <span>Volume Trend (7 Days)</span>
             </h3>
             <div className="h-64">
-              <Suspense
-                fallback={
-                  <div className="flex items-center justify-center h-full">
-                    <div className="animate-spin text-2xl">⚡</div>
-                  </div>
-                }
-              >
-                <VolumeChart data={volumeData} />
-              </Suspense>
+              <VolumeChart data={volumeData} />
             </div>
           </div>
 
@@ -372,15 +358,7 @@ export const Dashboard = () => {
               <span>Trading Activity (7 Days)</span>
             </h3>
             <div className="h-64">
-              <Suspense
-                fallback={
-                  <div className="flex items-center justify-center h-full">
-                    <div className="animate-spin text-2xl">⚡</div>
-                  </div>
-                }
-              >
-                <ActivityChart data={activityData} />
-              </Suspense>
+              <ActivityChart data={activityData} />
             </div>
           </div>
 
