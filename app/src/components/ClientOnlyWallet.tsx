@@ -19,13 +19,19 @@ const WalletMultiButtonDynamic = dynamic(
  */
 export const ClientOnlyWallet = () => {
   return (
-    <WalletMultiButtonDynamic
-      className="!bg-[var(--primary)] hover:!bg-[var(--primary-hover)] !text-black !font-bold !rounded !px-4 !py-2 !transition-colors"
-      style={{
-        backgroundColor: 'var(--primary)',
-        border: 'none',
-        fontFamily: 'var(--font-mono)',
-      }}
-    />
+    <div className="relative z-[100]" style={{ pointerEvents: 'auto' }}>
+      <WalletMultiButtonDynamic
+        className="!bg-[var(--primary)] hover:!bg-[var(--primary-hover)] !text-black !font-bold !rounded !px-4 !py-2 !transition-colors"
+        style={{
+          backgroundColor: 'var(--primary)',
+          border: 'none',
+          fontFamily: 'var(--font-mono)',
+          pointerEvents: 'auto',
+          cursor: 'pointer',
+          position: 'relative',
+          zIndex: 100,
+        }}
+      />
+    </div>
   );
 };

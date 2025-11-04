@@ -35,7 +35,7 @@ export default function Home() {
       {/* HEADER PRINCIPAL - Une seule navigation */}
       <nav className="border-b-2 border-[var(--primary)] bg-black sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center gap-4">
             {/* Logo */}
             <div className="text-2xl font-bold terminal-text terminal-glow hover:text-[var(--accent)] transition-colors flex items-center gap-3 uppercase tracking-wider">
               <span className="text-3xl">⚡</span>
@@ -66,8 +66,8 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Wallet Button */}
-            <div className="flex items-center">
+            {/* Wallet Button - Ensure it's always accessible */}
+            <div className="flex items-center relative z-[100]">
               <ClientOnlyWallet />
             </div>
           </div>
