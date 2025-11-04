@@ -59,6 +59,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [hasExistingNft, setHasExistingNft] = useState<boolean>(false);
 
   // Calcul du niveau basé sur la durée et le montant (visuel uniquement)
   const predictedLevel: CNFTLevel = useMemo(() => {
@@ -127,10 +128,38 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
       }
     };
 
+    const checkExistingNft = async () => {
+      try {
+        const CNFT_PROGRAM_ID = new PublicKey(
+          process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID ||
+            '2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G'
+        );
+        
+        const [userNftPda] = PublicKey.findProgramAddressSync(
+          [Buffer.from('user_nft'), publicKey.toBuffer()],
+          CNFT_PROGRAM_ID
+        );
+        
+        const accountInfo = await connection.getAccountInfo(userNftPda);
+        setHasExistingNft(!!accountInfo);
+        
+        if (accountInfo) {
+          console.log('ℹ️ User already has a locked NFT');
+        }
+      } catch (err) {
+        console.error('Erreur lors de la vérification du NFT existant:', err);
+        setHasExistingNft(false);
+      }
+    };
+
     fetchBalance();
+    checkExistingNft();
     
     // Rafraîchir toutes les 30 secondes
-    const interval = setInterval(fetchBalance, 30000);
+    const interval = setInterval(() => {
+      fetchBalance();
+      checkExistingNft();
+    }, 30000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [publicKey]); // connection est stable
@@ -268,6 +297,25 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
           Lock $BACK
         </h2>
       </div>
+
+      {/* Avertissement si NFT existe déjà */}
+      {hasExistingNft && (
+        <div className="mb-6 p-4 glass-effect rounded-lg border border-yellow-500/30 bg-yellow-500/5">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">⚠️</span>
+            <div className="flex-1">
+              <h3 className="text-yellow-400 font-bold mb-1">NFT de Lock déjà actif</h3>
+              <p className="text-gray-300 text-sm">
+                Vous avez déjà un NFT de lock actif. Pour créer un nouveau lock, vous devez d&apos;abord{' '}
+                <span className="text-yellow-400 font-semibold">déverrouiller (unlock)</span> vos tokens actuels.
+              </p>
+              <p className="text-gray-400 text-xs mt-2">
+                💡 Allez dans l&apos;onglet &quot;Unlock&quot; pour gérer votre lock existant.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Avertissement Lock avec transfert on-chain */}
       <div className="mb-6 p-4 glass-effect rounded-lg border border-green-500/30 bg-green-500/5">
@@ -510,6 +558,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         disabled={
           isLoading ||
           !publicKey ||
+          hasExistingNft ||
           !!amountError ||
           !!durationError ||
           !amount ||
@@ -518,6 +567,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         className={`w-full py-4 rounded-lg font-bold text-[var(--primary)] transition-all duration-300 relative overflow-hidden group ${
           isLoading ||
           !publicKey ||
+          hasExistingNft ||
           !!amountError ||
           !!durationError ||
           !amount ||
@@ -528,6 +578,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
       >
         {!isLoading && !(
           !publicKey ||
+          hasExistingNft ||
           !!amountError ||
           !!durationError ||
           !amount ||
@@ -561,6 +612,11 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
           </span>
         ) : !publicKey ? (
           <span className="relative">Connect Wallet</span>
+        ) : hasExistingNft ? (
+          <span className="relative flex items-center justify-center gap-2">
+            <span>⚠️</span>
+            <span>NFT Already Locked - Unlock First</span>
+          </span>
         ) : (
           <span className="relative flex items-center justify-center gap-2">
             <span>🔒</span>

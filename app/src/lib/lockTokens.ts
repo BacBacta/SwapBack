@@ -90,11 +90,23 @@ export async function createLockTokensTransaction(
   );
   console.log('✅ [LOCK TX] User NFT:', userNft.toString());
 
-  const [vaultAuthority] = PublicKey.findProgramAddressSync(
+  // Vérifier si le user_nft existe déjà (lock_tokens utilise 'init' donc échouera si existant)
+  console.log('🔍 [LOCK TX] Checking if user NFT already exists...');
+  const userNftAccount = await connection.getAccountInfo(userNft);
+  if (userNftAccount) {
+    console.error('❌ [LOCK TX] User NFT already exists!');
+    throw new Error(
+      "❌ Vous avez déjà un NFT de lock actif. " +
+      "Pour ajouter plus de tokens, vous devez d'abord déverrouiller (unlock) vos tokens actuels."
+    );
+  }
+  console.log('✅ [LOCK TX] No existing user NFT found, can proceed');
+
+  const vaultAuthority = PublicKey.findProgramAddressSync(
     [Buffer.from("vault_authority")],
     CNFT_PROGRAM_ID
   );
-  console.log('✅ [LOCK TX] Vault Authority:', vaultAuthority.toString());
+  console.log('✅ [LOCK TX] Vault Authority:', vaultAuthority[0].toString());
 
   // Obtenir les token accounts
   console.log('🔍 [LOCK TX] Getting token accounts...');
@@ -106,18 +118,15 @@ export async function createLockTokensTransaction(
   );
   console.log('✅ [LOCK TX] User Token Account:', userTokenAccount.toString());
 
-  console.log('✅ [LOCK TX] User Token Account:', userTokenAccount.toString());
-
-  console.log('✅ [LOCK TX] User Token Account:', userTokenAccount.toString());
-
   // Le vault token account est dérivé automatiquement par Anchor via l'IDL
   // On peut le calculer pour info mais Anchor le fera aussi
   const vaultTokenAccount = await getAssociatedTokenAddress(
     BACK_MINT,
-    vaultAuthority,
+    vaultAuthority[0],
     true, // allowOwnerOffCurve = true pour PDA
     TOKEN_2022_PROGRAM_ID
   );
+  console.log('✅ [LOCK TX] Vault Token Account (calculated):', vaultTokenAccount.toString());
   console.log('✅ [LOCK TX] Vault Token Account (calculated):', vaultTokenAccount.toString());
 
   // Construire l'instruction via Anchor
@@ -132,7 +141,7 @@ export async function createLockTokensTransaction(
         userNft,
         userTokenAccount,
         vaultTokenAccount, // On le passe quand même au cas où
-        vaultAuthority,
+        vaultAuthority: vaultAuthority[0],
         backMint: BACK_MINT,
         user: wallet.publicKey,
         tokenProgram: TOKEN_2022_PROGRAM_ID,
