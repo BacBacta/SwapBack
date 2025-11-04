@@ -85,6 +85,16 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
     return 'Bronze';
   }, [duration, amount]);
 
+  // Niveau et boost actuels : utilise les données du NFT existant si disponibles, sinon les valeurs prédites
+  const displayLevel: CNFTLevel = useMemo(() => {
+    return currentNftData ? currentNftData.level : predictedLevel;
+  }, [currentNftData, predictedLevel]);
+
+  // Boost actuel du NFT (pour référence future)
+  const _displayBoost = useMemo(() => {
+    return currentNftData ? currentNftData.boost : 0;
+  }, [currentNftData]);
+
   // Calcul du boost basé sur le montant ET la durée (DYNAMIQUE)
   const predictedBoost = useMemo(() => {
     const amt = parseFloat(amount) || 0;
@@ -105,9 +115,14 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
     return { amountScore, durationScore };
   }, [amount, duration]);
 
-  // Couleur du badge selon le niveau
+  // Couleur du badge selon le niveau (utilise le niveau réel du NFT si disponible)
   const levelColor = useMemo(() => {
-    switch (predictedLevel) {
+    const level = currentNftData ? currentNftData.level : predictedLevel;
+    switch (level) {
+      case 'Diamond':
+        return 'text-cyan-400 border-cyan-400 bg-cyan-400/10';
+      case 'Platinum':
+        return 'text-purple-400 border-purple-400 bg-purple-400/10';
       case 'Gold':
         return 'text-yellow-400 border-yellow-400 bg-yellow-400/10';
       case 'Silver':
@@ -115,7 +130,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
       case 'Bronze':
         return 'text-orange-400 border-orange-400 bg-orange-400/10';
     }
-  }, [predictedLevel]);
+  }, [currentNftData, predictedLevel]);
 
   // Récupérer le solde de $BACK
   useEffect(() => {
@@ -347,80 +362,6 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
 
       {/* Information sur les locks multiples */}
       {/* Current NFT Information */}
-      {currentNftData && (
-        <div className="mb-6 p-4 glass-effect rounded-lg border border-purple-500/30 bg-purple-500/5">
-          <div className="flex items-start gap-3">
-            <span className="text-2xl">🎭</span>
-            <div className="flex-1">
-              <h3 className="text-purple-400 font-bold mb-2">Your Current Lock NFT</h3>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="p-2 bg-black/20 rounded-lg">
-                  <div className="text-gray-400 text-xs">Niveau</div>
-                  <div className={`text-lg font-bold ${
-                    currentNftData.level === 'Diamond' ? 'text-cyan-400' :
-                    currentNftData.level === 'Platinum' ? 'text-purple-400' :
-                    currentNftData.level === 'Gold' ? 'text-yellow-400' :
-                    currentNftData.level === 'Silver' ? 'text-gray-300' :
-                    'text-orange-400'
-                  }`}>
-                    {currentNftData.level}
-                  </div>
-                </div>
-                <div className="p-2 bg-black/20 rounded-lg">
-                  <div className="text-gray-400 text-xs">Boost Actuel</div>
-                  <div className="text-lg font-bold text-green-400">
-                    +{currentNftData.boost.toFixed(2)}%
-                  </div>
-                </div>
-                <div className="p-2 bg-black/20 rounded-lg">
-                  <div className="text-gray-400 text-xs">Montant Locké</div>
-                  <div className="text-sm font-bold text-blue-400">
-                    {currentNftData.amount.toLocaleString()} BACK
-                  </div>
-                </div>
-                <div className="p-2 bg-black/20 rounded-lg">
-                  <div className="text-gray-400 text-xs">Déblocage</div>
-                  <div className="text-sm font-bold text-yellow-400">
-                    {new Date(currentNftData.unlockTime * 1000).toLocaleDateString()}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {hasExistingNft && (
-        <div className="mb-6 p-4 glass-effect rounded-lg border border-blue-500/30 bg-blue-500/5">
-          <div className="flex items-start gap-3">
-            <span className="text-2xl">💎</span>
-            <div className="flex-1">
-              <h3 className="text-blue-400 font-bold mb-1">Lock supplémentaire disponible</h3>
-              <p className="text-gray-300 text-sm">
-                Vous avez déjà un NFT de lock actif. Vous pouvez créer un nouveau lock pour{' '}
-                <span className="text-blue-400 font-semibold">augmenter votre boost global</span> !
-              </p>
-              <p className="text-gray-400 text-xs mt-2">
-                💡 Plus vous lockez de tokens, plus votre boost augmente (max 20%).
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Avertissement Lock avec transfert on-chain */}
-      <div className="mb-6 p-4 glass-effect rounded-lg border border-green-500/30 bg-green-500/5">
-        <div className="flex items-start gap-3">
-          <span className="text-2xl">✅</span>
-          <div className="flex-1">
-            <h3 className="text-green-400 font-bold mb-1">Lock avec transfert on-chain</h3>
-            <p className="text-gray-300 text-sm">
-              Les tokens BACK sont transférés vers un PDA de verrouillage sécurisé. Vous pourrez les récupérer après la période de lock.
-            </p>
-          </div>
-        </div>
-      </div>
-
       {/* Balance display */}
       <div className="mb-6 p-4 glass-effect rounded-lg border border-primary/10">
         <div className="flex justify-between items-center">
@@ -555,7 +496,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
             <span
               className={`px-4 py-1.5 rounded-full border font-bold ${levelColor} transition-all hover:scale-105`}
             >
-              {predictedLevel}
+              {displayLevel}
             </span>
           </div>
           
@@ -580,25 +521,6 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
                 <span className="text-2xl font-bold bg-gradient-to-r from-secondary to-green-400 bg-clip-text text-transparent">
                   +{predictedBoost.toFixed(2)}%
                 </span>
-              </div>
-            </div>
-          </div>
-          
-          {/* Amount Thresholds Guide */}
-          <div className="p-3 rounded-lg bg-gradient-to-r from-blue-500/5 to-transparent border border-blue-500/10">
-            <div className="text-xs font-bold text-blue-400 mb-2">📊 Seuils de montant</div>
-            <div className="space-y-1 text-xs text-gray-400">
-              <div className="flex justify-between">
-                <span>100K tokens (0.01% supply)</span>
-                <span className="text-blue-300">~0.2%</span>
-              </div>
-              <div className="flex justify-between">
-                <span>1M tokens (0.1% supply)</span>
-                <span className="text-blue-300">~2%</span>
-              </div>
-              <div className="flex justify-between">
-                <span>5M tokens (0.5% supply)</span>
-                <span className="text-green-400 font-bold">10% max ✓</span>
               </div>
             </div>
           </div>
