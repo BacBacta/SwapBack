@@ -22,13 +22,11 @@ export default function ClaimBuyback() {
           <h2 className="text-2xl font-bold text-[var(--primary)] mb-4">
             [CLAIM BUYBACK]
           </h2>
-          <p className="text-gray-400 mb-6">
-            Fonctionnalité en développement
-          </p>
+          <p className="text-gray-400 mb-6">Fonctionnalité en développement</p>
           <div className="bg-yellow-900/20 border border-yellow-500/30 rounded p-4">
             <p className="text-yellow-400 text-sm">
-              Le système de claim buyback n'est pas encore implémenté.
-              Cette fonctionnalité sera disponible dans une future mise à jour.
+              Le système de claim buyback n'est pas encore implémenté. Cette
+              fonctionnalité sera disponible dans une future mise à jour.
             </p>
           </div>
           {connected && publicKey && (
