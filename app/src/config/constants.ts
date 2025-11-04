@@ -62,10 +62,12 @@ export const LEVEL_THRESHOLDS: Record<CNFTLevel, number> = {
 };
 
 // Boost de rebate en pourcentage pour chaque niveau
+// Note: Ces valeurs sont indicatives. Le boost réel est calculé dynamiquement
+// basé sur le montant et la durée de lock (max 20%)
 export const LEVEL_BOOSTS: Record<CNFTLevel, number> = {
-  [CNFTLevel.Bronze]: 5,
-  [CNFTLevel.Silver]: 10,
-  [CNFTLevel.Gold]: 20,
+  [CNFTLevel.Bronze]: 3,   // Référence pour locks courts/petits montants
+  [CNFTLevel.Silver]: 8,   // Référence pour locks moyens
+  [CNFTLevel.Gold]: 15,    // Référence pour locks importants (le max est 20%)
 };
 
 // Couleurs Tailwind pour les badges de niveau

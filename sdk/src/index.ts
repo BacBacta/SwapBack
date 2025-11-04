@@ -483,17 +483,23 @@ export class SwapBackClient {
 export class SwapBackUtils {
   /**
    * Calcule le boost de remise basé sur le montant et la durée de lock
+   * Formule: boost maximum = 20%
+   * - Score montant: (amount / 10,000) * 10, max 10%
+   * - Score durée: (days / 365) * 10, max 10%
+   * - Total: max 20%
    */
   static calculateBoost(amount: number, durationDays: number): number {
-    // Thresholds: Gold = 10000+ tokens for 365+ days
-    if (amount >= 10000 && durationDays >= 365) {
-      return 50; // Gold
-    } else if (amount >= 1000 && durationDays >= 180) {
-      return 30; // Silver
-    } else if (amount >= 100 && durationDays >= 90) {
-      return 10; // Bronze
-    }
-    return 0;
+    // Score du montant (max 10%)
+    const amountScore = Math.min((amount / 10000) * 10, 10);
+    
+    // Score de la durée (max 10%)
+    const durationScore = Math.min((durationDays / 365) * 10, 10);
+    
+    // Boost total (max 20%)
+    const totalBoost = Math.min(amountScore + durationScore, 20);
+    
+    // Arrondir à 2 décimales
+    return Math.round(totalBoost * 100) / 100;
   }
 
   /**

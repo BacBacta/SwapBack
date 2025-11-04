@@ -25,17 +25,21 @@ const LEVEL_THRESHOLDS = {
 };
 
 // Fonction de calcul du boost dynamique
+// Formule: boost maximum = 20%
+// - Score montant: (amount / 10,000) * 10, max 10%
+// - Score durée: (days / 365) * 10, max 10%
+// - Total: max 20%
 const calculateDynamicBoost = (amount: number, durationDays: number): number => {
-  // Score du montant (max 50)
-  const amountScore = Math.min((amount / 1000) * 0.5, 50);
+  // Score du montant (max 10%)
+  const amountScore = Math.min((amount / 10000) * 10, 10);
   
-  // Score de la durée (max 50)
-  const durationScore = Math.min((durationDays / 10) * 1, 50);
+  // Score de la durée (max 10%)
+  const durationScore = Math.min((durationDays / 365) * 10, 10);
   
-  // Boost total (max 100%)
-  const totalBoost = Math.min(amountScore + durationScore, 100);
+  // Boost total (max 20%)
+  const totalBoost = Math.min(amountScore + durationScore, 20);
   
-  return Math.round(totalBoost * 10) / 10; // Arrondi à 1 décimale
+  return Math.round(totalBoost * 100) / 100; // Arrondi à 2 décimales
 };
 
 // Calcul de la part de buyback de l'utilisateur
@@ -85,8 +89,10 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
     const amt = parseFloat(amount) || 0;
     const days = parseInt(duration) || 0;
     
-    const amountScore = Math.min((amt / 1000) * 0.5, 50);
-    const durationScore = Math.min((days / 10) * 1, 50);
+    // Score montant: max 10%
+    const amountScore = Math.min((amt / 10000) * 10, 10);
+    // Score durée: max 10%
+    const durationScore = Math.min((days / 365) * 10, 10);
     
     return { amountScore, durationScore };
   }, [amount, duration]);
@@ -298,19 +304,19 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         </h2>
       </div>
 
-      {/* Avertissement si NFT existe déjà */}
+      {/* Information sur les locks multiples */}
       {hasExistingNft && (
-        <div className="mb-6 p-4 glass-effect rounded-lg border border-yellow-500/30 bg-yellow-500/5">
+        <div className="mb-6 p-4 glass-effect rounded-lg border border-blue-500/30 bg-blue-500/5">
           <div className="flex items-start gap-3">
-            <span className="text-2xl">⚠️</span>
+            <span className="text-2xl">💎</span>
             <div className="flex-1">
-              <h3 className="text-yellow-400 font-bold mb-1">NFT de Lock déjà actif</h3>
+              <h3 className="text-blue-400 font-bold mb-1">Lock supplémentaire disponible</h3>
               <p className="text-gray-300 text-sm">
-                Vous avez déjà un NFT de lock actif. Pour créer un nouveau lock, vous devez d&apos;abord{' '}
-                <span className="text-yellow-400 font-semibold">déverrouiller (unlock)</span> vos tokens actuels.
+                Vous avez déjà un NFT de lock actif. Vous pouvez créer un nouveau lock pour{' '}
+                <span className="text-blue-400 font-semibold">augmenter votre boost global</span> !
               </p>
               <p className="text-gray-400 text-xs mt-2">
-                💡 Allez dans l&apos;onglet &quot;Unlock&quot; pour gérer votre lock existant.
+                💡 Plus vous lockez de tokens, plus votre boost augmente (max 20%).
               </p>
             </div>
           </div>
@@ -470,21 +476,21 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
           
           {/* Boost Calculation Details */}
           <div className="p-3 rounded-lg bg-gradient-to-r from-secondary/5 to-transparent border border-secondary/10">
-            <div className="text-sm font-bold text-secondary mb-2">🎯 Boost Calculation</div>
+            <div className="text-sm font-bold text-secondary mb-2">🎯 Boost Calculation (Max 20%)</div>
             <div className="space-y-1 text-xs">
               <div className="flex justify-between items-center">
-                <span className="text-gray-400">Amount Score:</span>
-                <span className="text-gray-200">+{boostDetails.amountScore.toFixed(1)}%</span>
+                <span className="text-gray-400">Amount Score (max 10%):</span>
+                <span className="text-gray-200">+{boostDetails.amountScore.toFixed(2)}%</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-400">Duration Score:</span>
-                <span className="text-gray-200">+{boostDetails.durationScore.toFixed(1)}%</span>
+                <span className="text-gray-400">Duration Score (max 10%):</span>
+                <span className="text-gray-200">+{boostDetails.durationScore.toFixed(2)}%</span>
               </div>
               <div className="h-px bg-secondary/20 my-2"></div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-300 font-medium">Total Boost:</span>
                 <span className="text-2xl font-bold bg-gradient-to-r from-secondary to-green-400 bg-clip-text text-transparent">
-                  +{predictedBoost.toFixed(1)}%
+                  +{predictedBoost.toFixed(2)}%
                 </span>
               </div>
             </div>
@@ -499,10 +505,10 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
                   Your rebates will be multiplied by:
                 </div>
                 <div className="text-2xl font-bold text-primary">
-                  {(1 + predictedBoost / 100).toFixed(2)}x
+                  {(1 + predictedBoost / 100).toFixed(3)}x
                 </div>
                 <div className="text-xs text-gray-400 mt-1">
-                  Example: Base 3 USDC → {(3 * (1 + predictedBoost / 100)).toFixed(2)} USDC
+                  Example: Base 10 USDC → {(10 * (1 + predictedBoost / 100)).toFixed(2)} USDC
                 </div>
               </div>
               

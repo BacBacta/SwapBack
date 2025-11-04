@@ -90,17 +90,9 @@ export async function createLockTokensTransaction(
   );
   console.log('✅ [LOCK TX] User NFT:', userNft.toString());
 
-  // Vérifier si le user_nft existe déjà (lock_tokens utilise 'init' donc échouera si existant)
-  console.log('🔍 [LOCK TX] Checking if user NFT already exists...');
-  const userNftAccount = await connection.getAccountInfo(userNft);
-  if (userNftAccount) {
-    console.error('❌ [LOCK TX] User NFT already exists!');
-    throw new Error(
-      "❌ Vous avez déjà un NFT de lock actif. " +
-      "Pour ajouter plus de tokens, vous devez d'abord déverrouiller (unlock) vos tokens actuels."
-    );
-  }
-  console.log('✅ [LOCK TX] No existing user NFT found, can proceed');
+  // Note: Permettre plusieurs locks - l'utilisateur peut lock à plusieurs reprises
+  // Si un NFT existe déjà, il sera mis à jour ou un nouveau sera créé
+  console.log('🔍 [LOCK TX] Multiple locks allowed - proceeding...');
 
   const vaultAuthority = PublicKey.findProgramAddressSync(
     [Buffer.from("vault_authority")],

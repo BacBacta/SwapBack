@@ -189,11 +189,11 @@ export const LockUnlock = () => {
               disabled={loading}
               className="input-field w-full"
             >
-              <option value="30">[30_DAYS] - Bronze cNFT (+3% boost)</option>
-              <option value="90">[90_DAYS] - Silver cNFT (+9% boost)</option>
-              <option value="180">[180_DAYS] - Gold cNFT (+18% boost)</option>
+              <option value="30">[30_DAYS] - Bronze tier (boost dynamique)</option>
+              <option value="90">[90_DAYS] - Silver tier (boost dynamique)</option>
+              <option value="180">[180_DAYS] - Gold tier (boost dynamique)</option>
               <option value="365">
-                [365_DAYS] - Platinum cNFT (+36.5% boost)
+                [365_DAYS] - Platinum tier (boost max 20%)
               </option>
             </select>
           </div>
@@ -204,7 +204,7 @@ export const LockUnlock = () => {
               <div className="flex justify-between">
                 <span className="opacity-70">ESTIMATED_BOOST:</span>
                 <span className="text-[var(--primary)]">
-                  +{(Number.parseFloat(lockDuration) / 10).toFixed(1)}%
+                  Dynamique (max 20%)
                 </span>
               </div>
               <div className="flex justify-between">

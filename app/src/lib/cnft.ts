@@ -96,17 +96,30 @@ export function calculateLevel(
 
 /**
  * Calcule le boost basé sur le montant et la durée
- * Nouveau système dynamique: amount_score (max 50%) + duration_score (max 50%)
+ * Formule adaptée: boost maximum = 20%
+ * 
+ * Formule:
+ * - Score du montant: (amount / 10,000) * 10, max 10%
+ * - Score de la durée: (days / 365) * 10, max 10%
+ * - Boost total = montant_score + durée_score, max 20%
+ * 
+ * Exemples:
+ * - 1,000 $BACK pour 30 jours = 1% + 0.82% = 1.82%
+ * - 10,000 $BACK pour 180 jours = 10% + 4.93% = 14.93%
+ * - 50,000 $BACK pour 365 jours = 10% + 10% = 20% (max)
  */
 export function calculateBoost(amount: number, durationDays: number): number {
-  // Amount score: (amount / 1,000) * 0.5, max 50%
-  const amountScore = Math.min((amount / 1000) * 0.5, 50);
+  // Score du montant: max 10% (atteint à 10,000 tokens)
+  const amountScore = Math.min((amount / 10000) * 10, 10);
   
-  // Duration score: (days / 10) * 1, max 50%
-  const durationScore = Math.min((durationDays / 10) * 1, 50);
+  // Score de la durée: max 10% (atteint à 365 jours)
+  const durationScore = Math.min((durationDays / 365) * 10, 10);
   
-  // Total boost: max 100%
-  return Math.min(amountScore + durationScore, 100);
+  // Boost total: max 20%
+  const totalBoost = Math.min(amountScore + durationScore, 20);
+  
+  // Arrondir à 2 décimales
+  return Math.round(totalBoost * 100) / 100;
 }
 
 /**
