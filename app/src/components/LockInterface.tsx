@@ -272,39 +272,59 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
     try {
       console.log('🔍 [LOCK DEBUG] Starting lock process...');
       console.log('🔍 [LOCK DEBUG] Amount:', amt, 'Days:', days);
+      console.log('🔍 [LOCK DEBUG] Wallet public key:', publicKey.toString());
+      console.log('🔍 [LOCK DEBUG] Wallet object:', wallet);
       
       const durationSeconds = days * 24 * 60 * 60;
       console.log('🔍 [LOCK DEBUG] Duration in seconds:', durationSeconds);
       
+      // Variable pour stocker la signature
+      let signature: string;
+      
       // Obtenir le blockhash AVANT de créer la transaction
       console.log('🔍 [LOCK DEBUG] Getting latest blockhash...');
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
       console.log('✅ [LOCK DEBUG] Blockhash obtained:', blockhash.slice(0, 8) + '...');
       
       // Utiliser la nouvelle fonction avec transfert de tokens
       console.log('🔍 [LOCK DEBUG] Creating lock transaction...');
-      const transaction = await createLockTokensTransaction(connection, wallet, {
-        amount: amt,
-        duration: durationSeconds,
-      });
-      console.log('✅ [LOCK DEBUG] Transaction created successfully');
+      try {
+        const transaction = await createLockTokensTransaction(connection, wallet, {
+          amount: amt,
+          duration: durationSeconds,
+        });
+        console.log('✅ [LOCK DEBUG] Transaction created successfully');
+        console.log('🔍 [LOCK DEBUG] Transaction instructions:', transaction.instructions.length);
+        
+        // IMPORTANT: Définir le feePayer et recentBlockhash AVANT d'envoyer au wallet
+        transaction.feePayer = publicKey;
+        transaction.recentBlockhash = blockhash;
+        
+        console.log('🔍 [LOCK DEBUG] Transaction details:', {
+          feePayer: transaction.feePayer?.toString(),
+          recentBlockhash: transaction.recentBlockhash,
+          signatures: transaction.signatures.length
+        });
 
-      // Définir le feePayer et le recentBlockhash
-      transaction.feePayer = publicKey;
-      transaction.recentBlockhash = blockhash;
-      console.log('✅ [LOCK DEBUG] Transaction configured with blockhash and feePayer');
+        // Envoyer la transaction au wallet pour signature et broadcast
+        console.log('🔍 [LOCK DEBUG] Sending transaction to wallet for approval...');
+        signature = await sendTransaction(transaction, connection, {
+          skipPreflight: false,
+          preflightCommitment: 'finalized',
+        });
+        console.log('✅ [LOCK DEBUG] Transaction approved and sent:', signature);
 
-      console.log('🔍 [LOCK DEBUG] Sending transaction...');
-      const signature = await sendTransaction(transaction, connection);
-      console.log('✅ [LOCK DEBUG] Transaction sent:', signature);
-
-      // Attendre la confirmation (méthode moderne)
-      console.log('🔍 [LOCK DEBUG] Waiting for confirmation...');
-      await connection.confirmTransaction({
-        signature,
-        blockhash,
-        lastValidBlockHeight,
-      }, 'confirmed');
+        // Attendre la confirmation
+        console.log('🔍 [LOCK DEBUG] Waiting for confirmation...');
+        await connection.confirmTransaction({
+          signature,
+          blockhash,
+          lastValidBlockHeight,
+        }, 'confirmed');
+      } catch (txError) {
+        console.error('❌ [LOCK DEBUG] Transaction creation/send error:', txError);
+        throw txError;
+      }
       console.log('✅ [LOCK DEBUG] Transaction confirmed!');
 
       setSuccess(

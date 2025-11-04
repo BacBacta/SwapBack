@@ -49,11 +49,25 @@ export async function createLockTokensTransaction(
   }
   console.log('🔍 [LOCK TX] Wallet:', wallet.publicKey.toString());
 
-  // Créer le provider Anchor
+  // Créer un wrapper de wallet compatible avec Anchor
+  const anchorWallet = {
+    publicKey: wallet.publicKey,
+    signTransaction: wallet.signTransaction.bind(wallet),
+    signAllTransactions: wallet.signAllTransactions?.bind(wallet) || (async (txs: Transaction[]) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+      if (!wallet.signTransaction) throw new Error("Wallet cannot sign");
+      const signed = [];
+      for (const tx of txs) {
+        signed.push(await wallet.signTransaction(tx));
+      }
+      return signed;
+    }),
+  };
+
+  // Créer le provider Anchor avec le wrapper
   const provider = new AnchorProvider(
     connection,
-    wallet as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-    { commitment: "confirmed" }
+    anchorWallet as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    { commitment: "confirmed", skipPreflight: false }
   );
 
   // Charger le programme
