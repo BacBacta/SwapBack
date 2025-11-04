@@ -995,10 +995,8 @@ html {
   z-index: 10000 !important;
 }
 
-/* Ensure wallet button is clickable */
+/* Ensure wallet button is clickable - conservative approach */
 .wallet-adapter-button-trigger {
-  position: relative;
-  z-index: 100;
   pointer-events: auto !important;
   cursor: pointer !important;
 }
