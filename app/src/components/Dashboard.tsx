@@ -1,16 +1,19 @@
 "use client";
 
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { CNFTCard } from "./CNFTCard";
 import { useCNFT } from "../hooks/useCNFT";
 import { useRealtimeStats } from "../hooks/useRealtimeStats";
-import { VolumeChart, ActivityChart } from "./Charts";
 import { SkeletonLoader } from "./Skeletons";
 import { NoActivityState, NoConnectionState } from "./EmptyState";
 import { SwapBackDashboard } from "./SwapBackDashboard";
 import LockInterface from "./LockInterface";
 import UnlockInterface from "./UnlockInterface";
+
+// Lazy load heavy chart components
+const VolumeChart = lazy(() => import("./Charts").then(mod => ({ default: mod.VolumeChart })));
+const ActivityChart = lazy(() => import("./Charts").then(mod => ({ default: mod.ActivityChart })));
 
 export const Dashboard = () => {
   const { connected, publicKey } = useWallet();
@@ -302,7 +305,9 @@ export const Dashboard = () => {
               <span>Volume Trend (7 Days)</span>
             </h3>
             <div className="h-64">
-              <VolumeChart data={volumeData} />
+              <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="animate-spin text-2xl">⚡</div></div>}>
+                <VolumeChart data={volumeData} />
+              </Suspense>
             </div>
           </div>
 
@@ -313,7 +318,9 @@ export const Dashboard = () => {
               <span>Trading Activity (7 Days)</span>
             </h3>
             <div className="h-64">
-              <ActivityChart data={activityData} />
+              <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="animate-spin text-2xl">⚡</div></div>}>
+                <ActivityChart data={activityData} />
+              </Suspense>
             </div>
           </div>
 

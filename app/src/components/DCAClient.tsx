@@ -211,28 +211,44 @@ export const DCAClient = () => {
 
   // Create DCA Order (LOCAL STORAGE ONLY - ON-CHAIN EN DÉVELOPPEMENT)
   const handleCreateDCA = async () => {
+    console.log("🔍 [DEBUG] handleCreateDCA appelée");
+    console.log("🔍 [DEBUG] Connected:", connected);
+    console.log("🔍 [DEBUG] PublicKey:", publicKey?.toString());
+    console.log("🔍 [DEBUG] AmountPerOrder:", amountPerOrder);
+    console.log("🔍 [DEBUG] TotalOrders:", totalOrders);
+    console.log("🔍 [DEBUG] InputToken:", inputToken);
+    console.log("🔍 [DEBUG] OutputToken:", outputToken);
+    console.log("🔍 [DEBUG] Frequency:", frequency);
+
     if (!connected || !publicKey) {
+      console.error("❌ [DEBUG] Wallet non connecté");
       alert("Veuillez connecter votre wallet");
       return;
     }
 
     if (!amountPerOrder || Number.parseFloat(amountPerOrder) <= 0) {
+      console.error("❌ [DEBUG] Montant invalide:", amountPerOrder);
       alert("Veuillez saisir un montant valide");
       return;
     }
 
     if (!totalOrders || Number.parseInt(totalOrders) <= 0) {
+      console.error("❌ [DEBUG] Nombre d'ordres invalide:", totalOrders);
       alert("Veuillez saisir un nombre d'ordres valide");
       return;
     }
 
+    console.log("✅ [DEBUG] Validation passée");
     setLoading(true);
     setRpcError(null);
 
     try {
+      console.log("🔍 [DEBUG] Test de connexion RPC...");
       // Test RPC connection before proceeding
       const rpcOk = await testRpcConnection();
+      console.log("🔍 [DEBUG] RPC OK:", rpcOk);
       if (!rpcOk) {
+        console.error("❌ [DEBUG] Problème de connexion RPC");
         alert("Problème de connexion réseau. Veuillez réessayer.");
         setLoading(false);
         return;
@@ -264,17 +280,33 @@ export const DCAClient = () => {
       };
 
       const updatedOrders = [...dcaOrders, newOrder];
+      console.log("🔍 [DEBUG] Updated orders:", updatedOrders.length);
       setDcaOrders(updatedOrders);
 
       // Sauvegarder dans localStorage
       const storageKey = `swapback_dca_${publicKey.toString()}`;
-      localStorage.setItem(storageKey, JSON.stringify(updatedOrders));
+      console.log("🔍 [DEBUG] Storage key:", storageKey);
+      
+      try {
+        const serializedOrders = updatedOrders.map(order => ({
+          ...order,
+          createdAt: order.createdAt.toISOString(),
+          nextExecution: order.nextExecution.toISOString()
+        }));
+        localStorage.setItem(storageKey, JSON.stringify(serializedOrders));
+        console.log("✅ [DEBUG] Sauvegardé dans localStorage");
+      } catch (storageError) {
+        console.error("❌ [DEBUG] Erreur localStorage:", storageError);
+        throw storageError;
+      }
 
       // Reset form
       setAmountPerOrder("");
       setTotalOrders("10");
+      console.log("✅ [DEBUG] Formulaire réinitialisé");
 
       // Afficher la notification de succès
+      console.log("✅ [DEBUG] Affichage de l'alerte de succès");
       alert(
         `✅ Plan DCA créé avec succès!\n\n` +
         `⚠️ Note: Stocké localement (on-chain en développement)\n\n` +
@@ -316,7 +348,12 @@ export const DCAClient = () => {
 
     if (publicKey) {
       const storageKey = `swapback_dca_${publicKey.toString()}`;
-      localStorage.setItem(storageKey, JSON.stringify(updatedOrders));
+      const serializedOrders = updatedOrders.map(order => ({
+        ...order,
+        createdAt: order.createdAt.toISOString(),
+        nextExecution: order.nextExecution.toISOString()
+      }));
+      localStorage.setItem(storageKey, JSON.stringify(serializedOrders));
     }
   };
 
@@ -331,7 +368,12 @@ export const DCAClient = () => {
 
     if (publicKey) {
       const storageKey = `swapback_dca_${publicKey.toString()}`;
-      localStorage.setItem(storageKey, JSON.stringify(updatedOrders));
+      const serializedOrders = updatedOrders.map(order => ({
+        ...order,
+        createdAt: order.createdAt.toISOString(),
+        nextExecution: order.nextExecution.toISOString()
+      }));
+      localStorage.setItem(storageKey, JSON.stringify(serializedOrders));
     }
   };
 
