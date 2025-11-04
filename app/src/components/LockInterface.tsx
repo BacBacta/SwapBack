@@ -25,13 +25,14 @@ const LEVEL_THRESHOLDS = {
 };
 
 // Fonction de calcul du boost dynamique
-// Formule: boost maximum = 20%
-// - Score montant: (amount / 10,000) * 10, max 10%
+// Formule adaptée pour supply de 1 milliard de tokens
+// Boost maximum = 20%
+// - Score montant: (amount / 5,000,000) * 10, max 10%
 // - Score durée: (days / 365) * 10, max 10%
 // - Total: max 20%
 const calculateDynamicBoost = (amount: number, durationDays: number): number => {
-  // Score du montant (max 10%)
-  const amountScore = Math.min((amount / 10000) * 10, 10);
+  // Score du montant (max 10% atteint à 5M tokens)
+  const amountScore = Math.min((amount / 5000000) * 10, 10);
   
   // Score de la durée (max 10%)
   const durationScore = Math.min((durationDays / 365) * 10, 10);
@@ -66,14 +67,15 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
   const [hasExistingNft, setHasExistingNft] = useState<boolean>(false);
 
   // Calcul du niveau basé sur la durée et le montant (visuel uniquement)
+  // Seuils adaptés pour supply de 1 milliard
   const predictedLevel: CNFTLevel = useMemo(() => {
     const days = parseInt(duration) || 0;
     const amt = parseFloat(amount) || 0;
     
-    if (amt >= 100000 && days >= LEVEL_THRESHOLDS.Diamond) return 'Diamond' as CNFTLevel;
-    if (amt >= 50000 && days >= LEVEL_THRESHOLDS.Platinum) return 'Platinum' as CNFTLevel;
-    if (amt >= 10000 && days >= LEVEL_THRESHOLDS.Gold) return 'Gold';
-    if (amt >= 1000 && days >= LEVEL_THRESHOLDS.Silver) return 'Silver';
+    if (amt >= 10000000 && days >= LEVEL_THRESHOLDS.Diamond) return 'Diamond' as CNFTLevel;
+    if (amt >= 5000000 && days >= LEVEL_THRESHOLDS.Platinum) return 'Platinum' as CNFTLevel;
+    if (amt >= 1000000 && days >= LEVEL_THRESHOLDS.Gold) return 'Gold';
+    if (amt >= 500000 && days >= LEVEL_THRESHOLDS.Silver) return 'Silver';
     return 'Bronze';
   }, [duration, amount]);
 
@@ -89,8 +91,8 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
     const amt = parseFloat(amount) || 0;
     const days = parseInt(duration) || 0;
     
-    // Score montant: max 10%
-    const amountScore = Math.min((amt / 10000) * 10, 10);
+    // Score montant: max 10% (atteint à 5M tokens)
+    const amountScore = Math.min((amt / 5000000) * 10, 10);
     // Score durée: max 10%
     const durationScore = Math.min((days / 365) * 10, 10);
     
@@ -290,8 +292,8 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
     }
   };
 
-  // Bouton de montant rapide
-  const quickAmounts = [100, 500, 1000, 5000];
+  // Boutons de montant rapide - Adaptés pour supply de 1B
+  const quickAmounts = [100000, 500000, 1000000, 5000000];
 
   return (
     <div className="glass-effect rounded-xl p-6 max-w-lg mx-auto border border-gray-700/50">
@@ -482,6 +484,9 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
                 <span className="text-gray-400">Amount Score (max 10%):</span>
                 <span className="text-gray-200">+{boostDetails.amountScore.toFixed(2)}%</span>
               </div>
+              <div className="text-xs text-gray-500 mt-0.5 ml-2">
+                💡 Max atteint à 5M tokens
+              </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Duration Score (max 10%):</span>
                 <span className="text-gray-200">+{boostDetails.durationScore.toFixed(2)}%</span>
@@ -492,6 +497,25 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
                 <span className="text-2xl font-bold bg-gradient-to-r from-secondary to-green-400 bg-clip-text text-transparent">
                   +{predictedBoost.toFixed(2)}%
                 </span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Amount Thresholds Guide */}
+          <div className="p-3 rounded-lg bg-gradient-to-r from-blue-500/5 to-transparent border border-blue-500/10">
+            <div className="text-xs font-bold text-blue-400 mb-2">📊 Seuils de montant</div>
+            <div className="space-y-1 text-xs text-gray-400">
+              <div className="flex justify-between">
+                <span>100K tokens (0.01% supply)</span>
+                <span className="text-blue-300">~0.2%</span>
+              </div>
+              <div className="flex justify-between">
+                <span>1M tokens (0.1% supply)</span>
+                <span className="text-blue-300">~2%</span>
+              </div>
+              <div className="flex justify-between">
+                <span>5M tokens (0.5% supply)</span>
+                <span className="text-green-400 font-bold">10% max ✓</span>
               </div>
             </div>
           </div>

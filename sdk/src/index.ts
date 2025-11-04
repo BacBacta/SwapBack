@@ -483,14 +483,20 @@ export class SwapBackClient {
 export class SwapBackUtils {
   /**
    * Calcule le boost de remise basé sur le montant et la durée de lock
-   * Formule: boost maximum = 20%
-   * - Score montant: (amount / 10,000) * 10, max 10%
+   * Formule adaptée pour supply de 1 milliard de tokens
+   * Boost maximum = 20%
+   * - Score montant: (amount / 5,000,000) * 10, max 10%
    * - Score durée: (days / 365) * 10, max 10%
    * - Total: max 20%
+   * 
+   * Exemples:
+   * - 100,000 tokens pour 30 jours = 1.02%
+   * - 1,000,000 tokens pour 90 jours = 4.47%
+   * - 10,000,000 tokens pour 365 jours = 20% (max)
    */
   static calculateBoost(amount: number, durationDays: number): number {
-    // Score du montant (max 10%)
-    const amountScore = Math.min((amount / 10000) * 10, 10);
+    // Score du montant (max 10% atteint à 5M tokens = 0.5% du supply)
+    const amountScore = Math.min((amount / 5000000) * 10, 10);
     
     // Score de la durée (max 10%)
     const durationScore = Math.min((durationDays / 365) * 10, 10);
