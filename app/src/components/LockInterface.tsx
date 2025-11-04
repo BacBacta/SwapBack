@@ -65,6 +65,12 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [hasExistingNft, setHasExistingNft] = useState<boolean>(false);
+  const [currentNftData, setCurrentNftData] = useState<{
+    amount: number;
+    unlockTime: number;
+    level: CNFTLevel;
+    boost: number;
+  } | null>(null);
 
   // Calcul du niveau basé sur la durée et le montant (visuel uniquement)
   // Seuils adaptés pour supply de 1 milliard
@@ -149,14 +155,47 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         );
         
         const accountInfo = await connection.getAccountInfo(userNftPda);
-        setHasExistingNft(!!accountInfo);
         
-        if (accountInfo) {
-          console.log('ℹ️ User already has a locked NFT');
+        if (accountInfo && accountInfo.data.length > 0) {
+          // Le NFT existe, lire ses données
+          setHasExistingNft(true);
+          
+          try {
+            // Decoder les données du NFT (structure selon le programme Rust)
+            // Offset basé sur la structure UserNFT dans le programme
+            const data = accountInfo.data;
+            
+            // Structure: owner (32) + amount (8) + unlock_time (8) + boost_bps (2) + level (1) + padding
+            const amount = Number(data.readBigUInt64LE(32)) / 1_000_000_000; // Convertir lamports en tokens
+            const unlockTime = Number(data.readBigUInt64LE(40)); // Unix timestamp
+            const boostBps = data.readUInt16LE(48); // Boost en basis points
+            const levelByte = data.readUInt8(50); // 0=Bronze, 1=Silver, 2=Gold, 3=Platinum, 4=Diamond
+            
+            const levelNames: CNFTLevel[] = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond'];
+            const level = levelNames[Math.min(levelByte, 4)] || 'Bronze';
+            const boost = boostBps / 100; // Convertir BPS en pourcentage
+            
+            setCurrentNftData({
+              amount,
+              unlockTime,
+              level,
+              boost
+            });
+            
+            console.log('📊 Current NFT data:', { amount, unlockTime, level, boost });
+          } catch (decodeErr) {
+            console.error('Error decoding NFT data:', decodeErr);
+            // Même si le décodage échoue, on permet le lock
+            setCurrentNftData(null);
+          }
+        } else {
+          setHasExistingNft(false);
+          setCurrentNftData(null);
         }
       } catch (err) {
         console.error('Erreur lors de la vérification du NFT existant:', err);
         setHasExistingNft(false);
+        setCurrentNftData(null);
       }
     };
 
@@ -307,6 +346,50 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
       </div>
 
       {/* Information sur les locks multiples */}
+      {/* Current NFT Information */}
+      {currentNftData && (
+        <div className="mb-6 p-4 glass-effect rounded-lg border border-purple-500/30 bg-purple-500/5">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">🎭</span>
+            <div className="flex-1">
+              <h3 className="text-purple-400 font-bold mb-2">Your Current Lock NFT</h3>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="p-2 bg-black/20 rounded-lg">
+                  <div className="text-gray-400 text-xs">Niveau</div>
+                  <div className={`text-lg font-bold ${
+                    currentNftData.level === 'Diamond' ? 'text-cyan-400' :
+                    currentNftData.level === 'Platinum' ? 'text-purple-400' :
+                    currentNftData.level === 'Gold' ? 'text-yellow-400' :
+                    currentNftData.level === 'Silver' ? 'text-gray-300' :
+                    'text-orange-400'
+                  }`}>
+                    {currentNftData.level}
+                  </div>
+                </div>
+                <div className="p-2 bg-black/20 rounded-lg">
+                  <div className="text-gray-400 text-xs">Boost Actuel</div>
+                  <div className="text-lg font-bold text-green-400">
+                    +{currentNftData.boost.toFixed(2)}%
+                  </div>
+                </div>
+                <div className="p-2 bg-black/20 rounded-lg">
+                  <div className="text-gray-400 text-xs">Montant Locké</div>
+                  <div className="text-sm font-bold text-blue-400">
+                    {currentNftData.amount.toLocaleString()} BACK
+                  </div>
+                </div>
+                <div className="p-2 bg-black/20 rounded-lg">
+                  <div className="text-gray-400 text-xs">Déblocage</div>
+                  <div className="text-sm font-bold text-yellow-400">
+                    {new Date(currentNftData.unlockTime * 1000).toLocaleDateString()}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {hasExistingNft && (
         <div className="mb-6 p-4 glass-effect rounded-lg border border-blue-500/30 bg-blue-500/5">
           <div className="flex items-start gap-3">
@@ -588,7 +671,6 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         disabled={
           isLoading ||
           !publicKey ||
-          hasExistingNft ||
           !!amountError ||
           !!durationError ||
           !amount ||
@@ -597,7 +679,6 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         className={`w-full py-4 rounded-lg font-bold text-[var(--primary)] transition-all duration-300 relative overflow-hidden group ${
           isLoading ||
           !publicKey ||
-          hasExistingNft ||
           !!amountError ||
           !!durationError ||
           !amount ||
@@ -608,7 +689,6 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
       >
         {!isLoading && !(
           !publicKey ||
-          hasExistingNft ||
           !!amountError ||
           !!durationError ||
           !amount ||
@@ -642,15 +722,10 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
           </span>
         ) : !publicKey ? (
           <span className="relative">Connect Wallet</span>
-        ) : hasExistingNft ? (
-          <span className="relative flex items-center justify-center gap-2">
-            <span>⚠️</span>
-            <span>NFT Already Locked - Unlock First</span>
-          </span>
         ) : (
           <span className="relative flex items-center justify-center gap-2">
             <span>🔒</span>
-            <span>Lock $BACK</span>
+            <span>{hasExistingNft ? 'Update Lock' : 'Lock $BACK'}</span>
           </span>
         )}
       </button>
