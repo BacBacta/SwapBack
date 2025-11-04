@@ -179,23 +179,35 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
     setSuccess(null);
 
     try {
+      console.log('🔍 [LOCK DEBUG] Starting lock process...');
+      console.log('🔍 [LOCK DEBUG] Amount:', amt, 'Days:', days);
+      
       const durationSeconds = days * 24 * 60 * 60;
+      console.log('🔍 [LOCK DEBUG] Duration in seconds:', durationSeconds);
       
       // Utiliser la nouvelle fonction avec transfert de tokens
+      console.log('🔍 [LOCK DEBUG] Creating lock transaction...');
       const transaction = await createLockTokensTransaction(connection, wallet, {
         amount: amt,
         duration: durationSeconds,
       });
+      console.log('✅ [LOCK DEBUG] Transaction created successfully');
 
+      console.log('🔍 [LOCK DEBUG] Sending transaction...');
       const signature = await sendTransaction(transaction, connection);
+      console.log('✅ [LOCK DEBUG] Transaction sent:', signature);
+
+      console.log('✅ [LOCK DEBUG] Transaction sent:', signature);
 
       // Attendre la confirmation (méthode moderne)
+      console.log('🔍 [LOCK DEBUG] Waiting for confirmation...');
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
       await connection.confirmTransaction({
         signature,
         blockhash,
         lastValidBlockHeight,
       }, 'confirmed');
+      console.log('✅ [LOCK DEBUG] Transaction confirmed!');
 
       setSuccess(
         `✅ Lock réussi ! ${amt} BACK verrouillés pour ${days} jours. Signature: ${signature.slice(0, 8)}...`
@@ -216,8 +228,27 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         setBalance(bal);
       }, 2000);
     } catch (err: unknown) {
-      console.error('Error during lock:', err);
-      const message = err instanceof Error ? err.message : 'Lock failed. Please try again.';
+      console.error('❌ [LOCK ERROR] Error during lock:', err);
+      console.error('❌ [LOCK ERROR] Error stack:', err instanceof Error ? err.stack : 'No stack');
+      
+      let message = 'Lock failed. Please try again.';
+      
+      if (err instanceof Error) {
+        message = err.message;
+        console.error('❌ [LOCK ERROR] Error message:', message);
+        
+        // Vérifier les erreurs spécifiques
+        if (message.includes('User rejected')) {
+          message = '❌ Transaction cancelled by user';
+        } else if (message.includes('insufficient')) {
+          message = '❌ Insufficient balance';
+        } else if (message.includes('AccountNotFound')) {
+          message = '❌ Token account not found. Do you have BACK tokens?';
+        } else if (message.includes('0x1')) {
+          message = '❌ Program error: Account not initialized. Please contact support.';
+        }
+      }
+      
       setError(message);
     } finally {
       setIsLoading(false);

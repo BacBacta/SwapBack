@@ -7,7 +7,6 @@ import {
   PublicKey,
   Transaction,
   SystemProgram,
-  SYSVAR_RENT_PUBKEY,
 } from "@solana/web3.js";
 import { WalletContextState } from "@solana/wallet-adapter-react";
 import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
@@ -42,83 +41,120 @@ export async function createLockTokensTransaction(
     duration: number; // Durée en secondes
   }
 ): Promise<Transaction> {
+  console.log('🔍 [LOCK TX] Creating lock transaction...');
+  console.log('🔍 [LOCK TX] Params:', params);
+  
   if (!wallet.publicKey || !wallet.signTransaction) {
     throw new Error("Wallet not connected");
   }
+  console.log('🔍 [LOCK TX] Wallet:', wallet.publicKey.toString());
 
   // Créer le provider Anchor
   const provider = new AnchorProvider(
     connection,
-    wallet as any,
+    wallet as any, // eslint-disable-line @typescript-eslint/no-explicit-any
     { commitment: "confirmed" }
   );
 
   // Charger le programme
+  console.log('🔍 [LOCK TX] Loading program...');
   const program = new Program(cnftIdl as Idl, provider);
+  console.log('✅ [LOCK TX] Program loaded:', CNFT_PROGRAM_ID.toString());
 
   // Convertir le montant en lamports (9 decimals pour BACK)
   const amountLamports = new BN(Math.floor(params.amount * 1_000_000_000));
   const lockDuration = new BN(Math.floor(params.duration));
+  console.log('🔍 [LOCK TX] Amount (lamports):', amountLamports.toString());
+  console.log('🔍 [LOCK TX] Duration (seconds):', lockDuration.toString());
+
+  console.log('🔍 [LOCK TX] Amount (lamports):', amountLamports.toString());
+  console.log('🔍 [LOCK TX] Duration (seconds):', lockDuration.toString());
 
   // Dériver les PDAs
+  console.log('🔍 [LOCK TX] Deriving PDAs...');
   const [collectionConfig] = PublicKey.findProgramAddressSync(
     [Buffer.from("collection_config")],
     CNFT_PROGRAM_ID
   );
+  console.log('✅ [LOCK TX] Collection Config:', collectionConfig.toString());
 
   const [globalState] = PublicKey.findProgramAddressSync(
     [Buffer.from("global_state")],
     CNFT_PROGRAM_ID
   );
+  console.log('✅ [LOCK TX] Global State:', globalState.toString());
 
   const [userNft] = PublicKey.findProgramAddressSync(
     [Buffer.from("user_nft"), wallet.publicKey.toBuffer()],
     CNFT_PROGRAM_ID
   );
+  console.log('✅ [LOCK TX] User NFT:', userNft.toString());
 
   const [vaultAuthority] = PublicKey.findProgramAddressSync(
     [Buffer.from("vault_authority")],
     CNFT_PROGRAM_ID
   );
+  console.log('✅ [LOCK TX] Vault Authority:', vaultAuthority.toString());
 
   // Obtenir les token accounts
+  console.log('🔍 [LOCK TX] Getting token accounts...');
   const userTokenAccount = await getAssociatedTokenAddress(
     BACK_MINT,
     wallet.publicKey,
     false,
     TOKEN_2022_PROGRAM_ID
   );
+  console.log('✅ [LOCK TX] User Token Account:', userTokenAccount.toString());
 
-  // Le vault token account doit être créé manuellement ou via init_if_needed
-  // Pour simplifier, on suppose qu'il sera créé par l'instruction
+  console.log('✅ [LOCK TX] User Token Account:', userTokenAccount.toString());
+
+  console.log('✅ [LOCK TX] User Token Account:', userTokenAccount.toString());
+
+  // Le vault token account est dérivé automatiquement par Anchor via l'IDL
+  // On peut le calculer pour info mais Anchor le fera aussi
   const vaultTokenAccount = await getAssociatedTokenAddress(
     BACK_MINT,
     vaultAuthority,
     true, // allowOwnerOffCurve = true pour PDA
     TOKEN_2022_PROGRAM_ID
   );
+  console.log('✅ [LOCK TX] Vault Token Account (calculated):', vaultTokenAccount.toString());
 
   // Construire l'instruction via Anchor
-  const instruction = await program.methods
-    .lockTokens(amountLamports, lockDuration)
-    .accounts({
-      collectionConfig,
-      globalState,
-      userNft,
-      userTokenAccount,
-      vaultTokenAccount,
-      vaultAuthority,
-      backMint: BACK_MINT,
-      user: wallet.publicKey,
-      tokenProgram: TOKEN_2022_PROGRAM_ID,
-      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-      systemProgram: SystemProgram.programId,
-    })
-    .instruction();
+  console.log('🔍 [LOCK TX] Building instruction...');
+  try {
+    // Anchor convertit automatiquement lock_tokens en lockTokens
+    const instruction = await program.methods
+      .lockTokens(amountLamports, lockDuration)
+      .accounts({
+        collectionConfig,
+        globalState,
+        userNft,
+        userTokenAccount,
+        vaultTokenAccount, // On le passe quand même au cas où
+        vaultAuthority,
+        backMint: BACK_MINT,
+        user: wallet.publicKey,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .instruction();
+    
+    console.log('✅ [LOCK TX] Instruction created successfully');
 
-  const transaction = new Transaction().add(instruction);
+    const transaction = new Transaction().add(instruction);
+    console.log('✅ [LOCK TX] Transaction built successfully');
 
-  return transaction;
+    return transaction;
+  } catch (error) {
+    console.error('❌ [LOCK TX] Error building instruction:', error);
+    if (error instanceof Error) {
+      console.error('❌ [LOCK TX] Error message:', error.message);
+      console.error('❌ [LOCK TX] Error stack:', error.stack);
+    }
+    throw error;
+  }
 }
 
 /**
@@ -135,7 +171,7 @@ export async function createUnlockTokensTransaction(
   // Créer le provider Anchor
   const provider = new AnchorProvider(
     connection,
-    wallet as any,
+    wallet as any, // eslint-disable-line @typescript-eslint/no-explicit-any
     { commitment: "confirmed" }
   );
 
