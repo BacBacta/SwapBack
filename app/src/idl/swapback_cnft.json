@@ -472,7 +472,8 @@
     {
       "name": "unlock_tokens",
       "docs": [
-        "Unlock des tokens BACK et retour vers l'utilisateur"
+        "Unlock des tokens BACK et retour vers l'utilisateur",
+        "Permet l'unlock anticipé avec une pénalité de 1,5% des tokens brûlés"
       ],
       "discriminator": [
         233,
