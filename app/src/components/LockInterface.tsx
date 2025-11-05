@@ -269,6 +269,10 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
     setError(null);
     setSuccess(null);
 
+    console.log('═══════════════════════════════════════');
+    console.log('🚀 LOCK PROCESS STARTED');
+    console.log('═══════════════════════════════════════');
+
     try {
       console.log('🔍 [LOCK DEBUG] Starting lock process...');
       console.log('🔍 [LOCK DEBUG] Amount:', amt, 'Days:', days);
