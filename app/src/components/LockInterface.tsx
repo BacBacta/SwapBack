@@ -349,15 +349,6 @@ export default function LockInterface({
       // Variable pour stocker la signature
       let signature: string;
 
-      // Obtenir le blockhash AVANT de créer la transaction
-      console.log("🔍 [LOCK DEBUG] Getting latest blockhash...");
-      const { blockhash, lastValidBlockHeight } =
-        await connection.getLatestBlockhash("finalized");
-      console.log(
-        "✅ [LOCK DEBUG] Blockhash obtained:",
-        blockhash.slice(0, 8) + "..."
-      );
-
       // Utiliser la nouvelle fonction avec transfert de tokens
       console.log("🔍 [LOCK DEBUG] Creating lock transaction...");
       try {
@@ -373,6 +364,15 @@ export default function LockInterface({
         console.log(
           "🔍 [LOCK DEBUG] Transaction instructions:",
           transaction.instructions.length
+        );
+
+        // Obtenir le blockhash JUSTE AVANT de signer
+        console.log("🔍 [LOCK DEBUG] Getting latest blockhash...");
+        const { blockhash, lastValidBlockHeight } =
+          await connection.getLatestBlockhash("confirmed");
+        console.log(
+          "✅ [LOCK DEBUG] Blockhash obtained:",
+          blockhash.slice(0, 8) + "..."
         );
 
         // IMPORTANT: Définir le feePayer et recentBlockhash AVANT d'envoyer au wallet
@@ -400,7 +400,8 @@ export default function LockInterface({
         console.log("🔍 [LOCK DEBUG] Sending signed transaction to network...");
         signature = await connection.sendRawTransaction(signedTx.serialize(), {
           skipPreflight: false,
-          preflightCommitment: "finalized",
+          preflightCommitment: "confirmed",
+          maxRetries: 3,
         });
         console.log(
           "✅ [LOCK DEBUG] Transaction sent to network:",
