@@ -153,12 +153,11 @@ pub mod swapback_cnft {
                 .ok_or(ErrorCode::MathOverflow)?;
         }
         
+        // Utiliser saturating_add pour éviter les overflows sur les très grandes valeurs
         global_state.total_community_boost = global_state.total_community_boost
-            .checked_add(new_boost as u64)
-            .ok_or(ErrorCode::MathOverflow)?;
+            .saturating_add(new_boost as u64);
         global_state.total_value_locked = global_state.total_value_locked
-            .checked_add(amount)
-            .ok_or(ErrorCode::MathOverflow)?;
+            .saturating_add(amount);
 
         // Transférer les tokens BACK vers le vault PDA
         let cpi_accounts = TransferChecked {
