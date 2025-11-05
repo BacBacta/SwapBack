@@ -106,15 +106,22 @@ pub mod swapback_cnft {
         let global_state = &mut ctx.accounts.global_state;
         let user_nft = &mut ctx.accounts.user_nft;
 
-        // Calculer le boost dynamique
-        let boost = calculate_boost(amount, lock_duration);
-        
-        // Déterminer le niveau automatiquement
-        let duration_days = (lock_duration / 86400) as u64;
-        let level = LockLevel::from_lock_params(amount, duration_days);
-
         // Vérifier si c'est un nouveau NFT ou une mise à jour
         let is_new_nft = user_nft.user == Pubkey::default();
+        
+        // Calculer le nouveau montant total (cumulatif)
+        let new_total_amount = if is_new_nft {
+            amount
+        } else {
+            user_nft.amount_locked
+                .checked_add(amount)
+                .ok_or(ErrorCode::MathOverflow)?
+        };
+        
+        // Calculer le nouveau boost basé sur le montant total et la nouvelle durée
+        let duration_days = (lock_duration / 86400) as u64;
+        let new_level = LockLevel::from_lock_params(new_total_amount, duration_days);
+        let new_boost = calculate_boost(new_total_amount, lock_duration);
         
         // Si le NFT existe déjà et est actif, retirer l'ancien boost avant de mettre à jour
         if !is_new_nft && user_nft.is_active {
@@ -126,12 +133,12 @@ pub mod swapback_cnft {
                 .ok_or(ErrorCode::MathOverflow)?;
         }
 
-        // Enregistrer/Mettre à jour le NFT de l'utilisateur
+        // Enregistrer/Mettre à jour le NFT de l'utilisateur avec le montant cumulé
         user_nft.user = ctx.accounts.user.key();
-        user_nft.level = level;
-        user_nft.amount_locked = amount;
+        user_nft.level = new_level;
+        user_nft.amount_locked = new_total_amount;
         user_nft.lock_duration = lock_duration;
-        user_nft.boost = boost;
+        user_nft.boost = new_boost;
         user_nft.mint_time = Clock::get()?.unix_timestamp;
         user_nft.is_active = true;
         if is_new_nft {
@@ -147,7 +154,7 @@ pub mod swapback_cnft {
         }
         
         global_state.total_community_boost = global_state.total_community_boost
-            .checked_add(boost as u64)
+            .checked_add(new_boost as u64)
             .ok_or(ErrorCode::MathOverflow)?;
         global_state.total_value_locked = global_state.total_value_locked
             .checked_add(amount)
@@ -168,18 +175,19 @@ pub mod swapback_cnft {
 
         emit!(TokensLocked {
             user: ctx.accounts.user.key(),
-            amount,
-            level,
-            boost,
+            amount: new_total_amount,
+            level: new_level,
+            boost: new_boost,
             unlock_time: Clock::get()?.unix_timestamp + lock_duration,
             timestamp: Clock::get()?.unix_timestamp,
         });
 
         msg!(
-            "🔒 {} tokens BACK verrouillés - Niveau: {:?} - Boost: {}%",
+            "🔒 +{} tokens BACK verrouillés - Total: {} - Niveau: {:?} - Boost: {}%",
             amount / 1_000_000_000,
-            level,
-            boost / 100
+            new_total_amount / 1_000_000_000,
+            new_level,
+            new_boost / 100
         );
 
         Ok(())
