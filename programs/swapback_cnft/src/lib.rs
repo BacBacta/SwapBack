@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_2022::{Token2022, TransferChecked, transfer_checked};
-use anchor_spl::token_interface::{TokenAccount, Mint};
 use anchor_spl::associated_token::AssociatedToken;
+use anchor_spl::token_2022::{transfer_checked, Token2022, TransferChecked};
+use anchor_spl::token_interface::{Mint, TokenAccount};
 
 // Program ID déployé sur devnet - 3 Nov 2025 (version avec lock_tokens/unlock_tokens)
 declare_id!("9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq");
@@ -13,12 +13,12 @@ pub mod swapback_cnft {
     /// Initialise le GlobalState pour tracker le boost total de la communauté
     pub fn initialize_global_state(ctx: Context<InitializeGlobalState>) -> Result<()> {
         let global_state = &mut ctx.accounts.global_state;
-        
+
         global_state.authority = ctx.accounts.authority.key();
         global_state.total_community_boost = 0;
         global_state.active_locks_count = 0;
         global_state.total_value_locked = 0;
-        
+
         msg!("GlobalState initialisé - Tracking du boost communautaire actif");
         Ok(())
     }
@@ -49,7 +49,7 @@ pub mod swapback_cnft {
 
         // Calculer le boost dynamique
         let boost = calculate_boost(amount_locked, lock_duration);
-        
+
         // Déterminer le niveau automatiquement basé sur montant + durée
         let duration_days = (lock_duration / 86400) as u64;
         let level = LockLevel::from_lock_params(amount_locked, duration_days);
@@ -66,13 +66,16 @@ pub mod swapback_cnft {
 
         // Mettre à jour les statistiques globales
         collection_config.total_minted = collection_config.total_minted.checked_add(1).unwrap();
-        global_state.total_community_boost = global_state.total_community_boost
+        global_state.total_community_boost = global_state
+            .total_community_boost
             .checked_add(boost as u64)
             .ok_or(ErrorCode::MathOverflow)?;
-        global_state.active_locks_count = global_state.active_locks_count
+        global_state.active_locks_count = global_state
+            .active_locks_count
             .checked_add(1)
             .ok_or(ErrorCode::MathOverflow)?;
-        global_state.total_value_locked = global_state.total_value_locked
+        global_state.total_value_locked = global_state
+            .total_value_locked
             .checked_add(amount_locked)
             .ok_or(ErrorCode::MathOverflow)?;
 
@@ -97,64 +100,91 @@ pub mod swapback_cnft {
 
     /// Lock des tokens BACK avec transfert vers un PDA
     /// Cette instruction combine le mint du cNFT ET le transfert des tokens
-    pub fn lock_tokens(
-        ctx: Context<LockTokens>,
-        amount: u64,
-        lock_duration: i64,
-    ) -> Result<()> {
-        msg!("🔒 LockTokens: amount={}, duration={}", amount, lock_duration);
-        
+    pub fn lock_tokens(ctx: Context<LockTokens>, amount: u64, lock_duration: i64) -> Result<()> {
+        msg!(
+            "🔒 LockTokens: amount={}, duration={}",
+            amount,
+            lock_duration
+        );
+
         let collection_config = &mut ctx.accounts.collection_config;
         let global_state = &mut ctx.accounts.global_state;
         let user_nft = &mut ctx.accounts.user_nft;
 
         msg!("🔍 Accounts: collection.total_minted={}, global.boost={}, global.tv_locked={}, global.active_locks={}",
              collection_config.total_minted, global_state.total_community_boost, global_state.total_value_locked, global_state.active_locks_count);
-        msg!("🔍 User NFT: user={:?}, amount_locked={}, boost={}, is_active={}",
-             user_nft.user, user_nft.amount_locked, user_nft.boost, user_nft.is_active);
+        msg!(
+            "🔍 User NFT: user={:?}, amount_locked={}, boost={}, is_active={}",
+            user_nft.user,
+            user_nft.amount_locked,
+            user_nft.boost,
+            user_nft.is_active
+        );
 
         // Vérifier si c'est un nouveau NFT ou une mise à jour
         let is_new_nft = user_nft.user == Pubkey::default();
         msg!("🔍 is_new_nft: {}", is_new_nft);
-        
+
         // Calculer le nouveau montant total (cumulatif)
         let new_total_amount = if is_new_nft {
             amount
         } else {
-            msg!("🔍 Calculating new_total_amount: {} + {}", user_nft.amount_locked, amount);
-            user_nft.amount_locked
+            msg!(
+                "🔍 Calculating new_total_amount: {} + {}",
+                user_nft.amount_locked,
+                amount
+            );
+            user_nft
+                .amount_locked
                 .checked_add(amount)
                 .ok_or(ErrorCode::MathOverflow)?
         };
         msg!("🔍 new_total_amount: {}", new_total_amount);
-        
+
         // Calculer la durée maximale pour ce lock
         let max_duration = if is_new_nft {
             lock_duration
         } else {
             std::cmp::max(user_nft.lock_duration, lock_duration)
         };
-        
+
         // Calculer le nouveau boost basé sur le montant total et la durée maximale
         let duration_days = (max_duration / 86400) as u64;
-        msg!("🔍 duration_days: {} (max_duration: {})", duration_days, max_duration);
+        msg!(
+            "🔍 duration_days: {} (max_duration: {})",
+            duration_days,
+            max_duration
+        );
         let new_level = LockLevel::from_lock_params(new_total_amount, duration_days);
         let new_boost = calculate_boost(new_total_amount, max_duration);
         msg!("🔍 new_level: {:?}, new_boost: {}", new_level, new_boost);
-        
+
         // Si le NFT existe déjà et est actif, retirer l'ancien boost avant de mettre à jour
         if !is_new_nft && user_nft.is_active {
-            msg!("🔍 Removing old boost: global.boost {} - user.boost {}", global_state.total_community_boost, user_nft.boost as u64);
+            msg!(
+                "🔍 Removing old boost: global.boost {} - user.boost {}",
+                global_state.total_community_boost,
+                user_nft.boost as u64
+            );
             // Utiliser saturating_sub pour éviter les overflows dus à des données incohérentes
-            global_state.total_community_boost = global_state.total_community_boost
+            global_state.total_community_boost = global_state
+                .total_community_boost
                 .saturating_sub(user_nft.boost as u64);
             msg!("🔍 After sub boost: {}", global_state.total_community_boost);
-            
-            msg!("🔍 Removing old tv_locked: global.tv_locked {} - user.amount_locked {}", global_state.total_value_locked, user_nft.amount_locked);
+
+            msg!(
+                "🔍 Removing old tv_locked: global.tv_locked {} - user.amount_locked {}",
+                global_state.total_value_locked,
+                user_nft.amount_locked
+            );
             // Utiliser saturating_sub pour éviter les overflows dus à des données incohérentes
-            global_state.total_value_locked = global_state.total_value_locked
+            global_state.total_value_locked = global_state
+                .total_value_locked
                 .saturating_sub(user_nft.amount_locked);
-            msg!("🔍 After sub tv_locked: {}", global_state.total_value_locked);
+            msg!(
+                "🔍 After sub tv_locked: {}",
+                global_state.total_value_locked
+            );
         }
 
         // Enregistrer/Mettre à jour le NFT de l'utilisateur avec le montant cumulé
@@ -176,25 +206,47 @@ pub mod swapback_cnft {
 
         // Mettre à jour les statistiques globales
         if is_new_nft {
-            msg!("🔍 New NFT: incrementing total_minted {} + 1", collection_config.total_minted);
+            msg!(
+                "🔍 New NFT: incrementing total_minted {} + 1",
+                collection_config.total_minted
+            );
             collection_config.total_minted = collection_config.total_minted.checked_add(1).unwrap();
-            msg!("🔍 New NFT: incrementing active_locks_count {} + 1", global_state.active_locks_count);
-            global_state.active_locks_count = global_state.active_locks_count
+            msg!(
+                "🔍 New NFT: incrementing active_locks_count {} + 1",
+                global_state.active_locks_count
+            );
+            global_state.active_locks_count = global_state
+                .active_locks_count
                 .checked_add(1)
                 .ok_or(ErrorCode::MathOverflow)?;
-            msg!("🔍 After new NFT updates: total_minted={}, active_locks={}", collection_config.total_minted, global_state.active_locks_count);
+            msg!(
+                "🔍 After new NFT updates: total_minted={}, active_locks={}",
+                collection_config.total_minted,
+                global_state.active_locks_count
+            );
         }
-        
+
         // Utiliser saturating_add pour éviter les overflows sur les très grandes valeurs
-        msg!("🔍 Adding to global boost: {} + {}", global_state.total_community_boost, new_boost as u64);
-        global_state.total_community_boost = global_state.total_community_boost
+        msg!(
+            "🔍 Adding to global boost: {} + {}",
+            global_state.total_community_boost,
+            new_boost as u64
+        );
+        global_state.total_community_boost = global_state
+            .total_community_boost
             .saturating_add(new_boost as u64);
         msg!("🔍 After add boost: {}", global_state.total_community_boost);
-        
-        msg!("🔍 Adding to global tv_locked: {} + {}", global_state.total_value_locked, amount);
-        global_state.total_value_locked = global_state.total_value_locked
-            .saturating_add(amount);
-        msg!("🔍 After add tv_locked: {}", global_state.total_value_locked);
+
+        msg!(
+            "🔍 Adding to global tv_locked: {} + {}",
+            global_state.total_value_locked,
+            amount
+        );
+        global_state.total_value_locked = global_state.total_value_locked.saturating_add(amount);
+        msg!(
+            "🔍 After add tv_locked: {}",
+            global_state.total_value_locked
+        );
 
         // Transférer les tokens BACK vers le vault PDA
         let cpi_accounts = TransferChecked {
@@ -203,10 +255,10 @@ pub mod swapback_cnft {
             authority: ctx.accounts.user.to_account_info(),
             mint: ctx.accounts.back_mint.to_account_info(),
         };
-        
+
         let cpi_program = ctx.accounts.token_program.to_account_info();
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-        
+
         transfer_checked(cpi_ctx, amount, ctx.accounts.back_mint.decimals)?;
 
         emit!(TokensLocked {
@@ -261,30 +313,35 @@ pub mod swapback_cnft {
             (total_amount, 0)
         };
 
-        msg!("🔓 Unlock tokens: total={}, user_amount={}, burn_amount={}, early={}",
-             total_amount, user_amount, burn_amount, is_early_unlock);
+        msg!(
+            "🔓 Unlock tokens: total={}, user_amount={}, burn_amount={}, early={}",
+            total_amount,
+            user_amount,
+            burn_amount,
+            is_early_unlock
+        );
 
         // Décrémenter les stats globales
-        global_state.total_community_boost = global_state.total_community_boost
+        global_state.total_community_boost = global_state
+            .total_community_boost
             .saturating_sub(user_nft.boost as u64);
-        global_state.active_locks_count = global_state.active_locks_count
-            .saturating_sub(1);
-        global_state.total_value_locked = global_state.total_value_locked
-            .saturating_sub(total_amount);
+        global_state.active_locks_count = global_state.active_locks_count.saturating_sub(1);
+        global_state.total_value_locked =
+            global_state.total_value_locked.saturating_sub(total_amount);
 
         // Transférer les tokens du vault
         let bump = ctx.bumps.vault_authority;
-        let seeds: &[&[u8]] = &[
-            b"vault_authority",
-            &[bump],
-        ];
+        let seeds: &[&[u8]] = &[b"vault_authority", &[bump]];
         let signer_seeds = &[seeds];
 
         // "Brûler" la pénalité (garder dans le vault - tokens non récupérables)
         if burn_amount > 0 {
             // Les tokens de pénalité restent dans le vault et ne sont pas transférés à l'utilisateur
             // Cela équivaut à un burn effectif puisque personne ne peut les récupérer
-            msg!("🔥 Burned {} tokens as early unlock penalty (kept in vault)", burn_amount / 1_000_000_000);
+            msg!(
+                "🔥 Burned {} tokens as early unlock penalty (kept in vault)",
+                burn_amount / 1_000_000_000
+            );
         }
 
         // Transférer le reste à l'utilisateur (montant total moins la pénalité)
@@ -299,7 +356,7 @@ pub mod swapback_cnft {
             let user_cpi_ctx = CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
                 user_accounts,
-                signer_seeds
+                signer_seeds,
             );
 
             transfer_checked(user_cpi_ctx, user_amount, ctx.accounts.back_mint.decimals)?;
@@ -339,25 +396,31 @@ pub mod swapback_cnft {
 
         // Si on désactive (unlock), décrémenter le boost total
         if !is_active && user_nft.is_active {
-            global_state.total_community_boost = global_state.total_community_boost
+            global_state.total_community_boost = global_state
+                .total_community_boost
                 .checked_sub(user_nft.boost as u64)
                 .ok_or(ErrorCode::MathOverflow)?;
-            global_state.active_locks_count = global_state.active_locks_count
+            global_state.active_locks_count = global_state
+                .active_locks_count
                 .checked_sub(1)
                 .ok_or(ErrorCode::MathOverflow)?;
-            global_state.total_value_locked = global_state.total_value_locked
+            global_state.total_value_locked = global_state
+                .total_value_locked
                 .checked_sub(user_nft.amount_locked)
                 .ok_or(ErrorCode::MathOverflow)?;
         }
         // Si on réactive (re-lock), incrémenter le boost total
         else if is_active && !user_nft.is_active {
-            global_state.total_community_boost = global_state.total_community_boost
+            global_state.total_community_boost = global_state
+                .total_community_boost
                 .checked_add(user_nft.boost as u64)
                 .ok_or(ErrorCode::MathOverflow)?;
-            global_state.active_locks_count = global_state.active_locks_count
+            global_state.active_locks_count = global_state
+                .active_locks_count
                 .checked_add(1)
                 .ok_or(ErrorCode::MathOverflow)?;
-            global_state.total_value_locked = global_state.total_value_locked
+            global_state.total_value_locked = global_state
+                .total_value_locked
                 .checked_add(user_nft.amount_locked)
                 .ok_or(ErrorCode::MathOverflow)?;
         }
@@ -625,9 +688,9 @@ pub struct CollectionConfig {
 #[derive(InitSpace)]
 pub struct GlobalState {
     pub authority: Pubkey,
-    pub total_community_boost: u64,  // Somme de tous les boosts actifs (en basis points)
-    pub active_locks_count: u64,     // Nombre de locks actifs
-    pub total_value_locked: u64,     // TVL total en lamports
+    pub total_community_boost: u64, // Somme de tous les boosts actifs (en basis points)
+    pub active_locks_count: u64,    // Nombre de locks actifs
+    pub total_value_locked: u64,    // TVL total en lamports
 }
 
 #[account]
@@ -637,7 +700,7 @@ pub struct UserNft {
     pub level: LockLevel,
     pub amount_locked: u64,
     pub lock_duration: i64,
-    pub boost: u16,           // Boost en basis points (10000 = 100%)
+    pub boost: u16, // Boost en basis points (10000 = 100%)
     pub mint_time: i64,
     pub is_active: bool,
     pub bump: u8,
@@ -649,7 +712,7 @@ pub struct LevelNftMinted {
     pub level: LockLevel,
     pub amount_locked: u64,
     pub lock_duration: i64,
-    pub boost: u16,           // Boost en basis points
+    pub boost: u16, // Boost en basis points
     pub timestamp: i64,
 }
 
@@ -680,11 +743,11 @@ fn calculate_boost(amount: u64, duration: i64) -> u16 {
     // Amount score: (amount / 10000) * 100, max 1000 basis points (10%)
     // Cela signifie: 100k tokens = 1000 BP max
     let amount_score = std::cmp::min((amount_tokens / 10_000) * 100, 1000);
-    
+
     // Duration score: (days / 5) * 10, max 1000 basis points (10%)
     // Cela signifie: 365 jours = 730 BP ≈ 7.3%, 500 jours = 1000 BP (10%)
     let duration_score = std::cmp::min((days / 5) * 10, 1000);
-    
+
     // Total boost: max 2000 basis points (20%)
     std::cmp::min(amount_score + duration_score, 2000) as u16
 }
