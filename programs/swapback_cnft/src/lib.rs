@@ -113,7 +113,20 @@ pub mod swapback_cnft {
         let duration_days = (lock_duration / 86400) as u64;
         let level = LockLevel::from_lock_params(amount, duration_days);
 
-        // Enregistrer le NFT de l'utilisateur
+        // Vérifier si c'est un nouveau NFT ou une mise à jour
+        let is_new_nft = user_nft.user == Pubkey::default();
+        
+        // Si le NFT existe déjà et est actif, retirer l'ancien boost avant de mettre à jour
+        if !is_new_nft && user_nft.is_active {
+            global_state.total_community_boost = global_state.total_community_boost
+                .checked_sub(user_nft.boost as u64)
+                .ok_or(ErrorCode::MathOverflow)?;
+            global_state.total_value_locked = global_state.total_value_locked
+                .checked_sub(user_nft.amount_locked)
+                .ok_or(ErrorCode::MathOverflow)?;
+        }
+
+        // Enregistrer/Mettre à jour le NFT de l'utilisateur
         user_nft.user = ctx.accounts.user.key();
         user_nft.level = level;
         user_nft.amount_locked = amount;
@@ -121,15 +134,20 @@ pub mod swapback_cnft {
         user_nft.boost = boost;
         user_nft.mint_time = Clock::get()?.unix_timestamp;
         user_nft.is_active = true;
-        user_nft.bump = ctx.bumps.user_nft;
+        if is_new_nft {
+            user_nft.bump = ctx.bumps.user_nft;
+        }
 
         // Mettre à jour les statistiques globales
-        collection_config.total_minted = collection_config.total_minted.checked_add(1).unwrap();
+        if is_new_nft {
+            collection_config.total_minted = collection_config.total_minted.checked_add(1).unwrap();
+            global_state.active_locks_count = global_state.active_locks_count
+                .checked_add(1)
+                .ok_or(ErrorCode::MathOverflow)?;
+        }
+        
         global_state.total_community_boost = global_state.total_community_boost
             .checked_add(boost as u64)
-            .ok_or(ErrorCode::MathOverflow)?;
-        global_state.active_locks_count = global_state.active_locks_count
-            .checked_add(1)
             .ok_or(ErrorCode::MathOverflow)?;
         global_state.total_value_locked = global_state.total_value_locked
             .checked_add(amount)
@@ -440,7 +458,7 @@ pub struct LockTokens<'info> {
     pub global_state: Account<'info, GlobalState>,
 
     #[account(
-        init,
+        init_if_needed,
         payer = user,
         space = 8 + UserNft::INIT_SPACE,
         seeds = [b"user_nft", user.key().as_ref()],
