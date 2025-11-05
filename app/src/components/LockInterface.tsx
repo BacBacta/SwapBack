@@ -84,50 +84,55 @@ export default function LockInterface({
     boost: number;
   } | null>(null);
 
-  // Calcul du niveau basé sur la durée et le montant (visuel uniquement)
+  // Calcul du niveau basé sur la durée et le montant CUMULÉ (visuel uniquement)
   // Seuils adaptés pour supply de 1 milliard
   const predictedLevel: CNFTLevel = useMemo(() => {
     const days = parseInt(duration) || 0;
     const amt = parseFloat(amount) || 0;
+    
+    // Si NFT existe, calculer avec le montant CUMULÉ
+    const totalAmount = currentNftData ? currentNftData.amount + amt : amt;
 
-    if (amt >= 10000000 && days >= LEVEL_THRESHOLDS.Diamond)
+    if (totalAmount >= 10000000 && days >= LEVEL_THRESHOLDS.Diamond)
       return "Diamond" as CNFTLevel;
-    if (amt >= 5000000 && days >= LEVEL_THRESHOLDS.Platinum)
+    if (totalAmount >= 5000000 && days >= LEVEL_THRESHOLDS.Platinum)
       return "Platinum" as CNFTLevel;
-    if (amt >= 1000000 && days >= LEVEL_THRESHOLDS.Gold) return "Gold";
-    if (amt >= 500000 && days >= LEVEL_THRESHOLDS.Silver) return "Silver";
+    if (totalAmount >= 1000000 && days >= LEVEL_THRESHOLDS.Gold) return "Gold";
+    if (totalAmount >= 500000 && days >= LEVEL_THRESHOLDS.Silver) return "Silver";
     return "Bronze";
-  }, [duration, amount]);
+  }, [duration, amount, currentNftData]);
 
-  // Niveau et boost actuels : utilise les données du NFT existant si disponibles, sinon les valeurs prédites
+  // Niveau affiché : TOUJOURS utiliser la prédiction basée sur le montant cumulé
   const displayLevel: CNFTLevel = useMemo(() => {
-    return currentNftData ? currentNftData.level : predictedLevel;
-  }, [currentNftData, predictedLevel]);
+    return predictedLevel;
+  }, [predictedLevel]);
 
-  // Boost actuel du NFT (pour référence future)
-  const _displayBoost = useMemo(() => {
-    return currentNftData ? currentNftData.boost : 0;
-  }, [currentNftData]);
-
-  // Calcul du boost basé sur le montant ET la durée (DYNAMIQUE)
+  // Calcul du boost basé sur le montant CUMULÉ ET la durée (DYNAMIQUE)
   const predictedBoost = useMemo(() => {
     const amt = parseFloat(amount) || 0;
     const days = parseInt(duration) || 0;
-    return calculateDynamicBoost(amt, days);
-  }, [amount, duration]);
+    
+    // Si NFT existe, calculer avec le montant CUMULÉ
+    const totalAmount = currentNftData ? currentNftData.amount + amt : amt;
+    
+    return calculateDynamicBoost(totalAmount, days);
+  }, [amount, duration, currentNftData]);
 
   // Détails du calcul du boost pour affichage
   const boostDetails = useMemo(() => {
     const amt = parseFloat(amount) || 0;
     const days = parseInt(duration) || 0;
+    
+    // Si NFT existe, calculer avec le montant CUMULÉ
+    const totalAmount = currentNftData ? currentNftData.amount + amt : amt;
 
     // Score montant: max 10% (atteint à 5M tokens)
-    const amountScore = Math.min((amt / 5000000) * 10, 10);
+    const amountScore = Math.min((totalAmount / 5000000) * 10, 10);
     // Score durée: max 10%
     const durationScore = Math.min((days / 365) * 10, 10);
 
     return { amountScore, durationScore };
-  }, [amount, duration]);
+  }, [amount, duration, currentNftData]);
 
   // Couleur du badge selon le niveau (utilise le niveau réel du NFT si disponible)
   const levelColor = useMemo(() => {
@@ -166,7 +171,7 @@ export default function LockInterface({
         const bal = tokenAccount.value.uiAmount || 0;
         setBalance(bal);
       } catch (err) {
-        console.error("Erreur lors de la récupération du solde:", err);
+        console.error("Error fetching balance:", err);
         setBalance(0);
       }
     };
@@ -264,7 +269,7 @@ export default function LockInterface({
             });
           } catch (decodeErr) {
             console.error("Error decoding NFT data:", decodeErr);
-            // Même si le décodage échoue, on permet le lock
+            // Even if decoding fails, allow the lock
             setCurrentNftData(null);
           }
         } else {
@@ -272,7 +277,7 @@ export default function LockInterface({
           setCurrentNftData(null);
         }
       } catch (err) {
-        console.error("Erreur lors de la vérification du NFT existant:", err);
+        console.error("Error checking existing NFT:", err);
         setHasExistingNft(false);
         setCurrentNftData(null);
       }
@@ -428,23 +433,94 @@ export default function LockInterface({
       console.log("✅ [LOCK DEBUG] Transaction confirmed!");
 
       setSuccess(
-        `✅ Lock réussi ! ${amt} BACK verrouillés pour ${days} jours. Signature: ${signature.slice(0, 8)}...`
+        `✅ Lock successful! ${amt} BACK locked for ${days} days. Signature: ${signature.slice(0, 8)}...`
       );
       setAmount("");
+
+      // Rafraîchir immédiatement les données du NFT après le lock
+      setTimeout(async () => {
+        if (!publicKey) return;
+        
+        try {
+          // Rafraîchir le solde
+          const ata = await getAssociatedTokenAddress(
+            BACK_TOKEN_MINT,
+            publicKey,
+            false,
+            TOKEN_2022_PROGRAM_ID
+          );
+          const tokenAccount = await connection.getTokenAccountBalance(ata);
+          const bal = tokenAccount.value.uiAmount || 0;
+          setBalance(bal);
+
+          // Rafraîchir les données du NFT
+          const CNFT_PROGRAM_ID = new PublicKey(
+            process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID ||
+              "2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G"
+          );
+
+          const [userNftPda] = PublicKey.findProgramAddressSync(
+            [Buffer.from("user_nft"), publicKey.toBuffer()],
+            CNFT_PROGRAM_ID
+          );
+
+          const accountInfo = await connection.getAccountInfo(userNftPda);
+
+          if (accountInfo && accountInfo.data.length > 0) {
+            const data = accountInfo.data;
+            let offset = 8; // Skip discriminator
+            offset += 32; // Skip user pubkey
+            
+            const levelByte = data.readUInt8(offset);
+            offset += 1;
+            
+            const amountLocked = Number(data.readBigUInt64LE(offset)) / 1_000_000_000;
+            offset += 8;
+            
+            const lockDuration = Number(data.readBigInt64LE(offset));
+            offset += 8;
+            
+            const boostBps = data.readUInt16LE(offset);
+            offset += 2;
+            
+            const mintTime = Number(data.readBigInt64LE(offset));
+            offset += 8;
+            
+            const unlockTime = mintTime + lockDuration;
+            
+            const levelNames: CNFTLevel[] = [
+              "Bronze",
+              "Silver",
+              "Gold",
+              "Platinum",
+              "Diamond",
+            ];
+            const level = levelNames[Math.min(levelByte, 4)] || "Bronze";
+            const boost = boostBps / 100;
+
+            setCurrentNftData({
+              amount: amountLocked,
+              unlockTime,
+              level,
+              boost,
+            });
+
+            console.log("🔄 NFT data refreshed after lock:", {
+              amount: amountLocked,
+              lockDuration: `${lockDuration / 86400} days`,
+              level,
+              boost: `${boost}%`,
+            });
+          }
+        } catch (err) {
+          console.error("Error refreshing after lock:", err);
+        }
+      }, 2000);
 
       // Callback de succès
       if (onLockSuccess) {
         onLockSuccess();
       }
-
-      // Rafraîchir le solde
-      setTimeout(async () => {
-        if (!publicKey) return;
-        const ata = await getAssociatedTokenAddress(BACK_TOKEN_MINT, publicKey);
-        const tokenAccount = await connection.getTokenAccountBalance(ata);
-        const bal = tokenAccount.value.uiAmount || 0;
-        setBalance(bal);
-      }, 2000);
     } catch (err: unknown) {
       console.error("❌ [LOCK ERROR] Error during lock:", err);
       console.error("❌ [LOCK ERROR] Error type:", typeof err);
@@ -462,16 +538,18 @@ export default function LockInterface({
         // Afficher l'erreur complète pour debug
         message = `❌ ${err.message}`;
 
-        // Vérifier les erreurs spécifiques pour des messages plus clairs
+        // Check for specific errors with clearer messages
         if (err.message.includes("User rejected")) {
           message = "❌ Transaction cancelled by user";
         } else if (err.message.includes("insufficient")) {
           message = "❌ Insufficient balance";
         } else if (err.message.includes("AccountNotFound")) {
           message = "❌ Token account not found. Do you have BACK tokens?";
-        } else if (err.message.includes("0x1")) {
+        } else if (err.message.includes("0x1") || err.message.includes("Account not initialized")) {
           message =
-            "❌ Program error: Account not initialized. Please contact support.";
+            "❌ Global state not initialized. The program may need to be set up first. Please try again in a few moments.";
+        } else if (err.message.includes("Blockhash not found")) {
+          message = "❌ Transaction expired. Please try again.";
         }
       } else {
         // Si ce n'est pas une Error standard, afficher l'objet complet

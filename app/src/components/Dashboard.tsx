@@ -95,7 +95,7 @@ export const Dashboard = () => {
                 />
               </svg>
               <span className="text-xs text-gray-400">
-                {loading ? "Chargement..." : "Rafraîchir"}
+                {loading ? "Loading..." : "Refresh"}
               </span>
             </button>
 
@@ -107,7 +107,7 @@ export const Dashboard = () => {
               ></span>
               <span className="text-xs text-gray-400">
                 {lastRefresh
-                  ? `Mis à jour il y a ${Math.floor((Date.now() - lastRefresh) / 1000)}s`
+                  ? `Updated ${Math.floor((Date.now() - lastRefresh) / 1000)}s ago`
                   : "Auto-refresh: 5min"}
               </span>
             </div>
