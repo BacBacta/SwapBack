@@ -291,8 +291,8 @@ export const LockUnlock = () => {
                 <div className="flex justify-between">
                   <span className="opacity-70">UNLOCK_DATE:</span>
                   <span>
-                    {new Date(cnftData.unlockTime)
-                      ? new Date(cnftData.unlockTime).toLocaleDateString()
+                    {cnftData.unlockTime
+                      ? new Date(cnftData.unlockTime * 1000).toLocaleDateString()
                       : "N/A"}
                   </span>
                 </div>
