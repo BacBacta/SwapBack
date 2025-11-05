@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { createUnlockTransaction } from '@/lib/cnft';
+import { createUnlockTokensTransaction } from '@/lib/lockTokens';
 import { useCNFT } from '../hooks/useCNFT';
 
 type ExtendedCNFTLevel = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond';
@@ -129,7 +129,7 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
     setSuccess(null);
 
     try {
-  const transaction = await createUnlockTransaction(connection, wallet);
+      const transaction = await createUnlockTokensTransaction(connection, wallet);
 
       const signature = await sendTransaction(transaction, connection);
 
@@ -408,6 +408,15 @@ export default function UnlockInterface({ onUnlockSuccess }: Readonly<UnlockInte
           <h4 className="text-secondary font-bold">Important Information</h4>
         </div>
         <ul className="text-gray-400 text-sm space-y-2">
+          {!timeRemaining?.canUnlock && (
+            <li className="flex items-start gap-2 p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+              <span className="text-orange-400 mt-0.5 text-lg">⚠️</span>
+              <span className="text-orange-300 font-medium">
+                <strong>Early Unlock Penalty:</strong> Unlocking before the lock period ends will incur a <strong>1.5% penalty</strong>. 
+                These tokens will be burned permanently.
+              </span>
+            </li>
+          )}
           <li className="flex items-start gap-2">
             <span className="text-secondary mt-0.5">💰</span>
             <span>Unlocking will make your $BACK tokens available</span>
