@@ -191,15 +191,50 @@ export default function LockInterface({
 
           try {
             // Decoder les données du NFT (structure selon le programme Rust)
-            // Offset basé sur la structure UserNFT dans le programme
+            // Structure UserNft:
+            // - discriminator: 8 bytes (Anchor)
+            // - user: Pubkey (32 bytes)
+            // - level: LockLevel enum (1 byte)
+            // - amount_locked: u64 (8 bytes)
+            // - lock_duration: i64 (8 bytes)
+            // - boost: u16 (2 bytes)
+            // - mint_time: i64 (8 bytes)
+            // - is_active: bool (1 byte)
+            // - bump: u8 (1 byte)
+            
             const data = accountInfo.data;
-
-            // Structure: owner (32) + amount (8) + unlock_time (8) + boost_bps (2) + level (1) + padding
-            const amount = Number(data.readBigUInt64LE(32)) / 1_000_000_000; // Convertir lamports en tokens
-            const unlockTime = Number(data.readBigUInt64LE(40)); // Unix timestamp
-            const boostBps = data.readUInt16LE(48); // Boost en basis points
-            const levelByte = data.readUInt8(50); // 0=Bronze, 1=Silver, 2=Gold, 3=Platinum, 4=Diamond
-
+            
+            let offset = 8; // Skip discriminator
+            
+            // user: Pubkey (32 bytes) - skip
+            offset += 32;
+            
+            // level: enum (1 byte)
+            const levelByte = data.readUInt8(offset);
+            offset += 1;
+            
+            // amount_locked: u64 (8 bytes)
+            const amountLocked = Number(data.readBigUInt64LE(offset)) / 1_000_000_000;
+            offset += 8;
+            
+            // lock_duration: i64 (8 bytes)
+            const lockDuration = Number(data.readBigInt64LE(offset)); // en secondes
+            offset += 8;
+            
+            // boost: u16 (2 bytes) - en basis points
+            const boostBps = data.readUInt16LE(offset);
+            offset += 2;
+            
+            // mint_time: i64 (8 bytes)
+            const mintTime = Number(data.readBigInt64LE(offset));
+            offset += 8;
+            
+            // is_active: bool (1 byte)
+            const isActive = data.readUInt8(offset) !== 0;
+            
+            // Calculer unlock_time = mint_time + lock_duration
+            const unlockTime = mintTime + lockDuration;
+            
             const levelNames: CNFTLevel[] = [
               "Bronze",
               "Silver",
@@ -208,20 +243,24 @@ export default function LockInterface({
               "Diamond",
             ];
             const level = levelNames[Math.min(levelByte, 4)] || "Bronze";
-            const boost = boostBps / 100; // Convertir BPS en pourcentage
+            const boost = boostBps / 100; // Convertir basis points en pourcentage
 
             setCurrentNftData({
-              amount,
+              amount: amountLocked,
               unlockTime,
               level,
               boost,
             });
 
             console.log("📊 Current NFT data:", {
-              amount,
-              unlockTime,
+              amount: amountLocked,
+              lockDuration: `${lockDuration / 86400} days`,
+              mintTime: new Date(mintTime * 1000).toISOString(),
+              unlockTime: new Date(unlockTime * 1000).toISOString(),
               level,
-              boost,
+              boost: `${boost}%`,
+              boostBps,
+              isActive,
             });
           } catch (decodeErr) {
             console.error("Error decoding NFT data:", decodeErr);

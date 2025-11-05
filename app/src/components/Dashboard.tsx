@@ -170,11 +170,11 @@ export const Dashboard = () => {
               ? cnftData.level
               : "Bronze"
           }
-          boost={cnftData.boostBps}
+          boost={cnftData.boostBps / 100}
           lockedAmount={cnftData.lockedAmount}
-          lockDuration={cnftData.lockDuration}
+          lockDuration={Math.floor(cnftData.lockDuration / 86400)}
           isActive={cnftData.isActive}
-          unlockDate={new Date(cnftData.unlockTime)}
+          unlockDate={new Date(cnftData.unlockTime * 1000)}
         />
       )}
 
