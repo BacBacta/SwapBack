@@ -1,19 +1,23 @@
-'use client';
+"use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { PublicKey } from '@solana/web3.js';
-import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
-import { createLockTokensTransaction } from '@/lib/lockTokens';
+import React, { useState, useMemo, useEffect } from "react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
+import {
+  getAssociatedTokenAddress,
+  TOKEN_2022_PROGRAM_ID,
+} from "@solana/spl-token";
+import { createLockTokensTransaction } from "@/lib/lockTokens";
 // Fallback: import { createLockTransaction } from '@/lib/cnft';
 
 // Configuration du token $BACK - Utilise les variables d'environnement
 const BACK_TOKEN_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_BACK_MINT || '862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux'
+  process.env.NEXT_PUBLIC_BACK_MINT ||
+    "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
 );
 
 // Types pour les niveaux de cNFT - Étendus
-type CNFTLevel = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond';
+type CNFTLevel = "Bronze" | "Silver" | "Gold" | "Platinum" | "Diamond";
 
 // Seuils pour les niveaux (en nombre de jours) - Visuels uniquement
 const LEVEL_THRESHOLDS = {
@@ -30,21 +34,27 @@ const LEVEL_THRESHOLDS = {
 // - Score montant: (amount / 5,000,000) * 10, max 10%
 // - Score durée: (days / 365) * 10, max 10%
 // - Total: max 20%
-const calculateDynamicBoost = (amount: number, durationDays: number): number => {
+const calculateDynamicBoost = (
+  amount: number,
+  durationDays: number
+): number => {
   // Score du montant (max 10% atteint à 5M tokens)
   const amountScore = Math.min((amount / 5000000) * 10, 10);
-  
+
   // Score de la durée (max 10%)
   const durationScore = Math.min((durationDays / 365) * 10, 10);
-  
+
   // Boost total (max 20%)
   const totalBoost = Math.min(amountScore + durationScore, 20);
-  
+
   return Math.round(totalBoost * 100) / 100; // Arrondi à 2 décimales
 };
 
 // Calcul de la part de buyback de l'utilisateur
-const calculateBuybackShare = (userBoost: number, totalCommunityBoost: number): number => {
+const calculateBuybackShare = (
+  userBoost: number,
+  totalCommunityBoost: number
+): number => {
   if (totalCommunityBoost === 0) return 0;
   return (userBoost / totalCommunityBoost) * 100;
 };
@@ -53,13 +63,15 @@ interface LockInterfaceProps {
   onLockSuccess?: () => void;
 }
 
-export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceProps>) {
+export default function LockInterface({
+  onLockSuccess,
+}: Readonly<LockInterfaceProps>) {
   const wallet = useWallet();
-  const { publicKey, sendTransaction } = wallet;
+  const { publicKey } = wallet;
   const { connection } = useConnection();
 
-  const [amount, setAmount] = useState<string>('');
-  const [duration, setDuration] = useState<string>('30'); // Days
+  const [amount, setAmount] = useState<string>("");
+  const [duration, setDuration] = useState<string>("30"); // Days
   const [balance, setBalance] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,12 +89,14 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
   const predictedLevel: CNFTLevel = useMemo(() => {
     const days = parseInt(duration) || 0;
     const amt = parseFloat(amount) || 0;
-    
-    if (amt >= 10000000 && days >= LEVEL_THRESHOLDS.Diamond) return 'Diamond' as CNFTLevel;
-    if (amt >= 5000000 && days >= LEVEL_THRESHOLDS.Platinum) return 'Platinum' as CNFTLevel;
-    if (amt >= 1000000 && days >= LEVEL_THRESHOLDS.Gold) return 'Gold';
-    if (amt >= 500000 && days >= LEVEL_THRESHOLDS.Silver) return 'Silver';
-    return 'Bronze';
+
+    if (amt >= 10000000 && days >= LEVEL_THRESHOLDS.Diamond)
+      return "Diamond" as CNFTLevel;
+    if (amt >= 5000000 && days >= LEVEL_THRESHOLDS.Platinum)
+      return "Platinum" as CNFTLevel;
+    if (amt >= 1000000 && days >= LEVEL_THRESHOLDS.Gold) return "Gold";
+    if (amt >= 500000 && days >= LEVEL_THRESHOLDS.Silver) return "Silver";
+    return "Bronze";
   }, [duration, amount]);
 
   // Niveau et boost actuels : utilise les données du NFT existant si disponibles, sinon les valeurs prédites
@@ -101,17 +115,17 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
     const days = parseInt(duration) || 0;
     return calculateDynamicBoost(amt, days);
   }, [amount, duration]);
-  
+
   // Détails du calcul du boost pour affichage
   const boostDetails = useMemo(() => {
     const amt = parseFloat(amount) || 0;
     const days = parseInt(duration) || 0;
-    
+
     // Score montant: max 10% (atteint à 5M tokens)
     const amountScore = Math.min((amt / 5000000) * 10, 10);
     // Score durée: max 10%
     const durationScore = Math.min((days / 365) * 10, 10);
-    
+
     return { amountScore, durationScore };
   }, [amount, duration]);
 
@@ -119,16 +133,16 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
   const levelColor = useMemo(() => {
     const level = currentNftData ? currentNftData.level : predictedLevel;
     switch (level) {
-      case 'Diamond':
-        return 'text-cyan-400 border-cyan-400 bg-cyan-400/10';
-      case 'Platinum':
-        return 'text-purple-400 border-purple-400 bg-purple-400/10';
-      case 'Gold':
-        return 'text-yellow-400 border-yellow-400 bg-yellow-400/10';
-      case 'Silver':
-        return 'text-gray-300 border-gray-300 bg-gray-300/10';
-      case 'Bronze':
-        return 'text-orange-400 border-orange-400 bg-orange-400/10';
+      case "Diamond":
+        return "text-cyan-400 border-cyan-400 bg-cyan-400/10";
+      case "Platinum":
+        return "text-purple-400 border-purple-400 bg-purple-400/10";
+      case "Gold":
+        return "text-yellow-400 border-yellow-400 bg-yellow-400/10";
+      case "Silver":
+        return "text-gray-300 border-gray-300 bg-gray-300/10";
+      case "Bronze":
+        return "text-orange-400 border-orange-400 bg-orange-400/10";
     }
   }, [currentNftData, predictedLevel]);
 
@@ -152,7 +166,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         const bal = tokenAccount.value.uiAmount || 0;
         setBalance(bal);
       } catch (err) {
-        console.error('Erreur lors de la récupération du solde:', err);
+        console.error("Erreur lors de la récupération du solde:", err);
         setBalance(0);
       }
     };
@@ -161,45 +175,56 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
       try {
         const CNFT_PROGRAM_ID = new PublicKey(
           process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID ||
-            '2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G'
+            "2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G"
         );
-        
+
         const [userNftPda] = PublicKey.findProgramAddressSync(
-          [Buffer.from('user_nft'), publicKey.toBuffer()],
+          [Buffer.from("user_nft"), publicKey.toBuffer()],
           CNFT_PROGRAM_ID
         );
-        
+
         const accountInfo = await connection.getAccountInfo(userNftPda);
-        
+
         if (accountInfo && accountInfo.data.length > 0) {
           // Le NFT existe, lire ses données
           setHasExistingNft(true);
-          
+
           try {
             // Decoder les données du NFT (structure selon le programme Rust)
             // Offset basé sur la structure UserNFT dans le programme
             const data = accountInfo.data;
-            
+
             // Structure: owner (32) + amount (8) + unlock_time (8) + boost_bps (2) + level (1) + padding
             const amount = Number(data.readBigUInt64LE(32)) / 1_000_000_000; // Convertir lamports en tokens
             const unlockTime = Number(data.readBigUInt64LE(40)); // Unix timestamp
             const boostBps = data.readUInt16LE(48); // Boost en basis points
             const levelByte = data.readUInt8(50); // 0=Bronze, 1=Silver, 2=Gold, 3=Platinum, 4=Diamond
-            
-            const levelNames: CNFTLevel[] = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond'];
-            const level = levelNames[Math.min(levelByte, 4)] || 'Bronze';
+
+            const levelNames: CNFTLevel[] = [
+              "Bronze",
+              "Silver",
+              "Gold",
+              "Platinum",
+              "Diamond",
+            ];
+            const level = levelNames[Math.min(levelByte, 4)] || "Bronze";
             const boost = boostBps / 100; // Convertir BPS en pourcentage
-            
+
             setCurrentNftData({
               amount,
               unlockTime,
               level,
-              boost
+              boost,
             });
-            
-            console.log('📊 Current NFT data:', { amount, unlockTime, level, boost });
+
+            console.log("📊 Current NFT data:", {
+              amount,
+              unlockTime,
+              level,
+              boost,
+            });
           } catch (decodeErr) {
-            console.error('Error decoding NFT data:', decodeErr);
+            console.error("Error decoding NFT data:", decodeErr);
             // Même si le décodage échoue, on permet le lock
             setCurrentNftData(null);
           }
@@ -208,7 +233,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
           setCurrentNftData(null);
         }
       } catch (err) {
-        console.error('Erreur lors de la vérification du NFT existant:', err);
+        console.error("Erreur lors de la vérification du NFT existant:", err);
         setHasExistingNft(false);
         setCurrentNftData(null);
       }
@@ -216,7 +241,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
 
     fetchBalance();
     checkExistingNft();
-    
+
     // Rafraîchir toutes les 30 secondes
     const interval = setInterval(() => {
       fetchBalance();
@@ -230,8 +255,8 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
   const amountError = useMemo(() => {
     const amt = parseFloat(amount);
     if (!amount || isNaN(amt)) return null;
-    if (amt <= 0) return 'Amount must be greater than 0';
-    if (amt > balance) return 'Insufficient balance';
+    if (amt <= 0) return "Amount must be greater than 0";
+    if (amt > balance) return "Insufficient balance";
     return null;
   }, [amount, balance]);
 
@@ -241,19 +266,19 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
     if (!duration || isNaN(days)) return null;
     if (days < LEVEL_THRESHOLDS.Bronze)
       return `Minimum duration is ${LEVEL_THRESHOLDS.Bronze} days`;
-    if (days > 365) return 'Maximum duration is 365 days';
+    if (days > 365) return "Maximum duration is 365 days";
     return null;
   }, [duration]);
 
   // Function to lock tokens
   const handleLock = async () => {
     if (!publicKey) {
-      setError('Please connect your wallet');
+      setError("Please connect your wallet");
       return;
     }
 
     if (amountError || durationError) {
-      setError('Please correct form errors');
+      setError("Please correct form errors");
       return;
     }
 
@@ -261,7 +286,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
     const days = parseInt(duration);
 
     if (!amt || !days) {
-      setError('Please fill all fields');
+      setError("Please fill all fields");
       return;
     }
 
@@ -269,72 +294,103 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
     setError(null);
     setSuccess(null);
 
-    console.log('═══════════════════════════════════════');
-    console.log('🚀 LOCK PROCESS STARTED');
-    console.log('═══════════════════════════════════════');
+    console.log("═══════════════════════════════════════");
+    console.log("🚀 LOCK PROCESS STARTED");
+    console.log("═══════════════════════════════════════");
 
     try {
-      console.log('🔍 [LOCK DEBUG] Starting lock process...');
-      console.log('🔍 [LOCK DEBUG] Amount:', amt, 'Days:', days);
-      console.log('🔍 [LOCK DEBUG] Wallet public key:', publicKey.toString());
-      console.log('🔍 [LOCK DEBUG] Wallet object:', wallet);
-      
+      console.log("🔍 [LOCK DEBUG] Starting lock process...");
+      console.log("🔍 [LOCK DEBUG] Amount:", amt, "Days:", days);
+      console.log("🔍 [LOCK DEBUG] Wallet public key:", publicKey.toString());
+      console.log("🔍 [LOCK DEBUG] Wallet object:", wallet);
+
       const durationSeconds = days * 24 * 60 * 60;
-      console.log('🔍 [LOCK DEBUG] Duration in seconds:', durationSeconds);
-      
+      console.log("🔍 [LOCK DEBUG] Duration in seconds:", durationSeconds);
+
       // Variable pour stocker la signature
       let signature: string;
-      
+
       // Obtenir le blockhash AVANT de créer la transaction
-      console.log('🔍 [LOCK DEBUG] Getting latest blockhash...');
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
-      console.log('✅ [LOCK DEBUG] Blockhash obtained:', blockhash.slice(0, 8) + '...');
-      
+      console.log("🔍 [LOCK DEBUG] Getting latest blockhash...");
+      const { blockhash, lastValidBlockHeight } =
+        await connection.getLatestBlockhash("finalized");
+      console.log(
+        "✅ [LOCK DEBUG] Blockhash obtained:",
+        blockhash.slice(0, 8) + "..."
+      );
+
       // Utiliser la nouvelle fonction avec transfert de tokens
-      console.log('🔍 [LOCK DEBUG] Creating lock transaction...');
+      console.log("🔍 [LOCK DEBUG] Creating lock transaction...");
       try {
-        const transaction = await createLockTokensTransaction(connection, wallet, {
-          amount: amt,
-          duration: durationSeconds,
-        });
-        console.log('✅ [LOCK DEBUG] Transaction created successfully');
-        console.log('🔍 [LOCK DEBUG] Transaction instructions:', transaction.instructions.length);
-        
+        const transaction = await createLockTokensTransaction(
+          connection,
+          wallet,
+          {
+            amount: amt,
+            duration: durationSeconds,
+          }
+        );
+        console.log("✅ [LOCK DEBUG] Transaction created successfully");
+        console.log(
+          "🔍 [LOCK DEBUG] Transaction instructions:",
+          transaction.instructions.length
+        );
+
         // IMPORTANT: Définir le feePayer et recentBlockhash AVANT d'envoyer au wallet
         transaction.feePayer = publicKey;
         transaction.recentBlockhash = blockhash;
-        
-        console.log('🔍 [LOCK DEBUG] Transaction details:', {
+
+        console.log("🔍 [LOCK DEBUG] Transaction details:", {
           feePayer: transaction.feePayer?.toString(),
           recentBlockhash: transaction.recentBlockhash,
-          signatures: transaction.signatures.length
+          signatures: transaction.signatures.length,
         });
 
-        // Envoyer la transaction au wallet pour signature et broadcast
-        console.log('🔍 [LOCK DEBUG] Sending transaction to wallet for approval...');
-        signature = await sendTransaction(transaction, connection, {
+        // Approche alternative : signer puis envoyer manuellement pour capturer l'erreur
+        console.log(
+          "🔍 [LOCK DEBUG] Asking wallet to sign transaction..."
+        );
+        
+        if (!wallet.signTransaction) {
+          throw new Error("Wallet does not support transaction signing");
+        }
+        
+        const signedTx = await wallet.signTransaction(transaction);
+        console.log("✅ [LOCK DEBUG] Transaction signed successfully");
+        
+        console.log("🔍 [LOCK DEBUG] Sending signed transaction to network...");
+        signature = await connection.sendRawTransaction(signedTx.serialize(), {
           skipPreflight: false,
-          preflightCommitment: 'finalized',
+          preflightCommitment: "finalized",
         });
-        console.log('✅ [LOCK DEBUG] Transaction approved and sent:', signature);
+        console.log(
+          "✅ [LOCK DEBUG] Transaction sent to network:",
+          signature
+        );
 
         // Attendre la confirmation
-        console.log('🔍 [LOCK DEBUG] Waiting for confirmation...');
-        await connection.confirmTransaction({
-          signature,
-          blockhash,
-          lastValidBlockHeight,
-        }, 'confirmed');
+        console.log("🔍 [LOCK DEBUG] Waiting for confirmation...");
+        await connection.confirmTransaction(
+          {
+            signature,
+            blockhash,
+            lastValidBlockHeight,
+          },
+          "confirmed"
+        );
       } catch (txError) {
-        console.error('❌ [LOCK DEBUG] Transaction creation/send error:', txError);
+        console.error(
+          "❌ [LOCK DEBUG] Transaction creation/send error:",
+          txError
+        );
         throw txError;
       }
-      console.log('✅ [LOCK DEBUG] Transaction confirmed!');
+      console.log("✅ [LOCK DEBUG] Transaction confirmed!");
 
       setSuccess(
         `✅ Lock réussi ! ${amt} BACK verrouillés pour ${days} jours. Signature: ${signature.slice(0, 8)}...`
       );
-      setAmount('');
+      setAmount("");
 
       // Callback de succès
       if (onLockSuccess) {
@@ -350,35 +406,42 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         setBalance(bal);
       }, 2000);
     } catch (err: unknown) {
-      console.error('❌ [LOCK ERROR] Error during lock:', err);
-      console.error('❌ [LOCK ERROR] Error type:', typeof err);
-      console.error('❌ [LOCK ERROR] Error stack:', err instanceof Error ? err.stack : 'No stack');
-      
-      let message = 'Lock failed. Please try again.';
-      
+      console.error("❌ [LOCK ERROR] Error during lock:", err);
+      console.error("❌ [LOCK ERROR] Error type:", typeof err);
+      console.error(
+        "❌ [LOCK ERROR] Error stack:",
+        err instanceof Error ? err.stack : "No stack"
+      );
+
+      let message = "Lock failed. Please try again.";
+
       if (err instanceof Error) {
-        console.error('❌ [LOCK ERROR] Error message:', err.message);
-        console.error('❌ [LOCK ERROR] Error name:', err.name);
-        
+        console.error("❌ [LOCK ERROR] Error message:", err.message);
+        console.error("❌ [LOCK ERROR] Error name:", err.name);
+
         // Afficher l'erreur complète pour debug
         message = `❌ ${err.message}`;
-        
+
         // Vérifier les erreurs spécifiques pour des messages plus clairs
-        if (err.message.includes('User rejected')) {
-          message = '❌ Transaction cancelled by user';
-        } else if (err.message.includes('insufficient')) {
-          message = '❌ Insufficient balance';
-        } else if (err.message.includes('AccountNotFound')) {
-          message = '❌ Token account not found. Do you have BACK tokens?';
-        } else if (err.message.includes('0x1')) {
-          message = '❌ Program error: Account not initialized. Please contact support.';
+        if (err.message.includes("User rejected")) {
+          message = "❌ Transaction cancelled by user";
+        } else if (err.message.includes("insufficient")) {
+          message = "❌ Insufficient balance";
+        } else if (err.message.includes("AccountNotFound")) {
+          message = "❌ Token account not found. Do you have BACK tokens?";
+        } else if (err.message.includes("0x1")) {
+          message =
+            "❌ Program error: Account not initialized. Please contact support.";
         }
       } else {
         // Si ce n'est pas une Error standard, afficher l'objet complet
-        console.error('❌ [LOCK ERROR] Non-Error object:', JSON.stringify(err, null, 2));
+        console.error(
+          "❌ [LOCK ERROR] Non-Error object:",
+          JSON.stringify(err, null, 2)
+        );
         message = `❌ Unexpected error: ${JSON.stringify(err)}`;
       }
-      
+
       setError(message);
     } finally {
       setIsLoading(false);
@@ -394,9 +457,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary-dark/20 border border-primary/30">
           <span className="text-xl">🔒</span>
         </div>
-        <h2 className="card-title">
-          Lock $BACK
-        </h2>
+        <h2 className="card-title">Lock $BACK</h2>
       </div>
 
       {/* Information sur les locks multiples */}
@@ -406,7 +467,8 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         <div className="flex justify-between items-center">
           <span className="text-gray-400">Available Balance</span>
           <span className="text-[var(--primary)] font-bold text-lg">
-            {balance.toLocaleString()} <span className="text-primary">$BACK</span>
+            {balance.toLocaleString()}{" "}
+            <span className="text-primary">$BACK</span>
           </span>
         </div>
       </div>
@@ -424,8 +486,8 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
             placeholder="0.00"
             className={`w-full px-4 py-3 glass-effect text-[var(--primary)] rounded-lg focus:outline-none focus:ring-2 transition-all ${
               amountError
-                ? 'border border-red-500/50 focus:ring-red-500/50 focus:border-red-500'
-                : 'border border-gray-700/50 focus:ring-primary/50 focus:border-primary'
+                ? "border border-red-500/50 focus:ring-red-500/50 focus:border-red-500"
+                : "border border-gray-700/50 focus:ring-primary/50 focus:border-primary"
             }`}
             disabled={isLoading}
           />
@@ -475,8 +537,8 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
             placeholder="30"
             className={`w-full px-4 py-3 glass-effect text-[var(--primary)] rounded-lg focus:outline-none focus:ring-2 transition-all ${
               durationError
-                ? 'border border-red-500/50 focus:ring-red-500/50 focus:border-red-500'
-                : 'border border-gray-700/50 focus:ring-primary/50 focus:border-primary'
+                ? "border border-red-500/50 focus:ring-red-500/50 focus:border-red-500"
+                : "border border-gray-700/50 focus:ring-primary/50 focus:border-primary"
             }`}
             disabled={isLoading}
           />
@@ -494,28 +556,28 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         {/* Boutons de durée rapide */}
         <div className="grid grid-cols-4 gap-2 mt-3">
           <button
-            onClick={() => setDuration('7')}
+            onClick={() => setDuration("7")}
             className="px-3 py-2 glass-effect border border-orange-500/20 hover:border-orange-500/40 text-orange-400 rounded-lg text-sm font-medium transition-all hover:scale-105"
             disabled={isLoading}
           >
             7j
           </button>
           <button
-            onClick={() => setDuration('30')}
+            onClick={() => setDuration("30")}
             className="px-3 py-2 glass-effect border border-gray-500/20 hover:border-gray-400/40 text-gray-300 rounded-lg text-sm font-medium transition-all hover:scale-105"
             disabled={isLoading}
           >
             30j
           </button>
           <button
-            onClick={() => setDuration('90')}
+            onClick={() => setDuration("90")}
             className="px-3 py-2 glass-effect border border-yellow-500/20 hover:border-yellow-500/40 text-yellow-400 rounded-lg text-sm font-medium transition-all hover:scale-105"
             disabled={isLoading}
           >
             90j
           </button>
           <button
-            onClick={() => setDuration('180')}
+            onClick={() => setDuration("180")}
             className="px-3 py-2 glass-effect border border-yellow-500/20 hover:border-yellow-500/40 text-yellow-400 rounded-lg text-sm font-medium transition-all hover:scale-105"
             disabled={isLoading}
           >
@@ -527,7 +589,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
       {/* Tier and boost preview - ENHANCED with calculation details */}
       <div className="mb-6 p-5 glass-effect rounded-lg border border-primary/20 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-radial from-primary/10 to-transparent rounded-full blur-2xl"></div>
-        
+
         <div className="relative space-y-4">
           {/* Visual Tier */}
           <div className="flex justify-between items-center">
@@ -538,21 +600,27 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
               {displayLevel}
             </span>
           </div>
-          
+
           {/* Boost Calculation Details */}
           <div className="p-3 rounded-lg bg-gradient-to-r from-secondary/5 to-transparent border border-secondary/10">
-            <div className="text-sm font-bold text-secondary mb-2">🎯 Boost Calculation (Max 20%)</div>
+            <div className="text-sm font-bold text-secondary mb-2">
+              🎯 Boost Calculation (Max 20%)
+            </div>
             <div className="space-y-1 text-xs">
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Amount Score (max 10%):</span>
-                <span className="text-gray-200">+{boostDetails.amountScore.toFixed(2)}%</span>
+                <span className="text-gray-200">
+                  +{boostDetails.amountScore.toFixed(2)}%
+                </span>
               </div>
               <div className="text-xs text-gray-500 mt-0.5 ml-2">
                 💡 Max atteint à 5M tokens
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Duration Score (max 10%):</span>
-                <span className="text-gray-200">+{boostDetails.durationScore.toFixed(2)}%</span>
+                <span className="text-gray-200">
+                  +{boostDetails.durationScore.toFixed(2)}%
+                </span>
               </div>
               <div className="h-px bg-secondary/20 my-2"></div>
               <div className="flex justify-between items-center">
@@ -563,12 +631,14 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
               </div>
             </div>
           </div>
-          
+
           {/* Rebate Multiplier Impact */}
           {predictedBoost > 0 && (
             <>
               <div className="p-3 rounded-lg bg-gradient-to-r from-primary/5 to-transparent border border-primary/10">
-                <div className="text-sm font-bold text-primary mb-2">💰 Rebate Multiplier</div>
+                <div className="text-sm font-bold text-primary mb-2">
+                  💰 Rebate Multiplier
+                </div>
                 <div className="text-xs text-gray-400 mb-1">
                   Your rebates will be multiplied by:
                 </div>
@@ -576,13 +646,16 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
                   {(1 + predictedBoost / 100).toFixed(3)}x
                 </div>
                 <div className="text-xs text-gray-400 mt-1">
-                  Example: Base 10 USDC → {(10 * (1 + predictedBoost / 100)).toFixed(2)} USDC
+                  Example: Base 10 USDC →{" "}
+                  {(10 * (1 + predictedBoost / 100)).toFixed(2)} USDC
                 </div>
               </div>
-              
+
               {/* Buyback Share Estimation */}
               <div className="p-3 rounded-lg bg-gradient-to-r from-green-500/5 to-transparent border border-green-500/10">
-                <div className="text-sm font-bold text-green-400 mb-2">🔥 Buyback Allocation</div>
+                <div className="text-sm font-bold text-green-400 mb-2">
+                  🔥 Buyback Allocation
+                </div>
                 <div className="text-xs text-gray-400 mb-2">
                   Your share of buyback tokens (burned):
                 </div>
@@ -590,9 +663,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
                   <span className="text-2xl font-bold text-green-400">
                     {calculateBuybackShare(predictedBoost, 10000).toFixed(3)}%
                   </span>
-                  <span className="text-xs text-gray-500">
-                    (estimated*)
-                  </span>
+                  <span className="text-xs text-gray-500">(estimated*)</span>
                 </div>
                 <div className="text-xs text-gray-500 mt-2">
                   * Based on current community total boost
@@ -644,26 +715,24 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
           !!durationError ||
           !amount ||
           !duration
-            ? 'bg-gray-700 cursor-not-allowed opacity-50'
-            : 'bg-gradient-to-r from-primary to-primary-dark hover:scale-[1.02] shadow-glow'
+            ? "bg-gray-700 cursor-not-allowed opacity-50"
+            : "bg-gradient-to-r from-primary to-primary-dark hover:scale-[1.02] shadow-glow"
         }`}
       >
-        {!isLoading && !(
-          !publicKey ||
-          !!amountError ||
-          !!durationError ||
-          !amount ||
-          !duration
-        ) && (
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-transparent animate-shimmer"></div>
-        )}
-        
+        {!isLoading &&
+          !(
+            !publicKey ||
+            !!amountError ||
+            !!durationError ||
+            !amount ||
+            !duration
+          ) && (
+            <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-transparent animate-shimmer"></div>
+          )}
+
         {isLoading ? (
           <span className="flex items-center justify-center relative">
-            <svg
-              className="animate-spin h-5 w-5 mr-3"
-              viewBox="0 0 24 24"
-            >
+            <svg className="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24">
               <circle
                 className="opacity-25"
                 cx="12"
@@ -686,7 +755,7 @@ export default function LockInterface({ onLockSuccess }: Readonly<LockInterfaceP
         ) : (
           <span className="relative flex items-center justify-center gap-2">
             <span>🔒</span>
-            <span>{hasExistingNft ? 'Update Lock' : 'Lock $BACK'}</span>
+            <span>{hasExistingNft ? "Update Lock" : "Lock $BACK"}</span>
           </span>
         )}
       </button>
