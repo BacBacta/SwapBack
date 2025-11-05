@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, Transaction } from "@solana/web3.js";
 import {
   getAssociatedTokenAddress,
   TOKEN_2022_PROGRAM_ID,
@@ -394,35 +394,85 @@ export default function LockInterface({
         console.log(
           "🔍 [LOCK DEBUG] Asking wallet to sign transaction..."
         );
+        console.log("🔍 [LOCK DEBUG] Wallet supports signing:", !!wallet.signTransaction);
         
         if (!wallet.signTransaction) {
+          console.error("❌ Wallet does not support transaction signing");
           throw new Error("Wallet does not support transaction signing");
         }
         
-        const signedTx = await wallet.signTransaction(transaction);
-        console.log("✅ [LOCK DEBUG] Transaction signed successfully");
+        let signedTx: Transaction;
+        try {
+          console.log("⏳ [LOCK DEBUG] Waiting for user signature (check your wallet popup)...");
+          
+          // Créer une promesse avec timeout pour la signature
+          const signPromise = wallet.signTransaction(transaction);
+          const timeoutPromise = new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error("Signature timeout after 60s - Did you approve the transaction in your wallet?")), 60000)
+          );
+          
+          signedTx = await Promise.race([signPromise, timeoutPromise]);
+          console.log("✅ [LOCK DEBUG] Transaction signed successfully");
+        } catch (signError: unknown) {
+          const error = signError as Error;
+          console.error("❌ [LOCK DEBUG] Signature error:", signError);
+          console.error("❌ [LOCK DEBUG] Error details:", {
+            message: error?.message,
+            name: error?.name,
+          });
+          
+          // Message plus clair pour l'utilisateur
+          if (error?.message?.includes("User rejected") || error?.message?.includes("rejected")) {
+            throw new Error("Transaction cancelled by user");
+          } else if (error?.message?.includes("timeout")) {
+            throw new Error("Signature timeout - Please approve the transaction in your wallet");
+          }
+          
+          throw new Error(`Signature failed: ${error?.message || 'Unknown error'}`);
+        }
         
         console.log("🔍 [LOCK DEBUG] Sending signed transaction to network...");
-        signature = await connection.sendRawTransaction(signedTx.serialize(), {
-          skipPreflight: false,
-          preflightCommitment: "confirmed",
-          maxRetries: 3,
-        });
-        console.log(
-          "✅ [LOCK DEBUG] Transaction sent to network:",
-          signature
-        );
+        try {
+          signature = await connection.sendRawTransaction(signedTx.serialize(), {
+            skipPreflight: false,
+            preflightCommitment: "confirmed",
+            maxRetries: 3,
+          });
+          console.log(
+            "✅ [LOCK DEBUG] Transaction sent to network:",
+            signature
+          );
+        } catch (sendError: unknown) {
+          const error = sendError as Error & { logs?: string[] };
+          console.error("❌ [LOCK DEBUG] Send transaction error:", sendError);
+          console.error("❌ [LOCK DEBUG] Send error details:", {
+            message: error?.message,
+            logs: error?.logs,
+          });
+          throw new Error(`Send failed: ${error?.message || 'Unknown error'}`);
+        }
 
         // Attendre la confirmation
         console.log("🔍 [LOCK DEBUG] Waiting for confirmation...");
-        await connection.confirmTransaction(
-          {
-            signature,
-            blockhash,
-            lastValidBlockHeight,
-          },
-          "confirmed"
-        );
+        try {
+          await connection.confirmTransaction(
+            {
+              signature,
+              blockhash,
+              lastValidBlockHeight,
+            },
+            "confirmed"
+          );
+          console.log("✅ [LOCK DEBUG] Transaction confirmed!");
+        } catch (confirmError: unknown) {
+          const error = confirmError as Error;
+          console.error("❌ [LOCK DEBUG] Confirmation error:", confirmError);
+          console.error("❌ [LOCK DEBUG] Confirmation error details:", {
+            message: error?.message,
+            signature: signature,
+          });
+          throw new Error(`Confirmation failed: ${error?.message || 'Unknown error'}`);
+        }
       } catch (txError) {
         console.error(
           "❌ [LOCK DEBUG] Transaction creation/send error:",

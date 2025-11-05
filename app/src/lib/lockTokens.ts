@@ -158,8 +158,22 @@ export async function createLockTokensTransaction(
     
     console.log('✅ [LOCK TX] Instruction created successfully');
 
-    const transaction = new Transaction().add(instruction);
-    console.log('✅ [LOCK TX] Transaction built successfully');
+    // Ajouter les instructions de compute budget pour éviter les erreurs
+    const { ComputeBudgetProgram } = await import('@solana/web3.js');
+    
+    const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({
+      units: 400_000, // Augmenter la limite de compute units
+    });
+    
+    const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
+      microLamports: 1, // Petite priorité pour passage plus rapide
+    });
+
+    const transaction = new Transaction()
+      .add(modifyComputeUnits)
+      .add(addPriorityFee)
+      .add(instruction);
+    console.log('✅ [LOCK TX] Transaction built successfully with compute budget');
 
     return transaction;
   } catch (error) {
