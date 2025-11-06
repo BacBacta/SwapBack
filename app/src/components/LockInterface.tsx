@@ -29,25 +29,28 @@ const LEVEL_THRESHOLDS = {
 };
 
 // Fonction de calcul du boost dynamique
-// Formule adaptée pour supply de 1 milliard de tokens
-// Boost maximum = 20%
-// - Score montant: (amount / 5,000,000) * 10, max 10%
-// - Score durée: (days / 365) * 10, max 10%
-// - Total: max 20%
+// MUST match the Rust program (lib.rs calculate_boost function)
+// Boost maximum = 20% (2000 basis points)
+// - Score montant: (amount / 10,000) * 100, max 1000 BP (10%)
+// - Score durée: (days / 5) * 10, max 1000 BP (10%)
+// - Total: max 2000 BP (20%)
 const calculateDynamicBoost = (
   amount: number,
   durationDays: number
 ): number => {
-  // Score du montant (max 10% atteint à 5M tokens)
-  const amountScore = Math.min((amount / 5000000) * 10, 10);
+  // Amount score: (amount / 10000) * 100, max 1000 basis points (10%)
+  // 100k tokens = 1000 BP max
+  const amountScore = Math.min((amount / 10000) * 100, 1000);
 
-  // Score de la durée (max 10%)
-  const durationScore = Math.min((durationDays / 365) * 10, 10);
+  // Duration score: (days / 5) * 10, max 1000 basis points (10%)
+  // 365 days = 730 BP ≈ 7.3%, 500 days = 1000 BP (10%)
+  const durationScore = Math.min((durationDays / 5) * 10, 1000);
 
-  // Boost total (max 20%)
-  const totalBoost = Math.min(amountScore + durationScore, 20);
+  // Total boost: max 2000 basis points (20%)
+  const totalBoostBps = Math.min(amountScore + durationScore, 2000);
 
-  return Math.round(totalBoost * 100) / 100; // Arrondi à 2 décimales
+  // Convert basis points to percentage
+  return Math.round(totalBoostBps) / 100; // 1000 BP = 10%
 };
 
 // Calcul de la part de buyback de l'utilisateur
@@ -85,7 +88,7 @@ export default function LockInterface({
   } | null>(null);
 
   // Calcul du niveau basé sur la durée et le montant CUMULÉ (visuel uniquement)
-  // Seuils adaptés pour supply de 1 milliard
+  // Seuils MUST match the Rust program (lib.rs)
   const predictedLevel: CNFTLevel = useMemo(() => {
     const days = parseInt(duration) || 0;
     const amt = parseFloat(amount) || 0;
@@ -93,12 +96,17 @@ export default function LockInterface({
     // Si NFT existe, calculer avec le montant CUMULÉ
     const totalAmount = currentNftData ? currentNftData.amount + amt : amt;
 
-    if (totalAmount >= 10000000 && days >= LEVEL_THRESHOLDS.Diamond)
+    // Diamond: 100,000+ BACK AND 365+ days
+    if (totalAmount >= 100000 && days >= LEVEL_THRESHOLDS.Diamond)
       return "Diamond" as CNFTLevel;
-    if (totalAmount >= 5000000 && days >= LEVEL_THRESHOLDS.Platinum)
+    // Platinum: 50,000+ BACK AND 180+ days
+    if (totalAmount >= 50000 && days >= LEVEL_THRESHOLDS.Platinum)
       return "Platinum" as CNFTLevel;
-    if (totalAmount >= 1000000 && days >= LEVEL_THRESHOLDS.Gold) return "Gold";
-    if (totalAmount >= 500000 && days >= LEVEL_THRESHOLDS.Silver) return "Silver";
+    // Gold: 10,000+ BACK AND 90+ days
+    if (totalAmount >= 10000 && days >= LEVEL_THRESHOLDS.Gold) return "Gold";
+    // Silver: 1,000+ BACK AND 30+ days
+    if (totalAmount >= 1000 && days >= LEVEL_THRESHOLDS.Silver) return "Silver";
+    // Bronze: default (100+ BACK AND 7+ days recommended)
     return "Bronze";
   }, [duration, amount, currentNftData]);
 
@@ -126,12 +134,15 @@ export default function LockInterface({
     // Si NFT existe, calculer avec le montant CUMULÉ
     const totalAmount = currentNftData ? currentNftData.amount + amt : amt;
 
-    // Score montant: max 10% (atteint à 5M tokens)
-    const amountScore = Math.min((totalAmount / 5000000) * 10, 10);
-    // Score durée: max 10%
-    const durationScore = Math.min((days / 365) * 10, 10);
+    // Amount score: (amount / 10000) * 100, max 1000 BP (10%)
+    const amountScoreBps = Math.min((totalAmount / 10000) * 100, 1000);
+    // Duration score: (days / 5) * 10, max 1000 BP (10%)
+    const durationScoreBps = Math.min((days / 5) * 10, 1000);
 
-    return { amountScore, durationScore };
+    return { 
+      amountScore: amountScoreBps / 100,  // Convert to percentage
+      durationScore: durationScoreBps / 100 
+    };
   }, [amount, duration, currentNftData]);
 
   // Couleur du badge selon le niveau (utilise le niveau réel du NFT si disponible)
