@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { PublicKey } from "@solana/web3.js";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useTokenData } from "../hooks/useTokenData";
 import { DCASimulator } from "./DCASimulator";
 import { DCAOrderCard } from "./DCAOrderCard";
-import { useDcaPlans, useCreateDcaPlan, useReadyDcaPlans, useDcaStats } from "../hooks/useDCA";
-import { frequencyToSeconds, type DCAFrequency } from "../lib/dca";
+import { useDcaPlans, useCreateDcaPlan, useReadyDcaPlans } from "../hooks/useDCA";
+import type { DCAFrequency } from "../lib/dca";
 
 // Token symbol to mint address mapping
 const TOKEN_MINTS: Record<string, string> = {
@@ -35,8 +34,7 @@ export const DCAClient = () => {
   // On-chain DCA hooks
   const { data: dcaPlans = [], isLoading: plansLoading } = useDcaPlans();
   const { createPlan, isCreating } = useCreateDcaPlan();
-  const { readyPlans } = useReadyDcaPlans();
-  const stats = useDcaStats();
+  const { readyPlans = [] } = useReadyDcaPlans();
 
   // Token Data - Convert symbol to mint address
   const inputTokenMint = TOKEN_MINTS[inputToken] || TOKEN_MINTS.SOL;
@@ -118,18 +116,14 @@ export const DCAClient = () => {
         throw new Error("Token mint address not found");
       }
 
-      // Convert frequency to seconds
-      const intervalSeconds = frequencyToSeconds(frequency);
-
       // Create plan on-chain
       await createPlan({
-        tokenIn: new PublicKey(inputMint),
-        tokenOut: new PublicKey(outputMint),
+        tokenInSymbol: inputToken,
+        tokenOutSymbol: outputToken,
         amountPerSwap: Number.parseFloat(amountPerOrder),
         totalSwaps: Number.parseInt(totalOrders),
-        intervalSeconds,
+        frequency,
         minOutPerSwap: 0, // Can add slippage tolerance here
-        expiresAt: 0, // No expiration
       });
 
       // Reset form on success
@@ -142,12 +136,280 @@ export const DCAClient = () => {
       alert(`❌ Erreur lors de la création du plan DCA:\n\n${errorMessage}`);
       setRpcError(errorMessage);
     }
+  };  // Test RPC connectivity
+  const testRpcConnection = async (): Promise<boolean> => {
+    try {
+      await connection.getLatestBlockhash();
+      setRpcError(null);
+      return true;
+    } catch (error: unknown) {
+      console.error("RPC Connection test failed:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      if (errorMessage.includes("403") || errorMessage.includes("forbidden")) {
+        setRpcError("Accès RPC refusé (403). Vérifiez votre configuration réseau.");
+      } else if (errorMessage.includes("429")) {
+        setRpcError("Limite de taux RPC atteinte. Réessayez plus tard.");
+      } else {
+        setRpcError("Erreur de connexion RPC. Vérifiez votre réseau.");
+      }
+      return false;
+    }
+  };
+
+  // 🔄 PHASE 2: Load on-chain DCA plans (EN DÉVELOPPEMENT)
+  const loadOnChainPlans = useCallback(async () => {
+    if (!publicKey || !connected) {
+      return;
+    }
+
+    try {
+      console.log("🔍 Chargement des plans DCA on-chain...");
+
+      // NOTE: Fonctionnalité en développement
+      // Le programme on-chain nécessite une instruction DCA dédiée
+      // Pour l'instant, utilisation du stockage local uniquement
+      
+      console.log(`ℹ️  Chargement des plans DCA on-chain - Fonctionnalité en développement`);
+      console.log(`   Les plans sont stockés localement pour le moment`);
+      
+      // Version temporaire: retourner un tableau vide
+      const onChainOrders: DCAOrder[] = [];
+
+      // Fusionner avec les ordres locaux (éviter les doublons)
+      setDcaOrders((prevOrders) => {
+        const localOrders = prevOrders.filter(
+          (order) => !onChainOrders.find((onChain) => onChain.id === order.id)
+        );
+        return [...onChainOrders, ...localOrders];
+      });
+
+      console.log("✅ Plans DCA chargés (stockage local)");
+    } catch (error) {
+      console.error("❌ Erreur lors du chargement des plans:", error);
+      // Ne pas bloquer l'UI en cas d'erreur
+    }
+  }, [publicKey, connected]);
+
+  // Load DCA orders from localStorage
+  useEffect(() => {
+    if (connected && publicKey) {
+      const storageKey = `swapback_dca_${publicKey.toString()}`;
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        try {
+          const parsed: unknown = JSON.parse(stored);
+
+          if (Array.isArray(parsed)) {
+            const orders = parsed
+              .filter(isSerializedDCAOrder)
+              .map((order) => ({
+                ...order,
+                nextExecution: new Date(order.nextExecution),
+                createdAt: new Date(order.createdAt),
+              }));
+
+            setDcaOrders(orders);
+          }
+        } catch (e) {
+          console.error("Error loading DCA orders:", e);
+        }
+      }
+
+      // Load on-chain DCA plans
+      loadOnChainPlans();
+    }
+  }, [connected, publicKey, loadOnChainPlans]);
+
+  // Calculate next execution time
+  const calculateNextExecution = (freq: string): Date => {
+    const now = new Date();
+    switch (freq) {
+      case "hourly":
+        return new Date(now.getTime() + 60 * 60 * 1000);
+      case "daily":
+        return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      case "weekly":
+        return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      case "monthly":
+        return new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      default:
+        return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    }
   };
 
   // Calculate total investment
   const totalInvestment =
     Number.parseFloat(amountPerOrder || "0") *
     Number.parseInt(totalOrders || "0");
+
+  // Create DCA Order (LOCAL STORAGE ONLY - ON-CHAIN EN DÉVELOPPEMENT)
+  const handleCreateDCA = async () => {
+    console.log("🔍 [DEBUG] handleCreateDCA appelée");
+    console.log("🔍 [DEBUG] Connected:", connected);
+    console.log("🔍 [DEBUG] PublicKey:", publicKey?.toString());
+    console.log("🔍 [DEBUG] AmountPerOrder:", amountPerOrder);
+    console.log("🔍 [DEBUG] TotalOrders:", totalOrders);
+    console.log("🔍 [DEBUG] InputToken:", inputToken);
+    console.log("🔍 [DEBUG] OutputToken:", outputToken);
+    console.log("🔍 [DEBUG] Frequency:", frequency);
+
+    if (!connected || !publicKey) {
+      console.error("❌ [DEBUG] Wallet non connecté");
+      alert("Veuillez connecter votre wallet");
+      return;
+    }
+
+    if (!amountPerOrder || Number.parseFloat(amountPerOrder) <= 0) {
+      console.error("❌ [DEBUG] Montant invalide:", amountPerOrder);
+      alert("Veuillez saisir un montant valide");
+      return;
+    }
+
+    if (!totalOrders || Number.parseInt(totalOrders) <= 0) {
+      console.error("❌ [DEBUG] Nombre d'ordres invalide:", totalOrders);
+      alert("Veuillez saisir un nombre d'ordres valide");
+      return;
+    }
+
+    console.log("✅ [DEBUG] Validation passée");
+    setLoading(true);
+    setRpcError(null);
+
+    try {
+      console.log("🔍 [DEBUG] Test de connexion RPC...");
+      // Test RPC connection before proceeding
+      const rpcOk = await testRpcConnection();
+      console.log("🔍 [DEBUG] RPC OK:", rpcOk);
+      if (!rpcOk) {
+        console.error("❌ [DEBUG] Problème de connexion RPC");
+        alert("Problème de connexion réseau. Veuillez réessayer.");
+        setLoading(false);
+        return;
+      }
+
+      console.log("🚀 Création d'un plan DCA (stockage local)...");
+      
+      // Générer un ID unique pour le plan
+      const planId = Date.now().toString();
+      const planPdaSimulated = `DCA_${publicKey.toString().slice(0, 8)}_${planId}`;
+      
+      console.log("✓ Plan ID:", planId);
+      console.log("✓ PDA simulé:", planPdaSimulated);
+
+      // Créer l'ordre local pour le tracking UI
+      const newOrder: DCAOrder = {
+        id: planPdaSimulated,
+        inputToken,
+        outputToken,
+        amountPerOrder: Number.parseFloat(amountPerOrder),
+        frequency,
+        totalOrders: Number.parseInt(totalOrders),
+        executedOrders: 0,
+        nextExecution: calculateNextExecution(frequency),
+        status: "active",
+        createdAt: new Date(),
+        totalInvested: 0,
+        averagePrice: 0,
+      };
+
+      const updatedOrders = [...dcaOrders, newOrder];
+      console.log("🔍 [DEBUG] Updated orders:", updatedOrders.length);
+      setDcaOrders(updatedOrders);
+
+      // Sauvegarder dans localStorage
+      const storageKey = `swapback_dca_${publicKey.toString()}`;
+      console.log("🔍 [DEBUG] Storage key:", storageKey);
+      
+      try {
+        const serializedOrders = updatedOrders.map(order => ({
+          ...order,
+          createdAt: order.createdAt.toISOString(),
+          nextExecution: order.nextExecution.toISOString()
+        }));
+        localStorage.setItem(storageKey, JSON.stringify(serializedOrders));
+        console.log("✅ [DEBUG] Sauvegardé dans localStorage");
+      } catch (storageError) {
+        console.error("❌ [DEBUG] Erreur localStorage:", storageError);
+        throw storageError;
+      }
+
+      // Reset form
+      setAmountPerOrder("");
+      setTotalOrders("10");
+      console.log("✅ [DEBUG] Formulaire réinitialisé");
+
+      // Afficher la notification de succès
+      console.log("✅ [DEBUG] Affichage de l'alerte de succès");
+      alert(
+        `✅ Plan DCA créé avec succès!\n\n` +
+        `⚠️ Note: Stocké localement (on-chain en développement)\n\n` +
+        `Montant par ordre: ${amountPerOrder} ${inputToken}\n` +
+        `Fréquence: ${frequency}\n` +
+        `Nombre d'ordres: ${totalOrders}\n\n` +
+        `Les ordres seront exécutés automatiquement selon la fréquence choisie.`
+      );
+      
+      console.log("✅ Plan DCA créé localement!");
+    } catch (error) {
+      console.error("❌ Erreur création DCA:", error);
+      const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
+      alert(`❌ Erreur lors de la création du plan DCA:\n\n${errorMessage}`);
+      setRpcError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Pause/Resume DCA
+  const handlePauseResumeDCA = (orderId: string) => {
+    const updatedOrders = dcaOrders.map((order) => {
+      if (order.id === orderId) {
+        const newStatus: "active" | "paused" = order.status === "active" ? "paused" : "active";
+        return {
+          ...order,
+          status: newStatus,
+          nextExecution:
+            order.status === "paused"
+              ? calculateNextExecution(order.frequency)
+              : order.nextExecution,
+        };
+      }
+      return order;
+    });
+
+    setDcaOrders(updatedOrders);
+
+    if (publicKey) {
+      const storageKey = `swapback_dca_${publicKey.toString()}`;
+      const serializedOrders = updatedOrders.map(order => ({
+        ...order,
+        createdAt: order.createdAt.toISOString(),
+        nextExecution: order.nextExecution.toISOString()
+      }));
+      localStorage.setItem(storageKey, JSON.stringify(serializedOrders));
+    }
+  };
+
+  // Cancel DCA
+  const handleCancelDCA = (orderId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir annuler cet ordre DCA ?")) {
+      return;
+    }
+
+    const updatedOrders = dcaOrders.filter((order) => order.id !== orderId);
+    setDcaOrders(updatedOrders);
+
+    if (publicKey) {
+      const storageKey = `swapback_dca_${publicKey.toString()}`;
+      const serializedOrders = updatedOrders.map(order => ({
+        ...order,
+        createdAt: order.createdAt.toISOString(),
+        nextExecution: order.nextExecution.toISOString()
+      }));
+      localStorage.setItem(storageKey, JSON.stringify(serializedOrders));
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -384,10 +646,10 @@ export const DCAClient = () => {
             <div className="mt-6">
               <button
                 onClick={handleCreateDCA}
-                disabled={isCreating || !connected}
+                disabled={loading || !connected}
                 className="w-full px-6 py-4 bg-[var(--primary)] hover:bg-[var(--primary-hover)] disabled:bg-gray-600 text-black font-bold terminal-text rounded transition-colors"
               >
-                {isCreating ? (
+                {loading ? (
                   <span>CRÉATION EN COURS...</span>
                 ) : (
                   <span>
@@ -408,20 +670,16 @@ export const DCAClient = () => {
       {/* Orders Tab */}
       {activeTab === "orders" && (
         <div className="space-y-4">
-          {/* Ready Plans Notification */}
-          {readyPlans.length > 0 && (
-            <div className="bg-blue-900/50 border border-blue-700 rounded-lg p-4">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">⏰</span>
-                <div>
-                  <p className="font-bold text-blue-300">
-                    {readyPlans.length} plan{readyPlans.length > 1 ? 's' : ''} prêt{readyPlans.length > 1 ? 's' : ''} pour exécution !
-                  </p>
-                  <p className="text-sm text-blue-200">
-                    Consultez vos plans ci-dessous pour les exécuter.
-                  </p>
-                </div>
-              </div>
+          {/* Refresh Button */}
+          {connected && (
+            <div className="flex justify-end mb-4">
+              <button
+                onClick={loadOnChainPlans}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold terminal-text rounded transition-colors flex items-center gap-2"
+              >
+                <span className="terminal-prefix">&gt;</span>
+                <span>🔄 RAFRAÎCHIR</span>
+              </button>
             </div>
           )}
 
@@ -431,14 +689,7 @@ export const DCAClient = () => {
                 <span className="terminal-prefix">&gt;</span> [CONNECTEZ VOTRE WALLET POUR VOIR VOS ORDRES DCA]
               </p>
             </div>
-          ) : plansLoading ? (
-            <div className="text-center py-12">
-              <p className="text-gray-400 terminal-text mb-4">
-                <span className="terminal-prefix">&gt;</span> [CHARGEMENT DES PLANS DCA...]
-              </p>
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)] mx-auto mt-4"></div>
-            </div>
-          ) : dcaPlans.length === 0 ? (
+          ) : dcaOrders.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-400 terminal-text mb-4">
                 <span className="terminal-prefix">&gt;</span> [AUCUN ORDRE DCA TROUVÉ]
@@ -450,38 +701,134 @@ export const DCAClient = () => {
           ) : (
             <>
               {/* DCA Statistics Overview */}
-              {stats && (
-                <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-6">
-                  <h4 className="text-lg font-bold mb-4 terminal-text">
-                    <span className="terminal-prefix">&gt;</span> [STATISTIQUES DCA]
-                  </h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-[var(--primary)]">{stats.totalPlans}</p>
-                      <p className="text-xs text-gray-400">PLANS TOTAUX</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-green-400">{stats.activePlans}</p>
-                      <p className="text-xs text-gray-400">PLANS ACTIFS</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-yellow-400">{stats.pausedPlans}</p>
-                      <p className="text-xs text-gray-400">PLANS PAUSÉS</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-blue-400">{stats.completedPlans}</p>
-                      <p className="text-xs text-gray-400">PLANS COMPLÉTÉS</p>
-                    </div>
+              <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-6">
+                <h4 className="text-lg font-bold mb-4 terminal-text">
+                  <span className="terminal-prefix">&gt;</span> [STATISTIQUES DCA]
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-[var(--primary)]">{dcaOrders.length}</p>
+                    <p className="text-xs text-gray-400">ORDRES TOTAUX</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-green-400">
+                      {dcaOrders.filter(o => o.status === "active").length}
+                    </p>
+                    <p className="text-xs text-gray-400">ORDRES ACTIFS</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-blue-400">
+                      {dcaOrders.reduce((sum, o) => sum + o.executedOrders, 0)}
+                    </p>
+                    <p className="text-xs text-gray-400">ORDRES EXÉCUTÉS</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-yellow-400">
+                      ${dcaOrders.reduce((sum, o) => sum + o.totalInvested, 0).toFixed(2)}
+                    </p>
+                    <p className="text-xs text-gray-400">TOTAL INVESTI</p>
                   </div>
                 </div>
-              )}
-
-              {/* Plans List */}
-              <div className="space-y-4">
-                {dcaPlans.map((plan) => (
-                  <DCAOrderCard key={plan.planPda.toBase58()} plan={plan} />
-                ))}
               </div>
+
+              {/* Orders List */}
+              {dcaOrders.map((order) => {
+                // Détecter si c'est un ordre on-chain (PDA valide) ou local
+                const isOnChain = order.id.length >= 32 && !order.id.startsWith("dca_local_");
+                
+                return (
+                  <div
+                    key={order.id}
+                    className="bg-gray-900/50 border border-gray-700 rounded-lg p-6"
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="text-lg font-bold terminal-text">
+                            <span className="terminal-prefix">&gt;</span> [{order.inputToken} → {order.outputToken}]
+                          </h4>
+                          {isOnChain && (
+                            <span className="px-2 py-1 bg-purple-500/20 text-purple-300 text-xs font-bold rounded border border-purple-500/50">
+                              ⛓️ ON-CHAIN
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-400">
+                          Créé le {order.createdAt.toLocaleDateString()}
+                        </p>
+                        {isOnChain && (
+                          <p className="text-xs text-gray-500 font-mono mt-1">
+                            ID: {order.id.slice(0, 8)}...{order.id.slice(-8)}
+                          </p>
+                        )}
+                      </div>
+                      <div className={`px-3 py-1 rounded text-sm font-bold ${
+                        order.status === "active"
+                          ? "bg-green-500/20 text-green-400"
+                          : order.status === "paused"
+                          ? "bg-yellow-500/20 text-yellow-400"
+                          : order.status === "completed"
+                          ? "bg-blue-500/20 text-blue-400"
+                          : "bg-red-500/20 text-red-400"
+                      }`}>
+                        {order.status.toUpperCase()}
+                      </div>
+                    </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div>
+                      <p className="text-xs text-gray-400">MONTANT/ORDRE</p>
+                      <p className="font-bold">{order.amountPerOrder} {order.inputToken}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">FRÉQUENCE</p>
+                      <p className="font-bold">{order.frequency.toUpperCase()}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">ORDRES EXÉCUTÉS</p>
+                      <p className="font-bold">{order.executedOrders}/{order.totalOrders}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">PROCHAINE EXÉCUTION</p>
+                      <p className="font-bold text-sm">
+                        {order.nextExecution.toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <p className="text-xs text-gray-400">TOTAL INVESTI</p>
+                      <p className="font-bold">{order.totalInvested.toFixed(4)} {order.inputToken}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">PRIX MOYEN</p>
+                      <p className="font-bold">
+                        {order.averagePrice > 0 ? `$${order.averagePrice.toFixed(4)}` : "N/A"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {order.status !== "completed" && order.status !== "cancelled" && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handlePauseResumeDCA(order.id)}
+                        className="flex-1 px-4 py-2 border-2 border-[var(--primary)] text-[var(--primary)] terminal-text font-bold hover:bg-[var(--primary)]/20 transition-all"
+                      >
+                        <span className="terminal-prefix">&gt;</span> [
+                          {order.status === "active" ? "PAUSE" : "RESUME"}]
+                      </button>
+                      <button
+                        onClick={() => handleCancelDCA(order.id)}
+                        className="flex-1 px-4 py-2 border-2 border-red-500 text-red-500 terminal-text font-bold hover:bg-red-500/20 transition-all"
+                      >
+                        <span className="terminal-prefix">&gt;</span> [CANCEL]
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
             </>
           )}
         </div>

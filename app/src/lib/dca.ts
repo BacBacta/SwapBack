@@ -63,6 +63,11 @@ export interface DcaPlan {
 }
 
 /**
+ * DCA Frequency type
+ */
+export type DCAFrequency = "hourly" | "daily" | "weekly" | "monthly";
+
+/**
  * Parameters for creating a DCA plan
  */
 export interface CreateDcaPlanParams {
