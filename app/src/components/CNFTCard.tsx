@@ -21,7 +21,7 @@ export const CNFTCard = ({
 }: CNFTCardProps) => {
   const formatDate = (date?: Date) => {
     if (!date) return "N/A";
-    return date.toLocaleDateString("fr-FR", {
+    return date.toLocaleDateString("en-US", {
       day: "2-digit",
       month: "short",
       year: "numeric",
@@ -53,7 +53,7 @@ export const CNFTCard = ({
               <span className="text-2xl">🎖️</span>
             </div>
             <h3 className="text-xl font-bold terminal-text">
-              <span className="terminal-prefix">&gt;</span> VOTRE_CNFT
+              <span className="terminal-prefix">&gt;</span> YOUR_CNFT
             </h3>
           </div>
           <LevelBadge
@@ -69,7 +69,7 @@ export const CNFTCard = ({
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <span className="text-lg">💰</span>
-                <span className="terminal-text opacity-70">MONTANT_LOCKÉ:</span>
+                <span className="terminal-text opacity-70">LOCKED_AMOUNT:</span>
               </div>
               <span className="terminal-text font-bold text-lg">
                 {lockedAmount.toLocaleString()}{" "}
@@ -82,10 +82,10 @@ export const CNFTCard = ({
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <span className="text-lg">⏱️</span>
-                <span className="terminal-text opacity-70">DURÉE_DE_LOCK:</span>
+                <span className="terminal-text opacity-70">LOCK_DURATION:</span>
               </div>
               <span className="terminal-text font-bold text-lg">
-                {lockDuration} JOURS
+                {lockDuration} DAY{lockDuration !== 1 ? "S" : ""}
               </span>
             </div>
           </div>
@@ -97,7 +97,7 @@ export const CNFTCard = ({
                   <div className="flex items-center gap-2">
                     <span className="text-lg">📅</span>
                     <span className="terminal-text opacity-70">
-                      DATE_DÉBLOCAGE:
+                      UNLOCK_DATE:
                     </span>
                   </div>
                   <span className="terminal-text font-bold">
@@ -111,13 +111,13 @@ export const CNFTCard = ({
                   <div className="flex items-center gap-2">
                     <span className="text-lg">⏳</span>
                     <span className="terminal-text opacity-70">
-                      TEMPS_RESTANT:
+                      TIME_REMAINING:
                     </span>
                   </div>
                   <span
                     className={`font-bold text-lg terminal-text ${getRemainingDaysColor()}`}
                   >
-                    {daysRemaining} JOUR{daysRemaining !== 1 ? "S" : ""}
+                    {daysRemaining} DAY{daysRemaining !== 1 ? "S" : ""}
                   </span>
                 </div>
               </div>
@@ -134,10 +134,10 @@ export const CNFTCard = ({
               </div>
               <div className="flex-1">
                 <div className="text-sm terminal-text opacity-70 mb-1">
-                  BOOST_ACTIF:
+                  ACTIVE_BOOST:
                 </div>
                 <div className="text-2xl font-bold text-[var(--primary)] terminal-text">
-                  +{boost}% SUR_LES_REBATES
+                  +{boost}% ON_REBATES
                 </div>
               </div>
             </div>
@@ -149,7 +149,7 @@ export const CNFTCard = ({
             <div className="flex items-start gap-3">
               <span className="text-2xl">⚠️</span>
               <p className="text-red-400 text-sm font-medium flex-1 terminal-text">
-                [CNFT_INACTIF] - VOS_TOKENS_ONT_ÉTÉ_DÉBLOQUÉS
+                [CNFT_INACTIVE] - YOUR_TOKENS_HAVE_BEEN_UNLOCKED
               </p>
             </div>
           </div>
