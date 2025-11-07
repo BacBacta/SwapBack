@@ -113,14 +113,19 @@ export const DCAClient = () => {
     e?.preventDefault();
     e?.stopPropagation();
 
-    console.log("🔵 handleCreateDCA called");
+    console.log("🔵 handleCreateDCA called", {
+      walletReady,
+      connected,
+      publicKey: publicKey?.toBase58(),
+    });
 
-    if (!walletReady || !connected || !publicKey) {
-      if (!walletReady) {
-        alert("Initialisation du wallet en cours...");
-      } else {
-        alert("Veuillez connecter votre wallet");
-      }
+    if (!walletReady) {
+      alert("⏳ Initialisation du wallet en cours... Veuillez patienter quelques instants.");
+      return;
+    }
+
+    if (!connected || !publicKey) {
+      alert("❌ Veuillez connecter votre wallet pour créer un ordre DCA");
       return;
     }
 
@@ -185,16 +190,42 @@ export const DCAClient = () => {
 
   return (
     <div className="space-y-6">
-      {/* Network Status and RPC Error Display */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div
-            className={`w-2 h-2 rounded-full ${rpcError ? "bg-red-500" : "bg-green-500"} animate-pulse`}
-          ></div>
-          <span className="text-xs text-gray-400 terminal-text">
-            RÉSEAU: {rpcError ? "DÉCONNECTÉ" : "CONNECTÉ"}
-          </span>
+      {/* Network Status and Wallet Status Display */}
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center gap-4">
+          {/* RPC Status */}
+          <div className="flex items-center gap-2">
+            <div
+              className={`w-2 h-2 rounded-full ${rpcError ? "bg-red-500" : "bg-green-500"} animate-pulse`}
+            ></div>
+            <span className="text-xs text-gray-400 terminal-text">
+              RÉSEAU: {rpcError ? "DÉCONNECTÉ" : "CONNECTÉ"}
+            </span>
+          </div>
+          
+          {/* Wallet Status */}
+          <div className="flex items-center gap-2">
+            <div
+              className={`w-2 h-2 rounded-full ${
+                !walletReady 
+                  ? "bg-yellow-500" 
+                  : connected && publicKey 
+                  ? "bg-green-500" 
+                  : "bg-red-500"
+              } animate-pulse`}
+            ></div>
+            <span className="text-xs text-gray-400 terminal-text">
+              WALLET: {
+                !walletReady 
+                  ? "INITIALISATION..." 
+                  : connected && publicKey 
+                  ? "CONNECTÉ" 
+                  : "DÉCONNECTÉ"
+              }
+            </span>
+          </div>
         </div>
+        
         {rpcError && (
           <button
             onClick={testRpcConnection}
