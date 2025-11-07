@@ -40,7 +40,7 @@ export const TESTNET_PROGRAM_IDS = {
     process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw"
   ),
   ROUTER: new PublicKey(
-    process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
+    process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz"
   ),
   BUYBACK: new PublicKey(
     process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"

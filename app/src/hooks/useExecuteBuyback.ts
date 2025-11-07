@@ -6,8 +6,6 @@ import { toast } from 'react-hot-toast';
 import { trackBuyback } from '@/lib/analytics';
 import { parseBuybackTransaction } from '@/lib/parsers';
 import { getExplorerTxUrl } from '@/utils/explorer';
-import * as fs from 'fs';
-import * as path from 'path';
 
 import {
   BUYBACK_STATE_PDA,
@@ -35,9 +33,12 @@ export function useExecuteBuyback() {
         throw new Error('Wallet not connected');
       }
 
-      // Load buyback program IDL
-      const idlPath = path.join(process.cwd(), '../target/idl/swapback_buyback.json');
-      const idl = JSON.parse(fs.readFileSync(idlPath, 'utf-8'));
+      // Load buyback program IDL from public folder
+      const response = await fetch('/idl/swapback_buyback.json');
+      if (!response.ok) {
+        throw new Error(`Failed to load Buyback IDL: ${response.statusText}`);
+      }
+      const idl = await response.json();
 
       // Create Anchor provider
       const provider = new AnchorProvider(
