@@ -76,9 +76,11 @@ export function useDcaPlans() {
         nextExecutionFormatted: formatTimestamp(plan.nextExecution),
       }));
     },
-    enabled: !!wallet.publicKey && !!wallet.signTransaction,
+    enabled: !!wallet.publicKey && !!wallet.signTransaction && wallet.connected,
     refetchInterval: 30000, // Refetch every 30 seconds to check for ready plans
     staleTime: 15000,
+    refetchOnMount: 'always', // Force refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when tab gets focus
   });
 }
 
