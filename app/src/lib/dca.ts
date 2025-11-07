@@ -12,8 +12,7 @@ import {
   TOKEN_PROGRAM_ID,
   TOKEN_2022_PROGRAM_ID 
 } from '@solana/spl-token';
-import * as fs from 'fs';
-import * as path from 'path';
+import SwapbackRouterIdl from '@/idl/swapback_router.json';
 
 // Program constants
 export const ROUTER_PROGRAM_ID = new PublicKey(
@@ -165,19 +164,8 @@ export function lamportsToUi(amount: BN, decimals: number): number {
  * Load the Router program IDL
  */
 export function loadRouterIdl(): Idl {
-  const idlPath = path.join(process.cwd(), '../target/idl/swapback_router.json');
-  
-  if (fs.existsSync(idlPath)) {
-    return JSON.parse(fs.readFileSync(idlPath, 'utf-8')) as Idl;
-  }
-  
-  // Fallback to app directory if not found in project root
-  const appIdlPath = path.join(process.cwd(), 'public/idl/swapback_router.json');
-  if (fs.existsSync(appIdlPath)) {
-    return JSON.parse(fs.readFileSync(appIdlPath, 'utf-8')) as Idl;
-  }
-  
-  throw new Error('Router IDL not found. Please build the Anchor program.');
+  // Return the imported IDL directly (no fs access needed)
+  return SwapbackRouterIdl as Idl;
 }
 
 /**

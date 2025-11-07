@@ -6,15 +6,24 @@ import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useTokenData } from "../hooks/useTokenData";
 import { DCASimulator } from "./DCASimulator";
 import { DCAOrderCard } from "./DCAOrderCard";
-import { useDcaPlans, useCreateDcaPlan, useReadyDcaPlans, useDcaStats } from "../hooks/useDCA";
+import {
+  useDcaPlans,
+  useCreateDcaPlan,
+  useReadyDcaPlans,
+  useDcaStats,
+} from "../hooks/useDCA";
 import { frequencyToSeconds, type DCAFrequency } from "../lib/dca";
 
 // Token symbol to mint address mapping
 const TOKEN_MINTS: Record<string, string> = {
   SOL: "So11111111111111111111111111111111111111112",
-  USDC: process.env.NEXT_PUBLIC_USDC_MINT || "BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR",
+  USDC:
+    process.env.NEXT_PUBLIC_USDC_MINT ||
+    "BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR",
   USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-  BACK: process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
+  BACK:
+    process.env.NEXT_PUBLIC_BACK_MINT ||
+    "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
 };
 
 export const DCAClient = () => {
@@ -71,10 +80,13 @@ export const DCAClient = () => {
       return true;
     } catch (error: unknown) {
       console.error("RPC Connection test failed:", error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
 
       if (errorMessage.includes("403") || errorMessage.includes("forbidden")) {
-        setRpcError("Accès RPC refusé (403). Vérifiez votre configuration réseau.");
+        setRpcError(
+          "Accès RPC refusé (403). Vérifiez votre configuration réseau."
+        );
       } else if (errorMessage.includes("429")) {
         setRpcError("Limite de taux RPC atteinte. Réessayez plus tard.");
       } else {
@@ -144,7 +156,8 @@ export const DCAClient = () => {
       setActiveTab("orders");
     } catch (error) {
       console.error("❌ Erreur création DCA:", error);
-      const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
+      const errorMessage =
+        error instanceof Error ? error.message : "Erreur inconnue";
       alert(`❌ Erreur lors de la création du plan DCA:\n\n${errorMessage}`);
       setRpcError(errorMessage);
     }
@@ -160,9 +173,11 @@ export const DCAClient = () => {
       {/* Network Status and RPC Error Display */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${rpcError ? 'bg-red-500' : 'bg-green-500'} animate-pulse`}></div>
+          <div
+            className={`w-2 h-2 rounded-full ${rpcError ? "bg-red-500" : "bg-green-500"} animate-pulse`}
+          ></div>
           <span className="text-xs text-gray-400 terminal-text">
-            RÉSEAU: {rpcError ? 'DÉCONNECTÉ' : 'CONNECTÉ'}
+            RÉSEAU: {rpcError ? "DÉCONNECTÉ" : "CONNECTÉ"}
           </span>
         </div>
         {rpcError && (
@@ -180,7 +195,8 @@ export const DCAClient = () => {
           <div className="flex items-center">
             <span className="text-red-400 mr-2">⚠️</span>
             <p className="text-red-300 text-sm terminal-text">
-              <span className="terminal-prefix">&gt;</span> [ERREUR RPC]: {rpcError}
+              <span className="terminal-prefix">&gt;</span> [ERREUR RPC]:{" "}
+              {rpcError}
             </p>
           </div>
           <p className="text-red-300 text-xs mt-2">
@@ -219,18 +235,22 @@ export const DCAClient = () => {
               <span className="terminal-prefix">&gt;</span> [À PROPOS DU DCA]
             </h4>
             <p className="text-blue-200 text-sm mb-2">
-              Le Dollar Cost Averaging (DCA) vous permet d'investir automatiquement à intervalles réguliers,
-              réduisant l'impact de la volatilité du marché.
+              Le Dollar Cost Averaging (DCA) vous permet d'investir
+              automatiquement à intervalles réguliers, réduisant l'impact de la
+              volatilité du marché.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-blue-200">
               <div>
-                <span className="font-bold">📊 Réduction du risque:</span> Lissez vos achats sur le temps
+                <span className="font-bold">📊 Réduction du risque:</span>{" "}
+                Lissez vos achats sur le temps
               </div>
               <div>
-                <span className="font-bold">⏰ Automatisation:</span> Pas besoin d'intervenir manuellement
+                <span className="font-bold">⏰ Automatisation:</span> Pas besoin
+                d'intervenir manuellement
               </div>
               <div>
-                <span className="font-bold">📈 Discipline:</span> Évitez les décisions émotionnelles
+                <span className="font-bold">📈 Discipline:</span> Évitez les
+                décisions émotionnelles
               </div>
             </div>
           </div>
@@ -277,7 +297,8 @@ export const DCAClient = () => {
               {/* Amount per Order */}
               <div>
                 <label className="block text-sm font-medium mb-2 terminal-text">
-                  <span className="terminal-prefix">&gt;</span> MONTANT PAR ORDRE
+                  <span className="terminal-prefix">&gt;</span> MONTANT PAR
+                  ORDRE
                 </label>
                 <div className="relative">
                   <input
@@ -296,10 +317,16 @@ export const DCAClient = () => {
                 {inputTokenData && (
                   <div className="mt-2 flex items-center justify-between">
                     <p className="text-xs text-gray-400">
-                      Balance: {inputTokenData.balance?.toFixed(4) || "0.0000"} {inputToken}
+                      Balance: {inputTokenData.balance?.toFixed(4) || "0.0000"}{" "}
+                      {inputToken}
                       {inputTokenData.usdValue && (
                         <span className="ml-2">
-                          (~${(inputTokenData.usdValue * (Number.parseFloat(amountPerOrder) || 0)).toFixed(2)})
+                          (~$
+                          {(
+                            inputTokenData.usdValue *
+                            (Number.parseFloat(amountPerOrder) || 0)
+                          ).toFixed(2)}
+                          )
                         </span>
                       )}
                     </p>
@@ -334,7 +361,9 @@ export const DCAClient = () => {
                 </label>
                 <select
                   value={frequency}
-                  onChange={(e) => setFrequency(e.target.value as typeof frequency)}
+                  onChange={(e) =>
+                    setFrequency(e.target.value as typeof frequency)
+                  }
                   className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-mono focus:border-[var(--primary)] focus:outline-none"
                 >
                   <option value="hourly">Toutes les heures</option>
@@ -347,7 +376,8 @@ export const DCAClient = () => {
               {/* Total Orders */}
               <div>
                 <label className="block text-sm font-medium mb-2 terminal-text">
-                  <span className="terminal-prefix">&gt;</span> NOMBRE TOTAL D'ORDRES
+                  <span className="terminal-prefix">&gt;</span> NOMBRE TOTAL
+                  D'ORDRES
                 </label>
                 <input
                   type="number"
@@ -363,13 +393,15 @@ export const DCAClient = () => {
               {/* Total Investment Preview */}
               <div>
                 <label className="block text-sm font-medium mb-2 terminal-text">
-                  <span className="terminal-prefix">&gt;</span> INVESTISSEMENT TOTAL
+                  <span className="terminal-prefix">&gt;</span> INVESTISSEMENT
+                  TOTAL
                 </label>
                 <div className="px-4 py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-mono">
                   {totalInvestment.toFixed(2)} {inputToken}
                   {inputTokenData?.usdValue && (
                     <span className="ml-2 text-gray-400">
-                      (~${(inputTokenData.usdValue * totalInvestment).toFixed(2)})
+                      (~$
+                      {(inputTokenData.usdValue * totalInvestment).toFixed(2)})
                     </span>
                   )}
                 </div>
@@ -379,10 +411,12 @@ export const DCAClient = () => {
             {/* Next Execution Preview */}
             <div className="mt-6 p-4 bg-gray-800/50 rounded">
               <p className="text-sm text-gray-300 terminal-text">
-                <span className="terminal-prefix">&gt;</span> [PROCHAINE EXÉCUTION]: {getNextExecutionTime(frequency)}
+                <span className="terminal-prefix">&gt;</span> [PROCHAINE
+                EXÉCUTION]: {getNextExecutionTime(frequency)}
               </p>
               <p className="text-sm text-gray-300 terminal-text mt-1">
-                <span className="terminal-prefix">&gt;</span> [DURÉE TOTALE]: {getFrequencyDuration(frequency, Number.parseInt(totalOrders))}
+                <span className="terminal-prefix">&gt;</span> [DURÉE TOTALE]:{" "}
+                {getFrequencyDuration(frequency, Number.parseInt(totalOrders))}
               </p>
             </div>
 
@@ -398,7 +432,8 @@ export const DCAClient = () => {
                   <span>CRÉATION EN COURS...</span>
                 ) : (
                   <span>
-                    <span className="terminal-prefix">&gt;</span> [CRÉER ORDRE DCA]
+                    <span className="terminal-prefix">&gt;</span> [CRÉER ORDRE
+                    DCA]
                   </span>
                 )}
               </button>
@@ -422,7 +457,8 @@ export const DCAClient = () => {
                 <span className="text-2xl">⏰</span>
                 <div>
                   <p className="font-bold text-blue-300">
-                    {readyPlans.length} plan{readyPlans.length > 1 ? 's' : ''} prêt{readyPlans.length > 1 ? 's' : ''} pour exécution !
+                    {readyPlans.length} plan{readyPlans.length > 1 ? "s" : ""}{" "}
+                    prêt{readyPlans.length > 1 ? "s" : ""} pour exécution !
                   </p>
                   <p className="text-sm text-blue-200">
                     Consultez vos plans ci-dessous pour les exécuter.
@@ -435,20 +471,23 @@ export const DCAClient = () => {
           {!connected ? (
             <div className="text-center py-12">
               <p className="text-gray-400 terminal-text mb-4">
-                <span className="terminal-prefix">&gt;</span> [CONNECTEZ VOTRE WALLET POUR VOIR VOS ORDRES DCA]
+                <span className="terminal-prefix">&gt;</span> [CONNECTEZ VOTRE
+                WALLET POUR VOIR VOS ORDRES DCA]
               </p>
             </div>
           ) : plansLoading ? (
             <div className="text-center py-12">
               <p className="text-gray-400 terminal-text mb-4">
-                <span className="terminal-prefix">&gt;</span> [CHARGEMENT DES PLANS DCA...]
+                <span className="terminal-prefix">&gt;</span> [CHARGEMENT DES
+                PLANS DCA...]
               </p>
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)] mx-auto mt-4"></div>
             </div>
           ) : dcaPlans.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-400 terminal-text mb-4">
-                <span className="terminal-prefix">&gt;</span> [AUCUN ORDRE DCA TROUVÉ]
+                <span className="terminal-prefix">&gt;</span> [AUCUN ORDRE DCA
+                TROUVÉ]
               </p>
               <p className="text-sm text-gray-500">
                 Créez votre premier ordre DCA dans l'onglet "CRÉER ORDRE"
@@ -460,23 +499,32 @@ export const DCAClient = () => {
               {stats && (
                 <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-6">
                   <h4 className="text-lg font-bold mb-4 terminal-text">
-                    <span className="terminal-prefix">&gt;</span> [STATISTIQUES DCA]
+                    <span className="terminal-prefix">&gt;</span> [STATISTIQUES
+                    DCA]
                   </h4>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-[var(--primary)]">{stats.totalPlans}</p>
+                      <p className="text-2xl font-bold text-[var(--primary)]">
+                        {stats.totalPlans}
+                      </p>
                       <p className="text-xs text-gray-400">PLANS TOTAUX</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-green-400">{stats.activePlans}</p>
+                      <p className="text-2xl font-bold text-green-400">
+                        {stats.activePlans}
+                      </p>
                       <p className="text-xs text-gray-400">PLANS ACTIFS</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-yellow-400">{stats.pausedPlans}</p>
+                      <p className="text-2xl font-bold text-yellow-400">
+                        {stats.pausedPlans}
+                      </p>
                       <p className="text-xs text-gray-400">PLANS PAUSÉS</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-blue-400">{stats.completedPlans}</p>
+                      <p className="text-2xl font-bold text-blue-400">
+                        {stats.completedPlans}
+                      </p>
                       <p className="text-xs text-gray-400">PLANS COMPLÉTÉS</p>
                     </div>
                   </div>

@@ -11,11 +11,13 @@ import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 // ============================
 
 const ROUTER_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
+  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID ||
+    "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
 );
 
 const BACK_TOKEN_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
+  process.env.NEXT_PUBLIC_BACK_MINT ||
+    "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
 );
 
 // ============================
@@ -137,7 +139,10 @@ export const SwapBackDashboard = () => {
         setPlans(parsedPlans);
       } catch (err: unknown) {
         console.error("❌ Erreur chargement plans:", err);
-        const message = err instanceof Error ? err.message : "Erreur lors du chargement des plans";
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Erreur lors du chargement des plans";
         setError(message);
       } finally {
         setLoading(false);
@@ -422,7 +427,7 @@ export const SwapBackDashboard = () => {
                 {/* ACTIONS */}
                 <div className="mt-6 flex gap-3">
                   <a
-                    href={`https://explorer.solana.com/address/${plan.publicKey.toString()}?cluster=${process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'testnet'}`}
+                    href={`https://explorer.solana.com/address/${plan.publicKey.toString()}?cluster=${process.env.NEXT_PUBLIC_SOLANA_NETWORK || "testnet"}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex-1 bg-gray-900 hover:bg-gray-800 text-white px-4 py-2 rounded-lg font-medium text-center transition-colors border border-gray-700"
