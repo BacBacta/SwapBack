@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useTokenData } from "../hooks/useTokenData";
@@ -32,6 +32,7 @@ export const DCAClient = () => {
   const [activeTab, setActiveTab] = useState<"create" | "orders" | "simulator">(
     "create"
   );
+  const [walletReady, setWalletReady] = useState(false);
 
   // Create DCA Form States
   const [inputToken, setInputToken] = useState("SOL");
@@ -40,6 +41,16 @@ export const DCAClient = () => {
   const [frequency, setFrequency] = useState<DCAFrequency>("daily");
   const [totalOrders, setTotalOrders] = useState("10");
   const [rpcError, setRpcError] = useState<string | null>(null);
+
+  // Vérifier que le wallet est complètement initialisé
+  useEffect(() => {
+    // Attendre un court instant pour que le wallet s'initialise complètement
+    const timer = setTimeout(() => {
+      setWalletReady(true);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [connected, publicKey]);
 
   // On-chain DCA hooks
   const { data: dcaPlans = [], isLoading: plansLoading } = useDcaPlans();
@@ -104,8 +115,12 @@ export const DCAClient = () => {
 
     console.log("🔵 handleCreateDCA called");
 
-    if (!connected || !publicKey) {
-      alert("Veuillez connecter votre wallet");
+    if (!walletReady || !connected || !publicKey) {
+      if (!walletReady) {
+        alert("Initialisation du wallet en cours...");
+      } else {
+        alert("Veuillez connecter votre wallet");
+      }
       return;
     }
 
@@ -225,6 +240,18 @@ export const DCAClient = () => {
           </button>
         ))}
       </div>
+
+      {/* Wallet Status Indicator */}
+      {!walletReady && (
+        <div className="bg-yellow-900/50 border border-yellow-700 rounded-lg p-4">
+          <div className="flex items-center">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-400 mr-3"></div>
+            <p className="text-yellow-300 text-sm terminal-text">
+              <span className="terminal-prefix">&gt;</span> [INITIALISATION WALLET EN COURS...]
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Create DCA Tab */}
       {activeTab === "create" && (
@@ -425,7 +452,7 @@ export const DCAClient = () => {
               <button
                 type="button"
                 onClick={handleCreateDCA}
-                disabled={isCreating || !connected}
+                disabled={isCreating || !walletReady || !connected}
                 className="w-full px-6 py-4 bg-[var(--primary)] hover:bg-[var(--primary-hover)] disabled:bg-gray-600 text-black font-bold terminal-text rounded transition-colors"
               >
                 {isCreating ? (
@@ -437,7 +464,7 @@ export const DCAClient = () => {
                   </span>
                 )}
               </button>
-              {!connected && (
+              {!connected && walletReady && (
                 <p className="text-red-400 text-sm mt-2 text-center">
                   Veuillez connecter votre wallet pour créer un ordre DCA
                 </p>
@@ -468,7 +495,7 @@ export const DCAClient = () => {
             </div>
           )}
 
-          {!connected ? (
+          {!connected && walletReady ? (
             <div className="text-center py-12">
               <p className="text-gray-400 terminal-text mb-4">
                 <span className="terminal-prefix">&gt;</span> [CONNECTEZ VOTRE
