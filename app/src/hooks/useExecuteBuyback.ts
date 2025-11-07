@@ -33,11 +33,23 @@ async function loadBuybackIdl(): Promise<Idl> {
   try {
     // Load IDL from bundled source (works in browser)
     const idl = await import('@/idl/swapback_buyback.json');
+    
+    // Validate the imported IDL has required structure
+    if (!idl || !idl.default || typeof idl.default !== 'object') {
+      throw new Error('Invalid IDL structure');
+    }
+    
     cachedBuybackIdl = idl.default as Idl;
     return cachedBuybackIdl;
   } catch (error) {
     console.error('Error loading Buyback IDL:', error);
-    throw new Error('Buyback IDL not found. Please ensure swapback_buyback.json is in /src/idl/');
+    
+    // Provide more specific error messages
+    if (error instanceof Error && error.message.includes('Cannot find module')) {
+      throw new Error('Buyback IDL not found. Please ensure swapback_buyback.json is in /src/idl/');
+    }
+    
+    throw new Error(`Failed to load Buyback IDL: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
