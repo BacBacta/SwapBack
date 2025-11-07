@@ -177,17 +177,26 @@ export async function ensureRouterStateInitialized(
       console.log('✅ Router State is initialized');
       return true;
     }
-  } catch {
+  } catch (error) {
+    console.log('⚠️ Error checking Router State:', error);
     // State not found, need to initialize
   }
   
   console.log('⚠️ Router State not initialized, initializing now...');
+  console.log('📍 State PDA:', statePda.toBase58());
+  console.log('👤 Authority:', authorityPublicKey.toBase58());
   
   try {
-    await initializeRouterState(connection, provider, authorityPublicKey);
+    const signature = await initializeRouterState(connection, provider, authorityPublicKey);
+    console.log('✅ Initialization successful, signature:', signature);
     return true;
   } catch (error) {
     console.error('❌ Failed to initialize Router State:', error);
+    // Log more details about the error
+    if (error instanceof Error) {
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
     return false;
   }
 }
@@ -248,29 +257,35 @@ export async function initializeRouterState(
   console.log('🔄 Initializing Router State:', {
     statePda: statePda.toBase58(),
     authority: authorityPublicKey.toBase58(),
+    programId: ROUTER_PROGRAM_ID.toBase58(),
   });
   
-  // Build transaction
-  interface InitializeMethods {
-    initialize: () => {
-      accounts: (accounts: Record<string, unknown>) => {
-        rpc: () => Promise<string>;
+  try {
+    // Build transaction
+    interface InitializeMethods {
+      initialize: () => {
+        accounts: (accounts: Record<string, unknown>) => {
+          rpc: () => Promise<string>;
+        };
       };
-    };
+    }
+    
+    const signature = await (program.methods as unknown as InitializeMethods)
+      .initialize()
+      .accounts({
+        state: statePda,
+        authority: authorityPublicKey,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+    
+    console.log('✅ Router State initialized:', signature);
+    
+    return signature;
+  } catch (error) {
+    console.error('❌ Failed to call initialize instruction:', error);
+    throw error;
   }
-  
-  const signature = await (program.methods as unknown as InitializeMethods)
-    .initialize()
-    .accounts({
-      state: statePda,
-      authority: authorityPublicKey,
-      systemProgram: SystemProgram.programId,
-    })
-    .rpc();
-  
-  console.log('✅ Router State initialized:', signature);
-  
-  return signature;
 }
 
 /**

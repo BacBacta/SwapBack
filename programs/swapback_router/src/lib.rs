@@ -461,7 +461,7 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = authority,
-        space = 8 + 32 + 1,
+        space = 8 + 32 + 2 + 2 + 2 + 8 + 8 + 8 + 8 + 8 + 1, // 87 bytes total
         seeds = [b"router_state"],
         bump
     )]
