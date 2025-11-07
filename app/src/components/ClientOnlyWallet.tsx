@@ -9,25 +9,37 @@ import { useEffect, useState } from "react";
  * Améliore la détection des wallets dans tous les environnements
  */
 export const ClientOnlyWallet = () => {
-  const { wallets, select, connect, connected, connecting, disconnect, publicKey } = useWallet();
-  const [showModal, setShowModal] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [walletStatus, setWalletStatus] = useState<{[key: string]: boolean}>({});
 
   useEffect(() => {
     setMounted(true);
+  }, []);
 
+  // Ne rien rendre côté serveur
+  if (!mounted) {
+    return null;
+  }
+
+  return <ClientOnlyWalletContent />;
+};
+
+const ClientOnlyWalletContent = () => {
+  const { wallets, select, connect, connected, connecting, disconnect, publicKey } = useWallet();
+  const [showModal, setShowModal] = useState(false);
+  const [walletStatus, setWalletStatus] = useState<{[key: string]: boolean}>({});
+
+  useEffect(() => {
     // Vérifier manuellement la présence des wallets dans window
     const checkWalletAvailability = () => {
       const status: {[key: string]: boolean} = {};
 
       // Vérifier Phantom
-      if (typeof window !== 'undefined' && (window as any).solana?.isPhantom) {
+      if (typeof window !== 'undefined' && (window as Window & { solana?: { isPhantom?: boolean } }).solana?.isPhantom) {
         status['Phantom'] = true;
       }
 
       // Vérifier Solflare
-      if (typeof window !== 'undefined' && (window as any).solflare) {
+      if (typeof window !== 'undefined' && (window as Window & { solflare?: unknown }).solflare) {
         status['Solflare'] = true;
       }
 
@@ -44,9 +56,12 @@ export const ClientOnlyWallet = () => {
   const handleConnect = async (walletName: string) => {
     try {
       console.log(`🔍 Connecting to ${walletName}`);
-      select(walletName as any);
-      await connect();
-      setShowModal(false);
+      const wallet = wallets.find((w) => w.adapter.name === walletName);
+      if (wallet) {
+        select(wallet.adapter.name);
+        await connect();
+        setShowModal(false);
+      }
     } catch (error) {
       console.error('🔍 Connection error:', error);
       // Si la connexion échoue, essayer d'ouvrir le wallet dans un nouvel onglet
@@ -74,12 +89,6 @@ export const ClientOnlyWallet = () => {
   const getWalletStatusColor = (walletName: string) => {
     return walletStatus[walletName] ? 'text-green-400' : 'text-yellow-400';
   };
-
-  if (!mounted) {
-    return (
-      <div className="w-32 h-10 bg-gray-700 rounded animate-pulse"></div>
-    );
-  }
 
   if (connected && publicKey) {
     const address = publicKey.toBase58();
