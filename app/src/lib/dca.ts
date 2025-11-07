@@ -160,8 +160,26 @@ export function lamportsToUi(amount: BN, decimals: number): number {
 }
 
 /**
+ * Check if Router State is initialized
+ * Returns true if initialized, false otherwise
+ */
+export async function isRouterStateInitialized(
+  connection: Connection
+): Promise<boolean> {
+  const [statePda] = getRouterStatePDA();
+  
+  try {
+    const stateAccount = await connection.getAccountInfo(statePda);
+    return stateAccount !== null;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Ensure Router State is initialized (helper function)
- * Checks if state exists, and initializes if not
+ * Checks if state exists, and throws clear error if not
+ * Note: Only the program authority can initialize the Router State
  */
 export async function ensureRouterStateInitialized(
   connection: Connection,
@@ -177,19 +195,20 @@ export async function ensureRouterStateInitialized(
       console.log('✅ Router State is initialized');
       return true;
     }
-  } catch {
-    // State not found, need to initialize
-  }
-  
-  console.log('⚠️ Router State not initialized, initializing now...');
-  
-  try {
-    await initializeRouterState(connection, provider, authorityPublicKey);
-    return true;
   } catch (error) {
-    console.error('❌ Failed to initialize Router State:', error);
-    return false;
+    console.error('❌ Error checking Router State:', error);
   }
+  
+  // Router State is not initialized
+  console.error('⚠️ Router State not initialized');
+  console.error('State PDA:', statePda.toBase58());
+  console.error('The program authority must initialize the Router State before DCA plans can be created.');
+  
+  // Don't try to auto-initialize - user might not have authority
+  // Instead, throw a clear error
+  throw new Error(
+    'Router State is not initialized. Please contact the protocol administrator to initialize the program state before creating DCA plans.'
+  );
 }
 
 /**
