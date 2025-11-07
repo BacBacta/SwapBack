@@ -10,7 +10,7 @@ import { PublicKey } from '@solana/web3.js';
 // ============================================
 
 export const ROUTER_PROGRAM_ID = new PublicKey(
-  'GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt'
+  'BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz'
 );
 
 export const BUYBACK_PROGRAM_ID = new PublicKey(

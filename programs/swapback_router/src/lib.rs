@@ -461,7 +461,7 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = authority,
-        space = 8 + 32 + 1,
+        space = RouterState::LEN,
         seeds = [b"router_state"],
         bump
     )]
