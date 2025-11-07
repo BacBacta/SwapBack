@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { ClientWalletProvider } from "@/components/ClientWalletProvider";
 import { QueryProvider } from "@/components/QueryProvider";
@@ -7,8 +6,6 @@ import { Toaster } from "react-hot-toast";
 // import { WalletConnectionGuide } from "@/components/WalletConnectionGuide";
 // import { NetworkStatusIndicator } from "@/components/NetworkStatusIndicator";
 // import { NetworkInfoModal } from "@/components/NetworkInfoModal";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "SwapBack - Best Execution Router for Solana",
@@ -26,7 +23,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body>
         {/* Skip to main content - Accessibility */}
         <a href="#main-content" className="skip-link">
           Skip to main content
