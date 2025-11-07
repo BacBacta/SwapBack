@@ -85,7 +85,13 @@ export const DCAClient = () => {
   };
 
   // Create DCA Plan on-chain
-  const handleCreateDCA = async () => {
+  const handleCreateDCA = async (e?: React.MouseEvent<HTMLButtonElement>) => {
+    // Prevent any default behavior
+    e?.preventDefault();
+    e?.stopPropagation();
+
+    console.log("🔵 handleCreateDCA called");
+
     if (!connected || !publicKey) {
       alert("Veuillez connecter votre wallet");
       return;
@@ -383,6 +389,7 @@ export const DCAClient = () => {
             {/* Create Button */}
             <div className="mt-6">
               <button
+                type="button"
                 onClick={handleCreateDCA}
                 disabled={isCreating || !connected}
                 className="w-full px-6 py-4 bg-[var(--primary)] hover:bg-[var(--primary-hover)] disabled:bg-gray-600 text-black font-bold terminal-text rounded transition-colors"

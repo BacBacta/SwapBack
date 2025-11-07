@@ -273,7 +273,7 @@ export const SwapBackDashboard = () => {
             Créez votre premier plan pour commencer à investir automatiquement
           </p>
           <a
-            href="/"
+            href="/dca"
             className="inline-block bg-[var(--primary)] text-black px-8 py-3 rounded-lg font-semibold hover:bg-[var(--primary)]/90 transition-colors"
           >
             Créer un plan DCA
