@@ -160,6 +160,39 @@ export function lamportsToUi(amount: BN, decimals: number): number {
 }
 
 /**
+ * Ensure Router State is initialized (helper function)
+ * Checks if state exists, and initializes if not
+ */
+export async function ensureRouterStateInitialized(
+  connection: Connection,
+  provider: AnchorProvider,
+  authorityPublicKey: PublicKey
+): Promise<boolean> {
+  
+  const [statePda] = getRouterStatePDA();
+  
+  try {
+    const stateAccount = await connection.getAccountInfo(statePda);
+    if (stateAccount) {
+      console.log('✅ Router State is initialized');
+      return true;
+    }
+  } catch {
+    // State not found, need to initialize
+  }
+  
+  console.log('⚠️ Router State not initialized, initializing now...');
+  
+  try {
+    await initializeRouterState(connection, provider, authorityPublicKey);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to initialize Router State:', error);
+    return false;
+  }
+}
+
+/**
  * Load the Router program IDL
  * Loads from public folder to avoid fs module issues
  */
@@ -186,6 +219,61 @@ export async function loadRouterIdl(): Promise<Idl> {
 }
 
 /**
+ * Initialize the Router State (must be called once before any DCA operations)
+ */
+export async function initializeRouterState(
+  connection: Connection,
+  provider: AnchorProvider,
+  authorityPublicKey: PublicKey
+): Promise<string> {
+  
+  // Load IDL and create program instance
+  const idl = await loadRouterIdl();
+  const program = new Program(idl, provider);
+  
+  // Derive state PDA
+  const [statePda] = getRouterStatePDA();
+  
+  // Check if already initialized
+  try {
+    const stateAccount = await connection.getAccountInfo(statePda);
+    if (stateAccount) {
+      console.log('✅ Router State already initialized');
+      return 'already_initialized';
+    }
+  } catch {
+    console.log('Router State not initialized, proceeding...');
+  }
+  
+  console.log('🔄 Initializing Router State:', {
+    statePda: statePda.toBase58(),
+    authority: authorityPublicKey.toBase58(),
+  });
+  
+  // Build transaction
+  interface InitializeMethods {
+    initialize: () => {
+      accounts: (accounts: Record<string, unknown>) => {
+        rpc: () => Promise<string>;
+      };
+    };
+  }
+  
+  const signature = await (program.methods as unknown as InitializeMethods)
+    .initialize()
+    .accounts({
+      state: statePda,
+      authority: authorityPublicKey,
+      systemProgram: SystemProgram.programId,
+    })
+    .rpc();
+  
+  console.log('✅ Router State initialized:', signature);
+  
+  return signature;
+}
+
+/**
  * Create a DCA plan on-chain
  */
 export async function createDcaPlanTransaction(
@@ -205,6 +293,17 @@ export async function createDcaPlanTransaction(
   // Derive PDAs
   const [planPda] = getDcaPlanPDA(userPublicKey, planId);
   const [statePda] = getRouterStatePDA();
+  
+  // Check if Router State is initialized
+  try {
+    const stateAccount = await connection.getAccountInfo(statePda);
+    if (!stateAccount) {
+      throw new Error('Router State not initialized. Please initialize first.');
+    }
+  } catch (error) {
+    console.error('⚠️ Router State check failed:', error);
+    throw new Error('Router State must be initialized before creating DCA plans');
+  }
   
   // Get token decimals
   const tokenInDecimals = getTokenDecimals(params.tokenIn);

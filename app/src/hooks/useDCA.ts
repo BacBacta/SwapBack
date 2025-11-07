@@ -27,6 +27,7 @@ import {
   isPlanReadyForExecution,
   formatTimestamp,
   getTimeUntilNextExecution,
+  ensureRouterStateInitialized,
 } from '@/lib/dca';
 import { getExplorerTxUrl } from '@/utils/explorer';
 
@@ -102,6 +103,17 @@ export function useCreateDcaPlan() {
       );
 
       console.log('🔄 Creating DCA plan:', params);
+
+      // Ensure Router State is initialized before creating plans
+      const isInitialized = await ensureRouterStateInitialized(
+        connection,
+        provider,
+        wallet.publicKey
+      );
+
+      if (!isInitialized) {
+        throw new Error('Failed to initialize Router State. Please try again.');
+      }
 
       const { signature, planPda, planId } = await createDcaPlanTransaction(
         connection,
@@ -181,7 +193,7 @@ export function useExecuteDcaSwap() {
         explorerUrl: getExplorerTxUrl(signature),
       };
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       toast.success('DCA swap executed successfully!', { duration: 5000 });
 
       // Invalidate queries to refresh plans
