@@ -61,6 +61,13 @@ export interface DcaPlan {
 }
 
 /**
+ * DCA Plan with account address
+ */
+export interface DcaPlanWithAddress extends DcaPlan {
+  planPda: PublicKey;
+}
+
+/**
  * DCA Frequency type
  */
 export type DCAFrequency = "hourly" | "daily" | "weekly" | "monthly";
@@ -391,7 +398,9 @@ export async function fetchUserDcaPlans(
   connection: Connection,
   provider: AnchorProvider,
   userPublicKey: PublicKey
-): Promise<DcaPlan[]> {
+): Promise<DcaPlanWithAddress[]> {
+  
+  console.log('🔍 Fetching DCA plans for user:', userPublicKey.toBase58());
   
   const idl = await loadRouterIdl();
   const program = new Program(idl, provider);
@@ -400,6 +409,12 @@ export async function fetchUserDcaPlans(
   // - discriminator: 8 bytes [231, 97, 112, 227, 171, 241, 52, 84]
   // - plan_id: 32 bytes (u8[32])
   // - user: 32 bytes (pubkey) <- at offset 40
+  
+  console.log('🔍 Searching with filters:', {
+    programId: ROUTER_PROGRAM_ID.toBase58(),
+    discriminator: Buffer.from([231, 97, 112, 227, 171, 241, 52, 84]).toString('hex'),
+    userOffset: 40,
+  });
   
   // Use getProgramAccounts to fetch all DCA plans owned by the user
   const accounts = await connection.getProgramAccounts(ROUTER_PROGRAM_ID, {
@@ -421,19 +436,32 @@ export async function fetchUserDcaPlans(
     ],
   });
   
-  const plans: DcaPlan[] = [];
+  console.log(`📦 Found ${accounts.length} account(s) matching filters`);
+  
+  const plans: DcaPlanWithAddress[] = [];
   
   for (const account of accounts) {
     try {
+      console.log('🔓 Decoding account:', account.pubkey.toBase58());
       // Deserialize account data
-      const dcaPlan = program.coder.accounts.decode('DcaPlan', account.account.data);
-      plans.push(dcaPlan as DcaPlan);
+      const dcaPlan = program.coder.accounts.decode('DcaPlan', account.account.data) as DcaPlan;
+      console.log('✅ Decoded plan:', {
+        user: dcaPlan.user.toBase58(),
+        tokenIn: dcaPlan.tokenIn.toBase58(),
+        tokenOut: dcaPlan.tokenOut.toBase58(),
+        executedSwaps: dcaPlan.executedSwaps,
+        totalSwaps: dcaPlan.totalSwaps,
+      });
+      plans.push({
+        ...dcaPlan,
+        planPda: account.pubkey,
+      });
     } catch (error) {
-      console.warn('Failed to decode DCA plan:', error);
+      console.warn('❌ Failed to decode DCA plan:', account.pubkey.toBase58(), error);
     }
   }
   
-  console.log(`✅ Fetched ${plans.length} DCA plans for user ${userPublicKey.toBase58()}`);
+  console.log(`✅ Successfully fetched ${plans.length} DCA plan(s) for user ${userPublicKey.toBase58()}`);
   
   return plans;
 }

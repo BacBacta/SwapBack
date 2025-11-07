@@ -68,7 +68,7 @@ export function useDcaPlans() {
       // Enrich plans with UI-friendly data
       return plans.map((plan) => ({
         ...plan,
-        planPda: PublicKey.default, // Will be derived from plan_id + user in actual implementation
+        // planPda is already included from fetchUserDcaPlans
         readyForExecution: isPlanReadyForExecution(plan),
         timeUntilNext: getTimeUntilNextExecution(plan.nextExecution),
         progress: (plan.executedSwaps / plan.totalSwaps) * 100,
