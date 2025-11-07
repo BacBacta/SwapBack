@@ -396,12 +396,25 @@ export async function fetchUserDcaPlans(
   const idl = await loadRouterIdl();
   const program = new Program(idl, provider);
   
+  // DcaPlan account structure:
+  // - discriminator: 8 bytes [231, 97, 112, 227, 171, 241, 52, 84]
+  // - plan_id: 32 bytes (u8[32])
+  // - user: 32 bytes (pubkey) <- at offset 40
+  
   // Use getProgramAccounts to fetch all DCA plans owned by the user
   const accounts = await connection.getProgramAccounts(ROUTER_PROGRAM_ID, {
     filters: [
       {
+        // Filter by DcaPlan account discriminator
         memcmp: {
-          offset: 8, // Skip discriminator (8 bytes)
+          offset: 0,
+          bytes: Buffer.from([231, 97, 112, 227, 171, 241, 52, 84]).toString('base64'),
+        },
+      },
+      {
+        // Filter by user pubkey (at offset 40 = 8 bytes discriminator + 32 bytes plan_id)
+        memcmp: {
+          offset: 40,
           bytes: userPublicKey.toBase58(),
         },
       },
