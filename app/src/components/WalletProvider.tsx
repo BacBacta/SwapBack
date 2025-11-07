@@ -58,7 +58,7 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
     <ConnectionProvider endpoint={endpoint}>
       <SolanaWalletProvider
         wallets={wallets}
-        autoConnect={false} // Désactiver autoConnect pour éviter les conflits
+        autoConnect={true} // Activer autoConnect pour la persistance de connexion
         localStorageKey="swapback-wallet" // Clé unique pour éviter les conflits
       >
         <WalletModalProvider>{children}</WalletModalProvider>

@@ -44,10 +44,10 @@ export const DCAClient = () => {
 
   // Vérifier que le wallet est complètement initialisé
   useEffect(() => {
-    // Attendre un court instant pour que le wallet s'initialise complètement
+    // Avec autoConnect activé, réduire le délai d'initialisation
     const timer = setTimeout(() => {
       setWalletReady(true);
-    }, 500);
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [connected, publicKey]);
