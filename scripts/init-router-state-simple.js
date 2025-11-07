@@ -58,15 +58,33 @@ async function main() {
   
   // 3. Load Router program IDL
   console.log('\n📄 Loading Router IDL...');
-  const idlPath = path.join(__dirname, '../target/idl/swapback_router.json');
-  if (!fs.existsSync(idlPath)) {
-    console.error('❌ IDL not found:', idlPath);
-    console.error('   Run: anchor build');
+  
+  // Try multiple possible IDL locations
+  const possibleIdlPaths = [
+    path.join(__dirname, '../target/idl/swapback_router.json'),
+    path.join(__dirname, '../app/public/idl/swapback_router.json'),
+    path.join(__dirname, '../app/src/idl/swapback_router.json'),
+  ];
+  
+  let idlPath = null;
+  for (const tryPath of possibleIdlPaths) {
+    if (fs.existsSync(tryPath)) {
+      idlPath = tryPath;
+      break;
+    }
+  }
+  
+  if (!idlPath) {
+    console.error('❌ IDL not found in any of these locations:');
+    possibleIdlPaths.forEach(p => console.error('   -', p));
+    console.error('\n   Please run: anchor build');
+    console.error('   Or ensure the IDL is copied to app/public/idl/');
     process.exit(1);
   }
   
   const idl = JSON.parse(fs.readFileSync(idlPath, 'utf-8'));
-  console.log('✅ IDL loaded:', idl.name);
+  console.log('✅ IDL loaded from:', idlPath);
+  console.log('   Program:', idl.name);
   
   // 4. Create Anchor provider and program
   const provider = new AnchorProvider(
@@ -143,9 +161,9 @@ async function main() {
       const state = await program.account.routerState.fetch(statePda);
       console.log('\n📊 Initialized Router State:');
       console.log('   Authority:', state.authority.toBase58());
-      console.log('   Rebate %:', state.rebatePercentage / 100, '%');
-      console.log('   Buyback %:', state.buybackPercentage / 100, '%');
-      console.log('   Protocol %:', state.protocolPercentage / 100, '%');
+      console.log('   Rebate %:', (state.rebatePercentage / 100).toFixed(2), '% (', state.rebatePercentage, 'bps)');
+      console.log('   Buyback %:', (state.buybackPercentage / 100).toFixed(2), '% (', state.buybackPercentage, 'bps)');
+      console.log('   Protocol %:', (state.protocolPercentage / 100).toFixed(2), '% (', state.protocolPercentage, 'bps)');
       
       console.log('\n✨ DCA functionality is now ready to use!');
     }

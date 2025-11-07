@@ -205,9 +205,11 @@ export async function ensureRouterStateInitialized(
   console.error('The program authority must initialize the Router State before DCA plans can be created.');
   
   // Don't try to auto-initialize - user might not have authority
-  // Instead, throw a clear error
+  // Instead, throw a clear error with actionable steps
   throw new Error(
-    'Router State is not initialized. Please contact the protocol administrator to initialize the program state before creating DCA plans.'
+    `Router State is not initialized at ${statePda.toBase58()}. ` +
+    'Please contact the protocol administrator to initialize the program state. ' +
+    'If you have authority access, run: node scripts/init-router-state-simple.js'
   );
 }
 
