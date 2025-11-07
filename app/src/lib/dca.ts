@@ -12,7 +12,6 @@ import {
   TOKEN_PROGRAM_ID,
   TOKEN_2022_PROGRAM_ID 
 } from '@solana/spl-token';
-import SwapbackRouterIdl from '@/idl/swapback_router.json';
 
 // Program constants
 export const ROUTER_PROGRAM_ID = new PublicKey(
@@ -162,10 +161,28 @@ export function lamportsToUi(amount: BN, decimals: number): number {
 
 /**
  * Load the Router program IDL
+ * Loads from public folder to avoid fs module issues
  */
-export function loadRouterIdl(): Idl {
-  // Return the imported IDL directly (no fs access needed)
-  return SwapbackRouterIdl as Idl;
+let cachedIdl: Idl | null = null;
+
+export async function loadRouterIdl(): Promise<Idl> {
+  // Return cached IDL if available
+  if (cachedIdl) {
+    return cachedIdl;
+  }
+
+  try {
+    // Load IDL from public folder (works in browser)
+    const response = await fetch('/idl/swapback_router.json');
+    if (!response.ok) {
+      throw new Error(`Failed to load IDL: ${response.statusText}`);
+    }
+    cachedIdl = await response.json();
+    return cachedIdl as Idl;
+  } catch (error) {
+    console.error('Error loading Router IDL:', error);
+    throw new Error('Router IDL not found. Please ensure swapback_router.json is in /public/idl/');
+  }
 }
 
 /**
@@ -179,7 +196,7 @@ export async function createDcaPlanTransaction(
 ): Promise<{ signature: string; planPda: PublicKey; planId: Buffer }> {
   
   // Load IDL and create program instance
-  const idl = loadRouterIdl();
+  const idl = await loadRouterIdl();
   const program = new Program(idl, provider);
   
   // Generate unique plan ID
@@ -262,7 +279,7 @@ export async function fetchUserDcaPlans(
   userPublicKey: PublicKey
 ): Promise<DcaPlan[]> {
   
-  const idl = loadRouterIdl();
+  const idl = await loadRouterIdl();
   const program = new Program(idl, provider);
   
   // Use getProgramAccounts to fetch all DCA plans owned by the user
@@ -305,7 +322,7 @@ export async function executeDcaSwapTransaction(
   dcaPlan: DcaPlan
 ): Promise<string> {
   
-  const idl = loadRouterIdl();
+  const idl = await loadRouterIdl();
   const program = new Program(idl, provider);
   
   const [statePda] = getRouterStatePDA();
@@ -369,7 +386,7 @@ export async function pauseDcaPlanTransaction(
   planPda: PublicKey
 ): Promise<string> {
   
-  const idl = loadRouterIdl();
+  const idl = await loadRouterIdl();
   const program = new Program(idl, provider);
   
   console.log('⏸️  Pausing DCA plan:', planPda.toBase58());
@@ -405,7 +422,7 @@ export async function resumeDcaPlanTransaction(
   planPda: PublicKey
 ): Promise<string> {
   
-  const idl = loadRouterIdl();
+  const idl = await loadRouterIdl();
   const program = new Program(idl, provider);
   
   console.log('▶️  Resuming DCA plan:', planPda.toBase58());
@@ -441,7 +458,7 @@ export async function cancelDcaPlanTransaction(
   planPda: PublicKey
 ): Promise<string> {
   
-  const idl = loadRouterIdl();
+  const idl = await loadRouterIdl();
   const program = new Program(idl, provider);
   
   console.log('❌ Cancelling DCA plan:', planPda.toBase58());
