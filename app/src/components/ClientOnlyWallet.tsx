@@ -1,12 +1,11 @@
 "use client";
 
-import { useWallet } from "@solana/wallet-adapter-react";
 import { useEffect, useState } from "react";
 
 /**
- * Client-only wallet connector avec modal personnalisé
- * Évite complètement les redirections automatiques
- * Améliore la détection des wallets dans tous les environnements
+ * Client-only wallet connector avec connexion directe
+ * Utilise window.solana directement comme l'ancien WalletConnectionGuide
+ * pour une meilleure compatibilité avec les environnements comme VS Code
  */
 export const ClientOnlyWallet = () => {
   const [mounted, setMounted] = useState(false);
@@ -23,66 +22,52 @@ export const ClientOnlyWallet = () => {
   return <ClientOnlyWalletContent />;
 };
 
+// Type pour window avec les wallets Solana
+type WindowWithWallets = Window & {
+  solana?: {
+    isPhantom?: boolean;
+    connect: () => Promise<{ publicKey: { toString: () => string } }>;
+    disconnect: () => Promise<void>;
+    on: (event: string, callback: () => void) => void;
+    publicKey?: { toString: () => string };
+  };
+  phantom?: { solana?: unknown };
+  solflare?: {
+    connect: () => Promise<{ publicKey: { toString: () => string } }>;
+    disconnect: () => Promise<void>;
+    publicKey?: { toString: () => string };
+  };
+};
+
 const ClientOnlyWalletContent = () => {
-  const { wallets, select, connect, connected, connecting, disconnect, publicKey } = useWallet();
   const [showModal, setShowModal] = useState(false);
   const [walletStatus, setWalletStatus] = useState<{[key: string]: boolean}>({});
+  const [directConnection, setDirectConnection] = useState<{
+    wallet: string | null;
+    publicKey: string | null;
+  }>({ wallet: null, publicKey: null });
 
   useEffect(() => {
-    // Vérifier manuellement la présence des wallets dans window
+    // Vérifier la présence des wallets
     const checkWalletAvailability = () => {
       const status: {[key: string]: boolean} = {};
 
-      // Type pour window avec les wallets Solana
-      type WindowWithWallets = Window & {
-        solana?: { isPhantom?: boolean };
-        phantom?: { solana?: unknown };
-        solflare?: unknown;
-      };
-
-      // Log pour débogage
-      console.log('🔍 Checking wallet availability...');
-      console.log('window.solana:', typeof window !== 'undefined' ? (window as WindowWithWallets).solana : 'undefined');
-      console.log('window.phantom:', typeof window !== 'undefined' ? (window as WindowWithWallets).phantom : 'undefined');
-      console.log('window.solflare:', typeof window !== 'undefined' ? (window as WindowWithWallets).solflare : 'undefined');
-
-      // Vérifier Phantom - essayer plusieurs méthodes de détection
       if (typeof window !== 'undefined') {
         const w = window as WindowWithWallets;
         
-        // Méthode 1: window.solana.isPhantom
+        // Détecter Phantom
         if (w.solana?.isPhantom) {
-          console.log('✅ Phantom détecté via window.solana.isPhantom');
+          console.log('✅ Phantom détecté');
           status['Phantom'] = true;
-        }
-        // Méthode 2: window.phantom.solana
-        else if (w.phantom?.solana) {
-          console.log('✅ Phantom détecté via window.phantom.solana');
-          status['Phantom'] = true;
-        }
-        // Méthode 3: Chercher dans les wallets du contexte
-        else {
-          const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
-          if (phantomWallet?.readyState === 'Installed') {
-            console.log('✅ Phantom détecté via wallet adapter readyState');
-            status['Phantom'] = true;
-          }
         }
 
-        // Vérifier Solflare
+        // Détecter Solflare
         if (w.solflare) {
           console.log('✅ Solflare détecté');
           status['Solflare'] = true;
-        } else {
-          const solflareWallet = wallets.find(w => w.adapter.name === 'Solflare');
-          if (solflareWallet?.readyState === 'Installed') {
-            console.log('✅ Solflare détecté via wallet adapter readyState');
-            status['Solflare'] = true;
-          }
         }
       }
 
-      console.log('📊 Wallet status:', status);
       setWalletStatus(status);
     };
 
@@ -91,33 +76,79 @@ const ClientOnlyWalletContent = () => {
     // Re-vérifier périodiquement
     const interval = setInterval(checkWalletAvailability, 2000);
     return () => clearInterval(interval);
-  }, [wallets]);
+  }, []);
 
-  const handleConnect = async (walletName: string) => {
+  // Utiliser la connexion directe comme dans WalletConnectionGuide
+  const handlePhantomConnect = async () => {
     try {
-      console.log(`🔍 Connecting to ${walletName}`);
-      const wallet = wallets.find((w) => w.adapter.name === walletName);
-      if (wallet) {
-        select(wallet.adapter.name);
-        await connect();
+      if (typeof window === 'undefined') return;
+      
+      const w = window as WindowWithWallets;
+      const phantomWallet = w.solana;
+      
+      if (phantomWallet && phantomWallet.isPhantom) {
+        console.log('🔍 Connecting to Phantom directly...');
+        const response = await phantomWallet.connect();
+        console.log('✅ Phantom connected:', response.publicKey.toString());
+        
+        setDirectConnection({
+          wallet: 'Phantom',
+          publicKey: response.publicKey.toString()
+        });
         setShowModal(false);
+      } else {
+        console.warn('⚠️ Phantom not found, opening phantom.app');
+        window.open('https://phantom.app/', '_blank');
       }
     } catch (error) {
-      console.error('🔍 Connection error:', error);
-      // Si la connexion échoue, essayer d'ouvrir le wallet dans un nouvel onglet
-      if (walletName === 'Phantom') {
-        window.open('https://phantom.app/', '_blank');
-      } else if (walletName === 'Solflare') {
+      console.error('❌ Phantom connection error:', error);
+      window.open('https://phantom.app/', '_blank');
+    }
+  };
+
+  const handleSolflareConnect = async () => {
+    try {
+      if (typeof window === 'undefined') return;
+      
+      const w = window as WindowWithWallets;
+      const solflareWallet = w.solflare;
+      
+      if (solflareWallet) {
+        console.log('🔍 Connecting to Solflare directly...');
+        const response = await solflareWallet.connect();
+        console.log('✅ Solflare connected:', response.publicKey.toString());
+        
+        setDirectConnection({
+          wallet: 'Solflare',
+          publicKey: response.publicKey.toString()
+        });
+        setShowModal(false);
+      } else {
+        console.warn('⚠️ Solflare not found, opening solflare.com');
         window.open('https://solflare.com/', '_blank');
       }
+    } catch (error) {
+      console.error('❌ Solflare connection error:', error);
+      window.open('https://solflare.com/', '_blank');
     }
   };
 
   const handleDisconnect = async () => {
     try {
-      await disconnect();
+      if (typeof window !== 'undefined') {
+        const w = window as WindowWithWallets;
+        
+        // Déconnecter directement via window.solana si disponible
+        if (directConnection.wallet === 'Phantom' && w.solana) {
+          await w.solana.disconnect();
+        } else if (directConnection.wallet === 'Solflare' && w.solflare) {
+          await w.solflare.disconnect();
+        }
+        
+        setDirectConnection({ wallet: null, publicKey: null });
+      }
     } catch (error) {
-      console.error('🔍 Disconnect error:', error);
+      console.error('❌ Disconnect error:', error);
     }
   };
 
@@ -130,12 +161,15 @@ const ClientOnlyWalletContent = () => {
     return walletStatus[walletName] ? 'text-green-400' : 'text-yellow-400';
   };
 
-  if (connected && publicKey) {
-    const address = publicKey.toBase58();
+  // Afficher l'état de connexion via connexion directe
+  const isConnected = directConnection.publicKey !== null;
+  const displayPublicKey = directConnection.publicKey;
+
+  if (isConnected && displayPublicKey) {
     return (
       <div className="flex items-center gap-2">
         <div className="bg-green-600 text-white px-3 py-1 rounded text-sm font-mono">
-          {address.slice(0, 4)}...{address.slice(-4)}
+          {displayPublicKey.slice(0, 4)}...{displayPublicKey.slice(-4)}
         </div>
         <button
           onClick={handleDisconnect}
@@ -155,7 +189,6 @@ const ClientOnlyWalletContent = () => {
     <>
       <button
         onClick={() => setShowModal(true)}
-        disabled={connecting}
         className="!bg-[var(--primary)] hover:!bg-[var(--primary-hover)] disabled:opacity-50 !text-black !font-bold !rounded !px-4 !py-2 !transition-colors"
         style={{
           backgroundColor: 'var(--primary)',
@@ -163,7 +196,7 @@ const ClientOnlyWalletContent = () => {
           fontFamily: 'var(--font-mono)',
         }}
       >
-        {connecting ? 'Connecting...' : 'Connect Wallet'}
+        Connect Wallet
       </button>
 
       {showModal && (
@@ -171,31 +204,36 @@ const ClientOnlyWalletContent = () => {
           <div className="bg-gray-800 p-6 rounded-lg max-w-md w-full mx-4">
             <h3 className="text-xl font-bold mb-4 text-white">Connect Wallet</h3>
             <p className="text-gray-300 text-sm mb-4">
-              Sélectionnez votre wallet pour vous connecter. Si votre wallet n'est pas détecté, cliquez dessus pour l'ouvrir dans un nouvel onglet.
+              Sélectionnez votre wallet pour vous connecter.
             </p>
             <div className="space-y-2">
-              {wallets.map((wallet) => (
-                <button
-                  key={wallet.adapter.name}
-                  onClick={() => handleConnect(wallet.adapter.name)}
-                  className="w-full p-3 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={wallet.adapter.icon}
-                      alt={wallet.adapter.name}
-                      className="w-6 h-6"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                    <span>{wallet.adapter.name}</span>
-                  </div>
-                  <span className={`text-sm ${getWalletStatusColor(wallet.adapter.name)}`}>
-                    {getWalletStatus(wallet.adapter.name)}
-                  </span>
-                </button>
-              ))}
+              {/* Phantom Wallet */}
+              <button
+                onClick={handlePhantomConnect}
+                className="w-full p-3 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors flex items-center justify-between"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">👻</span>
+                  <span>Phantom</span>
+                </div>
+                <span className={`text-sm ${getWalletStatusColor('Phantom')}`}>
+                  {getWalletStatus('Phantom')}
+                </span>
+              </button>
+
+              {/* Solflare Wallet */}
+              <button
+                onClick={handleSolflareConnect}
+                className="w-full p-3 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors flex items-center justify-between"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🔥</span>
+                  <span>Solflare</span>
+                </div>
+                <span className={`text-sm ${getWalletStatusColor('Solflare')}`}>
+                  {getWalletStatus('Solflare')}
+                </span>
+              </button>
             </div>
             
             {!walletStatus['Phantom'] && (
