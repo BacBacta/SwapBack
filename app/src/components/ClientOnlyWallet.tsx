@@ -2,266 +2,101 @@
 
 import { useEffect, useState } from "react";
 
-/**
- * Client-only wallet connector avec connexion directe
- * Utilise window.solana directement comme l'ancien WalletConnectionGuide
- * pour une meilleure compatibilité avec les environnements comme VS Code
- */
-export const ClientOnlyWallet = () => {
-  const [mounted, setMounted] = useState(false);
+interface PhantomWallet {
+  isPhantom?: boolean;
+  connect: () => Promise<{ publicKey: { toString: () => string } }>;
+  disconnect: () => Promise<void>;
+  on: (event: string, handler: () => void) => void;
+  off: (event: string, handler: () => void) => void;
+}
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Ne rien rendre côté serveur
-  if (!mounted) {
-    return null;
+declare global {
+  interface Window {
+    solana?: PhantomWallet;
   }
+}
 
-  return <ClientOnlyWalletContent />;
-};
-
-// Type pour window avec les wallets Solana
-type WindowWithWallets = Window & {
-  solana?: {
-    isPhantom?: boolean;
-    connect: () => Promise<{ publicKey: { toString: () => string } }>;
-    disconnect: () => Promise<void>;
-    on: (event: string, callback: () => void) => void;
-    publicKey?: { toString: () => string };
-  };
-  phantom?: { solana?: unknown };
-  solflare?: {
-    connect: () => Promise<{ publicKey: { toString: () => string } }>;
-    disconnect: () => Promise<void>;
-    publicKey?: { toString: () => string };
-  };
-};
-
-const ClientOnlyWalletContent = () => {
+export const ClientOnlyWallet = () => {
   const [showModal, setShowModal] = useState(false);
-  const [walletStatus, setWalletStatus] = useState<{[key: string]: boolean}>({});
-  const [directConnection, setDirectConnection] = useState<{
-    wallet: string | null;
-    publicKey: string | null;
-  }>({ wallet: null, publicKey: null });
+  const [isConnected, setIsConnected] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
   useEffect(() => {
-    // Vérifier la présence des wallets
-    const checkWalletAvailability = () => {
-      const status: {[key: string]: boolean} = {};
-
-      if (typeof window !== 'undefined') {
-        const w = window as WindowWithWallets;
-        
-        // Détecter Phantom
-        if (w.solana?.isPhantom) {
-          console.log('✅ Phantom détecté');
-          status['Phantom'] = true;
-        }
-
-        // Détecter Solflare
-        if (w.solflare) {
-          console.log('✅ Solflare détecté');
-          status['Solflare'] = true;
+    const checkConnection = async () => {
+      if (window.solana?.isPhantom) {
+        try {
+          const resp = await window.solana.connect();
+          setIsConnected(true);
+          setWalletAddress(resp.publicKey.toString());
+        } catch {
+          // Wallet pas encore connecté
         }
       }
-
-      setWalletStatus(status);
     };
+    checkConnection();
 
-    checkWalletAvailability();
+    const handleConnect = () => setIsConnected(true);
+    const handleDisconnect = () => { setIsConnected(false); setWalletAddress(null); };
 
-    // Re-vérifier périodiquement
-    const interval = setInterval(checkWalletAvailability, 2000);
-    return () => clearInterval(interval);
+    if (window.solana) {
+      window.solana.on('connect', handleConnect);
+      window.solana.on('disconnect', handleDisconnect);
+    }
+
+    return () => {
+      if (window.solana) {
+        window.solana.off('connect', handleConnect);
+        window.solana.off('disconnect', handleDisconnect);
+      }
+    };
   }, []);
 
-  // Utiliser la connexion directe comme dans WalletConnectionGuide
-  const handlePhantomConnect = async () => {
+  const handleConnect = async () => {
     try {
-      if (typeof window === 'undefined') return;
-      
-      const w = window as WindowWithWallets;
-      const phantomWallet = w.solana;
-      
-      if (phantomWallet && phantomWallet.isPhantom) {
-        console.log('🔍 Connecting to Phantom directly...');
-        const response = await phantomWallet.connect();
-        console.log('✅ Phantom connected:', response.publicKey.toString());
-        
-        setDirectConnection({
-          wallet: 'Phantom',
-          publicKey: response.publicKey.toString()
-        });
+      if (window.solana?.isPhantom) {
+        const response = await window.solana.connect();
+        setIsConnected(true);
+        setWalletAddress(response.publicKey.toString());
         setShowModal(false);
       } else {
-        console.warn('⚠️ Phantom not found, opening phantom.app');
-        window.open('https://phantom.app/', '_blank');
+        window.open("https://phantom.app/", "_blank");
       }
     } catch (error) {
-      console.error('❌ Phantom connection error:', error);
-      window.open('https://phantom.app/', '_blank');
-    }
-  };
-
-  const handleSolflareConnect = async () => {
-    try {
-      if (typeof window === 'undefined') return;
-      
-      const w = window as WindowWithWallets;
-      const solflareWallet = w.solflare;
-      
-      if (solflareWallet) {
-        console.log('🔍 Connecting to Solflare directly...');
-        const response = await solflareWallet.connect();
-        console.log('✅ Solflare connected:', response.publicKey.toString());
-        
-        setDirectConnection({
-          wallet: 'Solflare',
-          publicKey: response.publicKey.toString()
-        });
-        setShowModal(false);
-      } else {
-        console.warn('⚠️ Solflare not found, opening solflare.com');
-        window.open('https://solflare.com/', '_blank');
-      }
-    } catch (error) {
-      console.error('❌ Solflare connection error:', error);
-      window.open('https://solflare.com/', '_blank');
+      console.error("Erreur:", error);
     }
   };
 
   const handleDisconnect = async () => {
     try {
-      if (typeof window !== 'undefined') {
-        const w = window as WindowWithWallets;
-        
-        // Déconnecter directement via window.solana si disponible
-        if (directConnection.wallet === 'Phantom' && w.solana) {
-          await w.solana.disconnect();
-        } else if (directConnection.wallet === 'Solflare' && w.solflare) {
-          await w.solflare.disconnect();
-        }
-        
-        setDirectConnection({ wallet: null, publicKey: null });
-      }
+      if (window.solana) await window.solana.disconnect();
     } catch (error) {
-      console.error('❌ Disconnect error:', error);
+      console.error("Erreur déconnexion:", error);
     }
   };
 
-  const getWalletStatus = (walletName: string) => {
-    if (walletStatus[walletName]) return 'Installed';
-    return 'Not detected';
-  };
-
-  const getWalletStatusColor = (walletName: string) => {
-    return walletStatus[walletName] ? 'text-green-400' : 'text-yellow-400';
-  };
-
-  // Afficher l'état de connexion via connexion directe
-  const isConnected = directConnection.publicKey !== null;
-  const displayPublicKey = directConnection.publicKey;
-
-  if (isConnected && displayPublicKey) {
-    return (
-      <div className="flex items-center gap-2">
-        <div className="bg-green-600 text-white px-3 py-1 rounded text-sm font-mono">
-          {displayPublicKey.slice(0, 4)}...{displayPublicKey.slice(-4)}
-        </div>
-        <button
-          onClick={handleDisconnect}
-          className="!bg-red-600 hover:!bg-red-700 !text-white !font-bold !rounded !px-3 !py-1 !text-sm !transition-colors"
-          style={{
-            border: 'none',
-            fontFamily: 'var(--font-mono)',
-          }}
-        >
-          Disconnect
-        </button>
-      </div>
-    );
-  }
-
   return (
     <>
-      <button
-        onClick={() => setShowModal(true)}
-        className="!bg-[var(--primary)] hover:!bg-[var(--primary-hover)] disabled:opacity-50 !text-black !font-bold !rounded !px-4 !py-2 !transition-colors"
-        style={{
-          backgroundColor: 'var(--primary)',
-          border: 'none',
-          fontFamily: 'var(--font-mono)',
-        }}
-      >
-        Connect Wallet
-      </button>
+      {!isConnected ? (
+        <button onClick={() => setShowModal(true)} className="bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-black font-bold px-4 py-2 rounded">
+          Connect Wallet
+        </button>
+      ) : (
+        <button onClick={handleDisconnect} className="bg-gray-700 hover:bg-gray-600 text-white font-bold px-4 py-2 rounded">
+          {walletAddress?.slice(0, 4)}...{walletAddress?.slice(-4)}
+        </button>
+      )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-800 p-6 rounded-lg max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setShowModal(false)}>
+          <div className="bg-black border-2 border-[var(--primary)] rounded-lg p-6 max-w-md" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-xl font-bold mb-4 text-white">Connect Wallet</h3>
-            <p className="text-gray-300 text-sm mb-4">
-              Sélectionnez votre wallet pour vous connecter.
-            </p>
-            <div className="space-y-2">
-              {/* Phantom Wallet */}
-              <button
-                onClick={handlePhantomConnect}
-                className="w-full p-3 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">👻</span>
-                  <span>Phantom</span>
-                </div>
-                <span className={`text-sm ${getWalletStatusColor('Phantom')}`}>
-                  {getWalletStatus('Phantom')}
-                </span>
-              </button>
-
-              {/* Solflare Wallet */}
-              <button
-                onClick={handleSolflareConnect}
-                className="w-full p-3 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">🔥</span>
-                  <span>Solflare</span>
-                </div>
-                <span className={`text-sm ${getWalletStatusColor('Solflare')}`}>
-                  {getWalletStatus('Solflare')}
-                </span>
-              </button>
-            </div>
-            
-            {!walletStatus['Phantom'] && (
-              <div className="mt-4 p-3 bg-yellow-900 bg-opacity-50 rounded text-sm text-yellow-200">
-                <strong>⚠️ Phantom non détecté</strong>
-                <p className="mt-1">
-                  Phantom wallet n'est pas installé ou n'est pas activé.
-                </p>
-                <a
-                  href="https://phantom.app/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block mt-2 px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-white font-bold transition-colors"
-                >
-                  Installer Phantom
-                </a>
+            <button onClick={handleConnect} className="w-full flex items-center gap-3 p-4 bg-purple-600 hover:bg-purple-700 rounded mb-4">
+              <span className="text-2xl">👻</span>
+              <div className="flex-1 text-left">
+                <div className="font-bold text-white">Phantom</div>
               </div>
-            )}
-            
-            <div className="mt-4 p-3 bg-blue-900 bg-opacity-50 rounded text-sm text-blue-200">
-              <strong>💡 Conseil:</strong> Si votre wallet n'est pas détecté, assurez-vous qu'il est installé et activé dans votre navigateur. Rafraîchissez la page après l'installation.
-            </div>
-            <button
-              onClick={() => setShowModal(false)}
-              className="mt-4 w-full p-2 bg-gray-600 hover:bg-gray-500 text-white rounded transition-colors"
-            >
-              Annuler
             </button>
+            <button onClick={() => setShowModal(false)} className="w-full py-2 text-gray-400 hover:text-white">Cancel</button>
           </div>
         </div>
       )}
