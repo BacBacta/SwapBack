@@ -22,31 +22,38 @@ export const ClientOnlyWallet = () => {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkConnection = async () => {
-      if (window.solana?.isPhantom) {
-        try {
-          const resp = await window.solana.connect();
-          setIsConnected(true);
-          setWalletAddress(resp.publicKey.toString());
-        } catch {
-          // Wallet pas encore connecté
+    // Vérifier silencieusement si déjà connecté (sans popup)
+    const checkConnection = () => {
+      if (window.solana?.isPhantom && (window.solana as any).isConnected) {
+        setIsConnected(true);
+        if ((window.solana as any).publicKey) {
+          setWalletAddress((window.solana as any).publicKey.toString());
         }
       }
     };
     checkConnection();
 
-    const handleConnect = () => setIsConnected(true);
-    const handleDisconnect = () => { setIsConnected(false); setWalletAddress(null); };
+    const handleConnectEvent = () => {
+      if ((window.solana as any)?.publicKey) {
+        setIsConnected(true);
+        setWalletAddress((window.solana as any).publicKey.toString());
+      }
+    };
+    
+    const handleDisconnectEvent = () => { 
+      setIsConnected(false); 
+      setWalletAddress(null); 
+    };
 
     if (window.solana) {
-      window.solana.on('connect', handleConnect);
-      window.solana.on('disconnect', handleDisconnect);
+      window.solana.on('connect', handleConnectEvent);
+      window.solana.on('disconnect', handleDisconnectEvent);
     }
 
     return () => {
       if (window.solana) {
-        window.solana.off('connect', handleConnect);
-        window.solana.off('disconnect', handleDisconnect);
+        window.solana.off('connect', handleConnectEvent);
+        window.solana.off('disconnect', handleDisconnectEvent);
       }
     };
   }, []);
