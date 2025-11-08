@@ -1,112 +1,194 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-interface PhantomWallet {
-  isPhantom?: boolean;
-  connect: () => Promise<{ publicKey: { toString: () => string } }>;
-  disconnect: () => Promise<void>;
-  on: (event: string, handler: () => void) => void;
-  off: (event: string, handler: () => void) => void;
-}
-
-declare global {
-  interface Window {
-    solana?: PhantomWallet;
-  }
-}
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { showToast } from "@/lib/toast";
+import { clusterApiUrl } from "@solana/web3.js";
 
 export const ClientOnlyWallet = () => {
-  const [showModal, setShowModal] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const { connected, connecting, publicKey, wallet, disconnect } = useWallet();
+  const { connection } = useConnection();
+  const [network, setNetwork] = useState<"mainnet-beta" | "devnet">("mainnet-beta");
+  const [isWrongNetwork, setIsWrongNetwork] = useState(false);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [showMenu, setShowMenu] = useState(false);
 
+  // Detect network from RPC endpoint
   useEffect(() => {
-    // Vérifier silencieusement si déjà connecté (sans popup)
-    const checkConnection = () => {
-      if (window.solana?.isPhantom && (window.solana as any).isConnected) {
-        setIsConnected(true);
-        if ((window.solana as any).publicKey) {
-          setWalletAddress((window.solana as any).publicKey.toString());
+    const detectNetwork = async () => {
+      try {
+        const endpoint = connection.rpcEndpoint;
+        if (endpoint.includes("devnet")) {
+          setNetwork("devnet");
+        } else if (endpoint.includes("mainnet")) {
+          setNetwork("mainnet-beta");
         }
+        
+        // Check if connected to wrong network
+        const expectedNetwork = process.env.NEXT_PUBLIC_SOLANA_NETWORK || "mainnet-beta";
+        setIsWrongNetwork(network !== expectedNetwork);
+      } catch (error) {
+        console.error("Network detection error:", error);
       }
     };
-    checkConnection();
+    detectNetwork();
+  }, [connection, network]);
 
-    const handleConnectEvent = () => {
-      if ((window.solana as any)?.publicKey) {
-        setIsConnected(true);
-        setWalletAddress((window.solana as any).publicKey.toString());
-      }
-    };
-    
-    const handleDisconnectEvent = () => { 
-      setIsConnected(false); 
-      setWalletAddress(null); 
-    };
-
-    if (window.solana) {
-      window.solana.on('connect', handleConnectEvent);
-      window.solana.on('disconnect', handleDisconnectEvent);
-    }
-
-    return () => {
-      if (window.solana) {
-        window.solana.off('connect', handleConnectEvent);
-        window.solana.off('disconnect', handleDisconnectEvent);
-      }
-    };
-  }, []);
-
-  const handleConnect = async () => {
-    try {
-      if (window.solana?.isPhantom) {
-        const response = await window.solana.connect();
-        setIsConnected(true);
-        setWalletAddress(response.publicKey.toString());
-        setShowModal(false);
+  // Fetch wallet balance when connected
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (connected && publicKey) {
+        try {
+          const bal = await connection.getBalance(publicKey);
+          setBalance(bal / 1e9); // Convert lamports to SOL
+        } catch (error) {
+          console.error("Error fetching balance:", error);
+        }
       } else {
-        window.open("https://phantom.app/", "_blank");
+        setBalance(null);
       }
-    } catch (error) {
-      console.error("Erreur:", error);
+    };
+    fetchBalance();
+    
+    // Refresh balance every 30s
+    const interval = setInterval(fetchBalance, 30000);
+    return () => clearInterval(interval);
+  }, [connected, publicKey, connection]);
+
+  // Toast notifications for wallet events
+  useEffect(() => {
+    if (connected && publicKey) {
+      showToast.success(`Wallet connected: ${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`);
     }
-  };
+  }, [connected, publicKey]);
 
   const handleDisconnect = async () => {
     try {
-      if (window.solana) await window.solana.disconnect();
+      await disconnect();
+      showToast.info("Wallet disconnected");
+      setShowMenu(false);
     } catch (error) {
-      console.error("Erreur déconnexion:", error);
+      console.error("Disconnect error:", error);
+      showToast.error("Failed to disconnect wallet");
+    }
+  };
+
+  const copyAddress = () => {
+    if (publicKey) {
+      navigator.clipboard.writeText(publicKey.toBase58());
+      showToast.success("Address copied to clipboard!");
+    }
+  };
+
+  const viewOnExplorer = () => {
+    if (publicKey) {
+      const explorerUrl = network === "devnet"
+        ? `https://explorer.solana.com/address/${publicKey.toBase58()}?cluster=devnet`
+        : `https://explorer.solana.com/address/${publicKey.toBase58()}`;
+      window.open(explorerUrl, "_blank");
     }
   };
 
   return (
-    <>
-      {!isConnected ? (
-        <button onClick={() => setShowModal(true)} className="bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-black font-bold px-4 py-2 rounded">
-          Connect Wallet
-        </button>
-      ) : (
-        <button onClick={handleDisconnect} className="bg-gray-700 hover:bg-gray-600 text-white font-bold px-4 py-2 rounded">
-          {walletAddress?.slice(0, 4)}...{walletAddress?.slice(-4)}
-        </button>
-      )}
-
-      {showModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setShowModal(false)}>
-          <div className="bg-black border-2 border-[var(--primary)] rounded-lg p-6 max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-xl font-bold mb-4 text-white">Connect Wallet</h3>
-            <button onClick={handleConnect} className="w-full flex items-center gap-3 p-4 bg-purple-600 hover:bg-purple-700 rounded mb-4">
-              <span className="text-2xl">👻</span>
-              <div className="flex-1 text-left">
-                <div className="font-bold text-white">Phantom</div>
-              </div>
-            </button>
-            <button onClick={() => setShowModal(false)} className="w-full py-2 text-gray-400 hover:text-white">Cancel</button>
-          </div>
+    <div className="relative flex items-center gap-3">
+      {/* Network Badge */}
+      {connected && (
+        <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${
+          isWrongNetwork 
+            ? "bg-red-500/20 text-red-400 border border-red-500/50" 
+            : network === "devnet"
+            ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50"
+            : "bg-green-500/20 text-green-400 border border-green-500/50"
+        }`}>
+          <span className={`w-2 h-2 rounded-full ${
+            isWrongNetwork ? "bg-red-400 animate-pulse" : 
+            network === "devnet" ? "bg-yellow-400" : "bg-green-400"
+          }`} />
+          {network === "devnet" ? "DEVNET" : "MAINNET"}
         </div>
       )}
-    </>
+
+      {/* Wallet Button or Menu */}
+      {!connected ? (
+        <div className="wallet-adapter-button-wrapper">
+          <WalletMultiButton 
+            className="!bg-[var(--primary)] hover:!bg-[var(--primary-hover)] !text-black !font-bold !px-4 !py-2 !rounded"
+          />
+        </div>
+      ) : (
+        <div className="relative">
+          <button
+            onClick={() => setShowMenu(!showMenu)}
+            className="bg-gray-700 hover:bg-gray-600 text-white font-bold px-4 py-2 rounded flex items-center gap-2"
+          >
+            {wallet?.adapter.icon && (
+              <img src={wallet.adapter.icon} alt={wallet.adapter.name} className="w-5 h-5" />
+            )}
+            <span>
+              {publicKey?.toBase58().slice(0, 4)}...{publicKey?.toBase58().slice(-4)}
+            </span>
+            {balance !== null && (
+              <span className="text-[var(--primary)] text-xs">
+                {balance.toFixed(4)} SOL
+              </span>
+            )}
+          </button>
+
+          {/* Dropdown Menu */}
+          {showMenu && (
+            <div className="absolute right-0 mt-2 w-64 bg-black border-2 border-[var(--primary)] rounded-lg shadow-lg z-50">
+              <div className="p-4 border-b border-gray-700">
+                <div className="flex items-center gap-2 mb-2">
+                  {wallet?.adapter.icon && (
+                    <img src={wallet.adapter.icon} alt={wallet.adapter.name} className="w-6 h-6" />
+                  )}
+                  <span className="font-bold text-white">{wallet?.adapter.name}</span>
+                </div>
+                <div className="text-sm text-gray-400 break-all">
+                  {publicKey?.toBase58()}
+                </div>
+                {balance !== null && (
+                  <div className="mt-2 text-lg font-bold text-[var(--primary)]">
+                    {balance.toFixed(4)} SOL
+                  </div>
+                )}
+              </div>
+              
+              <div className="p-2">
+                <button
+                  onClick={copyAddress}
+                  className="w-full text-left px-3 py-2 hover:bg-gray-800 rounded text-white flex items-center gap-2"
+                >
+                  <span>�</span>
+                  Copy Address
+                </button>
+                <button
+                  onClick={viewOnExplorer}
+                  className="w-full text-left px-3 py-2 hover:bg-gray-800 rounded text-white flex items-center gap-2"
+                >
+                  <span>🔍</span>
+                  View on Explorer
+                </button>
+                <button
+                  onClick={handleDisconnect}
+                  className="w-full text-left px-3 py-2 hover:bg-red-900/50 rounded text-red-400 flex items-center gap-2"
+                >
+                  <span>🚪</span>
+                  Disconnect
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Wrong Network Warning */}
+      {isWrongNetwork && connected && (
+        <div className="absolute top-full right-0 mt-2 w-64 bg-red-500/10 border border-red-500 rounded p-3 text-sm text-red-400">
+          ⚠️ You&apos;re on {network}. Please switch to {process.env.NEXT_PUBLIC_SOLANA_NETWORK || "mainnet-beta"}.
+        </div>
+      )}
+    </div>
   );
 };

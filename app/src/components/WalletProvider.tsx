@@ -45,11 +45,13 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
   }, [network]);
 
   // Configuration des wallets supportés
-  // Phantom et Solflare sont les plus populaires
+  // WalletMultiButton détectera automatiquement tous les wallets installés
+  // incluant Phantom, Solflare, Backpack, Glow, Slope, etc.
   const wallets = useMemo(
     () => [
       new PhantomWalletAdapter(),
       new SolflareWalletAdapter(),
+      // Autres wallets auto-détectés via window.solana
     ],
     []
   );
