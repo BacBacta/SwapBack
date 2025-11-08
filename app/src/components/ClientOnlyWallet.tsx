@@ -33,16 +33,56 @@ const ClientOnlyWalletContent = () => {
     const checkWalletAvailability = () => {
       const status: {[key: string]: boolean} = {};
 
-      // Vérifier Phantom
-      if (typeof window !== 'undefined' && (window as Window & { solana?: { isPhantom?: boolean } }).solana?.isPhantom) {
-        status['Phantom'] = true;
+      // Type pour window avec les wallets Solana
+      type WindowWithWallets = Window & {
+        solana?: { isPhantom?: boolean };
+        phantom?: { solana?: unknown };
+        solflare?: unknown;
+      };
+
+      // Log pour débogage
+      console.log('🔍 Checking wallet availability...');
+      console.log('window.solana:', typeof window !== 'undefined' ? (window as WindowWithWallets).solana : 'undefined');
+      console.log('window.phantom:', typeof window !== 'undefined' ? (window as WindowWithWallets).phantom : 'undefined');
+      console.log('window.solflare:', typeof window !== 'undefined' ? (window as WindowWithWallets).solflare : 'undefined');
+
+      // Vérifier Phantom - essayer plusieurs méthodes de détection
+      if (typeof window !== 'undefined') {
+        const w = window as WindowWithWallets;
+        
+        // Méthode 1: window.solana.isPhantom
+        if (w.solana?.isPhantom) {
+          console.log('✅ Phantom détecté via window.solana.isPhantom');
+          status['Phantom'] = true;
+        }
+        // Méthode 2: window.phantom.solana
+        else if (w.phantom?.solana) {
+          console.log('✅ Phantom détecté via window.phantom.solana');
+          status['Phantom'] = true;
+        }
+        // Méthode 3: Chercher dans les wallets du contexte
+        else {
+          const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
+          if (phantomWallet?.readyState === 'Installed') {
+            console.log('✅ Phantom détecté via wallet adapter readyState');
+            status['Phantom'] = true;
+          }
+        }
+
+        // Vérifier Solflare
+        if (w.solflare) {
+          console.log('✅ Solflare détecté');
+          status['Solflare'] = true;
+        } else {
+          const solflareWallet = wallets.find(w => w.adapter.name === 'Solflare');
+          if (solflareWallet?.readyState === 'Installed') {
+            console.log('✅ Solflare détecté via wallet adapter readyState');
+            status['Solflare'] = true;
+          }
+        }
       }
 
-      // Vérifier Solflare
-      if (typeof window !== 'undefined' && (window as Window & { solflare?: unknown }).solflare) {
-        status['Solflare'] = true;
-      }
-
+      console.log('📊 Wallet status:', status);
       setWalletStatus(status);
     };
 
@@ -51,7 +91,7 @@ const ClientOnlyWalletContent = () => {
     // Re-vérifier périodiquement
     const interval = setInterval(checkWalletAvailability, 2000);
     return () => clearInterval(interval);
-  }, []);
+  }, [wallets]);
 
   const handleConnect = async (walletName: string) => {
     try {
@@ -157,8 +197,26 @@ const ClientOnlyWalletContent = () => {
                 </button>
               ))}
             </div>
+            
+            {!walletStatus['Phantom'] && (
+              <div className="mt-4 p-3 bg-yellow-900 bg-opacity-50 rounded text-sm text-yellow-200">
+                <strong>⚠️ Phantom non détecté</strong>
+                <p className="mt-1">
+                  Phantom wallet n'est pas installé ou n'est pas activé.
+                </p>
+                <a
+                  href="https://phantom.app/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block mt-2 px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-white font-bold transition-colors"
+                >
+                  Installer Phantom
+                </a>
+              </div>
+            )}
+            
             <div className="mt-4 p-3 bg-blue-900 bg-opacity-50 rounded text-sm text-blue-200">
-              <strong>💡 Conseil:</strong> Si votre wallet n'est pas détecté, assurez-vous qu'il est installé et activé dans votre navigateur.
+              <strong>💡 Conseil:</strong> Si votre wallet n'est pas détecté, assurez-vous qu'il est installé et activé dans votre navigateur. Rafraîchissez la page après l'installation.
             </div>
             <button
               onClick={() => setShowModal(false)}
