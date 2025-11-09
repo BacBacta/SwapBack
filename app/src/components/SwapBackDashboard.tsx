@@ -112,20 +112,19 @@ export const SwapBackDashboard = () => {
             // Vérifier que c'est bien notre authority
             if (!authority.equals(publicKey)) continue;
 
-            const view = new DataView(data.buffer, data.byteOffset);
-
+            // Safe BN creation from Buffer (avoid BigInt conversion issues)
             const plan: DcaPlan = {
               publicKey: pubkey,
               account: {
                 authority,
-                inputAmount: new BN(view.getBigUint64(40, true)),
-                amountSwapped: new BN(view.getBigUint64(48, true)),
+                inputAmount: new BN(data.slice(40, 48), 'le'),
+                amountSwapped: new BN(data.slice(48, 56), 'le'),
                 destinationToken: new PublicKey(data.slice(56, 88)),
-                dcaInterval: new BN(view.getBigInt64(88, true)),
-                numberOfSwaps: new BN(view.getBigUint64(96, true)),
-                swapsExecuted: new BN(view.getBigUint64(104, true)),
-                lastSwapTime: new BN(view.getBigInt64(112, true)),
-                minOutputAmount: new BN(view.getBigUint64(120, true)),
+                dcaInterval: new BN(data.slice(88, 96), 'le'),
+                numberOfSwaps: new BN(data.slice(96, 104), 'le'),
+                swapsExecuted: new BN(data.slice(104, 112), 'le'),
+                lastSwapTime: new BN(data.slice(112, 120), 'le'),
+                minOutputAmount: new BN(data.slice(120, 128), 'le'),
                 isPaused: data[128] === 1,
               },
             };
@@ -241,7 +240,9 @@ export const SwapBackDashboard = () => {
             <div className="text-sm text-gray-400 mb-1">Total investi</div>
             <div className="text-3xl font-bold text-white">
               {plans
-                .reduce((sum, p) => sum + p.account.inputAmount.toNumber(), 0)
+                .reduce((sum, p) => sum.add(p.account.inputAmount), new BN(0))
+                .div(new BN(1e9))
+                .toNumber()
                 .toFixed(2)}{" "}
               SOL
             </div>
