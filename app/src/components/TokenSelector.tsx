@@ -27,7 +27,7 @@ interface TokenSelectorProps {
 }
 
 // Popular tokens on Solana Mainnet with enhanced metadata
-const POPULAR_TOKENS: Token[] = [
+const BASE_POPULAR_TOKENS: Token[] = [
   {
     address: "So11111111111111111111111111111111111111112",
     symbol: "SOL",
@@ -117,6 +117,21 @@ export const TokenSelector = ({
 
   // Load recent tokens from localStorage
   const [recentTokens, setRecentTokens] = useState<string[]>([]);
+
+  // Build popular tokens list with network-specific tokens
+  const POPULAR_TOKENS = [
+    ...BASE_POPULAR_TOKENS,
+    // Add $BACK token on devnet only
+    ...(process.env.NEXT_PUBLIC_SOLANA_NETWORK === 'devnet' ? [{
+      address: "3v3xneRUmsHY3UAyZDXZgVZwVeJwXVDwx5ZRsRAxuaLn",
+      symbol: "BACK",
+      name: "SwapBack Token",
+      decimals: 9,
+      logoURI: "https://swapback.xyz/logo.png", // TODO: Add proper logo
+      verified: true,
+      trending: true,
+    }] : []),
+  ];
 
   useEffect(() => {
     const recent = localStorage.getItem("recentTokens");
