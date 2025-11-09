@@ -6,10 +6,29 @@
   "typescript.surveys.enabled": false,
   "typescript.tsserver.useSyntaxServer": "never",
   
+  // TypeScript - Optimisations supplémentaires
+  "typescript.implementationsCodeLens.enabled": false,
+  "typescript.referencesCodeLens.enabled": false,
+  "typescript.preferences.includePackageJsonAutoImports": "off",
+  "typescript.suggest.enabled": true,
+  "typescript.validate.enable": true,
+  
   // ESLint limité
   "eslint.runtime": "node", 
   "eslint.execArgv": ["--max-old-space-size=512"],
   "eslint.validate": ["javascript", "typescript"],
+  "eslint.options": {
+    "cache": false
+  },
+  "eslint.workingDirectories": [{ "mode": "auto" }],
+  "eslint.probe": ["javascript", "typescript"],
+  "eslint.lintTask.enable": true,
+  
+  // Désactiver les fonctionnalités TypeScript/JavaScript gourmandes
+  "javascript.suggestionActions.enabled": false,
+  "typescript.suggestionActions.enabled": false,
+  "javascript.updateImportsOnFileMove.enabled": "never",
+  "typescript.updateImportsOnFileMove.enabled": "never",
   
   // Watchers désactivés (cause RAM leaks)
   "files.watcherExclude": {
