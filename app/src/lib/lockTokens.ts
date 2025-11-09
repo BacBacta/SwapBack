@@ -22,19 +22,21 @@ import { validateEnv } from "./validateEnv";
 // Valider l'environnement au chargement du module (fail-fast)
 // Cela évite les erreurs AccountOwnedByWrongProgram en détectant
 // les configurations incorrectes AVANT toute tentative de transaction
+// Note: La validation est automatiquement désactivée dans le navigateur (Client Components)
 const envConfig = validateEnv();
 
 // Program ID du programme swapback_cnft
 // IMPORTANT: Doit correspondre exactement à l'address dans l'IDL
 // Aucun fallback n'est autorisé pour éviter les erreurs de dérivation de PDA
-if (!process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID) {
+const cnftProgramId = process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || envConfig.cnftProgramId;
+if (!cnftProgramId) {
   throw new Error(
     "❌ NEXT_PUBLIC_CNFT_PROGRAM_ID is required. " +
       "Set it to: " + cnftIdl.address
   );
 }
 
-export const CNFT_PROGRAM_ID = new PublicKey(envConfig.cnftProgramId);
+export const CNFT_PROGRAM_ID = new PublicKey(cnftProgramId);
 
 // Mint du token BACK (Token-2022)
 // IMPORTANT: Doit correspondre au mint déployé sur le réseau actuel

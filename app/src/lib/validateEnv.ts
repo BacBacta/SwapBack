@@ -17,10 +17,29 @@ export interface EnvConfig {
 }
 
 /**
- * Valide que toutes les variables d'environnement critiques sont présentes
- * et cohérentes avec l'IDL déployé
+ * Valide toutes les variables d'environnement requises
+ *
+ * ⚠️ NOTE: Cette fonction doit être appelée UNIQUEMENT côté serveur (Node.js).
+ * Dans les Client Components, utilisez les variables directement sans validation.
+ *
+ * @throws {Error} Si des variables manquent ou ne correspondent pas aux IDLs
+ * @returns {EnvConfig} Configuration validée
  */
 export function validateEnv(): EnvConfig {
+  // Skip validation in browser environment (Client Components)
+  if (typeof window !== 'undefined') {
+    // In browser, just return the env vars without validation
+    return {
+      network: process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet',
+      rpcUrl: process.env.NEXT_PUBLIC_SOLANA_RPC_URL || '',
+      cnftProgramId: process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || '',
+      routerProgramId: process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || '',
+      backMint: process.env.NEXT_PUBLIC_BACK_MINT || '',
+      collectionConfig: process.env.NEXT_PUBLIC_COLLECTION_CONFIG || '',
+    };
+  }
+
+  // Server-side validation (Node.js only)
   const errors: string[] = [];
 
   // 1. Vérifier la présence des variables critiques

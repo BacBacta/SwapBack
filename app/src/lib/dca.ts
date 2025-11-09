@@ -17,10 +17,13 @@ import { validateEnv } from "./validateEnv";
 import routerIdl from "@/idl/swapback_router.json";
 
 // Valider l'environnement au chargement du module (fail-fast)
+// Note: La validation est automatiquement désactivée dans le navigateur (Client Components)
 const envConfig = validateEnv();
 
 // Vérification stricte : ROUTER_PROGRAM_ID doit être défini
-if (!process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID) {
+// Cette vérification fonctionne à la fois côté serveur ET client
+const routerProgramId = process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || envConfig.routerProgramId;
+if (!routerProgramId) {
   throw new Error(
     `❌ NEXT_PUBLIC_ROUTER_PROGRAM_ID is required. Set it to: ${routerIdl.address}\n\n` +
     `This is CRITICAL for DCA operations to avoid AccountOwnedByWrongProgram errors.\n` +
@@ -29,7 +32,7 @@ if (!process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID) {
 }
 
 // Program constants
-export const ROUTER_PROGRAM_ID = new PublicKey(envConfig.routerProgramId);
+export const ROUTER_PROGRAM_ID = new PublicKey(routerProgramId);
 
 // Token mints
 export const SOL_MINT = new PublicKey('So11111111111111111111111111111111111111112');
