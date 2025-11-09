@@ -14,6 +14,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "analyze": "ANALYZE=true next build",
+    "check:init": "node ../check-init.js",
+    "pdas:print": "node ../fix-collection-config.js",
     "postinstall": "echo 'App dependencies installed'"
   },
   "dependencies": {
