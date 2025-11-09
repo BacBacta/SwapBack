@@ -121,9 +121,9 @@ export const TokenSelector = ({
   // Build popular tokens list with network-specific tokens
   const POPULAR_TOKENS = [
     ...BASE_POPULAR_TOKENS,
-    // Add $BACK token on devnet only
+    // Add $BACK token on devnet only - Uses NEXT_PUBLIC_BACK_MINT from env
     ...(process.env.NEXT_PUBLIC_SOLANA_NETWORK === 'devnet' ? [{
-      address: "3v3xneRUmsHY3UAyZDXZgVZwVeJwXVDwx5ZRsRAxuaLn",
+      address: process.env.NEXT_PUBLIC_BACK_MINT || "8sQq53Up7KooCTygi8Dk3Gt8XDeUN5BVLNi5h6Skz43P",
       symbol: "BACK",
       name: "SwapBack Token",
       decimals: 9,
