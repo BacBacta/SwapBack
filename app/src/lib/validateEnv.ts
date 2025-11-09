@@ -5,11 +5,13 @@
 
 import { PublicKey } from "@solana/web3.js";
 import cnftIdl from "@/idl/swapback_cnft.json";
+import routerIdl from "@/idl/swapback_router.json";
 
 export interface EnvConfig {
   network: string;
   rpcUrl: string;
   cnftProgramId: string;
+  routerProgramId: string;
   backMint: string;
   collectionConfig: string;
 }
@@ -39,6 +41,13 @@ export function validateEnv(): EnvConfig {
     );
   }
 
+  const routerProgramId = process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID;
+  if (!routerProgramId) {
+    errors.push(
+      "NEXT_PUBLIC_ROUTER_PROGRAM_ID is required - This variable is CRITICAL for DCA plans to avoid AccountOwnedByWrongProgram errors"
+    );
+  }
+
   const backMint = process.env.NEXT_PUBLIC_BACK_MINT;
   if (!backMint) {
     errors.push("NEXT_PUBLIC_BACK_MINT is required");
@@ -62,21 +71,35 @@ export function validateEnv(): EnvConfig {
   }
 
   // 2. Vérifier que CNFT_PROGRAM_ID correspond à l'IDL
-  const idlAddress = cnftIdl.address;
-  if (cnftProgramId !== idlAddress) {
+  const cnftIdlAddress = cnftIdl.address;
+  if (cnftProgramId !== cnftIdlAddress) {
     throw new Error(
       `❌ CRITICAL: NEXT_PUBLIC_CNFT_PROGRAM_ID mismatch!\n\n` +
         `  Environment variable: ${cnftProgramId}\n` +
-        `  IDL program address:  ${idlAddress}\n\n` +
+        `  IDL program address:  ${cnftIdlAddress}\n\n` +
         `This mismatch WILL cause AccountOwnedByWrongProgram errors.\n` +
         `PDAs derived with wrong program ID won't match on-chain accounts.\n\n` +
-        `✅ Fix: Set NEXT_PUBLIC_CNFT_PROGRAM_ID=${idlAddress}`
+        `✅ Fix: Set NEXT_PUBLIC_CNFT_PROGRAM_ID=${cnftIdlAddress}`
+    );
+  }
+
+  // 2b. Vérifier que ROUTER_PROGRAM_ID correspond à l'IDL
+  const routerIdlAddress = routerIdl.address;
+  if (routerProgramId !== routerIdlAddress) {
+    throw new Error(
+      `❌ CRITICAL: NEXT_PUBLIC_ROUTER_PROGRAM_ID mismatch!\n\n` +
+        `  Environment variable: ${routerProgramId}\n` +
+        `  IDL program address:  ${routerIdlAddress}\n\n` +
+        `This mismatch WILL cause AccountOwnedByWrongProgram errors in DCA operations.\n` +
+        `The 'state' PDA derived with wrong program ID won't match on-chain accounts.\n\n` +
+        `✅ Fix: Set NEXT_PUBLIC_ROUTER_PROGRAM_ID=${routerIdlAddress}`
     );
   }
 
   // 3. Vérifier que ce sont des PublicKey valides
   try {
     new PublicKey(cnftProgramId);
+    new PublicKey(routerProgramId);
     new PublicKey(backMint);
     new PublicKey(collectionConfig);
   } catch (error) {
@@ -107,6 +130,7 @@ export function validateEnv(): EnvConfig {
   console.log("✅ Environment validation passed");
   console.log(`   Network: ${network}`);
   console.log(`   CNFT Program: ${cnftProgramId}`);
+  console.log(`   Router Program: ${routerProgramId}`);
   console.log(`   BACK Mint: ${backMint}`);
   console.log(`   Collection Config: ${collectionConfig}`);
 
@@ -114,6 +138,7 @@ export function validateEnv(): EnvConfig {
     network: network!,
     rpcUrl: rpcUrl!,
     cnftProgramId: cnftProgramId!,
+    routerProgramId: routerProgramId!,
     backMint: backMint!,
     collectionConfig: collectionConfig!,
   };

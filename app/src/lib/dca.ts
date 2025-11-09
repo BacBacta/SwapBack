@@ -13,11 +13,23 @@ import {
   TOKEN_2022_PROGRAM_ID 
 } from '@solana/spl-token';
 
+import { validateEnv } from "./validateEnv";
+import routerIdl from "@/idl/swapback_router.json";
+
+// Valider l'environnement au chargement du module (fail-fast)
+const envConfig = validateEnv();
+
+// Vérification stricte : ROUTER_PROGRAM_ID doit être défini
+if (!process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID) {
+  throw new Error(
+    `❌ NEXT_PUBLIC_ROUTER_PROGRAM_ID is required. Set it to: ${routerIdl.address}\n\n` +
+    `This is CRITICAL for DCA operations to avoid AccountOwnedByWrongProgram errors.\n` +
+    `Add to your .env.local or Vercel environment variables.`
+  );
+}
+
 // Program constants
-export const ROUTER_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || 
-  'GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt'
-);
+export const ROUTER_PROGRAM_ID = new PublicKey(envConfig.routerProgramId);
 
 // Token mints
 export const SOL_MINT = new PublicKey('So11111111111111111111111111111111111111112');
@@ -315,6 +327,21 @@ export async function createDcaPlanTransaction(
   // Derive PDAs
   const [planPda] = getDcaPlanPDA(userPublicKey, planId);
   const [statePda] = getRouterStatePDA();
+  
+  // 🔒 VALIDATION CRITIQUE: Vérifier la cohérence du Program ID
+  console.log('🔍 [DCA CREATE] Environment validation:');
+  console.log('   ROUTER_PROGRAM_ID:', ROUTER_PROGRAM_ID.toString());
+  console.log('   IDL address:', routerIdl.address);
+  console.log('   State PDA:', statePda.toString());
+  
+  if (ROUTER_PROGRAM_ID.toString() !== routerIdl.address) {
+    throw new Error(
+      `❌ CRITICAL: Router Program ID mismatch! This WILL cause AccountOwnedByWrongProgram errors!\n` +
+      `  Code uses: ${ROUTER_PROGRAM_ID.toString()}\n` +
+      `  IDL has:   ${routerIdl.address}\n\n` +
+      `Fix: Set NEXT_PUBLIC_ROUTER_PROGRAM_ID=${routerIdl.address}`
+    );
+  }
   
   // Check if Router State is initialized
   try {
