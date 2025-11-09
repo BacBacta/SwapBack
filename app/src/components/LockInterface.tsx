@@ -548,10 +548,10 @@ export default function LockInterface({
             CNFT_PROGRAM_ID
           );
 
-          const accountInfo = await connection.getAccountInfo(userNftPda);
+          const nftAccountInfo = await connection.getAccountInfo(userNftPda);
 
-          if (accountInfo && accountInfo.data.length > 0) {
-            const data = accountInfo.data;
+          if (nftAccountInfo && nftAccountInfo.data.length > 0) {
+            const data = nftAccountInfo.data;
             let offset = 8; // Skip discriminator
             offset += 32; // Skip user pubkey
             
