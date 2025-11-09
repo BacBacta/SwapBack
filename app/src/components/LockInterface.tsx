@@ -178,8 +178,24 @@ export default function LockInterface({
           TOKEN_2022_PROGRAM_ID // Token-2022 pour BACK
         );
 
-        const tokenAccount = await connection.getTokenAccountBalance(ata);
-        const bal = tokenAccount.value.uiAmount || 0;
+        // Pour Token-2022, on utilise getAccountInfo et on parse manuellement
+        const accountInfo = await connection.getAccountInfo(ata);
+        if (!accountInfo) {
+          setBalance(0);
+          return;
+        }
+
+        // Parser les données du compte Token-2022
+        // Format Token-2022 account: [mint(32), owner(32), amount(8), ...]
+        const data = accountInfo.data;
+        if (data.length < 72) { // Taille minimale d'un compte token
+          setBalance(0);
+          return;
+        }
+
+        // Amount commence à l'offset 64 (32 + 32) pour Token-2022
+        const amount = data.readBigUInt64LE(64);
+        const bal = Number(amount) / Math.pow(10, 9); // 9 décimales pour BACK
         setBalance(bal);
       } catch (err) {
         console.error("Error fetching balance:", err);
@@ -510,8 +526,15 @@ export default function LockInterface({
             false,
             TOKEN_2022_PROGRAM_ID
           );
-          const tokenAccount = await connection.getTokenAccountBalance(ata);
-          const bal = tokenAccount.value.uiAmount || 0;
+          
+          // Pour Token-2022, utiliser getAccountInfo
+          const accountInfo = await connection.getAccountInfo(ata);
+          let bal = 0;
+          if (accountInfo && accountInfo.data.length >= 72) {
+            const amount = accountInfo.data.readBigUInt64LE(64);
+            bal = Number(amount) / Math.pow(10, 9);
+          }
+          
           setBalance(bal);
 
           // Rafraîchir les données du NFT
