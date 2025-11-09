@@ -11,7 +11,7 @@
  * @date October 26, 2025
  */
 
-import { Connection, PublicKey, AccountInfo } from "@solana/web3.js";
+import { Connection, PublicKey, AccountInfo, RpcResponseAndContext, TokenAmount } from "@solana/web3.js";
 
 interface CacheEntry<T> {
   data: T;
@@ -144,7 +144,7 @@ export class RPCCache {
 
     console.log(`[RPCCache] MISS: getAccountInfo(${publicKey.toString()})`);
     const accountInfo = await this.connection.getAccountInfo(publicKey);
-    this.set(key, accountInfo, ttl);
+    this.set(key, accountInfo);
 
     // Subscribe to account changes if WebSocket enabled
     if (this.config.enableWebSocket && !this.subscriptions.has(key)) {
@@ -226,9 +226,9 @@ export class RPCCache {
   async getTokenAccountBalance(
     publicKey: PublicKey,
     ttl: number = 10_000
-  ): Promise<{ value: { amount: string; decimals: number; uiAmount: number | null; uiAmountString: string } }> {
+  ): Promise<RpcResponseAndContext<TokenAmount>> {
     const key = this.generateKey("getTokenAccountBalance", publicKey.toString());
-    const cached = this.get<{ value: { amount: string; decimals: number; uiAmount: number | null; uiAmountString: string } }>(key);
+    const cached = this.get<RpcResponseAndContext<TokenAmount>>(key);
 
     if (cached !== null) {
       console.log(`[RPCCache] HIT: getTokenAccountBalance(${publicKey.toString()})`);

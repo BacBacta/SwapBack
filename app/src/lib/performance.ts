@@ -163,11 +163,11 @@ export function requestIdleCallback(
   if (typeof window === 'undefined') return 0;
   
   if ('requestIdleCallback' in window) {
-    return window.requestIdleCallback(callback, options);
+    return window.requestIdleCallback(callback, options) as number;
   }
   
   // Fallback for browsers without requestIdleCallback
-  return window.setTimeout(callback, 1) as unknown as number;
+  return (window as any).setTimeout(callback, 1);
 }
 
 /**

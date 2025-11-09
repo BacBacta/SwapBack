@@ -1,19 +1,41 @@
 {
-  "typescript.tsserver.maxTsServerMemory": 2048,
+  // Limites mémoire AGRESSIVES pour Codespace 15GB (80%+ usage = disconnects)
+  "typescript.tsserver.maxTsServerMemory": 512,
+  "typescript.tsserver.experimental.enableProjectDiagnostics": false,
+  "typescript.disableAutomaticTypeAcquisition": true,
+  "typescript.surveys.enabled": false,
+  "typescript.tsserver.useSyntaxServer": "never",
+  
+  // ESLint limité
   "eslint.runtime": "node", 
-  "eslint.execArgv": ["--max-old-space-size=2048"],
+  "eslint.execArgv": ["--max-old-space-size=512"],
+  "eslint.validate": ["javascript", "typescript"],
+  
+  // Watchers désactivés (cause RAM leaks)
   "files.watcherExclude": {
     "**/node_modules/**": true,
     "**/.next/**": true,
     "**/dist/**": true,
     "**/build/**": true,
     "**/.git/objects/**": true,
-    "**/target/**": true
+    "**/target/**": true,
+    "**/.cargo/**": true
   },
+  
+  // Search optimisé
   "search.exclude": {
     "**/node_modules": true,
     "**/.next": true,
     "**/dist": true,
-    "**/build": true
-  }
+    "**/build": true,
+    "**/target": true
+  },
+  "search.followSymlinks": false,
+  
+  // Désactiver features lourdes
+  "editor.formatOnSave": false,
+  "editor.codeActionsOnSave": {},
+  "extensions.autoUpdate": false,
+  "git.autorefresh": false,
+  "git.autofetch": false
 }
