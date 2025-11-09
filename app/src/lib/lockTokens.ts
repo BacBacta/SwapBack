@@ -17,18 +17,35 @@ import {
 } from "@solana/spl-token";
 import cnftIdl from "@/idl/swapback_cnft.json";
 import type { Idl } from "@coral-xyz/anchor";
+import { validateEnv } from "./validateEnv";
+
+// Valider l'environnement au chargement du module (fail-fast)
+// Cela évite les erreurs AccountOwnedByWrongProgram en détectant
+// les configurations incorrectes AVANT toute tentative de transaction
+const envConfig = validateEnv();
 
 // Program ID du programme swapback_cnft
-export const CNFT_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID ||
-    "2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G"
-);
+// IMPORTANT: Doit correspondre exactement à l'address dans l'IDL
+// Aucun fallback n'est autorisé pour éviter les erreurs de dérivation de PDA
+if (!process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID) {
+  throw new Error(
+    "❌ NEXT_PUBLIC_CNFT_PROGRAM_ID is required. " +
+      "Set it to: " + cnftIdl.address
+  );
+}
+
+export const CNFT_PROGRAM_ID = new PublicKey(envConfig.cnftProgramId);
 
 // Mint du token BACK (Token-2022)
-export const BACK_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_BACK_MINT ||
-    "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
-);
+// IMPORTANT: Doit correspondre au mint déployé sur le réseau actuel
+if (!process.env.NEXT_PUBLIC_BACK_MINT) {
+  throw new Error(
+    "❌ NEXT_PUBLIC_BACK_MINT is required. " +
+      "Devnet: 862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
+  );
+}
+
+export const BACK_MINT = new PublicKey(envConfig.backMint);
 
 /**
  * Crée une transaction pour verrouiller des tokens BACK avec transfert on-chain
@@ -43,6 +60,23 @@ export async function createLockTokensTransaction(
 ): Promise<Transaction> {
   console.log('🔍 [LOCK TX] Creating lock transaction...');
   console.log('🔍 [LOCK TX] Params:', params);
+  
+  // Valider la configuration AVANT de construire la transaction
+  console.log('🔍 [LOCK TX] Environment validation:');
+  console.log('   CNFT_PROGRAM_ID:', CNFT_PROGRAM_ID.toString());
+  console.log('   IDL address:', cnftIdl.address);
+  console.log('   BACK_MINT:', BACK_MINT.toString());
+  console.log('   Network:', process.env.NEXT_PUBLIC_SOLANA_NETWORK);
+  
+  // Vérification de cohérence (double sécurité)
+  if (CNFT_PROGRAM_ID.toString() !== cnftIdl.address) {
+    throw new Error(
+      `❌ CRITICAL: Program ID mismatch!\n` +
+        `  NEXT_PUBLIC_CNFT_PROGRAM_ID: ${CNFT_PROGRAM_ID.toString()}\n` +
+        `  IDL address: ${cnftIdl.address}\n` +
+        `This WILL cause AccountOwnedByWrongProgram errors!`
+    );
+  }
   
   if (!wallet.publicKey || !wallet.signTransaction) {
     throw new Error("Wallet not connected");
