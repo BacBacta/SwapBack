@@ -16,12 +16,15 @@
   // ESLint limité
   "eslint.runtime": "node", 
   "eslint.execArgv": ["--max-old-space-size=512"],
-  "eslint.validate": ["javascript", "typescript"],
+  "eslint.validate": ["javascript", "typescript", "javascriptreact", "typescriptreact"],
   "eslint.options": {
     "cache": false
   },
-  "eslint.workingDirectories": [{ "mode": "auto" }],
-  "eslint.probe": ["javascript", "typescript"],
+  "eslint.workingDirectories": [
+    ".",
+    "./app"
+  ],
+  "eslint.probe": ["javascript", "typescript", "javascriptreact", "typescriptreact"],
   "eslint.lintTask.enable": true,
   
   // Désactiver les fonctionnalités TypeScript/JavaScript gourmandes
