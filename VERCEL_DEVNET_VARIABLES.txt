@@ -1,0 +1,146 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                                                                           ║
+║          📋 VARIABLES D'ENVIRONNEMENT VERCEL - DEVNET                    ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+⚠️  IMPORTANT : Cochez les 3 environnements pour CHAQUE variable :
+    ✅ Production
+    ✅ Preview  
+    ✅ Development
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+VARIABLE 1 : Configuration réseau
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Nom    : NEXT_PUBLIC_SOLANA_NETWORK
+Valeur : devnet
+
+Description : Spécifie le réseau Solana à utiliser
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+VARIABLE 2 : URL RPC
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Nom    : NEXT_PUBLIC_SOLANA_RPC_URL
+Valeur : https://api.devnet.solana.com
+
+Description : Point de terminaison RPC pour le devnet
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+VARIABLE 3 : Adresse du token $BACK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Nom    : NEXT_PUBLIC_BACK_MINT
+Valeur : 8sQq53Up7KooCTygi8Dk3Gt8XDeUN5BVLNi5h6Skz43P
+
+Description : Adresse du token $BACK Token-2022 sur devnet (100k supply)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+VARIABLE 4 : Configuration Collection cNFT  🔴 CRITIQUE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Nom    : NEXT_PUBLIC_COLLECTION_CONFIG
+Valeur : 5eM6KdFGJ63597ayYYtUqcNRhzxKtpx5qfL5mqRHwBom
+
+Description : PDA de configuration pour le programme cNFT
+              ⚠️  Cette variable est ESSENTIELLE pour le lock/unlock !
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+VARIABLES OPTIONNELLES (déjà configurées dans le code)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Ces variables ont des valeurs par défaut dans le code, pas besoin de les
+ajouter sur Vercel sauf si vous voulez les surcharger :
+
+• NEXT_PUBLIC_ROUTER_PROGRAM_ID
+  Défaut : BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz
+
+• NEXT_PUBLIC_BUYBACK_PROGRAM_ID
+  Défaut : EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf
+
+• NEXT_PUBLIC_CNFT_PROGRAM_ID
+  Défaut : 9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq
+
+• NEXT_PUBLIC_USDC_MINT
+  Défaut : BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR
+
+• NEXT_PUBLIC_MERKLE_TREE
+  Défaut : 93Tzc7btocwzDSbscW9EfL9dBzWLx85FHE6zeWrwHbNT
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📝 PROCÉDURE D'AJOUT SUR VERCEL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Allez sur : https://vercel.com/dashboard
+
+2. Sélectionnez votre projet : SwapBack
+
+3. Cliquez sur : Settings → Environment Variables
+
+4. Pour CHAQUE variable ci-dessus :
+   
+   a) Cliquez sur "Add New"
+   
+   b) Copiez-collez le Nom et la Valeur EXACTEMENT
+   
+   c) 🔴 IMPORTANT : Cochez les 3 cases :
+      ✅ Production
+      ✅ Preview
+      ✅ Development
+   
+   d) Cliquez sur "Save"
+
+5. Une fois les 4 variables ajoutées, Vercel redéploiera automatiquement
+
+6. Attendez 2-3 minutes que le déploiement se termine
+
+7. Testez : https://swap-back-7osvbldyx-bactas-projects.vercel.app/
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ VÉRIFICATION APRÈS DÉPLOIEMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Rafraîchir la page avec Ctrl+Shift+R (ou Cmd+Shift+R sur Mac)
+
+2. Connecter votre wallet (configuré sur devnet)
+
+3. Vérifier l'indicateur de réseau : doit afficher "devnet" 🟢
+
+4. Aller dans Lock/Unlock
+
+5. Vérifier que votre solde affiche : 100,000 $BACK ✅
+
+6. Tester le lock de quelques tokens → doit fonctionner sans erreur ✅
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ SI L'ERREUR AccountOwnedByWrongProgram PERSISTE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+→ C'est que NEXT_PUBLIC_COLLECTION_CONFIG n'est pas configurée ou 
+  les 3 environnements ne sont pas cochés
+
+→ Vérifiez dans Settings → Environment Variables que cette variable
+  existe bien avec la valeur : 5eM6KdFGJ63597ayYYtUqcNRhzxKtpx5qfL5mqRHwBom
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 RÉSUMÉ : 4 VARIABLES À CONFIGURER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. NEXT_PUBLIC_SOLANA_NETWORK = devnet
+2. NEXT_PUBLIC_SOLANA_RPC_URL = https://api.devnet.solana.com
+3. NEXT_PUBLIC_BACK_MINT = 8sQq53Up7KooCTygi8Dk3Gt8XDeUN5BVLNi5h6Skz43P
+4. NEXT_PUBLIC_COLLECTION_CONFIG = 5eM6KdFGJ63597ayYYtUqcNRhzxKtpx5qfL5mqRHwBom
+
+✅ Cocher Production + Preview + Development pour CHAQUE variable
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

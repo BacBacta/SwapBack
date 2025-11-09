@@ -13,6 +13,12 @@ export const ClientOnlyWallet = () => {
   const [isWrongNetwork, setIsWrongNetwork] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
   const [showMenu, setShowMenu] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Critical: Only render wallet button client-side to avoid SSR issues
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Detect network from RPC endpoint
   useEffect(() => {
@@ -89,6 +95,13 @@ export const ClientOnlyWallet = () => {
       window.open(explorerUrl, "_blank");
     }
   };
+
+  // Prevent SSR rendering to avoid infinite recursion with wallet adapter
+  if (!mounted) {
+    return (
+      <div className="w-[140px] h-[40px] bg-gray-800 animate-pulse rounded" />
+    );
+  }
 
   return (
     <div className="relative flex items-center gap-3">

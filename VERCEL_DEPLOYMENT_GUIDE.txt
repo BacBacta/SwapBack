@@ -1,0 +1,200 @@
+═══════════════════════════════════════════════════════════════════════════════
+  🚀 GUIDE COMPLET : Déploiement du nouveau token $BACK sur Vercel
+═══════════════════════════════════════════════════════════════════════════════
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ CONTEXTE                                                                  │
+└───────────────────────────────────────────────────────────────────────────┘
+
+❌ PROBLÈME : Votre application Vercel montre "mainnet-beta" au lieu de "devnet"
+✅ CAUSE    : Variables d'environnement Vercel non configurées
+✅ SOLUTION : Mettre à jour 3 variables sur Vercel + redéployer
+
+Application Vercel : https://swap-back-7osvbldyx-bactas-projects.vercel.app/
+Application locale : http://localhost:3000
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ ÉTAPE 1 : Mettre à jour les variables d'environnement Vercel (5 min)     │
+└───────────────────────────────────────────────────────────────────────────┘
+
+1. Allez sur : https://vercel.com/dashboard
+
+2. Sélectionnez votre projet (swap-back ou SwapBack)
+
+3. Cliquez sur "Settings" (onglet en haut)
+
+4. Dans le menu latéral gauche, cliquez sur "Environment Variables"
+
+5. Pour CHAQUE variable ci-dessous, cliquez sur "Add New" ou "Edit" :
+
+   ┌─────────────────────────────────────────────────────────────────┐
+   │ Variable 1                                                      │
+   ├─────────────────────────────────────────────────────────────────┤
+   │ Name:  NEXT_PUBLIC_SOLANA_NETWORK                              │
+   │ Value: devnet                                                   │
+   │                                                                 │
+   │ Environments (cochez les 3) :                                  │
+   │   ☑ Production                                                 │
+   │   ☑ Preview                                                    │
+   │   ☑ Development                                                │
+   │                                                                 │
+   │ [Save]                                                          │
+   └─────────────────────────────────────────────────────────────────┘
+
+   ┌─────────────────────────────────────────────────────────────────┐
+   │ Variable 2                                                      │
+   ├─────────────────────────────────────────────────────────────────┤
+   │ Name:  NEXT_PUBLIC_SOLANA_RPC_URL                              │
+   │ Value: https://api.devnet.solana.com                           │
+   │                                                                 │
+   │ Environments (cochez les 3) :                                  │
+   │   ☑ Production                                                 │
+   │   ☑ Preview                                                    │
+   │   ☑ Development                                                │
+   │                                                                 │
+   │ [Save]                                                          │
+   └─────────────────────────────────────────────────────────────────┘
+
+   ┌─────────────────────────────────────────────────────────────────┐
+   │ Variable 3                                                      │
+   ├─────────────────────────────────────────────────────────────────┤
+   │ Name:  NEXT_PUBLIC_BACK_MINT                                   │
+   │ Value: 8sQq53Up7KooCTygi8Dk3Gt8XDeUN5BVLNi5h6Skz43P           │
+   │                                                                 │
+   │ Environments (cochez les 3) :                                  │
+   │   ☑ Production                                                 │
+   │   ☑ Preview                                                    │
+   │   ☑ Development                                                │
+   │                                                                 │
+   │ [Save]                                                          │
+   └─────────────────────────────────────────────────────────────────┘
+
+⚠️  CRITIQUE : Les 3 checkboxes (Production, Preview, Development) 
+               doivent être cochées pour CHAQUE variable !
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ ÉTAPE 2 : Redéployer l'application (1 min)                               │
+└───────────────────────────────────────────────────────────────────────────┘
+
+Option A - Depuis le dashboard Vercel (recommandé) :
+  1. Cliquez sur l'onglet "Deployments"
+  2. Trouvez le dernier déploiement (le plus récent en haut)
+  3. Cliquez sur les "⋯" (3 points) à droite
+  4. Sélectionnez "Redeploy"
+  5. Confirmez en cliquant sur le bouton "Redeploy"
+
+Option B - Via Git (automatique) :
+  Depuis votre terminal :
+  
+  cd /workspaces/SwapBack
+  ./redeploy-vercel.sh
+
+  OU manuellement :
+
+  git commit --allow-empty -m "trigger: redeploy with new env vars"
+  git push origin main
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ ÉTAPE 3 : Vérifier le déploiement (2-3 min)                              │
+└───────────────────────────────────────────────────────────────────────────┘
+
+1. Sur Vercel, dans l'onglet "Deployments", attendez que le statut passe à :
+   "✓ Ready" (pastille verte)
+
+2. Ouvrez votre application : 
+   https://swap-back-7osvbldyx-bactas-projects.vercel.app/
+
+3. Videz complètement le cache de votre navigateur :
+   - Windows/Linux : Ctrl + Shift + R
+   - Mac : Cmd + Shift + R
+   - Ou : F12 → Console → Clic droit sur le bouton rafraîchir → "Empty Cache and Hard Reload"
+
+4. Connectez votre wallet (assurez-vous qu'il est sur devnet)
+
+5. Allez dans l'onglet "Lock/Unlock"
+
+6. ✨ Votre solde devrait afficher : 100,000 $BACK
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ INFORMATIONS DU NOUVEAU TOKEN                                             │
+└───────────────────────────────────────────────────────────────────────────┘
+
+Mint Address   : 8sQq53Up7KooCTygi8Dk3Gt8XDeUN5BVLNi5h6Skz43P
+Network        : Devnet
+Type           : Token-2022
+Decimals       : 9
+Supply         : 100,000 $BACK
+Votre Wallet   : 578DGN45PsuxySc4T5VsZKeJu2Q83L5coCWR47ZJkwQf
+Votre ATA      : GnMN1acTTTSPDuYcENPnvLYDbUSN2KiR8y2ov8e1fiF1
+Votre Balance  : 100,000 $BACK (confirmé on-chain)
+SOL Balance    : 11.17 SOL (suffisant pour les frais)
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ DÉPANNAGE                                                                 │
+└───────────────────────────────────────────────────────────────────────────┘
+
+Si le solde reste à 0 après le redéploiement :
+
+1. Vérifier les variables sur Vercel
+   → Settings → Environment Variables
+   → Confirmez que les 3 variables sont présentes avec les bonnes valeurs
+   → Confirmez que les 3 environnements sont cochés
+
+2. Vérifier que le déploiement est terminé
+   → Deployments → Dernier déploiement doit avoir un "✓" vert
+   → Si erreur rouge, cliquez dessus pour voir les logs
+
+3. Vider COMPLÈTEMENT le cache
+   → F12 → Application → Storage → Clear site data
+   → Ou mode incognito : Ctrl+Shift+N
+
+4. Vérifier votre wallet
+   → Assurez-vous qu'il est sur DEVNET (pas mainnet)
+   → Phantom : Settings → Developer Settings → Devnet
+   → Solflare : Cliquez sur le réseau → Devnet
+
+5. Déconnecter et reconnecter le wallet
+   → Déconnectez complètement
+   → Fermez et réouvrez l'extension du wallet
+   → Reconnectez à l'application
+
+6. Vérifier la console du navigateur
+   → F12 → Console
+   → Cherchez des erreurs en rouge
+   → Partagez les erreurs si besoin
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ VÉRIFICATIONS EN LIGNE DE COMMANDE                                        │
+└───────────────────────────────────────────────────────────────────────────┘
+
+Vérifier la balance on-chain :
+
+spl-token balance 8sQq53Up7KooCTygi8Dk3Gt8XDeUN5BVLNi5h6Skz43P \
+  --owner 578DGN45PsuxySc4T5VsZKeJu2Q83L5coCWR47ZJkwQf \
+  --url devnet
+
+Devrait afficher : 100000
+
+Vérifier le SOL :
+
+solana balance 578DGN45PsuxySc4T5VsZKeJu2Q83L5coCWR47ZJkwQf --url devnet
+
+Devrait afficher : ~11.17 SOL
+
+Explorer Solana :
+
+https://explorer.solana.com/address/578DGN45PsuxySc4T5VsZKeJu2Q83L5coCWR47ZJkwQf\?cluster\=devnet
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│ RÉCAPITULATIF DES FICHIERS CRÉÉS                                         │
+└───────────────────────────────────────────────────────────────────────────┘
+
+✅ VERCEL_DEPLOYMENT_GUIDE.txt      - Ce fichier (guide complet)
+✅ VERCEL_ENV_UPDATE.md             - Guide détaillé Markdown
+✅ VERCEL_QUICK_GUIDE.md            - Guide rapide 3 étapes
+✅ WALLET_NETWORK_SWITCH.md         - Guide changement réseau wallet
+✅ NEW_BACK_TOKEN_CREATED.md        - Documentation du nouveau token
+✅ redeploy-vercel.sh               - Script de redéploiement automatique
+✅ check-env-config.sh              - Script de vérification config
+
+═══════════════════════════════════════════════════════════════════════════════

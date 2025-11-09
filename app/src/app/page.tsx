@@ -2,7 +2,13 @@
 
 import { useState, lazy, Suspense } from "react";
 import { getNetworkLabel, isMainnet } from "@/utils/explorer";
-import { ClientOnlyWallet } from "@/components/ClientOnlyWallet";
+import dynamic from "next/dynamic";
+
+// Critical: Import wallet with ssr: false to avoid SSR recursion issues
+const ClientOnlyWallet = dynamic(
+  () => import("@/components/ClientOnlyWallet").then(mod => ({ default: mod.ClientOnlyWallet })),
+  { ssr: false, loading: () => <div className="w-[140px] h-[40px] bg-gray-800 animate-pulse rounded" /> }
+);
 
 // Performance: Lazy load heavy components
 const EnhancedSwapInterface = lazy(() => import("@/components/EnhancedSwapInterface").then(mod => ({ default: mod.EnhancedSwapInterface })));
