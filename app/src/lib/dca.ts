@@ -16,34 +16,50 @@ import {
 import { validateEnv } from "./validateEnv";
 import routerIdl from "@/idl/swapback_router.json";
 
-// Valider l'environnement au chargement du module (fail-fast)
-// Note: La validation est automatiquement désactivée dans le navigateur (Client Components)
-const envConfig = validateEnv();
+/**
+ * Get Router Program ID avec validation lazy (seulement au moment de l'utilisation)
+ * Évite les erreurs au chargement du module dans le navigateur
+ */
+function getRouterProgramId(): PublicKey {
+  const routerProgramId = process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID;
+  
+  if (!routerProgramId) {
+    throw new Error(
+      `❌ NEXT_PUBLIC_ROUTER_PROGRAM_ID is required. Set it to: ${routerIdl.address}\n\n` +
+      `This is CRITICAL for DCA operations to avoid AccountOwnedByWrongProgram errors.\n` +
+      `Add to your .env.local or Vercel environment variables.`
+    );
+  }
+  
+  return new PublicKey(routerProgramId);
+}
 
-// Vérification stricte : ROUTER_PROGRAM_ID doit être défini
-// Cette vérification fonctionne à la fois côté serveur ET client
-const routerProgramId = process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || envConfig.routerProgramId;
-if (!routerProgramId) {
-  throw new Error(
-    `❌ NEXT_PUBLIC_ROUTER_PROGRAM_ID is required. Set it to: ${routerIdl.address}\n\n` +
-    `This is CRITICAL for DCA operations to avoid AccountOwnedByWrongProgram errors.\n` +
-    `Add to your .env.local or Vercel environment variables.`
+// Program constants - utilise une fonction getter pour éviter l'évaluation au chargement
+export const ROUTER_PROGRAM_ID = getRouterProgramId();
+
+// Token mints - évaluation lazy pour éviter les erreurs au chargement
+export const SOL_MINT = new PublicKey('So11111111111111111111111111111111111111112');
+
+function getUsdcMint(): PublicKey {
+  return new PublicKey(
+    process.env.NEXT_PUBLIC_USDC_MINT || 
+    'BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR'
   );
 }
 
-// Program constants
-export const ROUTER_PROGRAM_ID = new PublicKey(routerProgramId);
+function getBackMint(): PublicKey {
+  const backMint = process.env.NEXT_PUBLIC_BACK_MINT;
+  if (!backMint) {
+    throw new Error(
+      '❌ NEXT_PUBLIC_BACK_MINT is required. ' +
+      'Devnet: 862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux'
+    );
+  }
+  return new PublicKey(backMint);
+}
 
-// Token mints
-export const SOL_MINT = new PublicKey('So11111111111111111111111111111111111111112');
-export const USDC_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_USDC_MINT || 
-  'BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR'
-);
-export const BACK_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_BACK_MINT || 
-  '862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux'
-);
+export const USDC_MINT = getUsdcMint();
+export const BACK_MINT = getBackMint();
 
 // Token symbol to mint mapping
 export const TOKEN_MINTS: Record<string, PublicKey> = {
@@ -331,19 +347,23 @@ export async function createDcaPlanTransaction(
   const [planPda] = getDcaPlanPDA(userPublicKey, planId);
   const [statePda] = getRouterStatePDA();
   
-  // 🔒 VALIDATION CRITIQUE: Vérifier la cohérence du Program ID
-  console.log('🔍 [DCA CREATE] Environment validation:');
-  console.log('   ROUTER_PROGRAM_ID:', ROUTER_PROGRAM_ID.toString());
-  console.log('   IDL address:', routerIdl.address);
-  console.log('   State PDA:', statePda.toString());
-  
-  if (ROUTER_PROGRAM_ID.toString() !== routerIdl.address) {
-    throw new Error(
-      `❌ CRITICAL: Router Program ID mismatch! This WILL cause AccountOwnedByWrongProgram errors!\n` +
-      `  Code uses: ${ROUTER_PROGRAM_ID.toString()}\n` +
-      `  IDL has:   ${routerIdl.address}\n\n` +
-      `Fix: Set NEXT_PUBLIC_ROUTER_PROGRAM_ID=${routerIdl.address}`
-    );
+  // 🔒 VALIDATION CRITIQUE: Vérifier la cohérence du Program ID (côté serveur uniquement)
+  if (typeof window === 'undefined') {
+    // Validation stricte côté serveur
+    const envConfig = validateEnv();
+    console.log('🔍 [DCA CREATE] Server-side environment validation:');
+    console.log('   ROUTER_PROGRAM_ID:', ROUTER_PROGRAM_ID.toString());
+    console.log('   IDL address:', routerIdl.address);
+    console.log('   State PDA:', statePda.toString());
+    
+    if (ROUTER_PROGRAM_ID.toString() !== routerIdl.address) {
+      throw new Error(
+        `❌ CRITICAL: Router Program ID mismatch! This WILL cause AccountOwnedByWrongProgram errors!\n` +
+        `  Code uses: ${ROUTER_PROGRAM_ID.toString()}\n` +
+        `  IDL has:   ${routerIdl.address}\n\n` +
+        `Fix: Set NEXT_PUBLIC_ROUTER_PROGRAM_ID=${routerIdl.address}`
+      );
+    }
   }
   
   // Check if Router State is initialized

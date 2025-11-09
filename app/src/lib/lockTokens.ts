@@ -19,35 +19,42 @@ import cnftIdl from "@/idl/swapback_cnft.json";
 import type { Idl } from "@coral-xyz/anchor";
 import { validateEnv } from "./validateEnv";
 
-// Valider l'environnement au chargement du module (fail-fast)
-// Cela évite les erreurs AccountOwnedByWrongProgram en détectant
-// les configurations incorrectes AVANT toute tentative de transaction
-// Note: La validation est automatiquement désactivée dans le navigateur (Client Components)
-const envConfig = validateEnv();
-
-// Program ID du programme swapback_cnft
-// IMPORTANT: Doit correspondre exactement à l'address dans l'IDL
-// Aucun fallback n'est autorisé pour éviter les erreurs de dérivation de PDA
-const cnftProgramId = process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || envConfig.cnftProgramId;
-if (!cnftProgramId) {
-  throw new Error(
-    "❌ NEXT_PUBLIC_CNFT_PROGRAM_ID is required. " +
-      "Set it to: " + cnftIdl.address
-  );
+/**
+ * Get CNFT Program ID avec validation lazy (seulement au moment de l'utilisation)
+ * Évite les erreurs au chargement du module dans le navigateur
+ */
+function getCnftProgramId(): PublicKey {
+  const cnftProgramId = process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID;
+  
+  if (!cnftProgramId) {
+    throw new Error(
+      "❌ NEXT_PUBLIC_CNFT_PROGRAM_ID is required. " +
+        "Set it to: " + cnftIdl.address
+    );
+  }
+  
+  return new PublicKey(cnftProgramId);
 }
 
-export const CNFT_PROGRAM_ID = new PublicKey(cnftProgramId);
+export const CNFT_PROGRAM_ID = getCnftProgramId();
 
-// Mint du token BACK (Token-2022)
-// IMPORTANT: Doit correspondre au mint déployé sur le réseau actuel
-if (!process.env.NEXT_PUBLIC_BACK_MINT) {
-  throw new Error(
-    "❌ NEXT_PUBLIC_BACK_MINT is required. " +
-      "Devnet: 862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
-  );
+/**
+ * Get BACK Mint avec validation lazy
+ */
+function getBackMint(): PublicKey {
+  const backMint = process.env.NEXT_PUBLIC_BACK_MINT;
+  
+  if (!backMint) {
+    throw new Error(
+      "❌ NEXT_PUBLIC_BACK_MINT is required. " +
+        "Devnet: 862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
+    );
+  }
+  
+  return new PublicKey(backMint);
 }
 
-export const BACK_MINT = new PublicKey(envConfig.backMint);
+export const BACK_MINT = getBackMint();
 
 /**
  * Crée une transaction pour verrouiller des tokens BACK avec transfert on-chain
@@ -63,21 +70,24 @@ export async function createLockTokensTransaction(
   console.log('🔍 [LOCK TX] Creating lock transaction...');
   console.log('🔍 [LOCK TX] Params:', params);
   
-  // Valider la configuration AVANT de construire la transaction
-  console.log('🔍 [LOCK TX] Environment validation:');
-  console.log('   CNFT_PROGRAM_ID:', CNFT_PROGRAM_ID.toString());
-  console.log('   IDL address:', cnftIdl.address);
-  console.log('   BACK_MINT:', BACK_MINT.toString());
-  console.log('   Network:', process.env.NEXT_PUBLIC_SOLANA_NETWORK);
-  
-  // Vérification de cohérence (double sécurité)
-  if (CNFT_PROGRAM_ID.toString() !== cnftIdl.address) {
-    throw new Error(
-      `❌ CRITICAL: Program ID mismatch!\n` +
-        `  NEXT_PUBLIC_CNFT_PROGRAM_ID: ${CNFT_PROGRAM_ID.toString()}\n` +
-        `  IDL address: ${cnftIdl.address}\n` +
-        `This WILL cause AccountOwnedByWrongProgram errors!`
-    );
+  // Valider la configuration côté serveur uniquement (AVANT de construire la transaction)
+  if (typeof window === 'undefined') {
+    const envConfig = validateEnv();
+    console.log('🔍 [LOCK TX] Server-side environment validation:');
+    console.log('   CNFT_PROGRAM_ID:', CNFT_PROGRAM_ID.toString());
+    console.log('   IDL address:', cnftIdl.address);
+    console.log('   BACK_MINT:', BACK_MINT.toString());
+    console.log('   Network:', process.env.NEXT_PUBLIC_SOLANA_NETWORK);
+    
+    // Vérification de cohérence (double sécurité)
+    if (CNFT_PROGRAM_ID.toString() !== cnftIdl.address) {
+      throw new Error(
+        `❌ CRITICAL: Program ID mismatch!\n` +
+          `  NEXT_PUBLIC_CNFT_PROGRAM_ID: ${CNFT_PROGRAM_ID.toString()}\n` +
+          `  IDL address: ${cnftIdl.address}\n` +
+          `This WILL cause AccountOwnedByWrongProgram errors!`
+      );
+    }
   }
   
   if (!wallet.publicKey || !wallet.signTransaction) {

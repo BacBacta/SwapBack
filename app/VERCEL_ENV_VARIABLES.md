@@ -1,6 +1,29 @@
 # 📋 Configuration des Variables d'Environnement Vercel# Variables d'Environnement pour Vercel
 
+## 🔍 IMPORTANT: Comportement de Validation Client vs Serveur
 
+### Validation Intelligente
+
+SwapBack utilise une validation **adaptative** des variables d'environnement:
+
+**Server-side (Node.js)**:
+- ✅ Validation stricte activée
+- Contextes: `npm run build`, SSR, API Routes
+- Vérifie Program IDs === IDL addresses
+- ❌ Build échoue si mismatch
+
+**Client-side (Browser)**:
+- ⏭️ Validation désactivée (skip)
+- Contextes: React Components dans le navigateur
+- Variables utilisées telles quelles
+- ✅ Dashboard se charge sans crash
+- ❌ Erreurs claires seulement lors de l'exécution de transactions
+
+**Pourquoi?** Résout l'erreur "Application error: a client-side exception has occurred" en permettant le chargement du Dashboard même si des variables manquent. La validation stricte reste active côté serveur pour prévenir les déploiements incorrects.
+
+📖 **Détails**: Voir `CLIENT_SIDE_ERROR_FIX.md` pour l'implémentation technique.
+
+---
 
 ## Vue d'ensembleCe fichier liste toutes les variables d'environnement à configurer dans le dashboard Vercel.
 
