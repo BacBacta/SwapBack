@@ -191,10 +191,23 @@ export function uiToLamports(amount: number, decimals: number): BN {
 }
 
 /**
- * Convert lamports/smallest unit to UI amount
+ * Convert lamports/smallest unit to UI amount (safe for large values)
+ * Uses BN division to avoid Number overflow for amounts > 2^53
  */
 export function lamportsToUi(amount: BN, decimals: number): number {
-  return amount.toNumber() / Math.pow(10, decimals);
+  // Diviser d'abord avec BN pour réduire la magnitude
+  const divisor = new BN(10).pow(new BN(decimals));
+  const whole = amount.div(divisor); // Partie entière
+  const remainder = amount.mod(divisor); // Reste
+  
+  // Conversion safe: only convert after division
+  // Si whole > MAX_SAFE_INTEGER, retourner MAX_SAFE_INTEGER (cas extrême)
+  if (whole.gt(new BN(Number.MAX_SAFE_INTEGER))) {
+    console.warn(`Amount too large: ${amount.toString()} lamports. Returning MAX_SAFE_INTEGER`);
+    return Number.MAX_SAFE_INTEGER;
+  }
+  
+  return whole.toNumber() + (remainder.toNumber() / Math.pow(10, decimals));
 }
 
 /**
@@ -694,6 +707,8 @@ export async function cancelDcaPlanTransaction(
  */
 export function isPlanReadyForExecution(dcaPlan: DcaPlan): boolean {
   const now = Date.now() / 1000; // Current time in seconds
+  
+  // Safe conversion: timestamps are in seconds (< 2^32), always safe
   const nextExecution = dcaPlan.nextExecution.toNumber();
   
   return (
@@ -704,9 +719,10 @@ export function isPlanReadyForExecution(dcaPlan: DcaPlan): boolean {
 }
 
 /**
- * Format timestamp to readable date
+ * Format timestamp to readable date (safe for timestamp values)
  */
 export function formatTimestamp(timestamp: BN | number): string {
+  // Timestamps are seconds since epoch, always < 2^32, safe to convert
   const ts = typeof timestamp === 'number' ? timestamp : timestamp.toNumber();
   return new Date(ts * 1000).toLocaleString();
 }
@@ -716,6 +732,7 @@ export function formatTimestamp(timestamp: BN | number): string {
  */
 export function getTimeUntilNextExecution(nextExecution: BN): string {
   const now = Date.now() / 1000;
+  // Safe: timestamp in seconds, always < 2^32
   const next = nextExecution.toNumber();
   const diff = next - now;
   

@@ -161,11 +161,16 @@ export const SwapBackDashboard = () => {
   // ============================
 
   const formatAmount = (amount: BN, decimals = 9) => {
-    const num = amount.toNumber() / Math.pow(10, decimals);
+    // Safe conversion: divide in BN first to avoid overflow
+    const divisor = new BN(10).pow(new BN(decimals));
+    const whole = amount.div(divisor);
+    const remainder = amount.mod(divisor);
+    const num = whole.toNumber() + (remainder.toNumber() / Math.pow(10, decimals));
     return num.toFixed(4);
   };
 
   const formatDate = (timestamp: BN) => {
+    // Timestamps are seconds since epoch, always < 2^32, safe to convert
     const ts = timestamp.toNumber();
     if (ts === 0) return "Jamais";
     const date = new Date(ts * 1000);
@@ -173,6 +178,7 @@ export const SwapBackDashboard = () => {
   };
 
   const getNextSwapTime = (plan: DcaPlan) => {
+    // Timestamps safe: < 2^32
     const lastSwap = plan.account.lastSwapTime.toNumber();
     const interval = plan.account.dcaInterval.toNumber();
 

@@ -57,9 +57,20 @@ export function useBuybackState() {
         authority: new PublicKey(data.slice(8, 40)),
         backMint: new PublicKey(data.slice(40, 72)),
         usdcVault: new PublicKey(data.slice(72, 104)),
-        minBuybackAmount: new BN(data.slice(104, 112), 'le').toNumber() / 1e6,
-        totalUsdcSpent: new BN(data.slice(112, 120), 'le').toNumber() / 1e6,
-        totalBackBurned: new BN(data.slice(120, 128), 'le').toNumber() / 1e9,
+        // Safe conversion: divide in BN first, then convert smaller values
+        minBuybackAmount: (() => {
+          const bn = new BN(data.slice(104, 112), 'le');
+          return bn.div(new BN(1e6)).toNumber() + (bn.mod(new BN(1e6)).toNumber() / 1e6);
+        })(),
+        totalUsdcSpent: (() => {
+          const bn = new BN(data.slice(112, 120), 'le');
+          return bn.div(new BN(1e6)).toNumber() + (bn.mod(new BN(1e6)).toNumber() / 1e6);
+        })(),
+        totalBackBurned: (() => {
+          const bn = new BN(data.slice(120, 128), 'le');
+          return bn.div(new BN(1e9)).toNumber() + (bn.mod(new BN(1e9)).toNumber() / 1e9);
+        })(),
+        // buybackCount safe: counter will never exceed MAX_SAFE_INTEGER
         buybackCount: new BN(data.slice(128, 136), 'le').toNumber(),
         bump: data[136],
       };

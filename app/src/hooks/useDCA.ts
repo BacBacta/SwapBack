@@ -415,7 +415,8 @@ export function useDcaStats() {
     activePlans: plans.filter(p => p.isActive && p.executedSwaps < p.totalSwaps).length,
     pausedPlans: plans.filter(p => !p.isActive && p.executedSwaps < p.totalSwaps).length,
     completedPlans: plans.filter(p => p.executedSwaps >= p.totalSwaps).length,
-    totalInvested: plans.reduce((sum, p) => sum + p.totalInvested.toNumber(), 0),
-    totalReceived: plans.reduce((sum, p) => sum + p.totalReceived.toNumber(), 0),
+    // Safe aggregation: use BN.add() then convert once at the end
+    totalInvested: plans.reduce((sum, p) => sum.add(p.totalInvested), new BN(0)).toNumber() / 1e6, // USDC has 6 decimals
+    totalReceived: plans.reduce((sum, p) => sum.add(p.totalReceived), new BN(0)).toNumber() / 1e9, // Assuming output token has 9 decimals
   };
 }
