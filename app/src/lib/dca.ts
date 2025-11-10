@@ -17,49 +17,29 @@ import { validateEnv } from "./validateEnv";
 import routerIdl from "@/idl/swapback_router.json";
 
 /**
- * Get Router Program ID avec validation lazy (seulement au moment de l'utilisation)
- * Évite les erreurs au chargement du module dans le navigateur
+ * Lazily resolve ROUTER_PROGRAM_ID to avoid throwing during module
+ * initialization in the browser. Server-side this will perform strict
+ * validation via validateEnv().
  */
-function getRouterProgramId(): PublicKey {
-  const routerProgramId = process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID;
-  
-  if (!routerProgramId) {
-    throw new Error(
-      `❌ NEXT_PUBLIC_ROUTER_PROGRAM_ID is required. Set it to: ${routerIdl.address}\n\n` +
-      `This is CRITICAL for DCA operations to avoid AccountOwnedByWrongProgram errors.\n` +
-      `Add to your .env.local or Vercel environment variables.`
-    );
+function getRouterProgramId(): PublicKey | null {
+  const envVar = process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID;
+  if (typeof window === 'undefined') {
+    const cfg = validateEnv();
+    return new PublicKey(cfg.routerProgramId);
   }
-  
-  return new PublicKey(routerProgramId);
+  return envVar ? new PublicKey(envVar) : null;
 }
 
-// Program constants - utilise une fonction getter pour éviter l'évaluation au chargement
-export const ROUTER_PROGRAM_ID = getRouterProgramId();
-
-// Token mints - évaluation lazy pour éviter les erreurs au chargement
+// Token mints
 export const SOL_MINT = new PublicKey('So11111111111111111111111111111111111111112');
-
-function getUsdcMint(): PublicKey {
-  return new PublicKey(
-    process.env.NEXT_PUBLIC_USDC_MINT || 
-    'BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR'
-  );
-}
-
-function getBackMint(): PublicKey {
-  const backMint = process.env.NEXT_PUBLIC_BACK_MINT;
-  if (!backMint) {
-    throw new Error(
-      '❌ NEXT_PUBLIC_BACK_MINT is required. ' +
-      'Devnet: 862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux'
-    );
-  }
-  return new PublicKey(backMint);
-}
-
-export const USDC_MINT = getUsdcMint();
-export const BACK_MINT = getBackMint();
+export const USDC_MINT = new PublicKey(
+  process.env.NEXT_PUBLIC_USDC_MINT || 
+  'BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR'
+);
+export const BACK_MINT = new PublicKey(
+  process.env.NEXT_PUBLIC_BACK_MINT || 
+  '862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux'
+);
 
 // Token symbol to mint mapping
 export const TOKEN_MINTS: Record<string, PublicKey> = {
@@ -120,6 +100,10 @@ export interface CreateDcaPlanParams {
  * Derive the Router State PDA
  */
 export function getRouterStatePDA(): [PublicKey, number] {
+  const ROUTER_PROGRAM_ID = getRouterProgramId();
+  if (!ROUTER_PROGRAM_ID) {
+    throw new Error('❌ NEXT_PUBLIC_ROUTER_PROGRAM_ID is not configured. Define it in Vercel or .env');
+  }
   return PublicKey.findProgramAddressSync(
     [Buffer.from('router_state')],
     ROUTER_PROGRAM_ID
@@ -133,6 +117,10 @@ export function getDcaPlanPDA(
   user: PublicKey,
   planId: Buffer
 ): [PublicKey, number] {
+  const ROUTER_PROGRAM_ID = getRouterProgramId();
+  if (!ROUTER_PROGRAM_ID) {
+    throw new Error('❌ NEXT_PUBLIC_ROUTER_PROGRAM_ID is not configured. Define it in Vercel or .env');
+  }
   return PublicKey.findProgramAddressSync(
     [
       Buffer.from('dca_plan'),
@@ -191,23 +179,10 @@ export function uiToLamports(amount: number, decimals: number): BN {
 }
 
 /**
- * Convert lamports/smallest unit to UI amount (safe for large values)
- * Uses BN division to avoid Number overflow for amounts > 2^53
+ * Convert lamports/smallest unit to UI amount
  */
 export function lamportsToUi(amount: BN, decimals: number): number {
-  // Diviser d'abord avec BN pour réduire la magnitude
-  const divisor = new BN(10).pow(new BN(decimals));
-  const whole = amount.div(divisor); // Partie entière
-  const remainder = amount.mod(divisor); // Reste
-  
-  // Conversion safe: only convert after division
-  // Si whole > MAX_SAFE_INTEGER, retourner MAX_SAFE_INTEGER (cas extrême)
-  if (whole.gt(new BN(Number.MAX_SAFE_INTEGER))) {
-    console.warn(`Amount too large: ${amount.toString()} lamports. Returning MAX_SAFE_INTEGER`);
-    return Number.MAX_SAFE_INTEGER;
-  }
-  
-  return whole.toNumber() + (remainder.toNumber() / Math.pow(10, decimals));
+  return amount.toNumber() / Math.pow(10, decimals);
 }
 
 /**
@@ -360,23 +335,19 @@ export async function createDcaPlanTransaction(
   const [planPda] = getDcaPlanPDA(userPublicKey, planId);
   const [statePda] = getRouterStatePDA();
   
-  // 🔒 VALIDATION CRITIQUE: Vérifier la cohérence du Program ID (côté serveur uniquement)
-  if (typeof window === 'undefined') {
-    // Validation stricte côté serveur
-    const envConfig = validateEnv();
-    console.log('🔍 [DCA CREATE] Server-side environment validation:');
-    console.log('   ROUTER_PROGRAM_ID:', ROUTER_PROGRAM_ID.toString());
-    console.log('   IDL address:', routerIdl.address);
-    console.log('   State PDA:', statePda.toString());
-    
-    if (ROUTER_PROGRAM_ID.toString() !== routerIdl.address) {
-      throw new Error(
-        `❌ CRITICAL: Router Program ID mismatch! This WILL cause AccountOwnedByWrongProgram errors!\n` +
-        `  Code uses: ${ROUTER_PROGRAM_ID.toString()}\n` +
-        `  IDL has:   ${routerIdl.address}\n\n` +
-        `Fix: Set NEXT_PUBLIC_ROUTER_PROGRAM_ID=${routerIdl.address}`
-      );
-    }
+  // 🔒 VALIDATION CRITIQUE: Vérifier la cohérence du Program ID
+  console.log('🔍 [DCA CREATE] Environment validation:');
+  console.log('   ROUTER_PROGRAM_ID:', ROUTER_PROGRAM_ID.toString());
+  console.log('   IDL address:', routerIdl.address);
+  console.log('   State PDA:', statePda.toString());
+  
+  if (ROUTER_PROGRAM_ID.toString() !== routerIdl.address) {
+    throw new Error(
+      `❌ CRITICAL: Router Program ID mismatch! This WILL cause AccountOwnedByWrongProgram errors!\n` +
+      `  Code uses: ${ROUTER_PROGRAM_ID.toString()}\n` +
+      `  IDL has:   ${routerIdl.address}\n\n` +
+      `Fix: Set NEXT_PUBLIC_ROUTER_PROGRAM_ID=${routerIdl.address}`
+    );
   }
   
   // Check if Router State is initialized
@@ -707,8 +678,6 @@ export async function cancelDcaPlanTransaction(
  */
 export function isPlanReadyForExecution(dcaPlan: DcaPlan): boolean {
   const now = Date.now() / 1000; // Current time in seconds
-  
-  // Safe conversion: timestamps are in seconds (< 2^32), always safe
   const nextExecution = dcaPlan.nextExecution.toNumber();
   
   return (
@@ -719,10 +688,9 @@ export function isPlanReadyForExecution(dcaPlan: DcaPlan): boolean {
 }
 
 /**
- * Format timestamp to readable date (safe for timestamp values)
+ * Format timestamp to readable date
  */
 export function formatTimestamp(timestamp: BN | number): string {
-  // Timestamps are seconds since epoch, always < 2^32, safe to convert
   const ts = typeof timestamp === 'number' ? timestamp : timestamp.toNumber();
   return new Date(ts * 1000).toLocaleString();
 }
@@ -732,7 +700,6 @@ export function formatTimestamp(timestamp: BN | number): string {
  */
 export function getTimeUntilNextExecution(nextExecution: BN): string {
   const now = Date.now() / 1000;
-  // Safe: timestamp in seconds, always < 2^32
   const next = nextExecution.toNumber();
   const diff = next - now;
   

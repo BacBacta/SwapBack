@@ -20,41 +20,31 @@ import type { Idl } from "@coral-xyz/anchor";
 import { validateEnv } from "./validateEnv";
 
 /**
- * Get CNFT Program ID avec validation lazy (seulement au moment de l'utilisation)
- * Évite les erreurs au chargement du module dans le navigateur
+ * Helpers to lazily resolve environment program IDs and mints.
+ * These helpers avoid throwing during module initialization in the
+ * browser (Client Components). They will perform strict validation
+ * server-side (via `validateEnv()`) and return `null` in the browser
+ * if the variables are not defined.
  */
-function getCnftProgramId(): PublicKey {
-  const cnftProgramId = process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID;
-  
-  if (!cnftProgramId) {
-    throw new Error(
-      "❌ NEXT_PUBLIC_CNFT_PROGRAM_ID is required. " +
-        "Set it to: " + cnftIdl.address
-    );
+function getCnftProgramId(): PublicKey | null {
+  const envVar = process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID;
+  if (typeof window === 'undefined') {
+    // Server-side: perform strict validation (will throw if invalid/missing)
+    const cfg = validateEnv();
+    return new PublicKey(cfg.cnftProgramId);
   }
-  
-  return new PublicKey(cnftProgramId);
+  // Client-side: be permissive and return null if not set
+  return envVar ? new PublicKey(envVar) : null;
 }
 
-export const CNFT_PROGRAM_ID = getCnftProgramId();
-
-/**
- * Get BACK Mint avec validation lazy
- */
-function getBackMint(): PublicKey {
-  const backMint = process.env.NEXT_PUBLIC_BACK_MINT;
-  
-  if (!backMint) {
-    throw new Error(
-      "❌ NEXT_PUBLIC_BACK_MINT is required. " +
-        "Devnet: 862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
-    );
+function getBackMint(): PublicKey | null {
+  const envVar = process.env.NEXT_PUBLIC_BACK_MINT;
+  if (typeof window === 'undefined') {
+    const cfg = validateEnv();
+    return new PublicKey(cfg.backMint);
   }
-  
-  return new PublicKey(backMint);
+  return envVar ? new PublicKey(envVar) : null;
 }
-
-export const BACK_MINT = getBackMint();
 
 /**
  * Crée une transaction pour verrouiller des tokens BACK avec transfert on-chain
@@ -70,24 +60,33 @@ export async function createLockTokensTransaction(
   console.log('🔍 [LOCK TX] Creating lock transaction...');
   console.log('🔍 [LOCK TX] Params:', params);
   
-  // Valider la configuration côté serveur uniquement (AVANT de construire la transaction)
-  if (typeof window === 'undefined') {
-    const envConfig = validateEnv();
-    console.log('🔍 [LOCK TX] Server-side environment validation:');
-    console.log('   CNFT_PROGRAM_ID:', CNFT_PROGRAM_ID.toString());
-    console.log('   IDL address:', cnftIdl.address);
-    console.log('   BACK_MINT:', BACK_MINT.toString());
-    console.log('   Network:', process.env.NEXT_PUBLIC_SOLANA_NETWORK);
-    
-    // Vérification de cohérence (double sécurité)
-    if (CNFT_PROGRAM_ID.toString() !== cnftIdl.address) {
-      throw new Error(
-        `❌ CRITICAL: Program ID mismatch!\n` +
-          `  NEXT_PUBLIC_CNFT_PROGRAM_ID: ${CNFT_PROGRAM_ID.toString()}\n` +
-          `  IDL address: ${cnftIdl.address}\n` +
-          `This WILL cause AccountOwnedByWrongProgram errors!`
-      );
-    }
+  // Valider la configuration AVANT de construire la transaction
+  // Resolve program IDs / mints lazily
+  const CNFT_PROGRAM_ID = getCnftProgramId();
+  const BACK_MINT = getBackMint();
+
+  console.log('🔍 [LOCK TX] Environment validation:');
+  console.log('   CNFT_PROGRAM_ID:', CNFT_PROGRAM_ID?.toString() ?? 'N/A');
+  console.log('   IDL address:', cnftIdl.address);
+  console.log('   BACK_MINT:', BACK_MINT?.toString() ?? 'N/A');
+  console.log('   Network:', process.env.NEXT_PUBLIC_SOLANA_NETWORK);
+  
+  // Vérification de cohérence (double sécurité)
+  if (!CNFT_PROGRAM_ID) {
+    throw new Error(
+      '❌ NEXT_PUBLIC_CNFT_PROGRAM_ID is not configured. ' +
+        'Define it in Vercel or .env and ensure it matches the IDL address: ' +
+        cnftIdl.address
+    );
+  }
+
+  if (CNFT_PROGRAM_ID.toString() !== cnftIdl.address) {
+    throw new Error(
+      `❌ CRITICAL: Program ID mismatch!\n` +
+        `  NEXT_PUBLIC_CNFT_PROGRAM_ID: ${CNFT_PROGRAM_ID.toString()}\n` +
+        `  IDL address: ${cnftIdl.address}\n` +
+        `This WILL cause AccountOwnedByWrongProgram errors!`
+    );
   }
   
   if (!wallet.publicKey || !wallet.signTransaction) {
@@ -162,6 +161,10 @@ export async function createLockTokensTransaction(
 
   // Obtenir les token accounts
   console.log('🔍 [LOCK TX] Getting token accounts...');
+  if (!BACK_MINT) {
+    throw new Error('❌ NEXT_PUBLIC_BACK_MINT is not configured. Define it in Vercel or .env');
+  }
+
   const userTokenAccount = await getAssociatedTokenAddress(
     BACK_MINT,
     wallet.publicKey,
