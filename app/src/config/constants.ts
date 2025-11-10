@@ -39,7 +39,7 @@ let _cnftProgramId: PublicKey | null = null;
 export function getCnftProgramId(): PublicKey {
   if (!_cnftProgramId) {
     _cnftProgramId = new PublicKey(
-      process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || 'FsD6D5yakUipRtFXXbgBf5YaE1ABVEocFDTLB3z2MxnB'
+      process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || '9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq'
     );
   }
   return _cnftProgramId;

@@ -15,7 +15,7 @@ export const BACK_TOKEN_DEVNET = {
 export const PROGRAM_IDS_DEVNET = {
   router: "opPhGcth2dGQQ7njYmkAYwfxspJ1DjgP9LV2y1jygCx",
   buyback: "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf",
-  cnft: "FsD6D5yakUipRtFXXbgBf5YaE1ABVEocFDTLB3z2MxnB",
+  cnft: "9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq",
 } as const;
 
 // Configuration du cluster - utilise les variables d'environnement

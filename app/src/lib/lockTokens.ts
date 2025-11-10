@@ -187,17 +187,20 @@ export async function createLockTokensTransaction(
   // Construire l'instruction via Anchor
   console.log('🔍 [LOCK TX] Building instruction...');
   try {
-    // TEMPORARY FIX: Use mint_level_nft instead of lock_tokens
-    // lock_tokens instruction is not deployed on devnet yet
-    // mint_level_nft is the currently deployed instruction that locks tokens
-    console.log('⚠️  [LOCK TX] Using mint_level_nft (lock_tokens not deployed yet)');
+    // Use the real lock_tokens instruction from the deployed program
+    console.log('✅ [LOCK TX] Using lock_tokens instruction');
     const instruction = await program.methods
-      .mintLevelNft(amountLamports, lockDuration)
+      .lockTokens(amountLamports, lockDuration)
       .accounts({
-        collectionConfig,
-        globalState,
-        userNft,
         user: wallet.publicKey,
+        userTokenAccount,
+        userNft,
+        vaultAuthority: vaultAuthority[0],
+        vaultTokenAccount,
+        backMint: BACK_MINT,
+        globalState,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       })
       .instruction();
@@ -333,16 +336,21 @@ export async function createUnlockTokensTransaction(
 
   // Construire l'instruction
   console.log('🔍 [UNLOCK TX] Building instruction...');
-  // TEMPORARY FIX: Use update_nft_status instead of unlock_tokens
-  // unlock_tokens instruction is not deployed on devnet yet
-  // update_nft_status is the currently deployed instruction that unlocks
-  console.log('⚠️  [UNLOCK TX] Using update_nft_status (unlock_tokens not deployed yet)');
+  // Use the real unlock_tokens instruction from the deployed program
+  console.log('✅ [UNLOCK TX] Using unlock_tokens instruction');
   const instruction = await program.methods
-    .updateNftStatus(false) // Set is_active to false to unlock
+    .unlockTokens()
     .accounts({
-      userNft,
-      globalState,
       user: wallet.publicKey,
+      userTokenAccount,
+      userNft,
+      vaultAuthority,
+      vaultTokenAccount,
+      backMint: BACK_MINT,
+      globalState,
+      tokenProgram: TOKEN_2022_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
     })
     .instruction();
 

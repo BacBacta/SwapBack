@@ -1,18 +1,187 @@
+`anchor` 0.30.1 is not installed with `avm`. Installing...
+
+    Updating git repository `https://github.com/coral-xyz/anchor`
+warning: skipping duplicate package `docs` found at `/usr/local/cargo/git/checkouts/anchor-50c4b9c8b5e0501f/e6d7daf/tests/docs/programs/docs`
+warning: skipping duplicate package `external` found at `/usr/local/cargo/git/checkouts/anchor-50c4b9c8b5e0501f/e6d7daf/tests/declare-program/programs/external`
+warning: skipping duplicate package `shared` found at `/usr/local/cargo/git/checkouts/anchor-50c4b9c8b5e0501f/e6d7daf/tests/typescript/programs/shared`
+warning: skipping duplicate package `relations-derivation` found at `/usr/local/cargo/git/checkouts/anchor-50c4b9c8b5e0501f/e6d7daf/tests/relations-derivation/programs/relations-derivation`
+warning: skipping duplicate package `shared` found at `/usr/local/cargo/git/checkouts/anchor-50c4b9c8b5e0501f/e6d7daf/tests/misc/programs/shared`
+warning: skipping duplicate package `swap` found at `/usr/local/cargo/git/checkouts/anchor-50c4b9c8b5e0501f/e6d7daf/tests/cfo/deps/swap/programs/swap`
+error: binary `anchor` already exists in destination
+Add --force to overwrite
+Error: Failed to install 0.30.1, is it a valid version?
+Failed to install `anchor`: failed to install `anchor` 0.30.1 with avm, using 0.32.1 instead
 {
-  "address": "FsD6D5yakUipRtFXXbgBf5YaE1ABVEocFDTLB3z2MxnB",
-  "metadata": {
-    "name": "swapback_cnft",
-    "version": "0.1.0",
-    "spec": "0.1.0",
-    "description": "Programme de gestion des compressed NFTs pour les niveaux SwapBack",
-    "address": "FsD6D5yakUipRtFXXbgBf5YaE1ABVEocFDTLB3z2MxnB"
-  },
+  "accounts": [
+    {
+      "discriminator": [
+        223,
+        110,
+        152,
+        160,
+        174,
+        157,
+        106,
+        255
+      ],
+      "name": "CollectionConfig"
+    },
+    {
+      "discriminator": [
+        163,
+        46,
+        74,
+        168,
+        216,
+        123,
+        133,
+        98
+      ],
+      "name": "GlobalState"
+    },
+    {
+      "discriminator": [
+        118,
+        117,
+        125,
+        216,
+        67,
+        180,
+        173,
+        226
+      ],
+      "name": "UserNft"
+    }
+  ],
+  "address": "9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq",
+  "errors": [
+    {
+      "code": 6000,
+      "msg": "Boost insuffisant pour ce niveau",
+      "name": "InsufficientBoost"
+    },
+    {
+      "code": 6001,
+      "msg": "Non autorisé",
+      "name": "Unauthorized"
+    },
+    {
+      "code": 6002,
+      "msg": "Dépassement arithmétique",
+      "name": "MathOverflow"
+    },
+    {
+      "code": 6003,
+      "msg": "Période de verrouillage non expirée",
+      "name": "LockNotExpired"
+    },
+    {
+      "code": 6004,
+      "msg": "Déjà déverrouillé",
+      "name": "AlreadyUnlocked"
+    }
+  ],
+  "events": [
+    {
+      "discriminator": [
+        238,
+        24,
+        138,
+        45,
+        180,
+        70,
+        246,
+        33
+      ],
+      "name": "LevelNftMinted"
+    },
+    {
+      "discriminator": [
+        165,
+        106,
+        121,
+        27,
+        1,
+        29,
+        55,
+        16
+      ],
+      "name": "NftStatusUpdated"
+    },
+    {
+      "discriminator": [
+        63,
+        184,
+        201,
+        20,
+        203,
+        194,
+        249,
+        138
+      ],
+      "name": "TokensLocked"
+    },
+    {
+      "discriminator": [
+        32,
+        143,
+        250,
+        162,
+        63,
+        131,
+        83,
+        163
+      ],
+      "name": "TokensUnlocked"
+    }
+  ],
   "instructions": [
     {
-      "name": "initialize_collection",
-      "docs": [
-        "Initialise la collection cNFT pour les niveaux SwapBack"
+      "accounts": [
+        {
+          "name": "collection_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  108,
+                  108,
+                  101,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          },
+          "writable": true
+        },
+        {
+          "name": "tree_config"
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "writable": true
+        },
+        {
+          "address": "11111111111111111111111111111111",
+          "name": "system_program"
+        }
       ],
+      "args": [],
       "discriminator": [
         112,
         62,
@@ -23,57 +192,49 @@
         98,
         93
       ],
+      "docs": [
+        "Initialise la collection cNFT pour les niveaux SwapBack"
+      ],
+      "name": "initialize_collection"
+    },
+    {
       "accounts": [
         {
-          "name": "collection_config",
-          "writable": true,
+          "name": "global_state",
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  99,
-                  111,
+                  103,
                   108,
-                  108,
-                  101,
-                  99,
-                  116,
-                  105,
                   111,
-                  110,
+                  98,
+                  97,
+                  108,
                   95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
                 ]
               }
             ]
-          }
-        },
-        {
-          "name": "tree_config"
+          },
+          "writable": true
         },
         {
           "name": "authority",
-          "writable": true,
-          "signer": true
+          "signer": true,
+          "writable": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "address": "11111111111111111111111111111111",
+          "name": "system_program"
         }
       ],
-      "args": []
-    },
-    {
-      "name": "initialize_global_state",
-      "docs": [
-        "Initialise le GlobalState pour tracker le boost total de la communauté"
-      ],
+      "args": [],
       "discriminator": [
         232,
         254,
@@ -84,65 +245,15 @@
         154,
         207
       ],
-      "accounts": [
-        {
-          "name": "global_state",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  108,
-                  111,
-                  98,
-                  97,
-                  108,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  101
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "authority",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
+      "docs": [
+        "Initialise le GlobalState pour tracker le boost total de la communauté"
       ],
-      "args": []
+      "name": "initialize_global_state"
     },
     {
-      "name": "mint_level_nft",
-      "docs": [
-        "Crée un cNFT de niveau pour un utilisateur",
-        "Note: Version simplifiée sans Bubblegum pour éviter les conflits de dépendances",
-        "L'intégration Bubblegum sera ajoutée après résolution des versions"
-      ],
-      "discriminator": [
-        101,
-        210,
-        207,
-        137,
-        3,
-        113,
-        177,
-        171
-      ],
       "accounts": [
         {
           "name": "collection_config",
-          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -168,11 +279,11 @@
                 ]
               }
             ]
-          }
+          },
+          "writable": true
         },
         {
           "name": "global_state",
-          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -193,11 +304,11 @@
                 ]
               }
             ]
-          }
+          },
+          "writable": true
         },
         {
           "name": "user_nft",
-          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -218,134 +329,80 @@
                 "path": "user"
               }
             ]
-          }
+          },
+          "writable": true
         },
         {
-          "name": "user",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "amount_locked",
-          "type": "u64"
-        },
-        {
-          "name": "lock_duration",
-          "type": "i64"
-        }
-      ]
-    },
-    {
-      "name": "lock_tokens",
-      "docs": [
-        "Verrouille des tokens BACK avec transfert on-chain"
-      ],
-      "discriminator": [
-        201,
-        58,
-        220,
-        50,
-        152,
-        42,
-        231,
-        232
-      ],
-      "accounts": [
-        {
-          "name": "collection_config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  108,
-                  108,
-                  101,
-                  99,
-                  116,
-                  105,
-                  111,
-                  110,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "global_state",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  108,
-                  111,
-                  98,
-                  97,
-                  108,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  101
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "user_nft",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  117,
-                  115,
-                  101,
-                  114,
-                  95,
-                  110,
-                  102,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "user"
-              }
-            ]
-          }
-        },
-        {
+          "docs": [
+            "Token Account de l'utilisateur (source)"
+          ],
           "name": "user_token_account",
           "writable": true
         },
         {
+          "docs": [
+            "Vault PDA pour stocker les tokens verrouillés"
+          ],
           "name": "vault_token_account",
+          "pda": {
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            },
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "vault_authority"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "back_mint"
+              }
+            ]
+          },
           "writable": true
         },
         {
+          "docs": [
+            "Autorité du vault (PDA)"
+          ],
           "name": "vault_authority",
           "pda": {
             "seeds": [
@@ -373,22 +430,27 @@
           }
         },
         {
+          "docs": [
+            "Mint du token BACK (Token-2022)"
+          ],
           "name": "back_mint"
         },
         {
           "name": "user",
-          "writable": true,
-          "signer": true
+          "signer": true,
+          "writable": true
         },
         {
+          "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
           "name": "token_program"
         },
         {
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
           "name": "associated_token_program"
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "address": "11111111111111111111111111111111",
+          "name": "system_program"
         }
       ],
       "args": [
@@ -400,52 +462,57 @@
           "name": "lock_duration",
           "type": "i64"
         }
-      ]
-    },
-    {
-      "name": "unlock_tokens",
-      "docs": [
-        "Déverrouille des tokens BACK et les retourne à l'utilisateur"
       ],
       "discriminator": [
-        202,
-        58,
-        220,
-        50,
-        152,
-        42,
-        231,
-        232
+        136,
+        11,
+        32,
+        232,
+        161,
+        117,
+        54,
+        211
       ],
+      "docs": [
+        "Lock des tokens BACK avec transfert vers un PDA",
+        "Cette instruction combine le mint du cNFT ET le transfert des tokens"
+      ],
+      "name": "lock_tokens"
+    },
+    {
       "accounts": [
         {
-          "name": "user_nft",
-          "writable": true,
+          "name": "collection_config",
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  117,
-                  115,
+                  99,
+                  111,
+                  108,
+                  108,
                   101,
-                  114,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
                   95,
+                  99,
+                  111,
                   110,
                   102,
-                  116
+                  105,
+                  103
                 ]
-              },
-              {
-                "kind": "account",
-                "path": "user"
               }
             ]
-          }
+          },
+          "writable": true
         },
         {
           "name": "global_state",
-          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -466,20 +533,171 @@
                 ]
               }
             ]
-          }
+          },
+          "writable": true
         },
         {
+          "name": "user_nft",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  110,
+                  102,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          },
+          "writable": true
+        },
+        {
+          "name": "user",
+          "signer": true,
+          "writable": true
+        },
+        {
+          "address": "11111111111111111111111111111111",
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount_locked",
+          "type": "u64"
+        },
+        {
+          "name": "lock_duration",
+          "type": "i64"
+        }
+      ],
+      "discriminator": [
+        101,
+        210,
+        207,
+        137,
+        3,
+        113,
+        177,
+        171
+      ],
+      "docs": [
+        "Crée un cNFT de niveau pour un utilisateur",
+        "Note: Version simplifiée sans Bubblegum pour éviter les conflits de dépendances",
+        "L'intégration Bubblegum sera ajoutée après résolution des versions"
+      ],
+      "name": "mint_level_nft"
+    },
+    {
+      "accounts": [
+        {
+          "name": "user_nft",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  110,
+                  102,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          },
+          "writable": true
+        },
+        {
+          "name": "global_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          },
+          "writable": true
+        },
+        {
+          "docs": [
+            "Token Account de l'utilisateur (destination)"
+          ],
           "name": "user_token_account",
           "writable": true
         },
         {
+          "docs": [
+            "Vault PDA qui contient les tokens verrouillés"
+          ],
           "name": "vault_token_account",
           "writable": true
         },
         {
-          "name": "vault_authority"
+          "docs": [
+            "Autorité du vault (PDA)"
+          ],
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
         },
         {
+          "docs": [
+            "Mint du token BACK (Token-2022)"
+          ],
           "name": "back_mint"
         },
         {
@@ -487,30 +705,31 @@
           "signer": true
         },
         {
+          "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
           "name": "token_program"
         }
       ],
-      "args": []
+      "args": [],
+      "discriminator": [
+        233,
+        35,
+        95,
+        159,
+        37,
+        185,
+        47,
+        88
+      ],
+      "docs": [
+        "Unlock des tokens BACK et retour vers l'utilisateur",
+        "Permet l'unlock anticipé avec une pénalité de 1,5% des tokens brûlés"
+      ],
+      "name": "unlock_tokens"
     },
     {
-      "name": "update_nft_status",
-      "docs": [
-        "Met à jour le statut d'un NFT (lors du unlock)"
-      ],
-      "discriminator": [
-        231,
-        58,
-        220,
-        50,
-        152,
-        42,
-        231,
-        232
-      ],
       "accounts": [
         {
           "name": "user_nft",
-          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -531,11 +750,11 @@
                 "path": "user"
               }
             ]
-          }
+          },
+          "writable": true
         },
         {
           "name": "global_state",
-          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -556,7 +775,8 @@
                 ]
               }
             ]
-          }
+          },
+          "writable": true
         },
         {
           "name": "user",
@@ -568,115 +788,33 @@
           "name": "is_active",
           "type": "bool"
         }
-      ]
-    }
-  ],
-  "accounts": [
-    {
-      "name": "CollectionConfig",
+      ],
       "discriminator": [
-        223,
-        110,
+        231,
+        58,
+        220,
+        50,
         152,
-        160,
-        174,
-        157,
-        106,
-        255
+        42,
+        231,
+        232
       ],
-      "type": {
-        "defined": {
-          "name": "CollectionConfig"
-        }
-      }
-    },
-    {
-      "name": "GlobalState",
-      "discriminator": [
-        163,
-        46,
-        74,
-        168,
-        216,
-        123,
-        133,
-        98
+      "docs": [
+        "Met à jour le statut d'un NFT (lors du unlock)"
       ],
-      "type": {
-        "defined": {
-          "name": "GlobalState"
-        }
-      }
-    },
-    {
-      "name": "UserNft",
-      "discriminator": [
-        118,
-        117,
-        125,
-        216,
-        67,
-        180,
-        173,
-        226
-      ],
-      "type": {
-        "defined": {
-          "name": "UserNft"
-        }
-      }
+      "name": "update_nft_status"
     }
   ],
-  "events": [
-    {
-      "name": "LevelNftMinted",
-      "discriminator": [
-        238,
-        24,
-        138,
-        45,
-        180,
-        70,
-        246,
-        33
-      ]
-    },
-    {
-      "name": "NftStatusUpdated",
-      "discriminator": [
-        165,
-        106,
-        121,
-        27,
-        1,
-        29,
-        55,
-        16
-      ]
-    }
-  ],
-  "errors": [
-    {
-      "code": 6000,
-      "name": "InsufficientBoost",
-      "msg": "Boost insuffisant pour ce niveau"
-    },
-    {
-      "code": 6001,
-      "name": "Unauthorized",
-      "msg": "Non autorisé"
-    },
-    {
-      "code": 6002,
-      "name": "MathOverflow",
-      "msg": "Dépassement arithmétique"
-    }
-  ],
+  "metadata": {
+    "description": "Programme de gestion des compressed NFTs pour les niveaux SwapBack",
+    "name": "swapback_cnft",
+    "spec": "0.1.0",
+    "version": "0.1.0"
+  },
   "types": [
     {
       "name": "CollectionConfig",
       "type": {
-        "kind": "struct",
         "fields": [
           {
             "name": "authority",
@@ -694,17 +832,17 @@
             "name": "bump",
             "type": "u8"
           }
-        ]
+        ],
+        "kind": "struct"
       }
     },
     {
-      "name": "GlobalState",
       "docs": [
         "GlobalState pour tracker le boost total de la communauté",
         "Utilisé pour calculer la distribution du buyback proportionnellement au boost de chaque utilisateur"
       ],
+      "name": "GlobalState",
       "type": {
-        "kind": "struct",
         "fields": [
           {
             "name": "authority",
@@ -722,13 +860,13 @@
             "name": "total_value_locked",
             "type": "u64"
           }
-        ]
+        ],
+        "kind": "struct"
       }
     },
     {
       "name": "LevelNftMinted",
       "type": {
-        "kind": "struct",
         "fields": [
           {
             "name": "user",
@@ -758,7 +896,8 @@
             "name": "timestamp",
             "type": "i64"
           }
-        ]
+        ],
+        "kind": "struct"
       }
     },
     {
@@ -787,7 +926,6 @@
     {
       "name": "NftStatusUpdated",
       "type": {
-        "kind": "struct",
         "fields": [
           {
             "name": "user",
@@ -809,13 +947,69 @@
             "name": "timestamp",
             "type": "i64"
           }
-        ]
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "name": "TokensLocked",
+      "type": {
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "level",
+            "type": {
+              "defined": {
+                "name": "LockLevel"
+              }
+            }
+          },
+          {
+            "name": "boost",
+            "type": "u16"
+          },
+          {
+            "name": "unlock_time",
+            "type": "i64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "name": "TokensUnlocked",
+      "type": {
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ],
+        "kind": "struct"
       }
     },
     {
       "name": "UserNft",
       "type": {
-        "kind": "struct",
         "fields": [
           {
             "name": "user",
@@ -853,7 +1047,8 @@
             "name": "bump",
             "type": "u8"
           }
-        ]
+        ],
+        "kind": "struct"
       }
     }
   ]
