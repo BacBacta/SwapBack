@@ -10,21 +10,40 @@ import { Program, AnchorProvider, BN, type Idl } from "@coral-xyz/anchor";
 // 🎯 CONFIGURATION SWAPBACK
 // ============================
 
-const ROUTER_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
-);
+// Lazy load to avoid module-level env access
+let _routerProgramId: PublicKey | null = null;
+function getRouterProgramId(): PublicKey {
+  if (!_routerProgramId) {
+    _routerProgramId = new PublicKey(
+      process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
+    );
+  }
+  return _routerProgramId;
+}
 
-const BACK_TOKEN_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
-);
+let _backTokenMint: PublicKey | null = null;
+function getBackTokenMint(): PublicKey {
+  if (!_backTokenMint) {
+    _backTokenMint = new PublicKey(
+      process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
+    );
+  }
+  return _backTokenMint;
+}
 
-const SWITCHBOARD_FEED = new PublicKey(
-  process.env.NEXT_PUBLIC_SWITCHBOARD_FEED || "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
-);
+let _switchboardFeed: PublicKey | null = null;
+function getSwitchboardFeed(): PublicKey {
+  if (!_switchboardFeed) {
+    _switchboardFeed = new PublicKey(
+      process.env.NEXT_PUBLIC_SWITCHBOARD_FEED || "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
+    );
+  }
+  return _switchboardFeed;
+}
 
 // Minimal IDL pour create_plan
 const ROUTER_IDL = {
-  address: ROUTER_PROGRAM_ID.toString(),
+  address: getRouterProgramId().toString(),
   metadata: {
     name: "swapback_router",
     version: "0.1.0",
@@ -65,7 +84,7 @@ export const SwapBackInterface = () => {
   const [dcaInterval, setDcaInterval] = useState("3600"); // 1 heure par défaut
   const [numberOfSwaps, setNumberOfSwaps] = useState("10");
   const [destinationToken, setDestinationToken] = useState(
-    BACK_TOKEN_MINT.toString()
+    getBackTokenMint().toString()
   );
 
   // États UI
@@ -301,7 +320,7 @@ export const SwapBackInterface = () => {
               onChange={(e) => setDestinationToken(e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             >
-              <option value={BACK_TOKEN_MINT.toString()}>$BACK Token</option>
+              <option value={getBackTokenMint().toString()}>$BACK Token</option>
               <option value="So11111111111111111111111111111111111111112">
                 Wrapped SOL
               </option>

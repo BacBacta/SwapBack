@@ -262,6 +262,12 @@ export async function initializeRouterState(
   authorityPublicKey: PublicKey
 ): Promise<string> {
   
+  // Resolve Program ID
+  const ROUTER_PROGRAM_ID = getRouterProgramId();
+  if (!ROUTER_PROGRAM_ID) {
+    throw new Error('❌ NEXT_PUBLIC_ROUTER_PROGRAM_ID is not configured. Define it in Vercel or .env');
+  }
+  
   // Load IDL and create program instance
   const idl = await loadRouterIdl();
   const program = new Program(idl, provider);
@@ -323,6 +329,12 @@ export async function createDcaPlanTransaction(
   userPublicKey: PublicKey,
   params: CreateDcaPlanParams
 ): Promise<{ signature: string; planPda: PublicKey; planId: Buffer }> {
+  
+  // Resolve Program ID
+  const ROUTER_PROGRAM_ID = getRouterProgramId();
+  if (!ROUTER_PROGRAM_ID) {
+    throw new Error('❌ NEXT_PUBLIC_ROUTER_PROGRAM_ID is not configured. Define it in Vercel or .env');
+  }
   
   // Load IDL and create program instance
   const idl = await loadRouterIdl();
@@ -433,6 +445,12 @@ export async function fetchUserDcaPlans(
   provider: AnchorProvider,
   userPublicKey: PublicKey
 ): Promise<DcaPlanWithAddress[]> {
+  
+  // Resolve Program ID
+  const ROUTER_PROGRAM_ID = getRouterProgramId();
+  if (!ROUTER_PROGRAM_ID) {
+    throw new Error('❌ NEXT_PUBLIC_ROUTER_PROGRAM_ID is not configured. Define it in Vercel or .env');
+  }
   
   console.log('🔍 Fetching DCA plans for user:', userPublicKey.toBase58());
   
