@@ -9,11 +9,20 @@ import { WalletContextState } from "@solana/wallet-adapter-react";
 import type { Idl } from "@coral-xyz/anchor";
 import cnftIdl from "@/idl/swapback_cnft.json";
 
-// Program ID du programme swapback_cnft déployé (Devnet - Updated Oct 31, 2025)
-export const CNFT_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID ||
-    "2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G" // Nouveau program ID avec fix bump
-);
+// Lazy load CNFT_PROGRAM_ID to avoid module-level env access
+let _cnftProgramId: PublicKey | null = null;
+function getCnftProgramId(): PublicKey {
+  if (!_cnftProgramId) {
+    const envId = process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID;
+    _cnftProgramId = new PublicKey(
+      envId || "2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G"
+    );
+  }
+  return _cnftProgramId;
+}
+
+// Export for backward compatibility
+export const CNFT_PROGRAM_ID = getCnftProgramId();
 
 type AnchorInstruction = {
   name: string;
@@ -136,14 +145,14 @@ export function calculateBoost(amount: number, durationDays: number): number {
 export function getCollectionConfigPDA(): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("collection_config")],
-    CNFT_PROGRAM_ID
+    getCnftProgramId()
   );
 }
 
 export function getGlobalStatePDA(): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("global_state")],
-    CNFT_PROGRAM_ID
+    getCnftProgramId()
   );
 }
 
@@ -153,7 +162,7 @@ export function getGlobalStatePDA(): [PublicKey, number] {
 export function getUserNftPDA(userPubkey: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("user_nft"), userPubkey.toBuffer()],
-    CNFT_PROGRAM_ID
+    getCnftProgramId()
   );
 }
 
@@ -246,7 +255,7 @@ export async function createUnlockTransaction(
   const [userNft] = getUserNftPDA(wallet.publicKey);
 
   const instruction = new TransactionInstruction({
-    programId: CNFT_PROGRAM_ID,
+    programId: getCnftProgramId(),
     keys: [
       { pubkey: userNft, isSigner: false, isWritable: true },
       { pubkey: globalState, isSigner: false, isWritable: true },
