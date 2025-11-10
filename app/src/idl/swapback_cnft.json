@@ -1,16 +1,3 @@
-`anchor` 0.30.1 is not installed with `avm`. Installing...
-
-    Updating git repository `https://github.com/coral-xyz/anchor`
-warning: skipping duplicate package `docs` found at `/usr/local/cargo/git/checkouts/anchor-50c4b9c8b5e0501f/e6d7daf/tests/docs/programs/docs`
-warning: skipping duplicate package `external` found at `/usr/local/cargo/git/checkouts/anchor-50c4b9c8b5e0501f/e6d7daf/tests/declare-program/programs/external`
-warning: skipping duplicate package `shared` found at `/usr/local/cargo/git/checkouts/anchor-50c4b9c8b5e0501f/e6d7daf/tests/typescript/programs/shared`
-warning: skipping duplicate package `relations-derivation` found at `/usr/local/cargo/git/checkouts/anchor-50c4b9c8b5e0501f/e6d7daf/tests/relations-derivation/programs/relations-derivation`
-warning: skipping duplicate package `shared` found at `/usr/local/cargo/git/checkouts/anchor-50c4b9c8b5e0501f/e6d7daf/tests/misc/programs/shared`
-warning: skipping duplicate package `swap` found at `/usr/local/cargo/git/checkouts/anchor-50c4b9c8b5e0501f/e6d7daf/tests/cfo/deps/swap/programs/swap`
-error: binary `anchor` already exists in destination
-Add --force to overwrite
-Error: Failed to install 0.30.1, is it a valid version?
-Failed to install `anchor`: failed to install `anchor` 0.30.1 with avm, using 0.32.1 instead
 {
   "accounts": [
     {
