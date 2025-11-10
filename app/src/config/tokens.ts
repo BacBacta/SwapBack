@@ -13,9 +13,9 @@ export const BACK_TOKEN_DEVNET = {
 
 // IDs des programmes SwapBack sur Devnet (pour référence)
 export const PROGRAM_IDS_DEVNET = {
-  router: "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt",
+  router: "opPhGcth2dGQQ7njYmkAYwfxspJ1DjgP9LV2y1jygCx",
   buyback: "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf",
-  cnft: "2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G",
+  cnft: "FsD6D5yakUipRtFXXbgBf5YaE1ABVEocFDTLB3z2MxnB",
 } as const;
 
 // Configuration du cluster - utilise les variables d'environnement

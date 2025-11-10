@@ -9,8 +9,20 @@ import { PublicKey } from '@solana/web3.js';
 // PROGRAM IDs (Devnet - Updated Oct 31, 2025)
 // ============================================
 
+// Lazy load to avoid module-level access
+let _routerProgramId: PublicKey | null = null;
+export function getRouterProgramId(): PublicKey {
+  if (!_routerProgramId) {
+    _routerProgramId = new PublicKey(
+      process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || 'opPhGcth2dGQQ7njYmkAYwfxspJ1DjgP9LV2y1jygCx'
+    );
+  }
+  return _routerProgramId;
+}
+
+// Keep for backward compatibility, but export lazy-loaded version
 export const ROUTER_PROGRAM_ID = new PublicKey(
-  'GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt'
+  'opPhGcth2dGQQ7njYmkAYwfxspJ1DjgP9LV2y1jygCx'
 );
 
 export const BUYBACK_PROGRAM_ID = new PublicKey(
@@ -18,7 +30,7 @@ export const BUYBACK_PROGRAM_ID = new PublicKey(
 );
 
 export const CNFT_PROGRAM_ID = new PublicKey(
-  '2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G' // Fixed bump initialization
+  'FsD6D5yakUipRtFXXbgBf5YaE1ABVEocFDTLB3z2MxnB' // Fixed bump initialization
 );
 
 // ============================================
