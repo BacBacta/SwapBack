@@ -64,16 +64,23 @@ export const SwapInterface = () => {
   const [showPriceImpactModal, setShowPriceImpactModal] = useState(false);
   const [buybackDeposit, setBuybackDeposit] = useState<BuybackDepositResult | null>(null);
 
-  const tokenAddresses: { [key: string]: string } = {
-    SOL: "So11111111111111111111111111111111111111112",
-    BACK: process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
-    USDC: process.env.NEXT_PUBLIC_USDC_MINT || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-    BONK: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
-    USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-    JUP: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
-    JTO: "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr",
-    mSOL: "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
-  };
+  // Lazy load token addresses to avoid module-level env access
+  let _tokenAddresses: { [key: string]: string } | null = null;
+  function getTokenAddresses(): { [key: string]: string } {
+    if (!_tokenAddresses) {
+      _tokenAddresses = {
+        SOL: "So11111111111111111111111111111111111111112",
+        BACK: process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
+        USDC: process.env.NEXT_PUBLIC_USDC_MINT || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        BONK: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+        USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+        JUP: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+        JTO: "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr",
+        mSOL: "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+      };
+    }
+    return _tokenAddresses;
+  }
 
   // Helper function to get token mint address
   // Si le token est déjà une adresse mint (commence par lettre/chiffre de 32-44 chars), l'utiliser directement
@@ -83,7 +90,7 @@ export const SwapInterface = () => {
       return token;
     }
     // Sinon chercher dans notre mapping
-    return tokenAddresses[token] || token;
+    return getTokenAddresses()[token] || token;
   };
 
   const inputTokenData = useTokenData(getTokenMint(inputToken));

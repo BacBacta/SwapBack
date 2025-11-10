@@ -14,17 +14,23 @@ import {
 } from "../hooks/useDCA";
 import { frequencyToSeconds, type DCAFrequency } from "../lib/dca";
 
-// Token symbol to mint address mapping
-const TOKEN_MINTS: Record<string, string> = {
-  SOL: "So11111111111111111111111111111111111111112",
-  USDC:
-    process.env.NEXT_PUBLIC_USDC_MINT ||
-    "BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR",
-  USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-  BACK:
-    process.env.NEXT_PUBLIC_BACK_MINT ||
-    "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
-};
+// Lazy load TOKEN_MINTS to avoid module-level env access
+let _tokenMints: Record<string, string> | null = null;
+function getTokenMints(): Record<string, string> {
+  if (!_tokenMints) {
+    _tokenMints = {
+      SOL: "So11111111111111111111111111111111111111112",
+      USDC:
+        process.env.NEXT_PUBLIC_USDC_MINT ||
+        "BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR",
+      USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+      BACK:
+        process.env.NEXT_PUBLIC_BACK_MINT ||
+        "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
+    };
+  }
+  return _tokenMints;
+}
 
 export const DCAClient = () => {
   const { connected, publicKey } = useWallet();
@@ -59,7 +65,7 @@ export const DCAClient = () => {
   const stats = useDcaStats();
 
   // Token Data - Convert symbol to mint address
-  const inputTokenMint = TOKEN_MINTS[inputToken] || TOKEN_MINTS.SOL;
+  const inputTokenMint = getTokenMints()[inputToken] || getTokenMints().SOL;
   const inputTokenData = useTokenData(inputTokenMint);
 
   // Helper functions
@@ -149,8 +155,8 @@ export const DCAClient = () => {
         return;
       }
 
-      const inputMint = TOKEN_MINTS[inputToken];
-      const outputMint = TOKEN_MINTS[outputToken];
+      const inputMint = getTokenMints()[inputToken];
+      const outputMint = getTokenMints()[outputToken];
 
       if (!inputMint || !outputMint) {
         throw new Error("Token mint address not found");

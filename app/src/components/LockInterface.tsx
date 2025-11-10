@@ -10,11 +10,17 @@ import {
 import { createLockTokensTransaction } from "@/lib/lockTokens";
 // Fallback: import { createLockTransaction } from '@/lib/cnft';
 
-// Configuration du token $BACK - Utilise les variables d'environnement
-const BACK_TOKEN_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_BACK_MINT ||
-    "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
-);
+// Lazy load BACK_TOKEN_MINT to avoid module-level env access
+let _backTokenMint: PublicKey | null = null;
+function getBackTokenMint(): PublicKey {
+  if (!_backTokenMint) {
+    _backTokenMint = new PublicKey(
+      process.env.NEXT_PUBLIC_BACK_MINT ||
+        "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
+    );
+  }
+  return _backTokenMint;
+}
 
 // Types pour les niveaux de cNFT - Étendus
 type CNFTLevel = "Bronze" | "Silver" | "Gold" | "Platinum" | "Diamond";
@@ -172,7 +178,7 @@ export default function LockInterface({
     const fetchBalance = async () => {
       try {
         const ata = await getAssociatedTokenAddress(
-          BACK_TOKEN_MINT,
+          getBackTokenMint(),
           publicKey,
           false, // allowOwnerOffCurve
           TOKEN_2022_PROGRAM_ID // Token-2022 pour BACK
@@ -521,7 +527,7 @@ export default function LockInterface({
         try {
           // Rafraîchir le solde
           const ata = await getAssociatedTokenAddress(
-            BACK_TOKEN_MINT,
+            getBackTokenMint(),
             publicKey,
             false,
             TOKEN_2022_PROGRAM_ID

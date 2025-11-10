@@ -119,19 +119,22 @@ export const TokenSelector = ({
   const [recentTokens, setRecentTokens] = useState<string[]>([]);
 
   // Build popular tokens list with network-specific tokens
-  const POPULAR_TOKENS = [
-    ...BASE_POPULAR_TOKENS,
-    // Add $BACK token on devnet only - Uses NEXT_PUBLIC_BACK_MINT from env
-    ...(process.env.NEXT_PUBLIC_SOLANA_NETWORK === 'devnet' ? [{
-      address: process.env.NEXT_PUBLIC_BACK_MINT || "8sQq53Up7KooCTygi8Dk3Gt8XDeUN5BVLNi5h6Skz43P",
-      symbol: "BACK",
-      name: "SwapBack Token",
-      decimals: 9,
-      logoURI: "https://swapback.xyz/logo.png", // TODO: Add proper logo
-      verified: true,
-      trending: true,
-    }] : []),
-  ];
+  // Use in component instead of module-level to avoid env access issues
+  const getPopularTokens = (): Token[] => {
+    return [
+      ...BASE_POPULAR_TOKENS,
+      // Add $BACK token on devnet only - Uses NEXT_PUBLIC_BACK_MINT from env
+      ...(process.env.NEXT_PUBLIC_SOLANA_NETWORK === 'devnet' ? [{
+        address: process.env.NEXT_PUBLIC_BACK_MINT || "8sQq53Up7KooCTygi8Dk3Gt8XDeUN5BVLNi5h6Skz43P",
+        symbol: "BACK",
+        name: "SwapBack Token",
+        decimals: 9,
+        logoURI: "https://swapback.xyz/logo.png", // TODO: Add proper logo
+        verified: true,
+        trending: true,
+      }] : []),
+    ];
+  };
 
   useEffect(() => {
     const recent = localStorage.getItem("recentTokens");
@@ -181,7 +184,7 @@ export const TokenSelector = ({
   }, [publicKey, connection]);
 
   // Filter tokens with enhanced search (include imported tokens)
-  const allTokens = [...POPULAR_TOKENS, ...importedTokens];
+  const allTokens = [...getPopularTokens(), ...importedTokens];
   const filteredTokens = allTokens.filter(
     (token) =>
       token.symbol.toLowerCase().includes(search.toLowerCase()) ||
@@ -199,7 +202,7 @@ export const TokenSelector = ({
   );
 
   // Get recent tokens
-  const recentTokensList = POPULAR_TOKENS.filter((token) =>
+  const recentTokensList = getPopularTokens().filter((token) =>
     recentTokens.includes(token.address)
   );
 
