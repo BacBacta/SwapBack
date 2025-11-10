@@ -38,7 +38,7 @@ export const RPC_ENDPOINTS: Record<NetworkEnvironment, string> = {
  * Wallet: 3PiZ1xdHbPbj1UaPS8pfzKnHpmQQLfR8zrhy5RcksqAt
  */
 const DEVNET_PROGRAM_IDS: ProgramIds = {
-  cnftProgram: new PublicKey('9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw'),
+  cnftProgram: new PublicKey('9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq'),
   routerProgram: new PublicKey('GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt'),
   buybackProgram: new PublicKey('EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf'),
 };
@@ -52,7 +52,7 @@ const DEVNET_PROGRAM_IDS: ProgramIds = {
  * Coût total: ~6.5 SOL
  */
 const TESTNET_PROGRAM_IDS: ProgramIds = {
-  cnftProgram: new PublicKey('9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw'),
+  cnftProgram: new PublicKey('9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq'),
   routerProgram: new PublicKey('GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt'),
   buybackProgram: new PublicKey('EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf'),
 };

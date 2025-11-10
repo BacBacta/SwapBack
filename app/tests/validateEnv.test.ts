@@ -20,7 +20,7 @@ describe("validateEnv", () => {
     process.env.NEXT_PUBLIC_SOLANA_NETWORK = "devnet";
     process.env.NEXT_PUBLIC_SOLANA_RPC_URL = "https://api.devnet.solana.com";
     process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID =
-      "9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw"; // IDL address
+      "9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq"; // IDL address
     process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID =
       "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"; // Router IDL address
     process.env.NEXT_PUBLIC_BACK_MINT =
@@ -32,7 +32,7 @@ describe("validateEnv", () => {
 
     expect(config.network).toBe("devnet");
     expect(config.cnftProgramId).toBe(
-      "9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw"
+      "9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq"
     );
         expect(config.routerProgramId).toBe(
       "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
@@ -81,7 +81,7 @@ describe("validateEnv", () => {
     process.env.NEXT_PUBLIC_SOLANA_NETWORK = "devnet";
     process.env.NEXT_PUBLIC_SOLANA_RPC_URL = "https://api.devnet.solana.com";
     process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID =
-      "9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw"; // IDL address
+      "9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq"; // IDL address
     process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID =
       "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt";
     process.env.NEXT_PUBLIC_BACK_MINT = "invalid-public-key";
@@ -121,7 +121,7 @@ describe("ensureDevnetConfig", () => {
     process.env.NEXT_PUBLIC_SOLANA_NETWORK = "devnet";
     process.env.NEXT_PUBLIC_SOLANA_RPC_URL = "https://api.devnet.solana.com";
     process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID =
-      "9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw"; // IDL address
+      "9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq"; // IDL address
     process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID =
       "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt";
     process.env.NEXT_PUBLIC_BACK_MINT =
@@ -137,7 +137,7 @@ describe("ensureDevnetConfig", () => {
     process.env.NEXT_PUBLIC_SOLANA_RPC_URL =
       "https://api.mainnet-beta.solana.com";
     process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID =
-      "9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw"; // IDL address
+      "9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq"; // IDL address
     process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID =
       "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt";
     process.env.NEXT_PUBLIC_BACK_MINT =

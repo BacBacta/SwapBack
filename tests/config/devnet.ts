@@ -9,7 +9,7 @@ export const BUYBACK_PROGRAM_ID = new PublicKey(
 );
 
 export const CNFT_PROGRAM_ID = new PublicKey(
-  "9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw"
+  "9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq"
 );
 
 export const BACK_TOKEN_MINT = new PublicKey(
