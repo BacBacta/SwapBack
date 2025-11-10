@@ -48,18 +48,20 @@ export interface ClaimBuybackParams {
 }
 
 // Configuration des Program IDs (à mettre à jour après déploiement)
-// Utilise les Program IDs depuis les variables d'environnement
-const PROGRAM_IDS = {
-  swapback_cnft: new PublicKey(
-    process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw"
-  ),
-  swapback_router: new PublicKey(
-    process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
-  ),
-  swapback_buyback: new PublicKey(
-    process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"
-  ),
-};
+// Utilise les Program IDs depuis les variables d'environnement avec résolution paresseuse
+function getProgramIds() {
+  return {
+    swapback_cnft: new PublicKey(
+      process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw"
+    ),
+    swapback_router: new PublicKey(
+      process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
+    ),
+    swapback_buyback: new PublicKey(
+      process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"
+    ),
+  };
+}
 
 export function useBoostSystem() {
   const { connection } = useConnection();
@@ -114,10 +116,10 @@ export function useBoostSystem() {
     /* CODE DÉSACTIVÉ - À réactiver avec IDL chargé dynamiquement
     // const provider = getProvider();
     // if (!provider) throw new Error("Provider not available");
-    // const cnftProgram = new Program(cnftIdl, PROGRAM_IDS.swapback_cnft, provider);
+    // const cnftProgram = new Program(cnftIdl, getProgramIds().swapback_cnft, provider);
     // const [userNftPda] = PublicKey.findProgramAddressSync(
     //   [Buffer.from("user_nft"), publicKey.toBuffer()],
-    //   PROGRAM_IDS.swapback_cnft
+    //   getProgramIds().swapback_cnft
     // );
     // const nftData = await cnftProgram.account.userNft.fetch(userNftPda);
     // const formattedData: UserNftData = {
@@ -172,19 +174,20 @@ export function useBoostSystem() {
         const lockDuration = new BN(durationDays * 86400); // Secondes
 
         // Dériver les PDAs
+        const programIds = getProgramIds();
         const [globalStatePda] = PublicKey.findProgramAddressSync(
           [Buffer.from("global_state")],
-          PROGRAM_IDS.swapback_cnft
+          programIds.swapback_cnft
         );
 
         const [collectionConfigPda] = PublicKey.findProgramAddressSync(
           [Buffer.from("collection_config")],
-          PROGRAM_IDS.swapback_cnft
+          programIds.swapback_cnft
         );
 
         const [userNftPda] = PublicKey.findProgramAddressSync(
           [Buffer.from("user_nft"), publicKey.toBuffer()],
-          PROGRAM_IDS.swapback_cnft
+          programIds.swapback_cnft
         );
 
         // Créer la transaction
@@ -246,14 +249,15 @@ export function useBoostSystem() {
 
       const cnftProgram = anchor.workspace.SwapbackCnft as Program;
 
+      const programIds = getProgramIds();
       const [globalStatePda] = PublicKey.findProgramAddressSync(
         [Buffer.from("global_state")],
-        PROGRAM_IDS.swapback_cnft
+        programIds.swapback_cnft
       );
 
       const [userNftPda] = PublicKey.findProgramAddressSync(
         [Buffer.from("user_nft"), publicKey.toBuffer()],
-        PROGRAM_IDS.swapback_cnft
+        programIds.swapback_cnft
       );
 
       const tx = await cnftProgram.methods
@@ -309,19 +313,20 @@ export function useBoostSystem() {
 
         const maxTokensBN = new BN(maxTokens * 1e9);
 
+        const programIds = getProgramIds();
         const [buybackStatePda] = PublicKey.findProgramAddressSync(
           [Buffer.from("buyback_state")],
-          PROGRAM_IDS.swapback_buyback
+          programIds.swapback_buyback
         );
 
         const [globalStatePda] = PublicKey.findProgramAddressSync(
           [Buffer.from("global_state")],
-          PROGRAM_IDS.swapback_cnft
+          programIds.swapback_cnft
         );
 
         const [userNftPda] = PublicKey.findProgramAddressSync(
           [Buffer.from("user_nft"), publicKey.toBuffer()],
-          PROGRAM_IDS.swapback_cnft
+          programIds.swapback_cnft
         );
 
         // Note: backVault et userBackAccount doivent être fournis

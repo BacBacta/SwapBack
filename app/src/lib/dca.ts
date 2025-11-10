@@ -30,16 +30,36 @@ function getRouterProgramId(): PublicKey | null {
   return envVar ? new PublicKey(envVar) : null;
 }
 
-// Token mints
+/**
+ * Lazily resolve BACK_MINT to avoid throwing during module
+ * initialization in the browser.
+ */
+function getBackMint(): PublicKey {
+  const envVar = process.env.NEXT_PUBLIC_BACK_MINT;
+  if (envVar) {
+    return new PublicKey(envVar);
+  }
+  // Default to devnet BACK mint
+  return new PublicKey('862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux');
+}
+
+/**
+ * Lazily resolve USDC_MINT to avoid throwing during module
+ * initialization in the browser.
+ */
+function getUsdcMint(): PublicKey {
+  const envVar = process.env.NEXT_PUBLIC_USDC_MINT;
+  if (envVar) {
+    return new PublicKey(envVar);
+  }
+  // Default to devnet USDC mint
+  return new PublicKey('BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR');
+}
+
+// Token mints - now lazy
 export const SOL_MINT = new PublicKey('So11111111111111111111111111111111111111112');
-export const USDC_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_USDC_MINT || 
-  'BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR'
-);
-export const BACK_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_BACK_MINT || 
-  '862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux'
-);
+export const USDC_MINT = getUsdcMint();
+export const BACK_MINT = getBackMint();
 
 // Token symbol to mint mapping
 export const TOKEN_MINTS: Record<string, PublicKey> = {
@@ -445,13 +465,18 @@ export async function fetchUserDcaPlans(
   // - user: 32 bytes (pubkey) <- at offset 40
   
   console.log('🔍 Searching with filters:', {
-    programId: ROUTER_PROGRAM_ID.toBase58(),
+    programId: getRouterProgramId()?.toString() ?? 'N/A',
     discriminator: Buffer.from([231, 97, 112, 227, 171, 241, 52, 84]).toString('hex'),
     userOffset: 40,
   });
   
+  const routerProgramId = getRouterProgramId();
+  if (!routerProgramId) {
+    throw new Error('❌ NEXT_PUBLIC_ROUTER_PROGRAM_ID is not configured. Define it in Vercel or .env');
+  }
+  
   // Use getProgramAccounts to fetch all DCA plans owned by the user
-  const accounts = await connection.getProgramAccounts(ROUTER_PROGRAM_ID, {
+  const accounts = await connection.getProgramAccounts(routerProgramId, {
     filters: [
       {
         // Filter by DcaPlan account discriminator
