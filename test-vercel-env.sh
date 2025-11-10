@@ -25,8 +25,8 @@ echo ""
 
 # Vérifier que les IDL correspondent
 echo "📋 Vérification des IDL..."
-CNFT_IDL_ADDRESS=$(grep -A 1 '"address"' app/src/idl/swapback_cnft.json | head -1 | cut -d'"' -f4)
-ROUTER_IDL_ADDRESS=$(grep '"address"' app/src/idl/swapback_router.json | tail -1 | cut -d'"' -f4)
+CNFT_IDL_ADDRESS=$(jq -r '.address' app/src/idl/swapback_cnft.json)
+ROUTER_IDL_ADDRESS=$(jq -r '.address' app/src/idl/swapback_router.json)
 
 echo "   IDL cNFT: $CNFT_IDL_ADDRESS"
 echo "   Env cNFT: $NEXT_PUBLIC_CNFT_PROGRAM_ID"
