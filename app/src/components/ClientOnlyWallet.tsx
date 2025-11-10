@@ -9,7 +9,9 @@ import { clusterApiUrl } from "@solana/web3.js";
 export const ClientOnlyWallet = () => {
   const { connected, connecting, publicKey, wallet, disconnect } = useWallet();
   const { connection } = useConnection();
-  const [network, setNetwork] = useState<"mainnet-beta" | "devnet">("mainnet-beta");
+  const [network, setNetwork] = useState<"mainnet-beta" | "devnet">(
+    (process.env.NEXT_PUBLIC_SOLANA_NETWORK as "mainnet-beta" | "devnet") || "devnet"
+  );
   const [isWrongNetwork, setIsWrongNetwork] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
   const [showMenu, setShowMenu] = useState(false);
