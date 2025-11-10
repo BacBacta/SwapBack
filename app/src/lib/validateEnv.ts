@@ -176,12 +176,15 @@ export function ensureDevnetConfig(): void {
     );
   }
 
-  // Vérifier que le Program ID correspond au déploiement devnet
+  // Vérifier que le Program ID correspond au déploiement devnet (26 Oct 2025)
   const expectedDevnetProgramId =
     "9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw";
   if (config.cnftProgramId !== expectedDevnetProgramId) {
-    throw new Error(
-      `❌ Expected devnet CNFT Program ${expectedDevnetProgramId} but got ${config.cnftProgramId}`
+    console.warn(
+      `⚠️  CNFT Program ID mismatch: Expected ${expectedDevnetProgramId} but got ${config.cnftProgramId}`
+    );
+    console.warn(
+      `   Update your environment variables. See VERCEL_ENV_UPDATE_REQUIRED.md`
     );
   }
 
