@@ -79,7 +79,7 @@ export function useCNFT() {
       });
 
       setLockData({
-        amount: account.amountLocked,
+        amount: lockedAmount, // FIX: Use converted amount, not lamports
         boost: account.boostBps,
         unlockTime: account.unlockTime,
         isActive: account.isActive,

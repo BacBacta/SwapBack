@@ -105,31 +105,47 @@ export function calculateLevel(
 
 /**
  * Calcule le boost basé sur le montant et la durée
- * Formule adaptée pour supply de 1 milliard de tokens
+ * Nouvelle formule ÉQUITABLE et PROPORTIONNELLE
  * Boost maximum = 20%
  * 
- * Formule:
- * - Score du montant: (amount / 5,000,000) * 10, max 10%
- * - Score de la durée: (days / 365) * 10, max 10%
+ * Formule améliorée:
+ * - Score du montant: logarithmique pour récompenser proportionnellement
+ *   (log10(amount / 100,000) / log10(100)) * 10, max 10%
+ * - Score de la durée: linéaire (days / 365) * 10, max 10%
  * - Boost total = montant_score + durée_score, max 20%
  * 
- * Seuils de montant (supply = 1B):
- * - 100,000 tokens (0.01% supply) = 0.2% boost montant
- * - 1,000,000 tokens (0.1% supply) = 2% boost montant
- * - 10,000,000 tokens (1% supply) = 10% boost montant (max montant)
- * - 50,000,000+ tokens (5%+ supply) = 10% boost montant (plafonné)
+ * Avec formule logarithmique:
+ * - 100,000 tokens = 0% boost montant (base)
+ * - 1,000,000 tokens (10x) = 5% boost montant
+ * - 10,000,000 tokens (100x) = 10% boost montant (max)
+ * - 100,000,000 tokens (1000x) = 10% boost montant (plafonné)
  * 
- * Exemples complets:
- * - 100,000 BACK pour 30 jours = 0.2% + 0.82% = 1.02%
- * - 1,000,000 BACK pour 90 jours = 2% + 2.47% = 4.47%
- * - 5,000,000 BACK pour 180 jours = 10% + 4.93% = 14.93%
+ * Exemples complets (transparents et équitables):
+ * - 100,000 BACK pour 30 jours = 0% + 0.82% = 0.82%
+ * - 1,000,000 BACK pour 30 jours = 5% + 0.82% = 5.82% (10x tokens = ~7x boost)
+ * - 5,000,000 BACK pour 30 jours = 8.5% + 0.82% = 9.32% (50x tokens = ~11x boost)
+ * - 10,000,000 BACK pour 30 jours = 10% + 0.82% = 10.82% (100x tokens = ~13x boost)
+ * - 100,000 BACK pour 365 jours = 0% + 10% = 10%
  * - 10,000,000 BACK pour 365 jours = 10% + 10% = 20% (max)
  */
 export function calculateBoost(amount: number, durationDays: number): number {
-  // Score du montant: max 10% (atteint à 5,000,000 tokens = 0.5% du supply)
-  const amountScore = Math.min((amount / 5000000) * 10, 10);
+  // Seuil minimum: 100,000 tokens
+  const minAmount = 100000;
+  const maxLogRatio = 2; // log10(100) = 2, donc 100x le minimum = boost max
   
-  // Score de la durée: max 10% (atteint à 365 jours)
+  // Score du montant: logarithmique pour équité
+  // Si amount < minAmount, score = 0%
+  // Si amount = minAmount (100k), score = 0%
+  // Si amount = 1M (10x), score = 5%
+  // Si amount = 10M (100x), score = 10% (max)
+  let amountScore = 0;
+  if (amount >= minAmount) {
+    const ratio = amount / minAmount;
+    const logRatio = Math.log10(ratio);
+    amountScore = Math.min((logRatio / maxLogRatio) * 10, 10);
+  }
+  
+  // Score de la durée: linéaire (max 10% à 365 jours)
   const durationScore = Math.min((durationDays / 365) * 10, 10);
   
   // Boost total: max 20%
