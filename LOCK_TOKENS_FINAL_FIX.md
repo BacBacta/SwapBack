@@ -14,10 +14,11 @@ L'**ancien programme** `9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq` contient *
 
 ### Actions effectuées
 1. **Mis à jour app/src/idl/swapback_cnft.json** : Remis l'ancien program ID
-2. **Variables d'environnement à utiliser** :
-   ```
+### 2. Variables d'environnement à utiliser** :
+   ```bash
    NEXT_PUBLIC_CNFT_PROGRAM_ID=9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq
    NEXT_PUBLIC_ROUTER_PROGRAM_ID=BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz
+   NEXT_PUBLIC_BACK_MINT=862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux
    ```
 
 ## 📊 Vérification
@@ -45,7 +46,7 @@ Dans le dashboard Vercel, définir :
 ```bash
 NEXT_PUBLIC_CNFT_PROGRAM_ID=9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq
 NEXT_PUBLIC_ROUTER_PROGRAM_ID=BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz
-NEXT_PUBLIC_BACK_MINT=Av3wTvhZHJLcSqJFBYNK8g4CxKtoCqzxEGxLNYLxqZ4a
+NEXT_PUBLIC_BACK_MINT=862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux
 ```
 
 ### 2. Tester le lock
@@ -65,7 +66,7 @@ Event: TokensLocked
 
 - **Programme cNFT** : `9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq`
 - **Programme Router** : `BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz`  
-- **Back Mint** : `Av3wTvhZHJLcSqJFBYNK8g4CxKtoCqzxEGxLNYLxqZ4a`
+- **Back Mint** : `862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux` (Token-2022 avec métadonnées)
 - **Cluster** : devnet
 
 ## 📝 Notes

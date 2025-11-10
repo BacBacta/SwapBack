@@ -3,8 +3,8 @@ use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token_2022::{transfer_checked, Token2022, TransferChecked};
 use anchor_spl::token_interface::{Mint, TokenAccount};
 
-// Program ID déployé sur devnet - 3 Nov 2025 (version avec lock_tokens/unlock_tokens)
-declare_id!("9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq");
+// Program ID - Keypair local pour deployment
+declare_id!("FsD6D5yakUipRtFXXbgBf5YaE1ABVEocFDTLB3z2MxnB");
 
 #[program]
 pub mod swapback_cnft {

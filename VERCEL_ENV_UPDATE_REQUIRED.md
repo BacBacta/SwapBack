@@ -6,12 +6,21 @@ L'ancien program ID cNFT (`9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq`) est **
 
 ## ✅ Variables Correctes (À UTILISER)
 
+```bash
+NEXT_PUBLIC_CNFT_PROGRAM_ID=9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq
+NEXT_PUBLIC_ROUTER_PROGRAM_ID=BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz
+NEXT_PUBLIC_BACK_MINT=862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux  # ⚠️ IMPORTANT: Token-2022 avec métadonnées
+NEXT_PUBLIC_SOLANA_NETWORK=devnet
+NEXT_PUBLIC_SOLANA_RPC_URL=https://api.devnet.solana.com
 ```
-NEXT_PUBLIC_CNFT_PROGRAM_ID = 9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq
-NEXT_PUBLIC_ROUTER_PROGRAM_ID = BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz
-NEXT_PUBLIC_BACK_MINT = Av3wTvhZHJLcSqJFBYNK8g4CxKtoCqzxEGxLNYLxqZ4a
-NEXT_PUBLIC_SOLANA_NETWORK = devnet
-NEXT_PUBLIC_SOLANA_RPC_URL = https://api.devnet.solana.com
+
+## ⚠️ ATTENTION : BACK_MINT Invalide
+
+**NE PAS UTILISER** : `Av3wTvhZHJLcSqJFBYNK8g4CxKtoCqzxEGxLNYLxqZ4a` - Ce token **n'existe pas** sur devnet !
+
+Si vous avez cette valeur sur Vercel, l'application va crasher avec :
+```
+Application error: a client-side exception has occurred
 ```
 
 ## 📝 Instructions (Si différent sur Vercel)

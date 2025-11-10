@@ -15,8 +15,8 @@ mod getrandom_stub;
 pub use state::{DcaPlan, RouterState, UserRebate};
 pub use error::SwapbackError;
 
-// Program ID déployé sur devnet - 27 Oct 2025 (mis à jour)
-declare_id!("BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz");
+// Program ID - Keypair local pour deployment
+declare_id!("opPhGcth2dGQQ7njYmkAYwfxspJ1DjgP9LV2y1jygCx");
 
 // DEX Program IDs (example - would need to be updated with actual deployed programs)
 pub const RAYDIUM_AMM_PROGRAM_ID: Pubkey = pubkey!("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8");
@@ -27,8 +27,8 @@ pub const JUPITER_PROGRAM_ID: Pubkey = pubkey!("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZ
 // Buyback Program ID (mis à jour)
 pub const BUYBACK_PROGRAM_ID: Pubkey = pubkey!("EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf");
 
-// cNFT Program ID for boost verification (mis à jour)
-pub const CNFT_PROGRAM_ID: Pubkey = pubkey!("9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw");
+// cNFT Program ID for boost verification
+pub const CNFT_PROGRAM_ID: Pubkey = pubkey!("FsD6D5yakUipRtFXXbgBf5YaE1ABVEocFDTLB3z2MxnB");
 
 // Oracle constants
 pub const MAX_STALENESS_SECS: i64 = 300; // 5 minutes max staleness
