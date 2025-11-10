@@ -10,15 +10,28 @@ import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 // 🎯 CONFIGURATION
 // ============================
 
-const ROUTER_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID ||
-    "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
-);
+// Lazy load to avoid module-level env access
+let _routerProgramId: PublicKey | null = null;
+function getRouterProgramId(): PublicKey {
+  if (!_routerProgramId) {
+    _routerProgramId = new PublicKey(
+      process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID ||
+        "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
+    );
+  }
+  return _routerProgramId;
+}
 
-const BACK_TOKEN_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_BACK_MINT ||
-    "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
-);
+let _backTokenMint: PublicKey | null = null;
+function getBackTokenMint(): PublicKey {
+  if (!_backTokenMint) {
+    _backTokenMint = new PublicKey(
+      process.env.NEXT_PUBLIC_BACK_MINT ||
+        "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
+    );
+  }
+  return _backTokenMint;
+}
 
 // ============================
 // 🎨 TYPE DEFINITIONS
@@ -70,7 +83,7 @@ export const SwapBackDashboard = () => {
         // Récupérer tous les plans DCA via getProgramAccounts
         // Discriminator pour DcaPlan = premiers 8 bytes du hash SHA256 de "account:DcaPlan"
         const accounts = await connection.getProgramAccounts(
-          ROUTER_PROGRAM_ID,
+          getRouterProgramId(),
           {
             filters: [
               // Filtrer par discriminator (si connu) ou par authority
@@ -194,7 +207,7 @@ export const SwapBackDashboard = () => {
   };
 
   const getTokenSymbol = (mint: PublicKey) => {
-    if (mint.equals(BACK_TOKEN_MINT)) return "$BACK";
+    if (mint.equals(getBackTokenMint())) return "$BACK";
     if (mint.toString() === "So11111111111111111111111111111111111111112")
       return "wSOL";
     return mint.toString().slice(0, 8) + "...";

@@ -81,7 +81,12 @@ export const LEVEL_COLORS: Record<CNFTLevel, string> = {
 // SOLANA NETWORK
 // ============================================
 
-export const SOLANA_NETWORK = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'mainnet-beta';
+// Lazy load to avoid module-level env access
+export function getSolanaNetwork(): string {
+  return process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'mainnet-beta';
+}
+
+export const SOLANA_NETWORK = getSolanaNetwork();
 
 export const SOLANA_RPC_ENDPOINTS = {
   'mainnet-beta': 'https://api.mainnet-beta.solana.com',

@@ -19,5 +19,14 @@ export const PROGRAM_IDS_DEVNET = {
 } as const;
 
 // Configuration du cluster - utilise les variables d'environnement
-export const SOLANA_CLUSTER = process.env.NEXT_PUBLIC_SOLANA_NETWORK || "mainnet-beta";
-export const SOLANA_RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+// Lazy load to avoid module-level env access
+export function getSolanaCluster(): string {
+  return process.env.NEXT_PUBLIC_SOLANA_NETWORK || "mainnet-beta";
+}
+
+export function getSolanaRpcUrl(): string {
+  return process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+}
+
+export const SOLANA_CLUSTER = getSolanaCluster();
+export const SOLANA_RPC_URL = getSolanaRpcUrl();

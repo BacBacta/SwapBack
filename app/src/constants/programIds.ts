@@ -1,13 +1,37 @@
 import { PublicKey } from "@solana/web3.js";
 
-export const ROUTER_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz"
-);
+// Lazy load to avoid module-level env access
+let _routerProgramId: PublicKey | null = null;
+export function getRouterProgramId(): PublicKey {
+  if (!_routerProgramId) {
+    _routerProgramId = new PublicKey(
+      process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz"
+    );
+  }
+  return _routerProgramId;
+}
 
-export const BACK_TOKEN_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
-);
+let _backTokenMint: PublicKey | null = null;
+export function getBackTokenMint(): PublicKey {
+  if (!_backTokenMint) {
+    _backTokenMint = new PublicKey(
+      process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
+    );
+  }
+  return _backTokenMint;
+}
 
-export const SWITCHBOARD_FEED = new PublicKey(
-  process.env.NEXT_PUBLIC_SWITCHBOARD_FEED || "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
-);
+let _switchboardFeed: PublicKey | null = null;
+export function getSwitchboardFeed(): PublicKey {
+  if (!_switchboardFeed) {
+    _switchboardFeed = new PublicKey(
+      process.env.NEXT_PUBLIC_SWITCHBOARD_FEED || "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR"
+    );
+  }
+  return _switchboardFeed;
+}
+
+// Export for backward compatibility (will be initialized on first use)
+export const ROUTER_PROGRAM_ID = getRouterProgramId();
+export const BACK_TOKEN_MINT = getBackTokenMint();
+export const SWITCHBOARD_FEED = getSwitchboardFeed();
