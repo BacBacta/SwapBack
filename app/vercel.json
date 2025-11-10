@@ -2,23 +2,5 @@
   "buildCommand": "npm run build",
   "installCommand": "npm install --legacy-peer-deps",
   "outputDirectory": ".next",
-  "framework": "nextjs",
-  "env": {
-    "NEXT_PUBLIC_SOLANA_NETWORK": "devnet",
-    "NODE_OPTIONS": "--max-old-space-size=4096",
-    "HUSKY": "0",
-    "JUPITER_API_URL": "https://lite-api.jup.ag/ultra/v1",
-    "USE_MOCK_QUOTES": "false",
-    "USE_CORS_PROXY": "false",
-    "NEXT_PUBLIC_SOLANA_RPC_URL": "https://api.devnet.solana.com",
-    "NEXT_PUBLIC_ROUTER_PROGRAM_ID": "BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz",
-    "NEXT_PUBLIC_BUYBACK_PROGRAM_ID": "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf",
-    "NEXT_PUBLIC_CNFT_PROGRAM_ID": "9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq",
-    "NEXT_PUBLIC_BACK_MINT": "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
-    "NEXT_PUBLIC_USDC_MINT": "BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR",
-    "NEXT_PUBLIC_MERKLE_TREE": "93Tzc7btocwzDSbscW9EfL9dBzWLx85FHE6zeWrwHbNT",
-    "NEXT_PUBLIC_COLLECTION_CONFIG": "5eM6KdFGJ63597ayYYtUqcNRhzxKtpx5qfL5mqRHwBom",
-    "NEXT_PUBLIC_PLATFORM_FEE_BPS": "20",
-    "NEXT_PUBLIC_PLATFORM_FEE_PERCENT": "0.20"
-  }
+  "framework": "nextjs"
 }
