@@ -176,9 +176,9 @@ export function ensureDevnetConfig(): void {
     );
   }
 
-  // Vérifier que le Program ID correspond au déploiement devnet (26 Oct 2025)
+  // Vérifier que le Program ID correspond au déploiement devnet (10 Nov 2025)
   const expectedDevnetProgramId =
-    "9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw";
+    "9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq";
   if (config.cnftProgramId !== expectedDevnetProgramId) {
     console.warn(
       `⚠️  CNFT Program ID mismatch: Expected ${expectedDevnetProgramId} but got ${config.cnftProgramId}`
