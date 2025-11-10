@@ -1,11 +1,11 @@
 import { PublicKey } from "@solana/web3.js";
 
-// Lazy load to avoid module-level env access
+// Lazy load to avoid module-level env access (prevents client-side errors)
 let _routerProgramId: PublicKey | null = null;
 export function getRouterProgramId(): PublicKey {
   if (!_routerProgramId) {
     _routerProgramId = new PublicKey(
-      process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz"
+      process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "opPhGcth2dGQQ7njYmkAYwfxspJ1DjgP9LV2y1jygCx"
     );
   }
   return _routerProgramId;
@@ -31,7 +31,5 @@ export function getSwitchboardFeed(): PublicKey {
   return _switchboardFeed;
 }
 
-// Export for backward compatibility (will be initialized on first use)
-export const ROUTER_PROGRAM_ID = getRouterProgramId();
-export const BACK_TOKEN_MINT = getBackTokenMint();
-export const SWITCHBOARD_FEED = getSwitchboardFeed();
+// DO NOT export module-level constants - they cause "Application error: client-side exception"
+// Use lazy loading functions instead: getRouterProgramId(), getBackTokenMint(), getSwitchboardFeed()

@@ -9,7 +9,7 @@ import { PublicKey } from '@solana/web3.js';
 // PROGRAM IDs (Devnet - Updated Oct 31, 2025)
 // ============================================
 
-// Lazy load to avoid module-level access
+// Lazy load to avoid module-level access to process.env (causes client-side errors)
 let _routerProgramId: PublicKey | null = null;
 export function getRouterProgramId(): PublicKey {
   if (!_routerProgramId) {
@@ -20,28 +20,47 @@ export function getRouterProgramId(): PublicKey {
   return _routerProgramId;
 }
 
-// Keep for backward compatibility, but export lazy-loaded version
-export const ROUTER_PROGRAM_ID = new PublicKey(
-  'opPhGcth2dGQQ7njYmkAYwfxspJ1DjgP9LV2y1jygCx'
-);
+// DO NOT export module-level constants - use lazy loading functions instead
+// Removed ROUTER_PROGRAM_ID, BUYBACK_PROGRAM_ID, CNFT_PROGRAM_ID to prevent module-level access
 
-export const BUYBACK_PROGRAM_ID = new PublicKey(
-  'EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf'
-);
+// Lazy load buyback program ID
+let _buybackProgramId: PublicKey | null = null;
+export function getBuybackProgramId(): PublicKey {
+  if (!_buybackProgramId) {
+    _buybackProgramId = new PublicKey(
+      process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || 'EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf'
+    );
+  }
+  return _buybackProgramId;
+}
 
-export const CNFT_PROGRAM_ID = new PublicKey(
-  'FsD6D5yakUipRtFXXbgBf5YaE1ABVEocFDTLB3z2MxnB' // Fixed bump initialization
-);
+// Lazy load CNFT program ID
+let _cnftProgramId: PublicKey | null = null;
+export function getCnftProgramId(): PublicKey {
+  if (!_cnftProgramId) {
+    _cnftProgramId = new PublicKey(
+      process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || 'FsD6D5yakUipRtFXXbgBf5YaE1ABVEocFDTLB3z2MxnB'
+    );
+  }
+  return _cnftProgramId;
+}
 
 // ============================================
 // TOKEN MINTS (Devnet - Created Oct 31, 2025)
 // ============================================
 
-export const BACK_TOKEN_MINT = new PublicKey(
-  '3Y6RXZUBHCeUj6VsWuyBY2Zy1RixY6BHkM4tf3euDdrE' // Token-2022
-);
+// Lazy load BACK token mint
+let _backTokenMint: PublicKey | null = null;
+export function getBackTokenMint(): PublicKey {
+  if (!_backTokenMint) {
+    _backTokenMint = new PublicKey(
+      process.env.NEXT_PUBLIC_BACK_MINT || '3Y6RXZUBHCeUj6VsWuyBY2Zy1RixY6BHkM4tf3euDdrE'
+    );
+  }
+  return _backTokenMint;
+}
 
-// Tokens communs sur Solana (pour référence future)
+// Tokens communs sur Solana (hardcoded, safe to export)
 export const SOL_MINT = new PublicKey(
   'So11111111111111111111111111111111111111112'
 );
@@ -95,10 +114,10 @@ export const LEVEL_COLORS: Record<CNFTLevel, string> = {
 
 // Lazy load to avoid module-level env access
 export function getSolanaNetwork(): string {
-  return process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'mainnet-beta';
+  return process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
 }
 
-export const SOLANA_NETWORK = getSolanaNetwork();
+// DO NOT export SOLANA_NETWORK at module level - use getSolanaNetwork() instead
 
 export const SOLANA_RPC_ENDPOINTS = {
   'mainnet-beta': 'https://api.mainnet-beta.solana.com',
@@ -186,9 +205,10 @@ export function getLevelColor(level: CNFTLevel): string {
 export function getExplorerUrl(
   type: 'address' | 'tx' | 'block',
   value: string,
-  network: string = SOLANA_NETWORK
+  network?: string
 ): string {
-  return `${SOLANA_EXPLORER_BASE_URL}/${type}/${value}?cluster=${network}`;
+  const networkToUse = network || getSolanaNetwork();
+  return `${SOLANA_EXPLORER_BASE_URL}/${type}/${value}?cluster=${networkToUse}`;
 }
 
 /**
