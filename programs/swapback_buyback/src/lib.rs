@@ -1,10 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Burn, Mint, TokenAccount, Transfer};
 use anchor_spl::token_2022::{self};
-
-// Module Pyth personnalisé sans dépendances externes
-mod pyth;
-use pyth::{load_price_from_account, check_price_age, get_price_scaled};
+use pyth_solana_receiver_sdk::price_update::{get_feed_id_from_hex, PriceUpdateV2};
 
 // Program ID déployé sur devnet - 31 Oct 2025 (nouveau déploiement avec Token-2022)
 declare_id!("92znK8METYTFW5dGDJUnHUMqubVGnPBTyjZ4HzjWQzir");
@@ -99,42 +96,52 @@ pub mod swapback_buyback {
 
         let actual_usdc = std::cmp::min(max_usdc_amount, ctx.accounts.usdc_vault.amount);
 
-        // Utiliser Pyth Oracle pour prix $BACK si disponible, sinon prix fixe
-        let back_bought = if let Some(price_account) = &ctx.accounts.price_feed {
-            // Lire le prix depuis Pyth
-            let price_data = load_price_from_account(price_account)?;
-            
-            // Vérifier que le prix n'est pas trop ancien (60 secondes)
-            check_price_age(&price_data, 60)?;
-            
-            msg!("Prix BACK/USD depuis Pyth: {} (expo: {})", price_data.price, price_data.expo);
-            
-            // Calculer combien de $BACK peut être acheté
-            // USDC a 6 decimals, BACK a 9 decimals
-            let price_scaled = get_price_scaled(&price_data, 6)?; // Prix en USDC (6 decimals)
-            
-            let back_amount = (actual_usdc as u128)
-                .checked_mul(1_000_000) // USDC avec decimals
+        // ✅ SOLUTION PRODUCTION: Utiliser Pyth Oracle pour prix $BACK
+        let price_update = &mut ctx.accounts.price_update;
+        let maximum_age: u64 = 60; // Prix valide pendant 60 secondes
+        let feed_id: [u8; 32] = get_feed_id_from_hex(
+            "0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43" // $BACK/USD feed (à configurer)
+        )?;
+
+        // Obtenir le prix depuis Pyth avec vérification d'âge
+        let price = price_update.get_price_no_older_than(
+            &Clock::get()?,
+            maximum_age,
+            &feed_id,
+        )?;
+
+        // Calculer combien de $BACK peut être acheté avec actual_usdc
+        // Formula: back_amount = (usdc_amount / usdc_price) * back_price
+        // Simplifié si BACK/USD direct: back_amount = usdc_amount / (price.price)
+        
+        // USDC a 6 decimals, BACK a 9 decimals
+        // price.exponent contient l'exposant du prix (ex: -8 pour $0.00000001)
+        let price_i64 = price.price;
+        let exponent = price.exponent;
+        
+        require!(price_i64 > 0, ErrorCode::InvalidPrice);
+
+        // Calcul sécurisé avec gestion des décimales
+        // back_amount = (actual_usdc * 10^6 * 10^9) / (price * 10^exponent)
+        let usdc_with_decimals = (actual_usdc as u128)
+            .checked_mul(1_000_000) // USDC decimals (6)
+            .ok_or(ErrorCode::MathOverflow)?;
+
+        let price_scaled = if exponent < 0 {
+            (price_i64 as u128)
+                .checked_mul(10u128.pow((-exponent) as u32))
                 .ok_or(ErrorCode::MathOverflow)?
-                .checked_div(price_scaled)
-                .ok_or(ErrorCode::MathOverflow)?
-                .checked_mul(1_000_000_000) // BACK avec decimals (9)
-                .ok_or(ErrorCode::MathOverflow)?;
-            
-            back_amount.try_into().map_err(|_| ErrorCode::MathOverflow)?
         } else {
-            // Fallback: Prix fixe 1 BACK = 0.01 USDC (1 cent)
-            msg!("Prix BACK/USD fixe: 0.01 USD (1 cent) - Pyth non fourni");
-            let back_price_in_usdc_cents: u64 = 1;
-            
-            (actual_usdc as u128)
-                .checked_mul(100)
+            (price_i64 as u128)
+                .checked_div(10u128.pow(exponent as u32))
                 .ok_or(ErrorCode::MathOverflow)?
-                .checked_div(back_price_in_usdc_cents as u128)
-                .ok_or(ErrorCode::MathOverflow)?
-                .checked_mul(1_000)
-                .ok_or(ErrorCode::MathOverflow)? as u64
         };
+
+        let back_bought = usdc_with_decimals
+            .checked_mul(1_000_000_000) // BACK decimals (9)
+            .ok_or(ErrorCode::MathOverflow)?
+            .checked_div(price_scaled)
+            .ok_or(ErrorCode::MathOverflow)? as u64;
 
         // Vérification du slippage (protection utilisateur)
         require!(
@@ -151,7 +158,7 @@ pub mod swapback_buyback {
         // Pour le MVP: on assume que les tokens sont déjà dans back_vault
         // En production: CPI vers pool DEX pour récupérer les BACK
 
-        msg!("Prix BACK/USD fixe: 0.01 USD (1 cent)");
+        msg!("Prix BACK/USD depuis Pyth: {} (expo: {})", price_i64, exponent);
         msg!("Swap calculé: {} USDC ({} lamports) -> {} BACK", 
              actual_usdc / 1_000_000, actual_usdc, back_bought);
 
@@ -423,9 +430,9 @@ pub struct ExecuteBuyback<'info> {
     #[account(mut)]
     pub back_vault: Account<'info, TokenAccount>,
 
-    /// Pyth Price Feed Account pour $BACK/USD (optionnel)
-    /// CHECK: Validé par notre module pyth interne
-    pub price_feed: Option<AccountInfo<'info>>,
+    /// Pyth Price Feed Account pour $BACK/USD
+    /// CHECK: Validé par Pyth SDK
+    pub price_update: Account<'info, PriceUpdateV2>,
 
     pub authority: Signer<'info>,
     /// CHECK: Token Program (standard ou 2022)

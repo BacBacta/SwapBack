@@ -61,27 +61,19 @@ export default function BuybackDashboard() {
         const authority = new PublicKey(data.slice(8, 40)).toBase58();
         const backMint = new PublicKey(data.slice(40, 72)).toBase58();
         const usdcVault = new PublicKey(data.slice(72, 104)).toBase58();
-        
-        // Safe conversion: divide by BN before .toNumber()
-        const totalUsdcCollectedBN = new BN(data.slice(104, 112), 'le');
-        const totalBackBurnedBN = new BN(data.slice(112, 120), 'le');
-        const minBuybackAmountBN = new BN(data.slice(120, 128), 'le');
-        const totalUsdcCollected = totalUsdcCollectedBN.div(new BN(1e6)).toNumber() + 
-                                   (totalUsdcCollectedBN.mod(new BN(1e6)).toNumber() / 1e6);
-        const totalBackBurned = totalBackBurnedBN.div(new BN(1e9)).toNumber() + 
-                                (totalBackBurnedBN.mod(new BN(1e9)).toNumber() / 1e9);
-        const minBuybackAmount = minBuybackAmountBN.div(new BN(1e6)).toNumber() + 
-                                 (minBuybackAmountBN.mod(new BN(1e6)).toNumber() / 1e6);
-        const lastBuybackTime = new BN(data.slice(128, 136), 'le').toNumber(); // Timestamp safe
+        const totalUsdcCollected = new BN(data.slice(104, 112), 'le').toNumber();
+        const totalBackBurned = new BN(data.slice(112, 120), 'le').toNumber();
+        const minBuybackAmount = new BN(data.slice(120, 128), 'le').toNumber();
+        const lastBuybackTime = new BN(data.slice(128, 136), 'le').toNumber();
         const bump = data[136];
 
         setBuybackState({
           authority,
           backMint,
           usdcVault,
-          totalUsdcCollected, // Already in UI units (USDC)
-          totalBackBurned, // Already in UI units ($BACK)
-          minBuybackAmount, // Already in UI units (USDC)
+          totalUsdcCollected: totalUsdcCollected / 1e6, // USDC has 6 decimals
+          totalBackBurned: totalBackBurned / 1e9, // $BACK has 9 decimals
+          minBuybackAmount: minBuybackAmount / 1e6,
           lastBuybackTime,
           bump,
         });

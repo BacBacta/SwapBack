@@ -415,10 +415,7 @@ export function useDcaStats() {
     activePlans: plans.filter(p => p.isActive && p.executedSwaps < p.totalSwaps).length,
     pausedPlans: plans.filter(p => !p.isActive && p.executedSwaps < p.totalSwaps).length,
     completedPlans: plans.filter(p => p.executedSwaps >= p.totalSwaps).length,
-    // Safe aggregation: use BN.add() then divide by BN before .toNumber()
-    totalInvested: plans.reduce((sum, p) => sum.add(p.totalInvested), new BN(0)).div(new BN(1e6)).toNumber() + 
-                   (plans.reduce((sum, p) => sum.add(p.totalInvested), new BN(0)).mod(new BN(1e6)).toNumber() / 1e6),
-    totalReceived: plans.reduce((sum, p) => sum.add(p.totalReceived), new BN(0)).div(new BN(1e9)).toNumber() + 
-                   (plans.reduce((sum, p) => sum.add(p.totalReceived), new BN(0)).mod(new BN(1e9)).toNumber() / 1e9),
+    totalInvested: plans.reduce((sum, p) => sum + p.totalInvested.toNumber(), 0),
+    totalReceived: plans.reduce((sum, p) => sum + p.totalReceived.toNumber(), 0),
   };
 }

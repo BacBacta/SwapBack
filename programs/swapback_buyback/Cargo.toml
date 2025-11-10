@@ -19,5 +19,4 @@ default = []
 [dependencies]
 anchor-lang = { workspace = true, features = ["init-if-needed"] }
 anchor-spl = { workspace = true }
-# Pyth: Utiliser l'account loader direct sans SDK pour éviter conflits
-# pyth-sdk-solana = { version = "0.8", optional = true }
+pyth-solana-receiver-sdk = "0.2.0"

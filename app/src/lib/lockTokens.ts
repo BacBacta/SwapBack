@@ -242,9 +242,47 @@ export async function createUnlockTokensTransaction(
   connection: Connection,
   wallet: WalletContextState
 ): Promise<Transaction> {
+  console.log('🔓 [UNLOCK TX] Creating unlock transaction...');
+  
   if (!wallet.publicKey || !wallet.signTransaction) {
     throw new Error("Wallet not connected");
   }
+
+  // Resolve program IDs / mints lazily (same pattern as createLockTokensTransaction)
+  const CNFT_PROGRAM_ID = getCnftProgramId();
+  const BACK_MINT = getBackMint();
+
+  console.log('🔍 [UNLOCK TX] Environment validation:');
+  console.log('   CNFT_PROGRAM_ID:', CNFT_PROGRAM_ID?.toString() ?? 'N/A');
+  console.log('   IDL address:', cnftIdl.address);
+  console.log('   BACK_MINT:', BACK_MINT?.toString() ?? 'N/A');
+  console.log('   Network:', process.env.NEXT_PUBLIC_SOLANA_NETWORK);
+
+  // Guard: ensure CNFT_PROGRAM_ID is configured
+  if (!CNFT_PROGRAM_ID) {
+    throw new Error(
+      '❌ NEXT_PUBLIC_CNFT_PROGRAM_ID is not configured. ' +
+        'Define it in Vercel or .env and ensure it matches the IDL address: ' +
+        cnftIdl.address
+    );
+  }
+
+  // Vérification de cohérence (protection contre AccountOwnedByWrongProgram)
+  if (CNFT_PROGRAM_ID.toString() !== cnftIdl.address) {
+    throw new Error(
+      `❌ CRITICAL: Program ID mismatch!\n` +
+        `  NEXT_PUBLIC_CNFT_PROGRAM_ID: ${CNFT_PROGRAM_ID.toString()}\n` +
+        `  IDL address: ${cnftIdl.address}\n` +
+        `This WILL cause AccountOwnedByWrongProgram errors!`
+    );
+  }
+
+  // Guard: ensure BACK_MINT is configured
+  if (!BACK_MINT) {
+    throw new Error('❌ NEXT_PUBLIC_BACK_MINT is not configured. Define it in Vercel or .env');
+  }
+
+  console.log('✅ [UNLOCK TX] Wallet:', wallet.publicKey.toString());
 
   // Créer le provider Anchor
   const provider = new AnchorProvider(
@@ -254,31 +292,39 @@ export async function createUnlockTokensTransaction(
   );
 
   // Charger le programme
+  console.log('🔍 [UNLOCK TX] Loading program...');
   const program = new Program(cnftIdl as Idl, provider);
+  console.log('✅ [UNLOCK TX] Program loaded:', CNFT_PROGRAM_ID.toString());
 
   // Dériver les PDAs
+  console.log('🔍 [UNLOCK TX] Deriving PDAs...');
   const [userNft] = PublicKey.findProgramAddressSync(
     [Buffer.from("user_nft"), wallet.publicKey.toBuffer()],
     CNFT_PROGRAM_ID
   );
+  console.log('✅ [UNLOCK TX] User NFT:', userNft.toString());
 
   const [globalState] = PublicKey.findProgramAddressSync(
     [Buffer.from("global_state")],
     CNFT_PROGRAM_ID
   );
+  console.log('✅ [UNLOCK TX] Global State:', globalState.toString());
 
   const [vaultAuthority] = PublicKey.findProgramAddressSync(
     [Buffer.from("vault_authority")],
     CNFT_PROGRAM_ID
   );
+  console.log('✅ [UNLOCK TX] Vault Authority:', vaultAuthority.toString());
 
   // Obtenir les token accounts
+  console.log('🔍 [UNLOCK TX] Getting token accounts...');
   const userTokenAccount = await getAssociatedTokenAddress(
     BACK_MINT,
     wallet.publicKey,
     false,
     TOKEN_2022_PROGRAM_ID
   );
+  console.log('✅ [UNLOCK TX] User Token Account:', userTokenAccount.toString());
 
   const vaultTokenAccount = await getAssociatedTokenAddress(
     BACK_MINT,
@@ -286,8 +332,10 @@ export async function createUnlockTokensTransaction(
     true, // allowOwnerOffCurve = true pour PDA
     TOKEN_2022_PROGRAM_ID
   );
+  console.log('✅ [UNLOCK TX] Vault Token Account:', vaultTokenAccount.toString());
 
   // Construire l'instruction
+  console.log('🔍 [UNLOCK TX] Building instruction...');
   const instruction = await program.methods
     .unlockTokens()
     .accounts({
@@ -302,7 +350,10 @@ export async function createUnlockTokensTransaction(
     })
     .instruction();
 
+  console.log('✅ [UNLOCK TX] Instruction created successfully');
+
   const transaction = new Transaction().add(instruction);
+  console.log('✅ [UNLOCK TX] Transaction built successfully');
 
   return transaction;
 }

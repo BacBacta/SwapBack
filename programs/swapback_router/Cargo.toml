@@ -19,14 +19,23 @@ custom-panic = []
 anchor-debug = []
 default = []
 devnet = []
-# switchboard = ["switchboard-solana"]
+switchboard = ["switchboard-solana"]
 pyth = []
 
 [dependencies]
 anchor-lang = { workspace = true, features = ["init-if-needed"] }
 anchor-spl = { workspace = true }
-# Switchboard: Désactivé jusqu'à version compatible disponible
-# switchboard-solana = { version = "0.29.0", optional = true }
+solana-program = { workspace = true }
+# Ne pas ajouter solana-program/solana-sdk directement - utiliser les exports d'anchor-lang
+# use anchor_lang::solana_program au lieu de use solana_program
+switchboard-solana = { version = "0.30.4", optional = true }
 
-# getrandom avec custom feature pour BPF
+# Pyth SDK - DÉSACTIVÉ pour éviter conflit de versions Solana
+# pyth-sdk-solana = "0.10.6"
+
+# getrandom avec custom feature pour notre stub BPF
 getrandom = { version = "0.2", default-features = false, features = ["custom"] }
+
+# Forcer les versions compatibles avec Rust 1.79
+indexmap = "=2.6.0"
+toml_edit = "=0.22.22"

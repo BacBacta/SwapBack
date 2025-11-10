@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program;  // Utiliser l'export d'anchor_lang
 use anchor_spl::token::{self, Token, TokenAccount};
 
 mod cpi_orca;
@@ -7,10 +6,6 @@ mod oracle;
 pub mod state;
 pub mod instructions;
 pub mod error;
-
-// Module Switchboard personnalisé sans dépendances externes
-#[cfg(feature = "switchboard")]
-mod switchboard;
 
 // Custom getrandom stub for Solana BPF target
 #[cfg(target_os = "solana")]
