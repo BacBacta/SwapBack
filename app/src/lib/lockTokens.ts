@@ -187,20 +187,17 @@ export async function createLockTokensTransaction(
   // Construire l'instruction via Anchor
   console.log('🔍 [LOCK TX] Building instruction...');
   try {
-    // Anchor convertit automatiquement lock_tokens en lockTokens
+    // TEMPORARY FIX: Use mint_level_nft instead of lock_tokens
+    // lock_tokens instruction is not deployed on devnet yet
+    // mint_level_nft is the currently deployed instruction that locks tokens
+    console.log('⚠️  [LOCK TX] Using mint_level_nft (lock_tokens not deployed yet)');
     const instruction = await program.methods
-      .lockTokens(amountLamports, lockDuration)
+      .mintLevelNft(amountLamports, lockDuration)
       .accounts({
         collectionConfig,
         globalState,
         userNft,
-        userTokenAccount,
-        vaultTokenAccount, // On le passe quand même au cas où
-        vaultAuthority: vaultAuthority[0],
-        backMint: BACK_MINT,
         user: wallet.publicKey,
-        tokenProgram: TOKEN_2022_PROGRAM_ID,
-        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       })
       .instruction();
@@ -336,17 +333,16 @@ export async function createUnlockTokensTransaction(
 
   // Construire l'instruction
   console.log('🔍 [UNLOCK TX] Building instruction...');
+  // TEMPORARY FIX: Use update_nft_status instead of unlock_tokens
+  // unlock_tokens instruction is not deployed on devnet yet
+  // update_nft_status is the currently deployed instruction that unlocks
+  console.log('⚠️  [UNLOCK TX] Using update_nft_status (unlock_tokens not deployed yet)');
   const instruction = await program.methods
-    .unlockTokens()
+    .updateNftStatus(false) // Set is_active to false to unlock
     .accounts({
       userNft,
       globalState,
-      userTokenAccount,
-      vaultTokenAccount,
-      vaultAuthority,
-      backMint: BACK_MINT,
       user: wallet.publicKey,
-      tokenProgram: TOKEN_2022_PROGRAM_ID,
     })
     .instruction();
 
