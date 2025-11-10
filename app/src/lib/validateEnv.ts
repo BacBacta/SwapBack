@@ -178,7 +178,7 @@ export function ensureDevnetConfig(): void {
 
   // Vérifier que le Program ID correspond au déploiement devnet
   const expectedDevnetProgramId =
-    "9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq";
+    "9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw";
   if (config.cnftProgramId !== expectedDevnetProgramId) {
     throw new Error(
       `❌ Expected devnet CNFT Program ${expectedDevnetProgramId} but got ${config.cnftProgramId}`
