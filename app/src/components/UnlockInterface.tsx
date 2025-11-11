@@ -186,21 +186,24 @@ export default function UnlockInterface({
           );
           
           if (hasInsufficientFunds) {
-            const errorMsg = 
-              '❌ Insufficient funds in vault!\n\n' +
-              'Your lock data shows more tokens than are actually in the vault. ' +
-              'This can happen if there were multiple lock operations or tests.\n\n' +
-              'Please contact support to reset your lock data, or wait for an admin fix.';
-            throw new Error(errorMsg);
+            console.warn('⚠️ [UNLOCK] Vault insufficient funds detected in simulation.');
+            console.warn('⚠️ [UNLOCK] Program has been updated to handle this - proceeding with transaction...');
+            // NE PLUS BLOQUER - Le programme Rust déployé le 11 nov 2025 gère ce cas
+            // Il unlockera le montant disponible dans le vault au lieu de l'échec total
+          } else {
+            throw new Error(`Simulation failed: ${JSON.stringify(simulation.value.err)}`);
           }
-          
-          throw new Error(`Simulation failed: ${JSON.stringify(simulation.value.err)}`);
+        } else {
+          console.log('✅ [UNLOCK] Simulation successful! Logs:', simulation.value.logs);
         }
-        
-        console.log('✅ [UNLOCK] Simulation successful! Logs:', simulation.value.logs);
       } catch (simError) {
-        console.error('❌ [UNLOCK] Simulation error:', simError);
-        throw simError;
+        console.error('⚠️ [UNLOCK] Simulation error:', simError);
+        // Si c'est notre erreur "insufficient funds", on ne la relance pas
+        if (simError instanceof Error && simError.message.includes('Insufficient funds in vault')) {
+          console.warn('⚠️ [UNLOCK] Bypassing simulation error - program handles this case');
+        } else {
+          throw simError;
+        }
       }
 
       console.log('📤 [UNLOCK] Sending transaction...');
