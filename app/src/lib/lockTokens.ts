@@ -192,13 +192,14 @@ export async function createLockTokensTransaction(
     const instruction = await program.methods
       .lockTokens(amountLamports, lockDuration)
       .accounts({
-        user: wallet.publicKey,
-        userTokenAccount,
-        userNft,
-        vaultAuthority: vaultAuthority[0],
-        vaultTokenAccount,
-        backMint: BACK_MINT,
+        collectionConfig,
         globalState,
+        userNft,
+        userTokenAccount,
+        vaultTokenAccount,
+        vaultAuthority: vaultAuthority[0],
+        backMint: BACK_MINT,
+        user: wallet.publicKey,
         tokenProgram: TOKEN_2022_PROGRAM_ID,
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
@@ -341,16 +342,14 @@ export async function createUnlockTokensTransaction(
   const instruction = await program.methods
     .unlockTokens()
     .accounts({
-      user: wallet.publicKey,
-      userTokenAccount,
       userNft,
-      vaultAuthority,
-      vaultTokenAccount,
-      backMint: BACK_MINT,
       globalState,
+      userTokenAccount,
+      vaultTokenAccount,
+      vaultAuthority,
+      backMint: BACK_MINT,
+      user: wallet.publicKey,
       tokenProgram: TOKEN_2022_PROGRAM_ID,
-      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-      systemProgram: SystemProgram.programId,
     })
     .instruction();
 

@@ -192,8 +192,30 @@ export default function UnlockInterface({
       }, 2000);
     } catch (err: unknown) {
       console.error("Error during unlock:", err);
-      const message =
-        err instanceof Error ? err.message : "Unlock failed. Please try again.";
+      
+      // Log détaillé pour debugging
+      if (err instanceof Error) {
+        console.error("Error name:", err.name);
+        console.error("Error message:", err.message);
+        console.error("Error stack:", err.stack);
+      }
+      
+      // Extraire le message d'erreur le plus utile
+      let message = "Unlock failed. Please try again.";
+      
+      if (err instanceof Error) {
+        // Vérifier si c'est une erreur de lock period
+        if (err.message.includes("LockPeriodNotExpired")) {
+          message = "❌ Lock period has not expired yet. Please wait until the unlock time.";
+        } else if (err.message.includes("InsufficientFunds")) {
+          message = "❌ Insufficient SOL for transaction fees. Please add SOL to your wallet.";
+        } else if (err.message.includes("AccountNotFound")) {
+          message = "❌ Lock account not found. Please ensure you have locked tokens first.";
+        } else {
+          message = `❌ ${err.message}`;
+        }
+      }
+      
       setError(message);
     } finally {
       setIsUnlocking(false);
