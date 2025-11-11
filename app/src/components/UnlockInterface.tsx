@@ -162,6 +162,29 @@ export default function UnlockInterface({
         wallet
       );
       console.log('✅ [UNLOCK] Transaction created successfully');
+      console.log('📋 [UNLOCK] Transaction details:', {
+        feePayer: transaction.feePayer?.toString(),
+        recentBlockhash: transaction.recentBlockhash,
+        instructions: transaction.instructions.length,
+      });
+
+      // SIMULATE la transaction avant de l'envoyer pour voir les erreurs
+      console.log('🧪 [UNLOCK] Simulating transaction first...');
+      try {
+        const simulation = await connection.simulateTransaction(transaction);
+        console.log('✅ [UNLOCK] Simulation result:', simulation);
+        
+        if (simulation.value.err) {
+          console.error('❌ [UNLOCK] SIMULATION FAILED:', simulation.value.err);
+          console.error('❌ [UNLOCK] Simulation logs:', simulation.value.logs);
+          throw new Error(`Simulation failed: ${JSON.stringify(simulation.value.err)}`);
+        }
+        
+        console.log('✅ [UNLOCK] Simulation successful! Logs:', simulation.value.logs);
+      } catch (simError) {
+        console.error('❌ [UNLOCK] Simulation error:', simError);
+        throw simError;
+      }
 
       console.log('📤 [UNLOCK] Sending transaction...');
       const signature = await sendTransaction(transaction, connection);
