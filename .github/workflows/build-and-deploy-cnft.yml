@@ -77,11 +77,17 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     
     - name: Build CNFT Program
+      env:
+        RUSTUP_TOOLCHAIN: 1.76.0
       run: |
         export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
         export PATH="$HOME/.cargo/bin:$PATH"
+        rustc --version
+        cargo --version
         anchor --version
         solana --version
+        cargo-build-sbf --version
+        echo "Building with Rust 1.76.0..."
         anchor build -p swapback_cnft --skip-lint
         ls -lh target/deploy/swapback_cnft.so
     
