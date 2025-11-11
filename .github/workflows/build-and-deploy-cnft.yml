@@ -49,50 +49,43 @@ jobs:
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
         anchor --version
     
-    - name: Patch cargo-build-sbf Rust to 1.76.0
+    - name: Force cargo-build-sbf to use tools-version v1.51 with Rust ≥ 1.76
       run: |
         set -euo pipefail
-        RUST_176_DIR="$HOME/.rustup/toolchains/1.76.0-x86_64-unknown-linux-gnu"
+        SOLANA_BIN="$HOME/.local/share/solana/install/active_release/bin"
+        ORIGINAL_BINARY="$SOLANA_BIN/cargo-build-sbf-original"
 
-        if [ ! -d "$RUST_176_DIR" ]; then
-          echo "::error::Rust 1.76.0 toolchain not found at $RUST_176_DIR"
+        if [ ! -x "$SOLANA_BIN/cargo-build-sbf" ]; then
+          echo "::error::cargo-build-sbf binary not found at $SOLANA_BIN"
           exit 1
         fi
 
-        PATCH_DIRS=()
-        PRIMARY_DIR="$HOME/.local/share/solana/install/active_release/bin/sdk/sbf/dependencies/platform-tools/rust"
-
-        if [ -d "$PRIMARY_DIR" ] || [ -L "$PRIMARY_DIR" ]; then
-          PATCH_DIRS+=("$PRIMARY_DIR")
+        if [ ! -x "$SOLANA_BIN/cargo-build-sbf" ]; then
+          echo "::error::cargo-build-sbf binary is not executable"
+          exit 1
         fi
 
-        CACHE_ROOT="$HOME/.cache/solana"
-        if [ -d "$CACHE_ROOT" ]; then
-          while IFS= read -r dir; do
-            if [ -n "$dir" ]; then
-              PATCH_DIRS+=("$dir")
+        if [ ! -f "$ORIGINAL_BINARY" ]; then
+          mv "$SOLANA_BIN/cargo-build-sbf" "$ORIGINAL_BINARY"
+        fi
+
+        cat <<'EOF' | sed 's/^      //' > "$SOLANA_BIN/cargo-build-sbf"
+            #!/usr/bin/env bash
+            set -euo pipefail
+            SOLANA_BIN_DIR="$(dirname "$0")"
+            REAL_BINARY="$SOLANA_BIN_DIR/cargo-build-sbf-original"
+            if [ ! -x "$REAL_BINARY" ]; then
+              echo "::error::Expected real cargo-build-sbf binary at $REAL_BINARY" >&2
+              exit 1
             fi
-          done < <(find "$CACHE_ROOT" -maxdepth 3 -type d -path "*/platform-tools/rust")
-        fi
+            exec "$REAL_BINARY" --tools-version v1.51 "$@"
+        EOF
 
-        if [ ${#PATCH_DIRS[@]} -eq 0 ]; then
-          echo "::warning::No platform-tools Rust directories detected. cargo-build-sbf may download them later."
-        fi
+        chmod +x "$SOLANA_BIN/cargo-build-sbf"
 
-        for dir in "${PATCH_DIRS[@]}"; do
-          if [ -z "$dir" ]; then
-            continue
-          fi
-
-          echo "🔄 Replacing platform-tools Rust toolchain at $dir"
-          rm -rf "$dir"
-          mkdir -p "$dir"
-          cp -a "$RUST_176_DIR/." "$dir/"
-          chmod -R +x "$dir/bin" || true
-          "$dir/bin/rustc" --version || true
-        done
-
-        cargo-build-sbf --version || true
+        # Trigger the download of the v1.51 tools to prime the cache before the build step.
+        "$SOLANA_BIN/cargo-build-sbf" --version || true
+        "$SOLANA_BIN/cargo-build-sbf" --help | head -n 5
     
     - name: Cache dependencies
       uses: actions/cache@v3
