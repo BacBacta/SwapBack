@@ -302,32 +302,47 @@ pub mod swapback_cnft {
 
         // Calculer les montants
         let total_amount = user_nft.amount_locked;
+        
+        // 🔒 SÉCURITÉ: Vérifier le solde réel du vault pour éviter "insufficient funds"
+        let actual_vault_balance = ctx.accounts.vault_token_account.amount;
+        let safe_total_amount = total_amount.min(actual_vault_balance);
+        
+        // Si le vault n'a pas assez de tokens, ajuster le montant
+        if safe_total_amount < total_amount {
+            msg!(
+                "⚠️ WARNING: Vault insufficient funds! NFT claims: {}, Vault has: {}, Using: {}",
+                total_amount,
+                actual_vault_balance,
+                safe_total_amount
+            );
+        }
+        
         let (user_amount, burn_amount) = if is_early_unlock {
             // Pénalité de 1,5% pour unlock anticipé
             let penalty_bps = 15; // 1.5% = 15 basis points
-            let burn_amount = (total_amount * penalty_bps) / 10_000;
-            let user_amount = total_amount - burn_amount;
+            let burn_amount = (safe_total_amount * penalty_bps) / 10_000;
+            let user_amount = safe_total_amount - burn_amount;
             (user_amount, burn_amount)
         } else {
             // Pas de pénalité pour unlock normal
-            (total_amount, 0)
+            (safe_total_amount, 0)
         };
 
         msg!(
             "🔓 Unlock tokens: total={}, user_amount={}, burn_amount={}, early={}",
-            total_amount,
+            safe_total_amount,
             user_amount,
             burn_amount,
             is_early_unlock
         );
 
-        // Décrémenter les stats globales
+        // Décrémenter les stats globales (utiliser le montant réel transféré)
         global_state.total_community_boost = global_state
             .total_community_boost
             .saturating_sub(user_nft.boost as u64);
         global_state.active_locks_count = global_state.active_locks_count.saturating_sub(1);
         global_state.total_value_locked =
-            global_state.total_value_locked.saturating_sub(total_amount);
+            global_state.total_value_locked.saturating_sub(safe_total_amount);
 
         // Transférer les tokens du vault
         let bump = ctx.bumps.vault_authority;
@@ -362,8 +377,9 @@ pub mod swapback_cnft {
             transfer_checked(user_cpi_ctx, user_amount, ctx.accounts.back_mint.decimals)?;
         }
 
-        // Désactiver le NFT
+        // Désactiver le NFT et réinitialiser le montant verrouillé
         user_nft.is_active = false;
+        user_nft.amount_locked = 0;
 
         // TODO: Add TokensUnlocked event
         // emit!(TokensUnlocked {
