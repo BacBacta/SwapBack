@@ -20,7 +20,7 @@ jobs:
     - name: Install Rust
       uses: actions-rs/toolchain@v1
       with:
-        toolchain: 1.76.0
+        toolchain: 1.78.0
         override: true
         profile: minimal
         components: rustfmt, clippy
@@ -49,47 +49,11 @@ jobs:
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
         anchor --version
     
-    - name: Force cargo-build-sbf to use tools-version v1.51 with Rust ≥ 1.76
+    - name: Configure cargo-build-sbf
       run: |
-        set -euo pipefail
-        SOLANA_BIN="$HOME/.local/share/solana/install/active_release/bin"
-        ORIGINAL_BINARY="$SOLANA_BIN/cargo-build-sbf-original"
-
-        if [ ! -x "$SOLANA_BIN/cargo-build-sbf" ]; then
-          echo "::error::cargo-build-sbf binary not found at $SOLANA_BIN"
-          exit 1
-        fi
-
-        if [ ! -x "$SOLANA_BIN/cargo-build-sbf" ]; then
-          echo "::error::cargo-build-sbf binary is not executable"
-          exit 1
-        fi
-
-        if [ ! -f "$ORIGINAL_BINARY" ]; then
-          mv "$SOLANA_BIN/cargo-build-sbf" "$ORIGINAL_BINARY"
-        fi
-
-        {
-          echo '#!/usr/bin/env bash'
-          echo 'set -euo pipefail'
-          echo 'SOLANA_BIN_DIR="$(dirname "$0")"'
-          echo 'REAL_BINARY="$SOLANA_BIN_DIR/cargo-build-sbf-original"'
-          echo 'if [ ! -x "$REAL_BINARY" ]; then'
-          echo '  echo "::error::Expected real cargo-build-sbf binary at $REAL_BINARY" >&2'
-          echo '  exit 1'
-          echo 'fi'
-          echo 'if [ "$#" -gt 0 ] && [ "$1" = "build-sbf" ]; then'
-          echo '  exec "$REAL_BINARY" "$1" --tools-version v1.51 "${@:2}"'
-          echo 'else'
-          echo '  exec "$REAL_BINARY" --tools-version v1.51 "$@"'
-          echo 'fi'
-        } > "$SOLANA_BIN/cargo-build-sbf"
-
-        chmod +x "$SOLANA_BIN/cargo-build-sbf"
-
-        # Trigger the download of the v1.51 tools to prime the cache before the build step.
-        "$SOLANA_BIN/cargo-build-sbf" --version || true
-        "$SOLANA_BIN/cargo-build-sbf" --help | head -n 5
+        export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+        # Pré-télécharger les platform-tools
+        cargo-build-sbf --version || true
     
     - name: Cache dependencies
       uses: actions/cache@v3
@@ -104,17 +68,22 @@ jobs:
     
     - name: Build CNFT Program
       env:
-        RUSTUP_TOOLCHAIN: 1.76.0
+        RUSTUP_TOOLCHAIN: 1.78.0
       run: |
         export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
         export PATH="$HOME/.cargo/bin:$PATH"
+        echo "=== Environment Check ==="
         rustc --version
         cargo --version
         anchor --version
         solana --version
         cargo-build-sbf --version
-        echo "Building with Rust 1.76.0..."
+        echo ""
+        echo "=== Building CNFT Program ==="
+        cd /home/runner/work/SwapBack/SwapBack
         anchor build -p swapback_cnft --skip-lint
+        echo ""
+        echo "=== Build Artifacts ==="
         ls -lh target/deploy/swapback_cnft.so
     
     - name: Setup Solana Keypair
