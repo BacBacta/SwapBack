@@ -207,8 +207,31 @@ export default function UnlockInterface({
       }
 
       console.log('📤 [UNLOCK] Sending transaction...');
-      const signature = await sendTransaction(transaction, connection);
-      console.log('✅ [UNLOCK] Transaction sent! Signature:', signature);
+      
+      // Essayer d'abord de signer, puis d'envoyer manuellement
+      console.log('🔐 [UNLOCK] Signing transaction with wallet...');
+      let signedTransaction;
+      try {
+        signedTransaction = await signTransaction(transaction);
+        console.log('✅ [UNLOCK] Transaction signed successfully');
+      } catch (signError) {
+        console.error('❌ [UNLOCK] Error signing transaction:', signError);
+        throw new Error(`Failed to sign transaction: ${signError instanceof Error ? signError.message : 'Unknown error'}`);
+      }
+      
+      // Envoyer la transaction signée
+      console.log('📡 [UNLOCK] Sending signed transaction to network...');
+      let signature;
+      try {
+        signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+        });
+        console.log('✅ [UNLOCK] Transaction sent! Signature:', signature);
+      } catch (sendError) {
+        console.error('❌ [UNLOCK] Error sending transaction:', sendError);
+        throw new Error(`Failed to send transaction: ${sendError instanceof Error ? sendError.message : 'Unknown error'}`);
+      }
 
       // Attendre la confirmation
       console.log('⏳ [UNLOCK] Waiting for confirmation...');
