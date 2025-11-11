@@ -69,17 +69,17 @@ jobs:
           mv "$SOLANA_BIN/cargo-build-sbf" "$ORIGINAL_BINARY"
         fi
 
-        cat <<'EOF' | sed 's/^      //' > "$SOLANA_BIN/cargo-build-sbf"
-            #!/usr/bin/env bash
-            set -euo pipefail
-            SOLANA_BIN_DIR="$(dirname "$0")"
-            REAL_BINARY="$SOLANA_BIN_DIR/cargo-build-sbf-original"
-            if [ ! -x "$REAL_BINARY" ]; then
-              echo "::error::Expected real cargo-build-sbf binary at $REAL_BINARY" >&2
-              exit 1
-            fi
-            exec "$REAL_BINARY" --tools-version v1.51 "$@"
-        EOF
+        {
+          echo '#!/usr/bin/env bash'
+          echo 'set -euo pipefail'
+          echo 'SOLANA_BIN_DIR="$(dirname "$0")"'
+          echo 'REAL_BINARY="$SOLANA_BIN_DIR/cargo-build-sbf-original"'
+          echo 'if [ ! -x "$REAL_BINARY" ]; then'
+          echo '  echo "::error::Expected real cargo-build-sbf binary at $REAL_BINARY" >&2'
+          echo '  exit 1'
+          echo 'fi'
+          echo 'exec "$REAL_BINARY" --tools-version v1.51 "$@"'
+        } > "$SOLANA_BIN/cargo-build-sbf"
 
         chmod +x "$SOLANA_BIN/cargo-build-sbf"
 
