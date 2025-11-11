@@ -78,7 +78,11 @@ jobs:
           echo '  echo "::error::Expected real cargo-build-sbf binary at $REAL_BINARY" >&2'
           echo '  exit 1'
           echo 'fi'
-          echo 'exec "$REAL_BINARY" --tools-version v1.51 "$@"'
+          echo 'if [ "$#" -gt 0 ] && [ "$1" = "build-sbf" ]; then'
+          echo '  exec "$REAL_BINARY" "$1" --tools-version v1.51 "${@:2}"'
+          echo 'else'
+          echo '  exec "$REAL_BINARY" --tools-version v1.51 "$@"'
+          echo 'fi'
         } > "$SOLANA_BIN/cargo-build-sbf"
 
         chmod +x "$SOLANA_BIN/cargo-build-sbf"
@@ -131,7 +135,7 @@ jobs:
         export PATH="$HOME/.cargo/bin:$PATH"
         solana airdrop 2 --url devnet || true
         anchor deploy -p swapback_cnft --provider.cluster devnet
-        echo "DEPLOYMENT_SIGNATURE=$(solana program show DHfa77Z9yCtVtg9GivhbjF1od25PWfwNBCm7ws5eXpzf --url devnet | grep 'Last Deployed' | awk '{print $4}')" >> $GITHUB_ENV
+        echo "DEPLOYMENT_SIGNATURE=$(solana program show CzxpYBeKbcA6AJH7yz8ggkJ1cWen3ejKUuikE6stHEaF --url devnet | grep 'Last Deployed' | awk '{print $4}')" >> $GITHUB_ENV
     
     - name: Update IDL
       if: ${{ inputs.deploy_to_devnet }}
@@ -140,7 +144,7 @@ jobs:
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         git add app/src/idl/swapback_cnft.json
-        git commit -m "chore: Update IDL after program deployment to DHfa77Z9yCtVtg9GivhbjF1od25PWfwNBCm7ws5eXpzf" || echo "No changes to commit"
+        git commit -m "chore: Update IDL after program deployment to CzxpYBeKbcA6AJH7yz8ggkJ1cWen3ejKUuikE6stHEaF" || echo "No changes to commit"
         git push
     
     - name: Upload program artifact
@@ -155,5 +159,5 @@ jobs:
       if: ${{ inputs.deploy_to_devnet }}
       run: |
         echo "✅ Program deployed successfully!" >> $GITHUB_STEP_SUMMARY
-        echo "Program ID: DHfa77Z9yCtVtg9GivhbjF1od25PWfwNBCm7ws5eXpzf" >> $GITHUB_STEP_SUMMARY
-        echo "View on Solana Explorer: https://explorer.solana.com/address/DHfa77Z9yCtVtg9GivhbjF1od25PWfwNBCm7ws5eXpzf?cluster=devnet" >> $GITHUB_STEP_SUMMARY
+        echo "Program ID: CzxpYBeKbcA6AJH7yz8ggkJ1cWen3ejKUuikE6stHEaF" >> $GITHUB_STEP_SUMMARY
+        echo "View on Solana Explorer: https://explorer.solana.com/address/CzxpYBeKbcA6AJH7yz8ggkJ1cWen3ejKUuikE6stHEaF?cluster=devnet" >> $GITHUB_STEP_SUMMARY
