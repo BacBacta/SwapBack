@@ -3,8 +3,8 @@ use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token_2022::{transfer_checked, Token2022, TransferChecked};
 use anchor_spl::token_interface::{Mint, TokenAccount};
 
-// Program ID - New deployment to fix DeclaredProgramIdMismatch
-declare_id!("DHfa77Z9yCtVtg9GivhbjF1od25PWfwNBCm7ws5eXpzf");
+// Program ID - Matches keypair in target/deploy/swapback_cnft-keypair.json
+declare_id!("CzxpYBeKbcA6AJH7yz8ggkJ1cWen3ejKUuikE6stHEaF");
 
 #[program]
 pub mod swapback_cnft {
