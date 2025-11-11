@@ -365,8 +365,27 @@ export async function createUnlockTokensTransaction(
 
     console.log('✅ [UNLOCK TX] Instruction created successfully');
 
+    // Créer la transaction et configurer les paramètres requis
     const transaction = new Transaction().add(instruction);
+    
+    // Définir le fee payer
+    transaction.feePayer = wallet.publicKey;
+    console.log('✅ [UNLOCK TX] Fee payer set:', wallet.publicKey.toString());
+    
+    // Obtenir le blockhash récent
+    console.log('🔍 [UNLOCK TX] Getting recent blockhash...');
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+    transaction.lastValidBlockHeight = lastValidBlockHeight;
+    console.log('✅ [UNLOCK TX] Blockhash set:', blockhash);
+    
     console.log('✅ [UNLOCK TX] Transaction built successfully');
+    console.log('📋 [UNLOCK TX] Transaction summary:', {
+      feePayer: transaction.feePayer?.toString(),
+      recentBlockhash: transaction.recentBlockhash,
+      instructions: transaction.instructions.length,
+      signatures: transaction.signatures.length
+    });
 
     return transaction;
   } catch (instrError) {
