@@ -28,10 +28,13 @@ jobs:
       run: |
         sh -c "$(curl -sSfL https://release.solana.com/v1.18.26/install)"
         echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+        export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+        solana --version
     
     - name: Install Anchor
       run: |
         cargo install --git https://github.com/coral-xyz/anchor --tag v0.30.1 anchor-cli --locked --force
+        anchor --version
     
     - name: Cache dependencies
       uses: actions/cache@v3
@@ -46,12 +49,18 @@ jobs:
     
     - name: Build CNFT Program
       run: |
+        export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+        export PATH="$HOME/.cargo/bin:$PATH"
+        anchor --version
+        solana --version
         anchor build -p swapback_cnft
         ls -lh target/deploy/swapback_cnft.so
     
     - name: Setup Solana Keypair
       if: ${{ inputs.deploy_to_devnet }}
       run: |
+        export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+        mkdir -p ~/.config/solana
         echo "${{ secrets.SOLANA_DEVNET_KEYPAIR }}" > ~/.config/solana/id.json
         chmod 600 ~/.config/solana/id.json
         solana config set --url devnet
@@ -61,7 +70,9 @@ jobs:
     - name: Deploy to Devnet
       if: ${{ inputs.deploy_to_devnet }}
       run: |
-        solana airdrop 2 || true
+        export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+        export PATH="$HOME/.cargo/bin:$PATH"
+        solana airdrop 2 --url devnet || true
         anchor deploy -p swapback_cnft --provider.cluster devnet
         echo "DEPLOYMENT_SIGNATURE=$(solana program show DHfa77Z9yCtVtg9GivhbjF1od25PWfwNBCm7ws5eXpzf --url devnet | grep 'Last Deployed' | awk '{print $4}')" >> $GITHUB_ENV
     
