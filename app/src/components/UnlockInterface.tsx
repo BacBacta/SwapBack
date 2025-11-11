@@ -15,7 +15,7 @@ export default function UnlockInterface({
   onUnlockSuccess,
 }: Readonly<UnlockInterfaceProps>) {
   const wallet = useWallet();
-  const { publicKey, sendTransaction } = wallet;
+  const { publicKey, sendTransaction, signTransaction } = wallet;
   const { connection } = useConnection();
   const {
     cnftData,
