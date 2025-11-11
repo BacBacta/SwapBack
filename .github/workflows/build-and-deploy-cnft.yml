@@ -51,28 +51,48 @@ jobs:
     
     - name: Patch cargo-build-sbf Rust to 1.76.0
       run: |
-        # cargo-build-sbf utilise son propre Rust 1.75.0 - copie complète du toolchain 1.76.0
-        RUST_BPF_DIR="$HOME/.local/share/solana/install/active_release/bin/sdk/sbf/dependencies/platform-tools/rust"
+        set -euo pipefail
         RUST_176_DIR="$HOME/.rustup/toolchains/1.76.0-x86_64-unknown-linux-gnu"
-        
-        if [ -d "$RUST_BPF_DIR" ]; then
-          echo "📦 Backing up cargo-build-sbf Rust 1.75.0..."
-          mv "$RUST_BPF_DIR" "$RUST_BPF_DIR.backup"
-          
-          echo "📋 Copying entire Rust 1.76.0 toolchain (not symlinking)..."
-          cp -rL "$RUST_176_DIR" "$RUST_BPF_DIR"
-          
-          echo "🔧 Ensuring binaries are executable..."
-          chmod -R +x "$RUST_BPF_DIR/bin/"
-          
-          echo "✅ Verifying Rust version in cargo-build-sbf:"
-          "$RUST_BPF_DIR/bin/rustc" --version || echo "Direct rustc check failed"
-          cargo-build-sbf --version || echo "cargo-build-sbf check failed"
-        else
-          echo "⚠️ Rust BPF directory not found at: $RUST_BPF_DIR"
-          echo "Listing platform-tools directory:"
-          ls -la "$HOME/.local/share/solana/install/active_release/bin/sdk/sbf/dependencies/platform-tools/" || true
+
+        if [ ! -d "$RUST_176_DIR" ]; then
+          echo "::error::Rust 1.76.0 toolchain not found at $RUST_176_DIR"
+          exit 1
         fi
+
+        PATCH_DIRS=()
+        PRIMARY_DIR="$HOME/.local/share/solana/install/active_release/bin/sdk/sbf/dependencies/platform-tools/rust"
+
+        if [ -d "$PRIMARY_DIR" ] || [ -L "$PRIMARY_DIR" ]; then
+          PATCH_DIRS+=("$PRIMARY_DIR")
+        fi
+
+        CACHE_ROOT="$HOME/.cache/solana"
+        if [ -d "$CACHE_ROOT" ]; then
+          while IFS= read -r dir; do
+            if [ -n "$dir" ]; then
+              PATCH_DIRS+=("$dir")
+            fi
+          done < <(find "$CACHE_ROOT" -maxdepth 3 -type d -path "*/platform-tools/rust")
+        fi
+
+        if [ ${#PATCH_DIRS[@]} -eq 0 ]; then
+          echo "::warning::No platform-tools Rust directories detected. cargo-build-sbf may download them later."
+        fi
+
+        for dir in "${PATCH_DIRS[@]}"; do
+          if [ -z "$dir" ]; then
+            continue
+          fi
+
+          echo "🔄 Replacing platform-tools Rust toolchain at $dir"
+          rm -rf "$dir"
+          mkdir -p "$dir"
+          cp -a "$RUST_176_DIR/." "$dir/"
+          chmod -R +x "$dir/bin" || true
+          "$dir/bin/rustc" --version || true
+        done
+
+        cargo-build-sbf --version || true
     
     - name: Cache dependencies
       uses: actions/cache@v3
