@@ -156,14 +156,19 @@ export default function UnlockInterface({
     setSuccess(null);
 
     try {
+      console.log('🔄 [UNLOCK] Starting unlock transaction...');
       const transaction = await createUnlockTokensTransaction(
         connection,
         wallet
       );
+      console.log('✅ [UNLOCK] Transaction created successfully');
 
+      console.log('📤 [UNLOCK] Sending transaction...');
       const signature = await sendTransaction(transaction, connection);
+      console.log('✅ [UNLOCK] Transaction sent! Signature:', signature);
 
       // Attendre la confirmation
+      console.log('⏳ [UNLOCK] Waiting for confirmation...');
       const { blockhash, lastValidBlockHeight } =
         await connection.getLatestBlockhash();
       await connection.confirmTransaction(
@@ -174,6 +179,7 @@ export default function UnlockInterface({
         },
         "confirmed"
       );
+      console.log('✅ [UNLOCK] Transaction confirmed!');
 
       const unlockedAmount = lockData?.amount
         ? Number(lockData.amount) / 1_000_000_000
@@ -191,13 +197,30 @@ export default function UnlockInterface({
         refresh();
       }, 2000);
     } catch (err: unknown) {
-      console.error("Error during unlock:", err);
+      console.error("❌ [UNLOCK] Error during unlock:", err);
       
-      // Log détaillé pour debugging
+      // Log TRÈS détaillé pour debugging
       if (err instanceof Error) {
-        console.error("Error name:", err.name);
-        console.error("Error message:", err.message);
-        console.error("Error stack:", err.stack);
+        console.error("❌ [UNLOCK] Error name:", err.name);
+        console.error("❌ [UNLOCK] Error message:", err.message);
+        console.error("❌ [UNLOCK] Error stack:", err.stack);
+        console.error("❌ [UNLOCK] Full error object:", JSON.stringify(err, null, 2));
+      }
+      
+      // Si c'est un objet avec des propriétés cachées
+      console.error("❌ [UNLOCK] Error keys:", Object.keys(err as object));
+      console.error("❌ [UNLOCK] Error values:", Object.values(err as object));
+      
+      // Essayer d'accéder aux propriétés spécifiques des erreurs Solana
+      const anyErr = err as any;
+      if (anyErr.logs) {
+        console.error("❌ [UNLOCK] Transaction logs:", anyErr.logs);
+      }
+      if (anyErr.message) {
+        console.error("❌ [UNLOCK] Direct message:", anyErr.message);
+      }
+      if (anyErr.error) {
+        console.error("❌ [UNLOCK] Nested error:", anyErr.error);
       }
       
       // Extraire le message d'erreur le plus utile

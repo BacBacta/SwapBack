@@ -337,26 +337,56 @@ export async function createUnlockTokensTransaction(
 
   // Construire l'instruction
   console.log('🔍 [UNLOCK TX] Building instruction...');
-  // Use the real unlock_tokens instruction from the deployed program
-  console.log('✅ [UNLOCK TX] Using unlock_tokens instruction');
-  const instruction = await program.methods
-    .unlockTokens()
-    .accounts({
-      userNft,
-      globalState,
-      userTokenAccount,
-      vaultTokenAccount,
-      vaultAuthority,
-      backMint: BACK_MINT,
-      user: wallet.publicKey,
-      tokenProgram: TOKEN_2022_PROGRAM_ID,
-    })
-    .instruction();
+  console.log('📋 [UNLOCK TX] Accounts in order:', {
+    '1_userNft': userNft.toString(),
+    '2_globalState': globalState.toString(),
+    '3_userTokenAccount': userTokenAccount.toString(),
+    '4_vaultTokenAccount': vaultTokenAccount.toString(),
+    '5_vaultAuthority': vaultAuthority.toString(),
+    '6_backMint': BACK_MINT.toString(),
+    '7_user': wallet.publicKey.toString(),
+    '8_tokenProgram': TOKEN_2022_PROGRAM_ID.toString(),
+  });
+  
+  try {
+    const instruction = await program.methods
+      .unlockTokens()
+      .accounts({
+        userNft,
+        globalState,
+        userTokenAccount,
+        vaultTokenAccount,
+        vaultAuthority,
+        backMint: BACK_MINT,
+        user: wallet.publicKey,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+      })
+      .instruction();
 
-  console.log('✅ [UNLOCK TX] Instruction created successfully');
+    console.log('✅ [UNLOCK TX] Instruction created successfully');
 
-  const transaction = new Transaction().add(instruction);
-  console.log('✅ [UNLOCK TX] Transaction built successfully');
+    const transaction = new Transaction().add(instruction);
+    console.log('✅ [UNLOCK TX] Transaction built successfully');
 
-  return transaction;
+    return transaction;
+  } catch (instrError) {
+    console.error('❌ [UNLOCK TX] ERROR building instruction:', instrError);
+    
+    // Log détaillé
+    if (instrError instanceof Error) {
+      console.error('❌ [UNLOCK TX] Instruction error name:', instrError.name);
+      console.error('❌ [UNLOCK TX] Instruction error message:', instrError.message);
+      console.error('❌ [UNLOCK TX] Instruction error stack:', instrError.stack);
+    }
+    
+    const anyInstrError = instrError as any;
+    if (anyInstrError.logs) {
+      console.error('❌ [UNLOCK TX] Anchor logs:', anyInstrError.logs);
+    }
+    if (anyInstrError.error) {
+      console.error('❌ [UNLOCK TX] Nested error:', JSON.stringify(anyInstrError.error, null, 2));
+    }
+    
+    throw instrError;
+  }
 }
