@@ -45,15 +45,29 @@ jobs:
     
     - name: Install Anchor
       run: |
-        # Installer directement Anchor CLI 0.30.1 avec Rust 1.80.1
-        # qui devrait compiler sans erreurs
         cargo install --git https://github.com/coral-xyz/anchor --tag v0.30.1 anchor-cli --locked --force
-        
-        # Ajouter au PATH
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-        
         anchor --version
-        anchor --version
+    
+    - name: Patch cargo-build-sbf Rust to 1.76.0
+      run: |
+        # cargo-build-sbf utilise son propre Rust 1.75.0 - on doit le patcher
+        RUST_BPF_DIR="$HOME/.local/share/solana/install/active_release/bin/sdk/sbf/dependencies/platform-tools/rust"
+        if [ -d "$RUST_BPF_DIR" ]; then
+          echo "Patching cargo-build-sbf Rust toolchain..."
+          # Sauvegarder l'original
+          cp "$RUST_BPF_DIR/bin/rustc" "$RUST_BPF_DIR/bin/rustc.1.75.0.bak" || true
+          # Copier le Rust 1.76.0 système
+          cp ~/.rustup/toolchains/1.76.0-x86_64-unknown-linux-gnu/bin/rustc "$RUST_BPF_DIR/bin/rustc"
+          cp ~/.rustup/toolchains/1.76.0-x86_64-unknown-linux-gnu/bin/rustdoc "$RUST_BPF_DIR/bin/rustdoc"
+          # Créer un lien vers les bibliothèques
+          rm -rf "$RUST_BPF_DIR/lib" || true
+          ln -sf ~/.rustup/toolchains/1.76.0-x86_64-unknown-linux-gnu/lib "$RUST_BPF_DIR/lib"
+          echo "Rust patched successfully!"
+          cargo-build-sbf --version
+        else
+          echo "Warning: Rust BPF directory not found, skipping patch"
+        fi
     
     - name: Cache dependencies
       uses: actions/cache@v3
