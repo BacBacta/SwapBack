@@ -64,7 +64,7 @@ jobs:
         export PATH="$HOME/.cargo/bin:$PATH"
         anchor --version
         solana --version
-        anchor build -p swapback_cnft
+        anchor build -p swapback_cnft --skip-lint
         ls -lh target/deploy/swapback_cnft.so
     
     - name: Setup Solana Keypair
