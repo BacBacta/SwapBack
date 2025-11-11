@@ -75,10 +75,10 @@ jobs:
         git commit -m "chore: Update IDL after program deployment to DHfa77Z9yCtVtg9GivhbjF1od25PWfwNBCm7ws5eXpzf" || echo "No changes to commit"
         git push
     
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+    - name: Upload program artifact
+      uses: actions/upload-artifact@v4
       with:
-        name: swapback-cnft-program
+        name: swapback_cnft
         path: |
           target/deploy/swapback_cnft.so
           target/idl/swapback_cnft.json
