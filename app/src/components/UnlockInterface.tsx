@@ -177,6 +177,23 @@ export default function UnlockInterface({
         if (simulation.value.err) {
           console.error('❌ [UNLOCK] SIMULATION FAILED:', simulation.value.err);
           console.error('❌ [UNLOCK] Simulation logs:', simulation.value.logs);
+          
+          // Vérifier si c'est une erreur "insufficient funds" du Token Program
+          const logs = simulation.value.logs || [];
+          const hasInsufficientFunds = logs.some(log => 
+            log.includes('Error: insufficient funds') || 
+            log.includes('custom program error: 0x1')
+          );
+          
+          if (hasInsufficientFunds) {
+            const errorMsg = 
+              '❌ Insufficient funds in vault!\n\n' +
+              'Your lock data shows more tokens than are actually in the vault. ' +
+              'This can happen if there were multiple lock operations or tests.\n\n' +
+              'Please contact support to reset your lock data, or wait for an admin fix.';
+            throw new Error(errorMsg);
+          }
+          
           throw new Error(`Simulation failed: ${JSON.stringify(simulation.value.err)}`);
         }
         
