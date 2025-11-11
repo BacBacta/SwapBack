@@ -51,18 +51,27 @@ jobs:
     
     - name: Patch cargo-build-sbf Rust to 1.76.0
       run: |
-        # cargo-build-sbf utilise son propre Rust 1.75.0 - on doit le remplacer complètement
+        # cargo-build-sbf utilise son propre Rust 1.75.0 - copie complète du toolchain 1.76.0
         RUST_BPF_DIR="$HOME/.local/share/solana/install/active_release/bin/sdk/sbf/dependencies/platform-tools/rust"
+        RUST_176_DIR="$HOME/.rustup/toolchains/1.76.0-x86_64-unknown-linux-gnu"
+        
         if [ -d "$RUST_BPF_DIR" ]; then
-          echo "Replacing cargo-build-sbf Rust toolchain with 1.76.0..."
-          # Sauvegarder l'original
-          mv "$RUST_BPF_DIR" "$RUST_BPF_DIR.1.75.0.backup"
-          # Créer un lien symbolique vers le Rust 1.76.0 système
-          ln -sf ~/.rustup/toolchains/1.76.0-x86_64-unknown-linux-gnu "$RUST_BPF_DIR"
-          echo "Rust toolchain replaced successfully!"
-          cargo-build-sbf --version
+          echo "📦 Backing up cargo-build-sbf Rust 1.75.0..."
+          mv "$RUST_BPF_DIR" "$RUST_BPF_DIR.backup"
+          
+          echo "📋 Copying entire Rust 1.76.0 toolchain (not symlinking)..."
+          cp -rL "$RUST_176_DIR" "$RUST_BPF_DIR"
+          
+          echo "🔧 Ensuring binaries are executable..."
+          chmod -R +x "$RUST_BPF_DIR/bin/"
+          
+          echo "✅ Verifying Rust version in cargo-build-sbf:"
+          "$RUST_BPF_DIR/bin/rustc" --version || echo "Direct rustc check failed"
+          cargo-build-sbf --version || echo "cargo-build-sbf check failed"
         else
-          echo "Warning: Rust BPF directory not found, skipping patch"
+          echo "⚠️ Rust BPF directory not found at: $RUST_BPF_DIR"
+          echo "Listing platform-tools directory:"
+          ls -la "$HOME/.local/share/solana/install/active_release/bin/sdk/sbf/dependencies/platform-tools/" || true
         fi
     
     - name: Cache dependencies
