@@ -26,7 +26,18 @@ jobs:
     
     - name: Install Solana
       run: |
-        sh -c "$(curl -sSfL https://release.solana.com/v1.18.26/install)"
+        # Try official installer first
+        if curl --retry 5 --retry-delay 2 -sSfL https://release.solana.com/v1.18.26/install -o /tmp/solana-install.sh; then
+          sh /tmp/solana-install.sh
+        else
+          # Fallback: download tarball directly
+          echo "Installer failed, trying direct download..."
+          cd /tmp
+          wget https://github.com/solana-labs/solana/releases/download/v1.18.26/solana-release-x86_64-unknown-linux-gnu.tar.bz2
+          tar -xjf solana-release-x86_64-unknown-linux-gnu.tar.bz2
+          mkdir -p $HOME/.local/share/solana/install
+          mv solana-release $HOME/.local/share/solana/install/active_release
+        fi
         echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
         export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
         solana --version
