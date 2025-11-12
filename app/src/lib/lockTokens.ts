@@ -117,8 +117,13 @@ export async function createLockTokensTransaction(
 
   // Charger le programme avec l'ID explicite et le type correct pour éviter DeclaredProgramIdMismatch
   console.log('🔍 [LOCK TX] Loading program...');
-  const program = new Program(cnftIdl as Idl, CNFT_PROGRAM_ID, provider);
-  console.log('✅ [LOCK TX] Program loaded:', CNFT_PROGRAM_ID.toString());
+  const program = new Program(cnftIdl as Idl, provider);
+  if (!program.programId.equals(CNFT_PROGRAM_ID)) {
+    throw new Error(
+      `❌ Program ID mismatch after initialization. Expected ${CNFT_PROGRAM_ID.toString()} but program.programId is ${program.programId.toString()}`
+    );
+  }
+  console.log('✅ [LOCK TX] Program loaded:', program.programId.toString());
   console.log('🔍 [LOCK TX] Coder has accounts:', Boolean((program as any)._coder?.accounts));
   if (!(program as any)._coder?.accounts) {
     console.warn('⚠️ [LOCK TX] Program coder missing accounts. Available keys:', Object.keys((program as any)._coder || {}));
@@ -303,8 +308,13 @@ export async function createUnlockTokensTransaction(
 
   // Charger le programme avec l'ID explicite et le type correct pour éviter DeclaredProgramIdMismatch
   console.log('🔍 [UNLOCK TX] Loading program...');
-  const program = new Program(cnftIdl as Idl, CNFT_PROGRAM_ID, provider);
-  console.log('✅ [UNLOCK TX] Program loaded:', CNFT_PROGRAM_ID.toString());
+  const program = new Program(cnftIdl as Idl, provider);
+  if (!program.programId.equals(CNFT_PROGRAM_ID)) {
+    throw new Error(
+      `❌ Program ID mismatch after initialization. Expected ${CNFT_PROGRAM_ID.toString()} but program.programId is ${program.programId.toString()}`
+    );
+  }
+  console.log('✅ [UNLOCK TX] Program loaded:', program.programId.toString());
   console.log('🔍 [UNLOCK TX] Coder has accounts:', Boolean((program as any)._coder?.accounts));
   if (!(program as any)._coder?.accounts) {
     const { BorshAccountsCoder } = await import('@coral-xyz/anchor');
