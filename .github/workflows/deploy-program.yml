@@ -1,0 +1,137 @@
+name: Deploy Solana Program to Devnet
+
+on:
+  workflow_dispatch:
+    inputs:
+      program_name:
+        description: 'Programme à déployer'
+        required: true
+        default: 'swapback_cnft'
+        type: choice
+        options:
+          - swapback_cnft
+          - swapback_router
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          profile: minimal
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache Cargo index
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache target directory
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.solana.com/stable/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      - name: Install Anchor CLI
+        run: |
+          cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+          avm install latest
+          avm use latest
+
+      - name: Verify declare_id
+        run: |
+          PROGRAM_FILE="programs/${{ github.event.inputs.program_name }}/src/lib.rs"
+          CURRENT_ID=$(grep 'declare_id!' "$PROGRAM_FILE" | grep -o '"[^"]*"' | tr -d '"')
+          echo "Program ID in source: $CURRENT_ID"
+          
+          if [ "${{ github.event.inputs.program_name }}" = "swapback_cnft" ]; then
+            EXPECTED_ID="26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru"
+          else
+            EXPECTED_ID="9JD7nuXd5wiyvT6VWnHxWK5VvYAFSG98huNvsDvPwLUg"
+          fi
+          
+          if [ "$CURRENT_ID" != "$EXPECTED_ID" ]; then
+            echo "❌ ERROR: declare_id! mismatch!"
+            echo "Expected: $EXPECTED_ID"
+            echo "Found: $CURRENT_ID"
+            exit 1
+          fi
+          echo "✅ declare_id! is correct"
+
+      - name: Build program
+        run: |
+          anchor build --program-name ${{ github.event.inputs.program_name }}
+
+      - name: Display build info
+        run: |
+          BINARY="target/deploy/${{ github.event.inputs.program_name }}.so"
+          KEYPAIR="target/deploy/${{ github.event.inputs.program_name }}-keypair.json"
+          
+          echo "📦 Binary size: $(du -h $BINARY | cut -f1)"
+          echo "🔑 Program ID: $(solana-keygen pubkey $KEYPAIR)"
+
+      - name: Setup Solana wallet
+        run: |
+          echo "${{ secrets.SOLANA_DEPLOYER_PRIVATE_KEY }}" > /tmp/deployer-keypair.json
+          solana config set --keypair /tmp/deployer-keypair.json
+          solana config set --url devnet
+
+      - name: Check wallet balance
+        run: |
+          WALLET_ADDRESS=$(solana address)
+          BALANCE=$(solana balance --url devnet | awk '{print $1}')
+          
+          echo "💼 Wallet: $WALLET_ADDRESS"
+          echo "💰 Balance: $BALANCE SOL"
+          
+          if (( $(echo "$BALANCE < 0.5" | bc -l) )); then
+            echo "⚠️ Low balance, requesting airdrop..."
+            solana airdrop 2 --url devnet || echo "Airdrop failed, continuing anyway..."
+          fi
+
+      - name: Deploy program
+        run: |
+          PROGRAM_ID=$(solana-keygen pubkey target/deploy/${{ github.event.inputs.program_name }}-keypair.json)
+          
+          echo "🚀 Deploying ${{ github.event.inputs.program_name }} to devnet..."
+          echo "📍 Program ID: $PROGRAM_ID"
+          
+          solana program deploy \
+            --url devnet \
+            --program-id target/deploy/${{ github.event.inputs.program_name }}-keypair.json \
+            target/deploy/${{ github.event.inputs.program_name }}.so
+
+      - name: Verify deployment
+        run: |
+          PROGRAM_ID=$(solana-keygen pubkey target/deploy/${{ github.event.inputs.program_name }}-keypair.json)
+          
+          echo "🔍 Verifying deployment..."
+          solana program show $PROGRAM_ID --url devnet
+          
+          echo ""
+          echo "✅ Program deployed successfully!"
+          echo "📍 Program ID: $PROGRAM_ID"
+          echo "🌐 Explorer: https://explorer.solana.com/address/$PROGRAM_ID?cluster=devnet"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f /tmp/deployer-keypair.json
