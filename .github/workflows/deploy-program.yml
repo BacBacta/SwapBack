@@ -1,698 +1,74 @@
 name: Deploy Solana Program to Devnet
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
-    inputs:
-      program_name:
-        description: 'Programme à déployer'
-        required: true
-        default: 'swapback_cnft'
-        type: choice
-        options:
-          - swapback_cnft
-          - swapback_router
 
-env:
-  SOLANA_VERSION: v1.18.18
-  SOLANA_PATH: /home/runner/.local/share/solana/install/active_release/bin
+permissions:
+  contents: read
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
-          components: rustfmt, clippy
+          fetch-depth: 0
+          submodules: false
 
-      - name: Cache Rust dependencies (EXCLUDE Cargo.lock)
-        uses: Swatinem/rust-cache@v2
+      - name: Set up Rust toolchain (optional, ensures reproducible toolchain for workspace)
+        uses: actions-rs/toolchain@v1
         with:
-          cache-on-failure: true
-          shared-key: solana-program-build-v2
-          # Exclude ALL Cargo.lock from cache
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-          cache-directories: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
+          toolchain: 1.70.0
+          override: true
+          profile: minimal
 
-      - name: NUCLEAR OPTION - Obliterate ALL Cargo.lock files
+      - name: Remove any repository root Cargo.lock (avoid Cargo.lock v4 parsing error in CI)
         run: |
-          echo "🔥 NUCLEAR: Removing ALL Cargo.lock at every level..."
-          
-          # Method 1: Find and delete
-          find . -name "Cargo.lock" -type f -print -delete 2>/dev/null || true
-          
-          # Method 2: Explicit deletion at known locations
-          rm -f Cargo.lock 2>/dev/null || true
-          rm -f ./Cargo.lock 2>/dev/null || true
-          rm -f programs/*/Cargo.lock 2>/dev/null || true
-          
-          # Method 3: Git remove if tracked (force untrack)
-          git rm --cached -f Cargo.lock 2>/dev/null || true
-          git rm --cached -f "**/Cargo.lock" 2>/dev/null || true
-          
-          # Verify complete obliteration
-          echo "Verification - searching for any remaining Cargo.lock:"
-          if find . -name "Cargo.lock" -type f -print 2>/dev/null | grep -q .; then
-            echo "❌ CRITICAL: Cargo.lock files still exist:"
-            find . -name "Cargo.lock" -type f -exec ls -lah {} \;
-            echo "Attempting chmod + force remove..."
-            find . -name "Cargo.lock" -type f -exec chmod 777 {} \; -exec rm -f {} \;
-          fi
-          
-          # Final check
-          REMAINING=$(find . -name "Cargo.lock" -type f 2>/dev/null | wc -l)
-          if [ "$REMAINING" -gt 0 ]; then
-            echo "❌ FAILED: $REMAINING Cargo.lock files remain"
-            exit 1
-          fi
-          
-          echo "✅ SUCCESS: All Cargo.lock files obliterated"
-          echo "cargo-build-sbf will generate its own Cargo.lock v3"
+          echo "Listing Cargo.lock files before deletion (for debug):"
+          find . -name Cargo.lock -type f -maxdepth 4 -print || true
+          # Delete root/workspace Cargo.lock files that break cargo-build-sbf
+          find . -name Cargo.lock -type f -maxdepth 4 -exec rm -f {} \; || true
+          echo "Deleted candidate Cargo.lock files. Verify none remain:"
+          find . -name Cargo.lock -type f -print || echo "No Cargo.lock files found"
 
-      - name: Install system dependencies
+      - name: Pull Solana CLI Docker image
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq \
-            pkg-config \
-            build-essential \
-            libudev-dev \
-            libssl-dev \
-            curl \
-            jq \
-            bc
-          echo "✅ System dependencies installed"
+          docker pull solanalabs/solana:v1.18.18
 
-      - name: Cache Solana installation
-        id: cache-solana
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.local/share/solana
-            ~/.cache/solana
-          key: solana-${{ env.SOLANA_VERSION }}-${{ runner.os }}
-          restore-keys: |
-            solana-${{ env.SOLANA_VERSION }}-
-
-      - name: Install Solana CLI
-        if: steps.cache-solana.outputs.cache-hit != 'true'
+      - name: Build Solana program(s) inside Solana Docker image
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
         run: |
-          echo "Installing Solana CLI ${{ env.SOLANA_VERSION }}"
-          
-          # Method 1: Try official installer
-          echo "Method 1: Official installer"
-          if curl --retry 3 --retry-delay 5 --max-time 60 -sSfL https://release.solana.com/${{ env.SOLANA_VERSION }}/install | sh; then
-            if [ -f "$HOME/.local/share/solana/install/active_release/bin/solana" ]; then
-              echo "✅ Installed via official installer"
-              exit 0
-            fi
-          fi
-          
-          echo "Method 1 failed, trying Method 2: Direct download"
-          
-          # Method 2: Direct binary download as fallback
-          SOLANA_INSTALL_DIR="$HOME/.local/share/solana/install/releases/${{ env.SOLANA_VERSION }}"
-          mkdir -p "$SOLANA_INSTALL_DIR"
-          
-          # Determine architecture
-          ARCH=$(uname -m)
-          if [ "$ARCH" = "x86_64" ]; then
-            SOLANA_ARCH="x86_64-unknown-linux-gnu"
-          elif [ "$ARCH" = "aarch64" ]; then
-            SOLANA_ARCH="aarch64-unknown-linux-gnu"
-          else
-            echo "❌ Unsupported architecture: $ARCH"
-            exit 1
-          fi
-          
-          SOLANA_RELEASE="solana-release-${SOLANA_ARCH}.tar.bz2"
-          DOWNLOAD_URL="https://github.com/solana-labs/solana/releases/download/${{ env.SOLANA_VERSION }}/${SOLANA_RELEASE}"
-          
-          echo "Downloading from GitHub: $DOWNLOAD_URL"
-          
-          cd "$SOLANA_INSTALL_DIR"
-          if curl --retry 5 --retry-delay 10 --max-time 180 -L "$DOWNLOAD_URL" -o solana.tar.bz2; then
-            echo "Extracting..."
-            tar -xjf solana.tar.bz2
-            rm solana.tar.bz2
-            
-            # Find the extracted directory
-            EXTRACTED_DIR=$(find . -maxdepth 1 -type d -name "solana-release" | head -1)
-            if [ -z "$EXTRACTED_DIR" ]; then
-              echo "⚠️ Looking for alternative directory structure..."
-              EXTRACTED_DIR=$(find . -maxdepth 1 -type d | grep -v "^\.$" | head -1)
-            fi
-            
-            if [ -n "$EXTRACTED_DIR" ] && [ -d "$EXTRACTED_DIR/bin" ]; then
-              # Create active_release link
-              mkdir -p "$HOME/.local/share/solana/install"
-              ln -sf "$SOLANA_INSTALL_DIR/$EXTRACTED_DIR" "$HOME/.local/share/solana/install/active_release"
-              
-              if [ -f "$HOME/.local/share/solana/install/active_release/bin/solana" ]; then
-                echo "✅ Installed via direct download"
-                ls -la "$HOME/.local/share/solana/install/active_release/bin/" | head -10
-                exit 0
-              fi
-            fi
-          fi
-          
-          echo "Method 2 failed, trying Method 3: apt package"
-          
-          # Method 3: Try from apt (if available)
-          if command -v apt-get &> /dev/null; then
-            echo "Attempting installation via apt..."
-            sudo apt-get update -qq
-            if sudo apt-get install -y -qq solana-cli 2>/dev/null; then
-              echo "✅ Installed via apt"
-              exit 0
-            fi
-          fi
-          
-          echo "❌ All installation methods failed"
-          exit 1
+          set -euo pipefail
+          # ensure workspace permissions for docker
+          ls -la "${GITHUB_WORKSPACE}" || true
 
-      - name: Setup Solana environment
-        run: |
-          # Find where Solana was actually installed
-          SOLANA_DIR=""
-          
-          # Check standard location first
-          if [ -d "$HOME/.local/share/solana/install/active_release/bin" ] && [ -f "$HOME/.local/share/solana/install/active_release/bin/solana" ]; then
-            SOLANA_DIR="$HOME/.local/share/solana/install/active_release/bin"
-            echo "✅ Found Solana at standard location"
-          # Check if installed via apt
-          elif command -v solana &> /dev/null; then
-            SOLANA_DIR=$(dirname $(which solana))
-            echo "✅ Found Solana via system PATH: $SOLANA_DIR"
-          else
-            # Search for it recursively
-            echo "🔍 Searching for Solana installation..."
-            SOLANA_BINARY=$(find $HOME/.local -type f -name "solana" -executable 2>/dev/null | grep -v "\.cargo" | head -1)
-            
-            if [ -n "$SOLANA_BINARY" ]; then
-              SOLANA_DIR=$(dirname "$SOLANA_BINARY")
-              echo "✅ Found Solana at: $SOLANA_DIR"
-            fi
-          fi
-          
-          if [ -z "$SOLANA_DIR" ] || [ ! -f "$SOLANA_DIR/solana" ]; then
-            echo "❌ Could not find Solana installation"
-            echo ""
-            echo "Diagnostic information:"
-            echo "HOME=$HOME"
-            echo "PATH=$PATH"
-            echo ""
-            echo "Contents of ~/.local/share/solana:"
-            ls -laR $HOME/.local/share/solana 2>/dev/null || echo "Directory not found"
-            echo ""
-            echo "Searching for solana binary:"
-            find $HOME/.local -name "solana" -type f 2>/dev/null || echo "Not found"
-            echo ""
-            echo "System solana:"
-            which solana 2>/dev/null || echo "Not in system PATH"
-            exit 1
-          fi
-          
-          # Add to PATH for all subsequent steps
-          echo "$SOLANA_DIR" >> $GITHUB_PATH
-          
-          # Export for current step
-          export PATH="$SOLANA_DIR:$PATH"
-          
-          # Save to env for reuse
-          echo "SOLANA_BIN_PATH=$SOLANA_DIR" >> $GITHUB_ENV
-          
-          # Verify all commands are accessible
-          echo "Verifying Solana CLI tools..."
-          for cmd in solana solana-keygen cargo-build-sbf; do
-            if command -v $cmd &> /dev/null; then
-              echo "  ✅ $cmd: $(which $cmd)"
-            else
-              echo "  ⚠️ $cmd: not found"
-            fi
-          done
-          
-          # Display versions
-          echo ""
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "✅ Environment Ready"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "Solana CLI: $(solana --version)"
-          echo "Rust: $(rustc --version)"
-          echo "Cargo: $(cargo --version)"
-          echo "Solana bin path: $SOLANA_DIR"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}":/workspace \
+            -w /workspace \
+            solanalabs/solana:v1.18.18 \
+            bash -lc '\
+              set -euo pipefail; \
+              echo "Working directory: $(pwd)"; \
+              # build each program (adjust path if you have multiple programs) \
+              if [ -d "programs/swapback_cnft" ]; then \
+                cd programs/swapback_cnft; \
+                echo "Running cargo build-sbf for programs/swapback_cnft"; \
+                cargo build-sbf 2>&1 | tee ../../build.log || true; \
+              else \
+                echo "ERROR: programs/swapback_cnft not found"; exit 1; \
+              fi; \
+            '
 
-      - name: Verify declare_id in source
-        run: |
-          PROGRAM_FILE="programs/${{ github.event.inputs.program_name }}/src/lib.rs"
-          
-          if [ ! -f "$PROGRAM_FILE" ]; then
-            echo "❌ ERROR: Program file not found: $PROGRAM_FILE"
-            ls -la programs/
-            exit 1
-          fi
-          
-          CURRENT_ID=$(grep 'declare_id!' "$PROGRAM_FILE" | grep -o '"[^"]*"' | tr -d '"')
-          echo "📋 Program ID in source: $CURRENT_ID"
-          
-          if [ "${{ github.event.inputs.program_name }}" = "swapback_cnft" ]; then
-            EXPECTED_ID="26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru"
-          else
-            EXPECTED_ID="9JD7nuXd5wiyvT6VWnHxWK5VvYAFSG98huNvsDvPwLUg"
-          fi
-          
-          if [ "$CURRENT_ID" != "$EXPECTED_ID" ]; then
-            echo "❌ ERROR: declare_id! mismatch!"
-            echo "Expected: $EXPECTED_ID"
-            echo "Found: $CURRENT_ID"
-            exit 1
-          fi
-          
-          echo "✅ declare_id! is correct: $CURRENT_ID"
-
-      - name: Build Solana program
-        run: |
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "🔨 BUILDING: ${{ github.event.inputs.program_name }}"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          
-          # Verify cargo-build-sbf is available
-          if ! command -v cargo-build-sbf &> /dev/null; then
-            echo "❌ cargo-build-sbf not found in PATH"
-            echo "Searching for Solana binaries..."
-            find $HOME/.local -name "cargo-build-sbf" -type f 2>/dev/null || echo "Not found"
-            exit 1
-          fi
-          
-          echo "✅ cargo-build-sbf: $(which cargo-build-sbf)"
-          
-          # Get cargo-build-sbf version info
-          echo "Checking cargo-build-sbf environment..."
-          cargo-build-sbf --version 2>&1 || echo "Version info unavailable"
-          echo ""
-          
-          cd programs/${{ github.event.inputs.program_name }}
-          
-          # PARANOID CHECK: Ensure no Cargo.lock exists before build
-          echo "🔍 Pre-build Cargo.lock check..."
-          
-          # Check local directory
-          if [ -f "Cargo.lock" ]; then
-            echo "❌ CRITICAL: Cargo.lock exists in programs/${{ github.event.inputs.program_name }}/"
-            ls -lah Cargo.lock
-            rm -f Cargo.lock
-            echo "Removed. Will let cargo-build-sbf generate its own."
-          fi
-          
-          # Check root directory
-          if [ -f "../../Cargo.lock" ]; then
-            echo "❌ CRITICAL: Root Cargo.lock exists"
-            ls -lah "../../Cargo.lock"
-            head -5 "../../Cargo.lock"  # Show version
-            rm -f "../../Cargo.lock"
-            echo "Removed root Cargo.lock"
-          fi
-          
-          # Absolute verification
-          cd ../../
-          if [ -f "Cargo.lock" ]; then
-            echo "❌ CATASTROPHIC: Cargo.lock STILL exists at root after double-check"
-            cat Cargo.lock | head -5
-            exit 1
-          fi
-          
-          cd programs/${{ github.event.inputs.program_name }}
-          echo "✅ Confirmed: No Cargo.lock files present"
-          
-          # Build with cargo-build-sbf (it handles Cargo.lock internally)
-          echo "Starting compilation..."
-          echo ""
-          
-          # cargo-build-sbf manages its own Rust toolchain and Cargo.lock
-          # Use PIPESTATUS to capture actual exit code, not tee's exit code
-          set +e  # Don't exit on error
-          cargo-build-sbf 2>&1 | tee ../../build.log
-          BUILD_EXIT_CODE=${PIPESTATUS[0]}
-          set -e  # Re-enable exit on error
-          
-          cd ../..
-          
-          # Check for Cargo.lock v4 error specifically
-          if grep -q "lock file version 4 requires" build.log; then
-            echo ""
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "❌ CARGO.LOCK VERSION 4 ERROR DETECTED"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo ""
-            echo "This indicates Cargo.lock version 4 was present during build."
-            echo "Showing relevant context:"
-            grep -A10 -B5 "lock file version 4" build.log || true
-            echo ""
-            echo "Checking for Cargo.lock files:"
-            find . -name "Cargo.lock" -type f -exec ls -lah {} \; 2>/dev/null || echo "No Cargo.lock files found"
-            exit 1
-          fi
-          
-          if [ $BUILD_EXIT_CODE -ne 0 ]; then
-            echo ""
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "❌ BUILD FAILED (Exit code: $BUILD_EXIT_CODE)"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo ""
-            echo "Last 150 lines of build log:"
-            tail -150 build.log
-            echo ""
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            
-            # Check for common errors
-            if grep -q "Cargo.lock" build.log; then
-              echo ""
-              echo "💡 Cargo.lock related error detected"
-              echo "Attempting to show relevant context:"
-              grep -A5 -B5 "Cargo.lock" build.log || true
-            fi
-            
-            exit 1
-          fi
-          
-          # Verify build artifacts
-          BINARY="target/deploy/${{ github.event.inputs.program_name }}.so"
-          KEYPAIR="target/deploy/${{ github.event.inputs.program_name }}-keypair.json"
-          
-          echo ""
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "✅ BUILD SUCCESSFUL"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          
-          if [ ! -f "$BINARY" ]; then
-            echo "❌ Binary not found: $BINARY"
-            ls -la target/deploy/ 2>/dev/null || echo "target/deploy/ not found"
-            exit 1
-          fi
-          
-          if [ ! -f "$KEYPAIR" ]; then
-            echo "❌ Keypair not found: $KEYPAIR"
-            exit 1
-          fi
-          
-          echo "📦 Binary: $BINARY ($(du -h $BINARY | cut -f1))"
-          echo "🔑 Keypair: $KEYPAIR"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-      - name: Display build info
-        run: |
-          BINARY="target/deploy/${{ github.event.inputs.program_name }}.so"
-          KEYPAIR="target/deploy/${{ github.event.inputs.program_name }}-keypair.json"
-          
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "📦 BUILD SUMMARY"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "Program: ${{ github.event.inputs.program_name }}"
-          echo "Binary: $BINARY"
-          echo "Size: $(du -h $BINARY | cut -f1)"
-          echo "Keypair: $KEYPAIR"
-          echo "Program ID: $(solana-keygen pubkey $KEYPAIR)"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-      - name: Setup deployer wallet
-        run: |
-          # Validate secret exists
-          if [ -z "${{ secrets.SOLANA_DEPLOYER_PRIVATE_KEY }}" ]; then
-            echo "❌ ERROR: SOLANA_DEPLOYER_PRIVATE_KEY secret not configured"
-            echo ""
-            echo "Please add your deployer keypair to GitHub Secrets:"
-            echo "1. Go to: https://github.com/${{ github.repository }}/settings/secrets/actions"
-            echo "2. Click 'New repository secret'"
-            echo "3. Name: SOLANA_DEPLOYER_PRIVATE_KEY"
-            echo "4. Value: [your keypair JSON array]"
-            exit 1
-          fi
-          
-          # Create keypair file
-          echo "${{ secrets.SOLANA_DEPLOYER_PRIVATE_KEY }}" > /tmp/deployer-keypair.json
-          
-          # Validate keypair format
-          if ! jq empty /tmp/deployer-keypair.json 2>/dev/null; then
-            echo "❌ ERROR: Invalid keypair JSON format"
-            rm -f /tmp/deployer-keypair.json
-            exit 1
-          fi
-          
-          # Verify keypair with solana-keygen
-          PUBKEY=$(solana-keygen pubkey /tmp/deployer-keypair.json 2>&1)
-          if [ $? -ne 0 ]; then
-            echo "❌ ERROR: Invalid keypair format"
-            echo "$PUBKEY"
-            rm -f /tmp/deployer-keypair.json
-            exit 1
-          fi
-          
-          # Configure Solana CLI
-          solana config set --keypair /tmp/deployer-keypair.json
-          solana config set --url devnet
-          
-          echo "✅ Deployer wallet configured"
-          echo "💼 Address: $PUBKEY"
-
-      - name: Check balance and request airdrop if needed
-        run: |
-          WALLET_ADDRESS=$(solana address 2>&1)
-          echo "💼 Deployer wallet: $WALLET_ADDRESS"
-          
-          # Get balance with retry
-          max_attempts=3
-          attempt=1
-          BALANCE=""
-          
-          while [ $attempt -le $max_attempts ]; do
-            BALANCE=$(solana balance --url devnet 2>&1 | grep -oE '[0-9]+\.[0-9]+' | head -n1 || echo "")
-            
-            if [ -n "$BALANCE" ]; then
-              break
-            fi
-            
-            echo "⏳ Retry $attempt/$max_attempts to get balance..."
-            sleep 5
-            attempt=$((attempt + 1))
-          done
-          
-          if [ -z "$BALANCE" ]; then
-            echo "⚠️ Could not determine balance, will attempt airdrop"
-            BALANCE="0"
-          fi
-          
-          echo "💰 Current balance: $BALANCE SOL"
-          
-          # Check if balance is sufficient (need at least 1 SOL for deployment)
-          if (( $(echo "$BALANCE < 1.0" | bc -l) )); then
-            echo "⚠️ Balance too low for deployment, requesting airdrop..."
-            
-            # Try airdrop with retry
-            airdrop_success=false
-            for i in {1..3}; do
-              echo "Airdrop attempt $i/3"
-              if solana airdrop 2 --url devnet 2>&1; then
-                airdrop_success=true
-                echo "✅ Airdrop successful"
-                sleep 5
-                break
-              fi
-              sleep 10
-            done
-            
-            if [ "$airdrop_success" = "false" ]; then
-              echo "⚠️ Airdrop failed, but continuing with deployment attempt"
-            fi
-            
-            # Check new balance
-            NEW_BALANCE=$(solana balance --url devnet 2>&1 | grep -oE '[0-9]+\.[0-9]+' | head -n1 || echo "$BALANCE")
-            echo "💰 Updated balance: $NEW_BALANCE SOL"
-          else
-            echo "✅ Sufficient balance for deployment"
-          fi
-
-      - name: Verify program and authority
-        run: |
-          PROGRAM_ID=$(solana-keygen pubkey target/deploy/${{ github.event.inputs.program_name }}-keypair.json)
-          WALLET_ADDRESS=$(solana address)
-          
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "🔍 PRE-DEPLOYMENT VERIFICATION"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "Program ID: $PROGRAM_ID"
-          echo "Deployer: $WALLET_ADDRESS"
-          echo ""
-          
-          # Check if program exists on-chain
-          PROGRAM_INFO=$(solana program show $PROGRAM_ID --url devnet 2>&1 || echo "NOT_FOUND")
-          
-          if echo "$PROGRAM_INFO" | grep -q "could not find account"; then
-            echo "📝 Status: FIRST DEPLOYMENT"
-            echo "FIRST_DEPLOY=true" >> $GITHUB_ENV
-          else
-            echo "🔄 Status: UPGRADE"
-            
-            # Extract and verify authority
-            CURRENT_AUTHORITY=$(echo "$PROGRAM_INFO" | grep "Authority:" | awk '{print $2}')
-            
-            if [ -z "$CURRENT_AUTHORITY" ]; then
-              echo "⚠️ Could not determine current authority"
-            else
-              echo "Current Authority: $CURRENT_AUTHORITY"
-              
-              if [ "$WALLET_ADDRESS" != "$CURRENT_AUTHORITY" ]; then
-                echo "❌ ERROR: Wallet does not have upgrade authority"
-                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                echo "Required authority: $CURRENT_AUTHORITY"
-                echo "Your wallet: $WALLET_ADDRESS"
-                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                exit 1
-              fi
-              
-              echo "✅ Upgrade authority verified"
-            fi
-            
-            echo "FIRST_DEPLOY=false" >> $GITHUB_ENV
-            
-            # Show current program info
-            echo ""
-            echo "Current program info:"
-            echo "$PROGRAM_INFO"
-          fi
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-      - name: Deploy program to devnet
-        run: |
-          PROGRAM_ID=$(solana-keygen pubkey target/deploy/${{ github.event.inputs.program_name }}-keypair.json)
-          
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "🚀 DEPLOYING TO DEVNET"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "Program: ${{ github.event.inputs.program_name }}"
-          echo "Program ID: $PROGRAM_ID"
-          echo "Network: devnet"
-          echo "Type: $([ "${{ env.FIRST_DEPLOY }}" = "true" ] && echo "First deployment" || echo "Upgrade")"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo ""
-          
-          # Deploy with verbose output
-          if solana program deploy \
-            --url devnet \
-            --program-id target/deploy/${{ github.event.inputs.program_name }}-keypair.json \
-            --upgrade-authority /tmp/deployer-keypair.json \
-            target/deploy/${{ github.event.inputs.program_name }}.so \
-            --verbose 2>&1 | tee deploy.log; then
-            
-            echo ""
-            echo "✅ DEPLOYMENT SUCCESSFUL!"
-          else
-            echo ""
-            echo "❌ DEPLOYMENT FAILED"
-            echo "Deployment log:"
-            cat deploy.log
-            exit 1
-          fi
-
-      - name: Verify deployment
-        run: |
-          PROGRAM_ID=$(solana-keygen pubkey target/deploy/${{ github.event.inputs.program_name }}-keypair.json)
-          
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "✅ POST-DEPLOYMENT VERIFICATION"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          
-          # Wait a moment for propagation
-          sleep 3
-          
-          # Verify deployment
-          PROGRAM_INFO=$(solana program show $PROGRAM_ID --url devnet 2>&1)
-          
-          if echo "$PROGRAM_INFO" | grep -q "Program Id: $PROGRAM_ID"; then
-            echo "✅ Program verified on-chain"
-            echo ""
-            echo "$PROGRAM_INFO"
-            echo ""
-            
-            LAST_SLOT=$(echo "$PROGRAM_INFO" | grep "Last Deployed Slot:" | awk '{print $4}')
-            if [ -n "$LAST_SLOT" ]; then
-              echo "⏰ Deployed at slot: $LAST_SLOT"
-            fi
-          else
-            echo "⚠️ Could not verify program on-chain"
-            echo "$PROGRAM_INFO"
-          fi
-          
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo ""
-          echo "🔗 EXPLORER LINKS:"
-          echo "• Solana Explorer: https://explorer.solana.com/address/$PROGRAM_ID?cluster=devnet"
-          echo "• Solscan: https://solscan.io/account/$PROGRAM_ID?cluster=devnet"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-      - name: Cleanup
+      - name: Upload build.log artifact
         if: always()
-        run: |
-          rm -f /tmp/deployer-keypair.json
-          rm -f build.log deploy.log
-          echo "🧹 Cleanup complete"
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
 
-      - name: Create deployment summary
-        if: success()
-        run: |
-          PROGRAM_ID=$(solana-keygen pubkey target/deploy/${{ github.event.inputs.program_name }}-keypair.json)
-          
-          cat >> $GITHUB_STEP_SUMMARY << EOF
-          ## ✅ Deployment Successful
-          
-          **Program:** \`${{ github.event.inputs.program_name }}\`  
-          **Program ID:** \`$PROGRAM_ID\`  
-          **Network:** devnet  
-          **Type:** $([ "${{ env.FIRST_DEPLOY }}" = "true" ] && echo "First deployment" || echo "Upgrade")
-          
-          ### 📋 Next Steps
-          
-          1. **Wait 30-60 seconds** for network propagation
-          2. **Test** on [Vercel App](https://swap-back-pc5qkn6em-bactas-projects.vercel.app/)
-          3. **Verify** that \`DeclaredProgramIdMismatch\` error is resolved
-          4. **Check** transaction logs for successful lock/unlock operations
-          
-          ### 🔗 Explorer Links
-          
-          - [Solana Explorer](https://explorer.solana.com/address/$PROGRAM_ID?cluster=devnet)
-          - [Solscan](https://solscan.io/account/$PROGRAM_ID?cluster=devnet)
-          
-          ### 🧪 Testing Checklist
-          
-          - [ ] Lock tokens successfully
-          - [ ] cNFT minted correctly
-          - [ ] Unlock tokens works
-          - [ ] No \`DeclaredProgramIdMismatch\` errors
-          
-          ---
-          
-          *Deployment completed at $(date -u +"%Y-%m-%d %H:%M:%S UTC")*
-          EOF
-          
-          echo "🔍 Verifying deployment..."
-          solana program show $PROGRAM_ID --url devnet
-          
-          echo ""
-          echo "✅ Program deployed successfully!"
-          echo "📍 Program ID: $PROGRAM_ID"
-          echo "🌐 Explorer: https://explorer.solana.com/address/$PROGRAM_ID?cluster=devnet"
-
-      - name: Cleanup
-        if: always()
-        run: |
-          rm -f /tmp/deployer-keypair.json
+# End workflow
