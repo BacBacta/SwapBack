@@ -115,9 +115,9 @@ export async function createLockTokensTransaction(
     { commitment: "confirmed", skipPreflight: false }
   );
 
-  // Charger le programme
+  // Charger le programme avec l'ID explicite pour éviter DeclaredProgramIdMismatch
   console.log('🔍 [LOCK TX] Loading program...');
-  const program = new Program(cnftIdl as Idl, provider);
+  const program = new Program(cnftIdl as Idl, CNFT_PROGRAM_ID, provider);
   console.log('✅ [LOCK TX] Program loaded:', CNFT_PROGRAM_ID.toString());
 
   // Convertir le montant en lamports (9 decimals pour BACK)
@@ -292,9 +292,9 @@ export async function createUnlockTokensTransaction(
     { commitment: "confirmed" }
   );
 
-  // Charger le programme
+  // Charger le programme avec l'ID explicite pour éviter DeclaredProgramIdMismatch
   console.log('🔍 [UNLOCK TX] Loading program...');
-  const program = new Program(cnftIdl as Idl, provider);
+  const program = new Program(cnftIdl as Idl, CNFT_PROGRAM_ID, provider);
   console.log('✅ [UNLOCK TX] Program loaded:', CNFT_PROGRAM_ID.toString());
 
   // Dériver les PDAs
