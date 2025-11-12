@@ -1,13 +1,11 @@
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AnchorProvider, Program, BN, Wallet } from '@coral-xyz/anchor';
+import { AnchorProvider, Program, BN, Wallet, Idl } from '@coral-xyz/anchor';
 import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
 import { toast } from 'react-hot-toast';
 import { trackBuyback } from '@/lib/analytics';
 import { parseBuybackTransaction } from '@/lib/parsers';
 import { getExplorerTxUrl } from '@/utils/explorer';
-import * as fs from 'fs';
-import * as path from 'path';
 
 import {
   BUYBACK_STATE_PDA,
@@ -18,6 +16,41 @@ import {
 interface ExecuteBuybackParams {
   usdcAmount: number; // Amount in USDC (e.g., 5 for 5 USDC)
   minBackAmount?: number; // Minimum BACK tokens expected (slippage protection)
+}
+
+/**
+ * Load the Buyback program IDL
+ * Loads from src/idl folder (bundled with app)
+ */
+let cachedBuybackIdl: Idl | null = null;
+
+async function loadBuybackIdl(): Promise<Idl> {
+  // Return cached IDL if available
+  if (cachedBuybackIdl) {
+    return cachedBuybackIdl;
+  }
+
+  try {
+    // Load IDL from bundled source (works in browser)
+    const idl = await import('@/idl/swapback_buyback.json');
+    
+    // Validate the imported IDL has required structure
+    if (!idl || !idl.default || typeof idl.default !== 'object') {
+      throw new Error('Invalid IDL structure');
+    }
+    
+    cachedBuybackIdl = idl.default as Idl;
+    return cachedBuybackIdl;
+  } catch (error) {
+    console.error('Error loading Buyback IDL:', error);
+    
+    // Provide more specific error messages
+    if (error instanceof Error && error.message.includes('Cannot find module')) {
+      throw new Error('Buyback IDL not found. Please ensure swapback_buyback.json is in /src/idl/');
+    }
+    
+    throw new Error(`Failed to load Buyback IDL: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 /**
@@ -36,8 +69,7 @@ export function useExecuteBuyback() {
       }
 
       // Load buyback program IDL
-      const idlPath = path.join(process.cwd(), '../target/idl/swapback_buyback.json');
-      const idl = JSON.parse(fs.readFileSync(idlPath, 'utf-8'));
+      const idl = await loadBuybackIdl();
 
       // Create Anchor provider
       const provider = new AnchorProvider(
