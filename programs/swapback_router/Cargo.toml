@@ -38,4 +38,4 @@ getrandom = { version = "0.2", default-features = false, features = ["custom"] }
 
 # Forcer les versions compatibles avec Rust 1.79
 indexmap = "=2.6.0"
-toml_edit = "=0.22.22"
+toml_edit = "=0.23.7"
