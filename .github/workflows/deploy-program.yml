@@ -76,9 +76,19 @@ jobs:
             
             # Try primary method
             if curl --retry 3 --retry-delay 5 -sSfL https://release.solana.com/${{ env.SOLANA_VERSION }}/install | sh; then
-              install_success=true
-              echo "✅ Solana installed successfully"
-              break
+              # Verify installation immediately
+              if [ -d "$HOME/.local/share/solana/install/active_release/bin" ]; then
+                if [ -f "$HOME/.local/share/solana/install/active_release/bin/solana" ]; then
+                  install_success=true
+                  echo "✅ Solana installed successfully"
+                  ls -la "$HOME/.local/share/solana/install/active_release/bin/" | head -20
+                  break
+                else
+                  echo "⚠️ Installation directory exists but solana binary not found"
+                fi
+              else
+                echo "⚠️ Installation directory not created"
+              fi
             fi
             
             # Wait before retry
@@ -93,22 +103,49 @@ jobs:
           
           if [ "$install_success" = "false" ]; then
             echo "❌ Failed to install Solana after $max_attempts attempts"
+            echo "Checking what was installed:"
+            find $HOME/.local/share/solana -type f -name "solana" 2>/dev/null || echo "No solana binary found"
             exit 1
           fi
 
       - name: Setup Solana environment
         run: |
-          # Add Solana to PATH for current and future steps
-          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+          # Find where Solana was actually installed
+          SOLANA_DIR=""
           
-          # Also export for immediate use
-          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          # Check standard location
+          if [ -d "$HOME/.local/share/solana/install/active_release/bin" ] && [ -f "$HOME/.local/share/solana/install/active_release/bin/solana" ]; then
+            SOLANA_DIR="$HOME/.local/share/solana/install/active_release/bin"
+          else
+            # Search for it
+            echo "Searching for Solana installation..."
+            SOLANA_BINARY=$(find $HOME/.local/share/solana -type f -name "solana" 2>/dev/null | head -1)
+            if [ -n "$SOLANA_BINARY" ]; then
+              SOLANA_DIR=$(dirname "$SOLANA_BINARY")
+              echo "Found Solana at: $SOLANA_DIR"
+            fi
+          fi
+          
+          if [ -z "$SOLANA_DIR" ] || [ ! -f "$SOLANA_DIR/solana" ]; then
+            echo "❌ Could not find Solana installation"
+            echo "Contents of ~/.local/share/solana:"
+            ls -laR $HOME/.local/share/solana 2>/dev/null || echo "Directory not found"
+            exit 1
+          fi
+          
+          # Add to PATH for all subsequent steps
+          echo "$SOLANA_DIR" >> $GITHUB_PATH
+          
+          # Export for current step
+          export PATH="$SOLANA_DIR:$PATH"
+          
+          # Save to env for reuse
+          echo "SOLANA_BIN_PATH=$SOLANA_DIR" >> $GITHUB_ENV
           
           # Verify installation
           if ! command -v solana &> /dev/null; then
-            echo "❌ Solana not found in PATH after installation"
-            echo "Checking installation directory..."
-            ls -la $HOME/.local/share/solana/install/active_release/bin/ || echo "Directory not found"
+            echo "❌ Solana still not found in PATH"
+            echo "PATH=$PATH"
             exit 1
           fi
           
@@ -116,6 +153,7 @@ jobs:
           echo "✅ Solana CLI: $(solana --version)"
           echo "✅ Rust: $(rustc --version)"
           echo "✅ Cargo: $(cargo --version)"
+          echo "✅ Solana path: $SOLANA_DIR"
 
       - name: Verify declare_id in source
         run: |
