@@ -5,6 +5,7 @@ import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { BN } from "@coral-xyz/anchor";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { lamportsToUiSafe, bnToNumberWithFallback } from "@/lib/bnUtils";
 
 // ============================
 // 🎯 CONFIGURATION
