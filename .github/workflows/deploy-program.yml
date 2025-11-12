@@ -16,6 +16,9 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     
+    env:
+      SOLANA_CLI_VERSION: 1.18.18
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -47,12 +50,15 @@ jobs:
 
       - name: Install Solana CLI
         run: |
-          sh -c "$(curl -sSfL https://release.solana.com/v1.18.18/install)"
-          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+          sh -c "$(curl -sSfL https://release.solana.com/v${{ env.SOLANA_CLI_VERSION }}/install)"
           
-      - name: Verify Solana installation
+      - name: Add Solana to PATH
+        run: echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+          
+      - name: Verify installations
         run: |
           solana --version
+          rustc --version
           cargo --version
 
       - name: Verify declare_id
