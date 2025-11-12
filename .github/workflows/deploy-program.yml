@@ -50,11 +50,9 @@ jobs:
           sh -c "$(curl -sSfL https://release.solana.com/stable/install)"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
-      - name: Install Anchor CLI
+      - name: Install cargo-build-sbf
         run: |
-          cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
-          avm install latest
-          avm use latest
+          cargo install cargo-build-sbf --force
 
       - name: Verify declare_id
         run: |
@@ -78,7 +76,8 @@ jobs:
 
       - name: Build program
         run: |
-          anchor build --program-name ${{ github.event.inputs.program_name }}
+          cd programs/${{ github.event.inputs.program_name }}
+          cargo build-sbf
 
       - name: Display build info
         run: |
