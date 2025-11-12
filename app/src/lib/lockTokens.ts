@@ -187,10 +187,10 @@ export async function createLockTokensTransaction(
   // Construire l'instruction via Anchor
   console.log('🔍 [LOCK TX] Building instruction...');
   try {
-    // Use the real lock_tokens instruction from the deployed program
-    console.log('✅ [LOCK TX] Using lock_tokens instruction');
+    // Use mint_level_nft instruction (the actual instruction name in the IDL)
+    console.log('✅ [LOCK TX] Using mint_level_nft instruction');
     const instruction = await program.methods
-      .lockTokens(amountLamports, lockDuration)
+      .mintLevelNft(amountLamports, lockDuration)
       .accounts({
         collectionConfig,
         globalState,
