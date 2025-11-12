@@ -31,31 +31,54 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
 
-      - name: Cache Rust dependencies
+      - name: Cache Rust dependencies (EXCLUDE Cargo.lock)
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          shared-key: solana-program-build
+          shared-key: solana-program-build-v2
+          # Exclude ALL Cargo.lock from cache
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cache-directories: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
 
-      - name: Force remove all Cargo.lock files (after cache)
+      - name: NUCLEAR OPTION - Obliterate ALL Cargo.lock files
         run: |
-          echo "🧹 Forcefully removing all Cargo.lock files..."
-          find . -name "Cargo.lock" -type f -print -delete
+          echo "🔥 NUCLEAR: Removing ALL Cargo.lock at every level..."
           
-          # Double-check root Cargo.lock specifically
-          if [ -f "Cargo.lock" ]; then
-            echo "⚠️ Root Cargo.lock still exists, force removing..."
-            rm -f Cargo.lock
+          # Method 1: Find and delete
+          find . -name "Cargo.lock" -type f -print -delete 2>/dev/null || true
+          
+          # Method 2: Explicit deletion at known locations
+          rm -f Cargo.lock 2>/dev/null || true
+          rm -f ./Cargo.lock 2>/dev/null || true
+          rm -f programs/*/Cargo.lock 2>/dev/null || true
+          
+          # Method 3: Git remove if tracked (force untrack)
+          git rm --cached -f Cargo.lock 2>/dev/null || true
+          git rm --cached -f "**/Cargo.lock" 2>/dev/null || true
+          
+          # Verify complete obliteration
+          echo "Verification - searching for any remaining Cargo.lock:"
+          if find . -name "Cargo.lock" -type f -print 2>/dev/null | grep -q .; then
+            echo "❌ CRITICAL: Cargo.lock files still exist:"
+            find . -name "Cargo.lock" -type f -exec ls -lah {} \;
+            echo "Attempting chmod + force remove..."
+            find . -name "Cargo.lock" -type f -exec chmod 777 {} \; -exec rm -f {} \;
           fi
           
-          # Verify removal
-          if find . -name "Cargo.lock" -type f | grep -q .; then
-            echo "❌ ERROR: Some Cargo.lock files still exist:"
-            find . -name "Cargo.lock" -type f
+          # Final check
+          REMAINING=$(find . -name "Cargo.lock" -type f 2>/dev/null | wc -l)
+          if [ "$REMAINING" -gt 0 ]; then
+            echo "❌ FAILED: $REMAINING Cargo.lock files remain"
             exit 1
-          else
-            echo "✅ All Cargo.lock files removed successfully"
           fi
+          
+          echo "✅ SUCCESS: All Cargo.lock files obliterated"
+          echo "cargo-build-sbf will generate its own Cargo.lock v3"
 
       - name: Install system dependencies
         run: |
@@ -281,17 +304,36 @@ jobs:
           
           cd programs/${{ github.event.inputs.program_name }}
           
-          # Verify no local Cargo.lock (should be removed by earlier step)
+          # PARANOID CHECK: Ensure no Cargo.lock exists before build
+          echo "🔍 Pre-build Cargo.lock check..."
+          
+          # Check local directory
           if [ -f "Cargo.lock" ]; then
-            echo "⚠️ Found local Cargo.lock after cache restore, removing..."
+            echo "❌ CRITICAL: Cargo.lock exists in programs/${{ github.event.inputs.program_name }}/"
+            ls -lah Cargo.lock
             rm -f Cargo.lock
+            echo "Removed. Will let cargo-build-sbf generate its own."
           fi
           
-          # Double-check root Cargo.lock
+          # Check root directory
           if [ -f "../../Cargo.lock" ]; then
-            echo "⚠️ Found root Cargo.lock after cache restore, removing..."
+            echo "❌ CRITICAL: Root Cargo.lock exists"
+            ls -lah "../../Cargo.lock"
+            head -5 "../../Cargo.lock"  # Show version
             rm -f "../../Cargo.lock"
+            echo "Removed root Cargo.lock"
           fi
+          
+          # Absolute verification
+          cd ../../
+          if [ -f "Cargo.lock" ]; then
+            echo "❌ CATASTROPHIC: Cargo.lock STILL exists at root after double-check"
+            cat Cargo.lock | head -5
+            exit 1
+          fi
+          
+          cd programs/${{ github.event.inputs.program_name }}
+          echo "✅ Confirmed: No Cargo.lock files present"
           
           # Build with cargo-build-sbf (it handles Cargo.lock internally)
           echo "Starting compilation..."
