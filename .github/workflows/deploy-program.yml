@@ -25,29 +25,37 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Force clean Cargo.lock (definitive fix)
-        run: |
-          echo "🧹 Removing all Cargo.lock files to force clean generation..."
-          find . -name "Cargo.lock" -type f -delete
-          echo "✅ All Cargo.lock files removed"
-
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
           components: rustfmt, clippy
 
-      - name: Prepare for build (skip Cargo.lock)
-        run: |
-          echo "📦 Build will generate Cargo.lock as needed..."
-          echo "✅ Rust: $(rustc --version)"
-          echo "✅ Cargo: $(cargo --version)"
-
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
           shared-key: solana-program-build
+
+      - name: Force remove all Cargo.lock files (after cache)
+        run: |
+          echo "🧹 Forcefully removing all Cargo.lock files..."
+          find . -name "Cargo.lock" -type f -print -delete
+          
+          # Double-check root Cargo.lock specifically
+          if [ -f "Cargo.lock" ]; then
+            echo "⚠️ Root Cargo.lock still exists, force removing..."
+            rm -f Cargo.lock
+          fi
+          
+          # Verify removal
+          if find . -name "Cargo.lock" -type f | grep -q .; then
+            echo "❌ ERROR: Some Cargo.lock files still exist:"
+            find . -name "Cargo.lock" -type f
+            exit 1
+          else
+            echo "✅ All Cargo.lock files removed successfully"
+          fi
 
       - name: Install system dependencies
         run: |
@@ -273,10 +281,16 @@ jobs:
           
           cd programs/${{ github.event.inputs.program_name }}
           
-          # Verify no local Cargo.lock
+          # Verify no local Cargo.lock (should be removed by earlier step)
           if [ -f "Cargo.lock" ]; then
-            echo "⚠️ Found local Cargo.lock, removing..."
-            rm Cargo.lock
+            echo "⚠️ Found local Cargo.lock after cache restore, removing..."
+            rm -f Cargo.lock
+          fi
+          
+          # Double-check root Cargo.lock
+          if [ -f "../../Cargo.lock" ]; then
+            echo "⚠️ Found root Cargo.lock after cache restore, removing..."
+            rm -f "../../Cargo.lock"
           fi
           
           # Build with cargo-build-sbf (it handles Cargo.lock internally)
@@ -284,18 +298,34 @@ jobs:
           echo ""
           
           # cargo-build-sbf manages its own Rust toolchain and Cargo.lock
-          if cargo-build-sbf 2>&1 | tee ../../build.log; then
-            BUILD_SUCCESS=true
-          else
-            BUILD_SUCCESS=false
-          fi
+          # Use PIPESTATUS to capture actual exit code, not tee's exit code
+          set +e  # Don't exit on error
+          cargo-build-sbf 2>&1 | tee ../../build.log
+          BUILD_EXIT_CODE=${PIPESTATUS[0]}
+          set -e  # Re-enable exit on error
           
           cd ../..
           
-          if [ "$BUILD_SUCCESS" = "false" ]; then
+          # Check for Cargo.lock v4 error specifically
+          if grep -q "lock file version 4 requires" build.log; then
             echo ""
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "❌ BUILD FAILED"
+            echo "❌ CARGO.LOCK VERSION 4 ERROR DETECTED"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo ""
+            echo "This indicates Cargo.lock version 4 was present during build."
+            echo "Showing relevant context:"
+            grep -A10 -B5 "lock file version 4" build.log || true
+            echo ""
+            echo "Checking for Cargo.lock files:"
+            find . -name "Cargo.lock" -type f -exec ls -lah {} \; 2>/dev/null || echo "No Cargo.lock files found"
+            exit 1
+          fi
+          
+          if [ $BUILD_EXIT_CODE -ne 0 ]; then
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "❌ BUILD FAILED (Exit code: $BUILD_EXIT_CODE)"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo ""
             echo "Last 150 lines of build log:"
