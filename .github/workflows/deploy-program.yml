@@ -66,70 +66,117 @@ jobs:
         run: |
           echo "Installing Solana CLI ${{ env.SOLANA_VERSION }}"
           
-          # Download and install with multiple fallbacks
-          max_attempts=5
-          attempt=1
-          install_success=false
-          
-          while [ $attempt -le $max_attempts ] && [ "$install_success" = "false" ]; do
-            echo "📥 Installation attempt $attempt of $max_attempts"
-            
-            # Try primary method
-            if curl --retry 3 --retry-delay 5 -sSfL https://release.solana.com/${{ env.SOLANA_VERSION }}/install | sh; then
-              # Verify installation immediately
-              if [ -d "$HOME/.local/share/solana/install/active_release/bin" ]; then
-                if [ -f "$HOME/.local/share/solana/install/active_release/bin/solana" ]; then
-                  install_success=true
-                  echo "✅ Solana installed successfully"
-                  ls -la "$HOME/.local/share/solana/install/active_release/bin/" | head -20
-                  break
-                else
-                  echo "⚠️ Installation directory exists but solana binary not found"
-                fi
-              else
-                echo "⚠️ Installation directory not created"
-              fi
+          # Method 1: Try official installer
+          echo "Method 1: Official installer"
+          if curl --retry 3 --retry-delay 5 --max-time 60 -sSfL https://release.solana.com/${{ env.SOLANA_VERSION }}/install | sh; then
+            if [ -f "$HOME/.local/share/solana/install/active_release/bin/solana" ]; then
+              echo "✅ Installed via official installer"
+              exit 0
             fi
-            
-            # Wait before retry
-            if [ $attempt -lt $max_attempts ]; then
-              wait_time=$((attempt * 15))
-              echo "⏳ Waiting ${wait_time}s before retry..."
-              sleep $wait_time
-            fi
-            
-            attempt=$((attempt + 1))
-          done
+          fi
           
-          if [ "$install_success" = "false" ]; then
-            echo "❌ Failed to install Solana after $max_attempts attempts"
-            echo "Checking what was installed:"
-            find $HOME/.local/share/solana -type f -name "solana" 2>/dev/null || echo "No solana binary found"
+          echo "Method 1 failed, trying Method 2: Direct download"
+          
+          # Method 2: Direct binary download as fallback
+          SOLANA_INSTALL_DIR="$HOME/.local/share/solana/install/releases/${{ env.SOLANA_VERSION }}"
+          mkdir -p "$SOLANA_INSTALL_DIR"
+          
+          # Determine architecture
+          ARCH=$(uname -m)
+          if [ "$ARCH" = "x86_64" ]; then
+            SOLANA_ARCH="x86_64-unknown-linux-gnu"
+          elif [ "$ARCH" = "aarch64" ]; then
+            SOLANA_ARCH="aarch64-unknown-linux-gnu"
+          else
+            echo "❌ Unsupported architecture: $ARCH"
             exit 1
           fi
+          
+          SOLANA_RELEASE="solana-release-${SOLANA_ARCH}.tar.bz2"
+          DOWNLOAD_URL="https://github.com/solana-labs/solana/releases/download/${{ env.SOLANA_VERSION }}/${SOLANA_RELEASE}"
+          
+          echo "Downloading from GitHub: $DOWNLOAD_URL"
+          
+          cd "$SOLANA_INSTALL_DIR"
+          if curl --retry 5 --retry-delay 10 --max-time 180 -L "$DOWNLOAD_URL" -o solana.tar.bz2; then
+            echo "Extracting..."
+            tar -xjf solana.tar.bz2
+            rm solana.tar.bz2
+            
+            # Find the extracted directory
+            EXTRACTED_DIR=$(find . -maxdepth 1 -type d -name "solana-release" | head -1)
+            if [ -z "$EXTRACTED_DIR" ]; then
+              echo "⚠️ Looking for alternative directory structure..."
+              EXTRACTED_DIR=$(find . -maxdepth 1 -type d | grep -v "^\.$" | head -1)
+            fi
+            
+            if [ -n "$EXTRACTED_DIR" ] && [ -d "$EXTRACTED_DIR/bin" ]; then
+              # Create active_release link
+              mkdir -p "$HOME/.local/share/solana/install"
+              ln -sf "$SOLANA_INSTALL_DIR/$EXTRACTED_DIR" "$HOME/.local/share/solana/install/active_release"
+              
+              if [ -f "$HOME/.local/share/solana/install/active_release/bin/solana" ]; then
+                echo "✅ Installed via direct download"
+                ls -la "$HOME/.local/share/solana/install/active_release/bin/" | head -10
+                exit 0
+              fi
+            fi
+          fi
+          
+          echo "Method 2 failed, trying Method 3: apt package"
+          
+          # Method 3: Try from apt (if available)
+          if command -v apt-get &> /dev/null; then
+            echo "Attempting installation via apt..."
+            sudo apt-get update -qq
+            if sudo apt-get install -y -qq solana-cli 2>/dev/null; then
+              echo "✅ Installed via apt"
+              exit 0
+            fi
+          fi
+          
+          echo "❌ All installation methods failed"
+          exit 1
 
       - name: Setup Solana environment
         run: |
           # Find where Solana was actually installed
           SOLANA_DIR=""
           
-          # Check standard location
+          # Check standard location first
           if [ -d "$HOME/.local/share/solana/install/active_release/bin" ] && [ -f "$HOME/.local/share/solana/install/active_release/bin/solana" ]; then
             SOLANA_DIR="$HOME/.local/share/solana/install/active_release/bin"
+            echo "✅ Found Solana at standard location"
+          # Check if installed via apt
+          elif command -v solana &> /dev/null; then
+            SOLANA_DIR=$(dirname $(which solana))
+            echo "✅ Found Solana via system PATH: $SOLANA_DIR"
           else
-            # Search for it
-            echo "Searching for Solana installation..."
-            SOLANA_BINARY=$(find $HOME/.local/share/solana -type f -name "solana" 2>/dev/null | head -1)
+            # Search for it recursively
+            echo "🔍 Searching for Solana installation..."
+            SOLANA_BINARY=$(find $HOME/.local -type f -name "solana" -executable 2>/dev/null | grep -v "\.cargo" | head -1)
+            
             if [ -n "$SOLANA_BINARY" ]; then
               SOLANA_DIR=$(dirname "$SOLANA_BINARY")
-              echo "Found Solana at: $SOLANA_DIR"
+              echo "✅ Found Solana at: $SOLANA_DIR"
             fi
           fi
           
           if [ -z "$SOLANA_DIR" ] || [ ! -f "$SOLANA_DIR/solana" ]; then
             echo "❌ Could not find Solana installation"
+            echo ""
+            echo "Diagnostic information:"
+            echo "HOME=$HOME"
+            echo "PATH=$PATH"
+            echo ""
             echo "Contents of ~/.local/share/solana:"
             ls -laR $HOME/.local/share/solana 2>/dev/null || echo "Directory not found"
+            echo ""
+            echo "Searching for solana binary:"
+            find $HOME/.local -name "solana" -type f 2>/dev/null || echo "Not found"
+            echo ""
+            echo "System solana:"
+            which solana 2>/dev/null || echo "Not in system PATH"
             exit 1
           fi
           
@@ -142,18 +189,26 @@ jobs:
           # Save to env for reuse
           echo "SOLANA_BIN_PATH=$SOLANA_DIR" >> $GITHUB_ENV
           
-          # Verify installation
-          if ! command -v solana &> /dev/null; then
-            echo "❌ Solana still not found in PATH"
-            echo "PATH=$PATH"
-            exit 1
-          fi
+          # Verify all commands are accessible
+          echo "Verifying Solana CLI tools..."
+          for cmd in solana solana-keygen cargo-build-sbf; do
+            if command -v $cmd &> /dev/null; then
+              echo "  ✅ $cmd: $(which $cmd)"
+            else
+              echo "  ⚠️ $cmd: not found"
+            fi
+          done
           
           # Display versions
-          echo "✅ Solana CLI: $(solana --version)"
-          echo "✅ Rust: $(rustc --version)"
-          echo "✅ Cargo: $(cargo --version)"
-          echo "✅ Solana path: $SOLANA_DIR"
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ Environment Ready"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Solana CLI: $(solana --version)"
+          echo "Rust: $(rustc --version)"
+          echo "Cargo: $(cargo --version)"
+          echo "Solana bin path: $SOLANA_DIR"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       - name: Verify declare_id in source
         run: |
