@@ -49,10 +49,12 @@ jobs:
         run: |
           sh -c "$(curl -sSfL https://release.solana.com/stable/install)"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
-
-      - name: Install cargo-build-sbf
+          
+      - name: Verify Solana installation
         run: |
-          cargo install cargo-build-sbf --force
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          solana --version
+          cargo --version
 
       - name: Verify declare_id
         run: |
@@ -76,11 +78,15 @@ jobs:
 
       - name: Build program
         run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           cd programs/${{ github.event.inputs.program_name }}
           cargo build-sbf
+          cd ../..
+          ls -lh target/deploy/
 
       - name: Display build info
         run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           BINARY="target/deploy/${{ github.event.inputs.program_name }}.so"
           KEYPAIR="target/deploy/${{ github.event.inputs.program_name }}-keypair.json"
           
@@ -89,25 +95,23 @@ jobs:
 
       - name: Setup Solana wallet
         run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           echo "${{ secrets.SOLANA_DEPLOYER_PRIVATE_KEY }}" > /tmp/deployer-keypair.json
           solana config set --keypair /tmp/deployer-keypair.json
           solana config set --url devnet
 
       - name: Check wallet balance
         run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           WALLET_ADDRESS=$(solana address)
           BALANCE=$(solana balance --url devnet | awk '{print $1}')
           
           echo "💼 Wallet: $WALLET_ADDRESS"
           echo "💰 Balance: $BALANCE SOL"
-          
-          if (( $(echo "$BALANCE < 0.5" | bc -l) )); then
-            echo "⚠️ Low balance, requesting airdrop..."
-            solana airdrop 2 --url devnet || echo "Airdrop failed, continuing anyway..."
-          fi
 
       - name: Deploy program
         run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           PROGRAM_ID=$(solana-keygen pubkey target/deploy/${{ github.event.inputs.program_name }}-keypair.json)
           
           echo "🚀 Deploying ${{ github.event.inputs.program_name }} to devnet..."
@@ -120,6 +124,7 @@ jobs:
 
       - name: Verify deployment
         run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           PROGRAM_ID=$(solana-keygen pubkey target/deploy/${{ github.event.inputs.program_name }}-keypair.json)
           
           echo "🔍 Verifying deployment..."
