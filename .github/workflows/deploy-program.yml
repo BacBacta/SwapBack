@@ -31,6 +31,25 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
 
+      - name: Fix Cargo.lock if needed
+        run: |
+          if [ -f "Cargo.lock" ]; then
+            # Check Cargo.lock version
+            LOCK_VERSION=$(grep -m1 "^version = " Cargo.lock | grep -o '[0-9]*')
+            echo "Current Cargo.lock version: $LOCK_VERSION"
+            
+            if [ "$LOCK_VERSION" = "4" ]; then
+              echo "⚠️ Cargo.lock version 4 detected, regenerating..."
+              rm Cargo.lock
+              cargo generate-lockfile
+              echo "✅ Cargo.lock regenerated with stable version"
+            else
+              echo "✅ Cargo.lock version is compatible"
+            fi
+          else
+            echo "No Cargo.lock found, will be generated during build"
+          fi
+
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
@@ -249,13 +268,31 @@ jobs:
           if ! command -v cargo-build-sbf &> /dev/null; then
             echo "❌ cargo-build-sbf not found"
             echo "Available Solana commands:"
-            ls -la $HOME/.local/share/solana/install/active_release/bin/
+            ls -la $HOME/.local/share/solana/install/active_release/bin/ 2>/dev/null || echo "Directory not found"
             exit 1
           fi
           
           cd programs/${{ github.event.inputs.program_name }}
           
+          # Check and fix Cargo.lock in program directory
+          if [ -f "Cargo.lock" ]; then
+            LOCK_VERSION=$(grep -m1 "^version = " Cargo.lock | grep -o '[0-9]*' || echo "unknown")
+            echo "Program Cargo.lock version: $LOCK_VERSION"
+            
+            if [ "$LOCK_VERSION" = "4" ] || [ "$LOCK_VERSION" = "unknown" ]; then
+              echo "⚠️ Incompatible Cargo.lock detected, regenerating..."
+              rm Cargo.lock
+              cargo generate-lockfile
+              echo "✅ Cargo.lock regenerated"
+            fi
+          fi
+          
+          # Update dependencies if needed
+          echo "Updating dependencies..."
+          cargo update --workspace 2>&1 || echo "Warning: cargo update had issues, continuing..."
+          
           # Build with verbose output
+          echo "Starting build..."
           cargo-build-sbf --verbose 2>&1 | tee ../../build.log
           
           BUILD_STATUS=${PIPESTATUS[0]}
@@ -264,8 +301,12 @@ jobs:
           
           if [ $BUILD_STATUS -ne 0 ]; then
             echo "❌ Build failed with status $BUILD_STATUS"
-            echo "Build log:"
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "BUILD LOG:"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             cat build.log
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             exit 1
           fi
           
