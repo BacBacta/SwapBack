@@ -15,63 +15,77 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    
-    env:
-      SOLANA_CLI_VERSION: 1.18.18
+    timeout-minutes: 30
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          override: true
-          profile: minimal
 
-      - name: Cache Cargo registry
-        uses: actions/cache@v3
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
         with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          cache-on-failure: true
 
-      - name: Cache Cargo index
-        uses: actions/cache@v3
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Cache target directory
-        uses: actions/cache@v3
-        with:
-          path: target
-          key: ${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Install Solana CLI
+      - name: Install system dependencies
         run: |
-          sh -c "$(curl -sSfL https://release.solana.com/v${{ env.SOLANA_CLI_VERSION }}/install)"
+          sudo apt-get update
+          sudo apt-get install -y pkg-config build-essential libudev-dev libssl-dev
+
+      - name: Install Solana CLI (with retry)
+        run: |
+          max_attempts=3
+          attempt=1
+          
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt of $max_attempts"
+            
+            if curl -sSfL https://release.solana.com/v1.18.18/install | sh; then
+              echo "Solana CLI installed successfully"
+              echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+              break
+            else
+              echo "Installation failed, waiting 30 seconds before retry..."
+              sleep 30
+              attempt=$((attempt + 1))
+              
+              if [ $attempt -gt $max_attempts ]; then
+                echo "Failed to install Solana CLI after $max_attempts attempts"
+                exit 1
+              fi
+            fi
+          done
+
+      - name: Verify Solana installation
+        run: |
           export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           solana --version
-          
+          solana-keygen --version
+          echo "Solana installed successfully"
+
       - name: Cache Solana
         uses: actions/cache@v3
         with:
           path: |
             ~/.local/share/solana/
             ~/.cache/solana/
-          key: solana-${{ env.SOLANA_CLI_VERSION }}
-          
-      - name: Verify installations
-        run: |
-          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
-          solana --version
-          rustc --version
-          cargo --version
+          key: solana-1.18.18-${{ runner.os }}
+          restore-keys: |
+            solana-1.18.18-
 
-      - name: Verify declare_id
+      - name: Verify declare_id in source
         run: |
           PROGRAM_FILE="programs/${{ github.event.inputs.program_name }}/src/lib.rs"
+          
+          if [ ! -f "$PROGRAM_FILE" ]; then
+            echo "❌ ERROR: Program file not found: $PROGRAM_FILE"
+            exit 1
+          fi
+          
           CURRENT_ID=$(grep 'declare_id!' "$PROGRAM_FILE" | grep -o '"[^"]*"' | tr -d '"')
           echo "Program ID in source: $CURRENT_ID"
           
@@ -87,58 +101,203 @@ jobs:
             echo "Found: $CURRENT_ID"
             exit 1
           fi
-          echo "✅ declare_id! is correct"
+          
+          echo "✅ declare_id! is correct: $CURRENT_ID"
 
-      - name: Build program
+      - name: Build Solana program
         run: |
           export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          
+          echo "Building program: ${{ github.event.inputs.program_name }}"
           cd programs/${{ github.event.inputs.program_name }}
-          cargo build-sbf
+          
+          # Build with cargo-build-sbf
+          cargo build-sbf --verbose
+          
           cd ../..
+          
+          # Verify build artifacts
+          BINARY="target/deploy/${{ github.event.inputs.program_name }}.so"
+          KEYPAIR="target/deploy/${{ github.event.inputs.program_name }}-keypair.json"
+          
+          if [ ! -f "$BINARY" ]; then
+            echo "❌ ERROR: Binary not found: $BINARY"
+            exit 1
+          fi
+          
+          if [ ! -f "$KEYPAIR" ]; then
+            echo "❌ ERROR: Keypair not found: $KEYPAIR"
+            exit 1
+          fi
+          
+          echo "✅ Build successful"
           ls -lh target/deploy/
 
       - name: Display build info
         run: |
           export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          
           BINARY="target/deploy/${{ github.event.inputs.program_name }}.so"
           KEYPAIR="target/deploy/${{ github.event.inputs.program_name }}-keypair.json"
           
-          echo "📦 Binary size: $(du -h $BINARY | cut -f1)"
+          echo "📦 Binary: $BINARY"
+          echo "📦 Size: $(du -h $BINARY | cut -f1)"
+          echo "🔑 Keypair: $KEYPAIR"
           echo "🔑 Program ID: $(solana-keygen pubkey $KEYPAIR)"
 
       - name: Setup Solana wallet
         run: |
           export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          
+          # Check if secret exists
+          if [ -z "${{ secrets.SOLANA_DEPLOYER_PRIVATE_KEY }}" ]; then
+            echo "❌ ERROR: SOLANA_DEPLOYER_PRIVATE_KEY secret not configured"
+            echo "Please add your deployer keypair to GitHub Secrets"
+            exit 1
+          fi
+          
+          # Create temporary keypair file
           echo "${{ secrets.SOLANA_DEPLOYER_PRIVATE_KEY }}" > /tmp/deployer-keypair.json
+          
+          # Validate keypair format
+          if ! solana-keygen verify $(solana-keygen pubkey /tmp/deployer-keypair.json) /tmp/deployer-keypair.json; then
+            echo "❌ ERROR: Invalid keypair format"
+            rm -f /tmp/deployer-keypair.json
+            exit 1
+          fi
+          
+          # Configure Solana CLI
           solana config set --keypair /tmp/deployer-keypair.json
           solana config set --url devnet
-
-      - name: Check wallet balance
-        run: |
-          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
-          WALLET_ADDRESS=$(solana address)
-          BALANCE=$(solana balance --url devnet | awk '{print $1}')
           
-          echo "💼 Wallet: $WALLET_ADDRESS"
-          echo "💰 Balance: $BALANCE SOL"
+          echo "✅ Wallet configured"
 
-      - name: Deploy program
+      - name: Check wallet and balance
         run: |
           export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          
+          WALLET_ADDRESS=$(solana address)
+          echo "💼 Deployer wallet: $WALLET_ADDRESS"
+          
+          # Get balance
+          BALANCE=$(solana balance --url devnet 2>&1 | awk '{print $1}')
+          echo "💰 Current balance: $BALANCE SOL"
+          
+          # Check if balance is sufficient (need at least 0.5 SOL)
+          BALANCE_NUM=$(echo "$BALANCE" | sed 's/[^0-9.]//g')
+          if [ -z "$BALANCE_NUM" ]; then
+            echo "⚠️ Could not determine balance, attempting airdrop..."
+            solana airdrop 2 --url devnet || echo "Airdrop failed, will try to deploy anyway"
+          elif (( $(echo "$BALANCE_NUM < 0.5" | bc -l 2>/dev/null || echo "0") )); then
+            echo "⚠️ Low balance, requesting airdrop..."
+            solana airdrop 2 --url devnet || echo "Airdrop failed"
+            sleep 5
+            BALANCE=$(solana balance --url devnet | awk '{print $1}')
+            echo "💰 New balance: $BALANCE SOL"
+          fi
+
+      - name: Verify upgrade authority
+        run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          
+          PROGRAM_ID=$(solana-keygen pubkey target/deploy/${{ github.event.inputs.program_name }}-keypair.json)
+          WALLET_ADDRESS=$(solana address)
+          
+          echo "Checking upgrade authority for program: $PROGRAM_ID"
+          
+          # Try to get program info
+          PROGRAM_INFO=$(solana program show $PROGRAM_ID --url devnet 2>&1 || echo "")
+          
+          if echo "$PROGRAM_INFO" | grep -q "Account does not exist"; then
+            echo "⚠️ Program not yet deployed (first deployment)"
+            echo "FIRST_DEPLOY=true" >> $GITHUB_ENV
+          else
+            CURRENT_AUTHORITY=$(echo "$PROGRAM_INFO" | grep "Authority:" | awk '{print $2}')
+            echo "Current authority: $CURRENT_AUTHORITY"
+            echo "Deployer wallet: $WALLET_ADDRESS"
+            
+            if [ "$WALLET_ADDRESS" != "$CURRENT_AUTHORITY" ]; then
+              echo "❌ ERROR: Wallet does not have upgrade authority"
+              echo "Expected authority: $CURRENT_AUTHORITY"
+              echo "Your wallet: $WALLET_ADDRESS"
+              exit 1
+            fi
+            
+            echo "✅ Upgrade authority verified"
+            echo "FIRST_DEPLOY=false" >> $GITHUB_ENV
+          fi
+
+      - name: Deploy program to devnet
+        run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          
           PROGRAM_ID=$(solana-keygen pubkey target/deploy/${{ github.event.inputs.program_name }}-keypair.json)
           
-          echo "🚀 Deploying ${{ github.event.inputs.program_name }} to devnet..."
+          echo "🚀 Deploying program: ${{ github.event.inputs.program_name }}"
           echo "📍 Program ID: $PROGRAM_ID"
+          echo "🌐 Network: devnet"
           
+          if [ "${{ env.FIRST_DEPLOY }}" = "true" ]; then
+            echo "📝 This is a first-time deployment"
+          else
+            echo "🔄 This is an upgrade"
+          fi
+          
+          # Deploy with detailed output
           solana program deploy \
             --url devnet \
             --program-id target/deploy/${{ github.event.inputs.program_name }}-keypair.json \
-            target/deploy/${{ github.event.inputs.program_name }}.so
+            --upgrade-authority /tmp/deployer-keypair.json \
+            target/deploy/${{ github.event.inputs.program_name }}.so \
+            --verbose
+          
+          echo "✅ Deployment successful!"
 
       - name: Verify deployment
         run: |
           export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          
           PROGRAM_ID=$(solana-keygen pubkey target/deploy/${{ github.event.inputs.program_name }}-keypair.json)
+          
+          echo "🔍 Verifying deployment..."
+          solana program show $PROGRAM_ID --url devnet
+          
+          echo ""
+          echo "✅ Program successfully deployed!"
+          echo "📍 Program ID: $PROGRAM_ID"
+          echo "🌐 Explorer: https://explorer.solana.com/address/$PROGRAM_ID?cluster=devnet"
+          echo "🔗 Solscan: https://solscan.io/account/$PROGRAM_ID?cluster=devnet"
+          
+          # Get the last deployed slot
+          LAST_SLOT=$(solana program show $PROGRAM_ID --url devnet | grep "Last Deployed Slot:" | awk '{print $4}')
+          echo "⏰ Last Deployed Slot: $LAST_SLOT"
+
+      - name: Cleanup sensitive files
+        if: always()
+        run: |
+          rm -f /tmp/deployer-keypair.json
+          echo "🧹 Cleaned up temporary files"
+
+      - name: Summary
+        if: success()
+        run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          PROGRAM_ID=$(solana-keygen pubkey target/deploy/${{ github.event.inputs.program_name }}-keypair.json)
+          
+          echo "## ✅ Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Program:** \`${{ github.event.inputs.program_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Program ID:** \`$PROGRAM_ID\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Network:** devnet" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Wait 30-60 seconds for network propagation" >> $GITHUB_STEP_SUMMARY
+          echo "2. Test on https://swap-back-pc5qkn6em-bactas-projects.vercel.app/" >> $GITHUB_STEP_SUMMARY
+          echo "3. Verify that \`DeclaredProgramIdMismatch\` error is gone" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [Solana Explorer](https://explorer.solana.com/address/$PROGRAM_ID?cluster=devnet)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Solscan](https://solscan.io/account/$PROGRAM_ID?cluster=devnet)" >> $GITHUB_STEP_SUMMARY
           
           echo "🔍 Verifying deployment..."
           solana program show $PROGRAM_ID --url devnet
