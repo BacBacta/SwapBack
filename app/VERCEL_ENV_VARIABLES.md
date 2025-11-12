@@ -70,32 +70,29 @@ NEXT_PUBLIC_SOLANA_RPC_URL=https://api.testnet.solana.com
 
 
 
-### 3. NEXT_PUBLIC_CNFT_PROGRAM_ID**Testnet**:
+### 3. NEXT_PUBLIC_CNFT_PROGRAM_ID
+
+**Valeur devnet (ACTUELLE)**: `26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru`
 
 ```bash
-
-**Valeur**: `9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq`NEXT_PUBLIC_ROUTER_PROGRAM_ID=GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt
-
-NEXT_PUBLIC_BUYBACK_PROGRAM_ID=EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf
-
-**Description**: Program ID du programme swapback_cnft déployé sur devnet.NEXT_PUBLIC_CNFT_PROGRAM_ID=9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw
-
+NEXT_PUBLIC_CNFT_PROGRAM_ID=26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru
 ```
+
+**Description**: Program ID du programme swapback_cnft déployé sur devnet.
 
 **Environnements**: ✅ Production ✅ Preview ✅ Development
 
 **Mainnet** (à mettre à jour après déploiement):
 
-**Pourquoi critique**: 🔥 **ULTRA-CRITIQUE** 🔥```bash
+```bash
+NEXT_PUBLIC_CNFT_PROGRAM_ID=<votre_program_id_mainnet>
+```
 
-NEXT_PUBLIC_ROUTER_PROGRAM_ID=<votre_program_id_mainnet>
+**Pourquoi critique**: 🔥 **ULTRA-CRITIQUE** 🔥
 
-- Cette variable **doit correspondre exactement** à l'`address` dans `app/src/idl/swapback_cnft.json`NEXT_PUBLIC_BUYBACK_PROGRAM_ID=<votre_program_id_mainnet>
-
-- Si elle diffère → **TOUTES** les transactions lock/unlock échoueront avec `AccountOwnedByWrongProgram`NEXT_PUBLIC_CNFT_PROGRAM_ID=<votre_program_id_mainnet>
-
-- Les PDAs (Program Derived Addresses) sont calculés avec ce Program ID```
-
+- Cette variable **doit correspondre exactement** à l'`address` dans `app/src/idl/swapback_cnft.json`
+- Si elle diffère → **TOUTES** les transactions lock/unlock échoueront avec `DeclaredProgramIdMismatch`
+- Les PDAs (Program Derived Addresses) sont calculés avec ce Program ID
 - Un Program ID incorrect génère des PDAs qui ne correspondent pas aux comptes on-chain
 
 #### 4. Token Addresses
