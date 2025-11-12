@@ -9,13 +9,13 @@ import {
   SystemProgram,
 } from "@solana/web3.js";
 import { WalletContextState } from "@solana/wallet-adapter-react";
-import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
+import { Program, AnchorProvider, BN, type Idl } from "@coral-xyz/anchor";
 import { 
   TOKEN_2022_PROGRAM_ID, 
   getAssociatedTokenAddress,
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { IDL as cnftIdl, type SwapbackCnft } from "@/idl/swapback_cnft";
+import cnftIdl from "@/idl/swapback_cnft.json";
 import { validateEnv } from "./validateEnv";
 
 /**
@@ -67,6 +67,7 @@ export async function createLockTokensTransaction(
   console.log('🔍 [LOCK TX] Environment validation:');
   console.log('   CNFT_PROGRAM_ID:', CNFT_PROGRAM_ID?.toString() ?? 'N/A');
   console.log('   IDL address:', cnftIdl.address);
+  console.log('   IDL accounts length:', Array.isArray((cnftIdl as any).accounts) ? (cnftIdl as any).accounts.length : 'undefined');
   console.log('   BACK_MINT:', BACK_MINT?.toString() ?? 'N/A');
   console.log('   Network:', process.env.NEXT_PUBLIC_SOLANA_NETWORK);
   
@@ -116,7 +117,7 @@ export async function createLockTokensTransaction(
 
   // Charger le programme avec l'ID explicite et le type correct pour éviter DeclaredProgramIdMismatch
   console.log('🔍 [LOCK TX] Loading program...');
-  const program = new Program<SwapbackCnft>(cnftIdl, CNFT_PROGRAM_ID, provider);
+  const program = new Program(cnftIdl as Idl, CNFT_PROGRAM_ID, provider);
   console.log('✅ [LOCK TX] Program loaded:', CNFT_PROGRAM_ID.toString());
 
   // Convertir le montant en lamports (9 decimals pour BACK)
@@ -255,6 +256,7 @@ export async function createUnlockTokensTransaction(
   console.log('🔍 [UNLOCK TX] Environment validation:');
   console.log('   CNFT_PROGRAM_ID:', CNFT_PROGRAM_ID?.toString() ?? 'N/A');
   console.log('   IDL address:', cnftIdl.address);
+  console.log('   IDL accounts length:', Array.isArray((cnftIdl as any).accounts) ? (cnftIdl as any).accounts.length : 'undefined');
   console.log('   BACK_MINT:', BACK_MINT?.toString() ?? 'N/A');
   console.log('   Network:', process.env.NEXT_PUBLIC_SOLANA_NETWORK);
 
@@ -293,7 +295,7 @@ export async function createUnlockTokensTransaction(
 
   // Charger le programme avec l'ID explicite et le type correct pour éviter DeclaredProgramIdMismatch
   console.log('🔍 [UNLOCK TX] Loading program...');
-  const program = new Program<SwapbackCnft>(cnftIdl, CNFT_PROGRAM_ID, provider);
+  const program = new Program(cnftIdl as Idl, CNFT_PROGRAM_ID, provider);
   console.log('✅ [UNLOCK TX] Program loaded:', CNFT_PROGRAM_ID.toString());
 
   // Dériver les PDAs
