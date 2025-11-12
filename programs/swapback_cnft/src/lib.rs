@@ -4,7 +4,7 @@ use anchor_spl::token_2022::{transfer_checked, Token2022, TransferChecked};
 use anchor_spl::token_interface::{Mint, TokenAccount};
 
 // Program ID - Matches keypair in target/deploy/swapback_cnft-keypair.json
-declare_id!("CzxpYBeKbcA6AJH7yz8ggkJ1cWen3ejKUuikE6stHEaF");
+declare_id!("26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru");
 
 #[program]
 pub mod swapback_cnft {
@@ -620,13 +620,7 @@ pub struct LockTokens<'info> {
     pub user_token_account: InterfaceAccount<'info, TokenAccount>,
 
     /// Vault PDA pour stocker les tokens verrouillés
-    #[account(
-        init_if_needed,
-        payer = user,
-        associated_token::mint = back_mint,
-        associated_token::authority = vault_authority,
-        associated_token::token_program = token_program,
-    )]
+    #[account(mut)]
     pub vault_token_account: InterfaceAccount<'info, TokenAccount>,
 
     /// Autorité du vault (PDA)

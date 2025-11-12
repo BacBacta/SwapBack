@@ -3,8 +3,8 @@ cluster = "devnet"
 wallet = "devnet-keypair.json"
 
 [toolchain]
-anchor_version = "0.30.1"
-solana_version = "1.18.26"
+anchor_version = "0.32.1"
+solana_version = "3.0.10"
 
 [features]
 resolution = true
@@ -16,7 +16,7 @@ swapback_cnft = "CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH"
 swapback_router = "Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa"
 
 [programs.devnet]
-swapback_cnft = "CzxpYBeKbcA6AJH7yz8ggkJ1cWen3ejKUuikE6stHEaF"
+swapback_cnft = "26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru"
 swapback_router = "opPhGcth2dGQQ7njYmkAYwfxspJ1DjgP9LV2y1jygCx"
 swapback_buyback = "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"
 
