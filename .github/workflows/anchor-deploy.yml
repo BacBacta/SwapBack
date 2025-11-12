@@ -25,10 +25,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust toolchain (1.75.0 for Cargo.lock v3)
+        uses: dtolnay/rust-toolchain@1.75.0
         with:
-          toolchain: stable
           components: rustfmt, clippy
 
       - name: Cache dependencies
@@ -60,6 +59,26 @@ jobs:
             exit 1
           fi
           echo "✅ All Cargo.lock obliterated"
+
+      - name: Generate Cargo.lock v3 with Rust 1.75.0
+        run: |
+          echo "🔧 Generating Cargo.lock v3 with Rust 1.75.0..."
+          rustc --version
+          cargo --version
+          
+          # Generate Cargo.lock v3 at workspace root
+          cargo generate-lockfile
+          
+          # Verify it's version 3
+          LOCK_VERSION=$(head -5 Cargo.lock | grep "version" | grep -oE '[0-9]+')
+          if [ "$LOCK_VERSION" != "3" ]; then
+            echo "❌ Generated Cargo.lock is version $LOCK_VERSION, expected 3"
+            echo "Rust 1.75.0 should generate v3!"
+            exit 1
+          fi
+          
+          echo "✅ Cargo.lock v3 generated successfully"
+          head -5 Cargo.lock
 
       - name: Install Solana CLI
         run: |
@@ -114,12 +133,22 @@ jobs:
       - name: Pre-build Cargo.lock check
         run: |
           echo "🔍 Final pre-build check..."
-          if find . -name "Cargo.lock" -type f | grep -q .; then
-            echo "❌ Cargo.lock found:"
-            find . -name "Cargo.lock" -type f -exec ls -lah {} \; -exec head -5 {} \;
+          
+          if [ ! -f "Cargo.lock" ]; then
+            echo "❌ Cargo.lock v3 not found! Should have been generated."
             exit 1
           fi
-          echo "✅ No Cargo.lock files present"
+          
+          # Verify it's version 3
+          LOCK_VERSION=$(head -5 Cargo.lock | grep "version" | grep -oE '[0-9]+')
+          if [ "$LOCK_VERSION" != "3" ]; then
+            echo "❌ Cargo.lock is version $LOCK_VERSION, expected 3"
+            head -10 Cargo.lock
+            exit 1
+          fi
+          
+          echo "✅ Cargo.lock v3 confirmed:"
+          head -5 Cargo.lock
 
       - name: Build with Anchor
         run: |
