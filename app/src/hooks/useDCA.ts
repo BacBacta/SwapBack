@@ -14,6 +14,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { PublicKey } from '@solana/web3.js';
 import { toast } from 'react-hot-toast';
+import { lamportsToUiSafe, bnToNumberWithFallback } from '@/lib/bnUtils';
 
 import {
   DcaPlan,
@@ -415,7 +416,7 @@ export function useDcaStats() {
     activePlans: plans.filter(p => p.isActive && p.executedSwaps < p.totalSwaps).length,
     pausedPlans: plans.filter(p => !p.isActive && p.executedSwaps < p.totalSwaps).length,
     completedPlans: plans.filter(p => p.executedSwaps >= p.totalSwaps).length,
-    totalInvested: plans.reduce((sum, p) => sum + p.totalInvested.toNumber(), 0),
-    totalReceived: plans.reduce((sum, p) => sum + p.totalReceived.toNumber(), 0),
+    totalInvested: plans.reduce((sum, p) => sum + bnToNumberWithFallback(p.totalInvested, 0), 0),
+    totalReceived: plans.reduce((sum, p) => sum + bnToNumberWithFallback(p.totalReceived, 0), 0),
   };
 }

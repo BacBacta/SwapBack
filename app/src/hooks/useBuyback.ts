@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
+import { lamportsToUiSafe, bnToNumberWithFallback } from '@/lib/bnUtils';
 
 const BUYBACK_PROGRAM_ID = new PublicKey('92znK8METYTFW5dGDJUnHUMqubVGnPBTyjZ4HzjWQzir');
 const BACK_TOKEN_MINT = new PublicKey('3Y6RXZUBHCeUj6VsWuyBY2Zy1RixY6BHkM4tf3euDdrE');
@@ -63,10 +64,12 @@ export function useBuyback() {
       const authority = new PublicKey(data.slice(8, 40)).toBase58();
       const backMint = new PublicKey(data.slice(40, 72)).toBase58();
       const usdcVault = new PublicKey(data.slice(72, 104)).toBase58();
-      const totalUsdcCollected = new BN(data.slice(104, 112), 'le').toNumber() / 1e6;
-      const totalBackBurned = new BN(data.slice(112, 120), 'le').toNumber() / 1e9;
-      const minBuybackAmount = new BN(data.slice(120, 128), 'le').toNumber() / 1e6;
-      const lastBuybackTime = new BN(data.slice(128, 136), 'le').toNumber();
+      
+      // Use safe conversion for large numbers
+      const totalUsdcCollected = lamportsToUiSafe(new BN(data.slice(104, 112), 'le'), 6);
+      const totalBackBurned = lamportsToUiSafe(new BN(data.slice(112, 120), 'le'), 9);
+      const minBuybackAmount = lamportsToUiSafe(new BN(data.slice(120, 128), 'le'), 6);
+      const lastBuybackTime = bnToNumberWithFallback(new BN(data.slice(128, 136), 'le'), 0);
       const bump = data[136];
 
       // Fetch vault balance

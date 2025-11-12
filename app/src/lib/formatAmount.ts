@@ -19,8 +19,23 @@ export function formatAmount(
   const whole = amount.div(divisor);
   const remainder = amount.mod(divisor);
   
-  // Combiner pour obtenir la valeur UI complète
-  const uiValue = whole.toNumber() + (remainder.toNumber() / Math.pow(10, decimals));
+  // Vérifier si la valeur est sûre pour conversion en Number
+  // MAX_SAFE_INTEGER = 2^53 - 1 = 9007199254740991
+  const maxSafeBN = new BN(Number.MAX_SAFE_INTEGER);
+  
+  // Si le montant entier dépasse MAX_SAFE_INTEGER, utiliser formatAmountPrecise
+  if (whole.gt(maxSafeBN)) {
+    return formatAmountPrecise(amount, decimals, maxDecimals);
+  }
+  
+  // Conversion sécurisée uniquement si la valeur est dans la plage safe
+  let uiValue: number;
+  try {
+    uiValue = whole.toNumber() + (remainder.toNumber() / Math.pow(10, decimals));
+  } catch (error) {
+    // Fallback si toNumber() échoue quand même
+    return formatAmountPrecise(amount, decimals, maxDecimals);
+  }
   
   // Formater avec suffixes
   if (uiValue >= 1_000_000_000) {
@@ -77,6 +92,23 @@ export function formatPercentage(value: BN, decimals: number = 2): string {
   const whole = value.div(divisor);
   const remainder = value.mod(divisor);
   
-  const percent = whole.toNumber() + (remainder.toNumber() / Math.pow(10, decimals));
+  // Vérifier la plage sûre
+  const maxSafeBN = new BN(Number.MAX_SAFE_INTEGER);
+  
+  let percent: number;
+  if (whole.gt(maxSafeBN)) {
+    // Pour les très grandes valeurs, convertir en string
+    const wholeStr = whole.toString();
+    const remainderStr = remainder.toString().padStart(decimals, '0');
+    return `${wholeStr}.${remainderStr.slice(0, 2)}%`;
+  }
+  
+  try {
+    percent = whole.toNumber() + (remainder.toNumber() / Math.pow(10, decimals));
+  } catch (error) {
+    // Fallback
+    return `${whole.toString()}%`;
+  }
+  
   return `${percent.toFixed(2)}%`;
 }

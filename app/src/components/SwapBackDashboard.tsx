@@ -177,8 +177,23 @@ export const SwapBackDashboard = () => {
     const divisor = new BN(10).pow(new BN(decimals));
     const whole = amount.div(divisor);
     const remainder = amount.mod(divisor);
-    const num = whole.toNumber() + (remainder.toNumber() / Math.pow(10, decimals));
-    return num.toFixed(4);
+    
+    // Vérifier la plage sûre avant toNumber()
+    const maxSafeBN = new BN(Number.MAX_SAFE_INTEGER);
+    if (whole.gt(maxSafeBN)) {
+      // Retourner en format string si trop grand
+      const wholeStr = whole.toString();
+      const remainderStr = remainder.toString().padStart(decimals, '0');
+      return `${wholeStr}.${remainderStr.slice(0, 4)}`;
+    }
+    
+    try {
+      const num = whole.toNumber() + (remainder.toNumber() / Math.pow(10, decimals));
+      return num.toFixed(4);
+    } catch (error) {
+      console.error('formatAmount error:', error);
+      return whole.toString();
+    }
   };
 
   const formatDate = (timestamp: BN) => {

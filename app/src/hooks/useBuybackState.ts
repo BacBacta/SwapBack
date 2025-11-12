@@ -2,6 +2,7 @@ import { useConnection } from '@solana/wallet-adapter-react';
 import { useQuery } from '@tanstack/react-query';
 import { PublicKey } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
+import { lamportsToUiSafe, bnToNumberWithFallback } from '@/lib/bnUtils';
 
 // Buyback Program addresses (devnet)
 export const BUYBACK_PROGRAM_ID = new PublicKey('92znK8METYTFW5dGDJUnHUMqubVGnPBTyjZ4HzjWQzir');
@@ -57,10 +58,10 @@ export function useBuybackState() {
         authority: new PublicKey(data.slice(8, 40)),
         backMint: new PublicKey(data.slice(40, 72)),
         usdcVault: new PublicKey(data.slice(72, 104)),
-        minBuybackAmount: new BN(data.slice(104, 112), 'le').toNumber() / 1e6,
-        totalUsdcSpent: new BN(data.slice(112, 120), 'le').toNumber() / 1e6,
-        totalBackBurned: new BN(data.slice(120, 128), 'le').toNumber() / 1e9,
-        buybackCount: new BN(data.slice(128, 136), 'le').toNumber(),
+        minBuybackAmount: lamportsToUiSafe(new BN(data.slice(104, 112), 'le'), 6),
+        totalUsdcSpent: lamportsToUiSafe(new BN(data.slice(112, 120), 'le'), 6),
+        totalBackBurned: lamportsToUiSafe(new BN(data.slice(120, 128), 'le'), 9),
+        buybackCount: bnToNumberWithFallback(new BN(data.slice(128, 136), 'le'), 0),
         bump: data[136],
       };
     },

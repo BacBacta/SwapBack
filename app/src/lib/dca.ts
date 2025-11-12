@@ -180,9 +180,26 @@ export function uiToLamports(amount: number, decimals: number): BN {
 
 /**
  * Convert lamports/smallest unit to UI amount
+ * Safely handles large amounts by checking MAX_SAFE_INTEGER
  */
 export function lamportsToUi(amount: BN, decimals: number): number {
-  return amount.toNumber() / Math.pow(10, decimals);
+  // Vérifier la plage sûre
+  const divisor = new BN(10).pow(new BN(decimals));
+  const whole = amount.div(divisor);
+  const maxSafeBN = new BN(Number.MAX_SAFE_INTEGER);
+  
+  if (whole.gt(maxSafeBN)) {
+    console.warn('lamportsToUi: Amount exceeds MAX_SAFE_INTEGER, precision may be lost');
+    // Retourner une approximation ou MAX_SAFE_INTEGER
+    return Number.MAX_SAFE_INTEGER;
+  }
+  
+  try {
+    return amount.toNumber() / Math.pow(10, decimals);
+  } catch (error) {
+    console.error('lamportsToUi: Failed to convert BN to number', error);
+    return 0;
+  }
 }
 
 /**
