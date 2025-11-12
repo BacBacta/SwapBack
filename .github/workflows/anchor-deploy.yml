@@ -25,25 +25,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Rust toolchain (1.75.0 for Cargo.lock v3)
-        uses: dtolnay/rust-toolchain@1.75.0
+      - name: Setup Rust toolchain (1.70.0 - GUARANTEED v3)
+        uses: dtolnay/rust-toolchain@1.70.0
         with:
           components: rustfmt, clippy
 
-      - name: Cache dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            ~/.local/share/solana/
-            target/
-          key: ${{ runner.os }}-anchor-${{ env.ANCHOR_VERSION }}-${{ hashFiles('**/Cargo.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-anchor-${{ env.ANCHOR_VERSION }}-
-            ${{ runner.os }}-anchor-
+      - name: NO CACHE - Fresh build every time
+        run: |
+          echo "⚠️ Cache DISABLED to prevent Cargo.lock v4 restoration"
+          echo "Building fresh every time to guarantee Cargo.lock v3"
 
       - name: NUCLEAR - Remove ALL Cargo.lock files
         run: |
@@ -60,25 +50,34 @@ jobs:
           fi
           echo "✅ All Cargo.lock obliterated"
 
-      - name: Generate Cargo.lock v3 with Rust 1.75.0
+      - name: Generate Cargo.lock v3 with Rust 1.70.0
         run: |
-          echo "🔧 Generating Cargo.lock v3 with Rust 1.75.0..."
-          rustc --version
-          cargo --version
+          echo "🔧 Generating Cargo.lock v3 with Rust 1.70.0..."
+          echo "Rust version: $(rustc --version)"
+          echo "Cargo version: $(cargo --version)"
           
           # Generate Cargo.lock v3 at workspace root
           cargo generate-lockfile
           
           # Verify it's version 3
-          LOCK_VERSION=$(head -5 Cargo.lock | grep "version" | grep -oE '[0-9]+')
+          echo ""
+          echo "Generated Cargo.lock:"
+          head -5 Cargo.lock
+          
+          LOCK_VERSION=$(head -5 Cargo.lock | grep "version = " | grep -oE '[0-9]+')
+          echo ""
+          echo "Detected version: $LOCK_VERSION"
+          
           if [ "$LOCK_VERSION" != "3" ]; then
-            echo "❌ Generated Cargo.lock is version $LOCK_VERSION, expected 3"
-            echo "Rust 1.75.0 should generate v3!"
+            echo "❌ ERROR: Generated Cargo.lock is version $LOCK_VERSION, expected 3"
+            echo "Rust 1.70.0 MUST generate v3!"
+            echo ""
+            echo "Full Cargo.lock header:"
+            head -20 Cargo.lock
             exit 1
           fi
           
-          echo "✅ Cargo.lock v3 generated successfully"
-          head -5 Cargo.lock
+          echo "✅ Cargo.lock v3 generated successfully with Rust 1.70.0"
 
       - name: Install Solana CLI
         run: |
