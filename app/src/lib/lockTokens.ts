@@ -349,8 +349,9 @@ export async function createUnlockTokensTransaction(
   });
   
   try {
+    // Use update_nft_status instruction (the actual instruction name in the IDL)
     const instruction = await program.methods
-      .unlockTokens()
+      .updateNftStatus()
       .accounts({
         userNft,
         globalState,
