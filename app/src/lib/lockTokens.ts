@@ -119,6 +119,14 @@ export async function createLockTokensTransaction(
   console.log('🔍 [LOCK TX] Loading program...');
   const program = new Program(cnftIdl as Idl, CNFT_PROGRAM_ID, provider);
   console.log('✅ [LOCK TX] Program loaded:', CNFT_PROGRAM_ID.toString());
+  console.log('🔍 [LOCK TX] Coder has accounts:', Boolean((program as any)._coder?.accounts));
+  if (!(program as any)._coder?.accounts) {
+    console.warn('⚠️ [LOCK TX] Program coder missing accounts. Available keys:', Object.keys((program as any)._coder || {}));
+    const { BorshAccountsCoder } = await import('@coral-xyz/anchor');
+    (program as any)._coder = (program as any)._coder || {};
+    (program as any)._coder.accounts = new BorshAccountsCoder(cnftIdl as Idl);
+    console.log('✅ [LOCK TX] Injected BorshAccountsCoder manually.');
+  }
 
   // Convertir le montant en lamports (9 decimals pour BACK)
   const amountLamports = new BN(Math.floor(params.amount * 1_000_000_000));
@@ -297,6 +305,13 @@ export async function createUnlockTokensTransaction(
   console.log('🔍 [UNLOCK TX] Loading program...');
   const program = new Program(cnftIdl as Idl, CNFT_PROGRAM_ID, provider);
   console.log('✅ [UNLOCK TX] Program loaded:', CNFT_PROGRAM_ID.toString());
+  console.log('🔍 [UNLOCK TX] Coder has accounts:', Boolean((program as any)._coder?.accounts));
+  if (!(program as any)._coder?.accounts) {
+    const { BorshAccountsCoder } = await import('@coral-xyz/anchor');
+    (program as any)._coder = (program as any)._coder || {};
+    (program as any)._coder.accounts = new BorshAccountsCoder(cnftIdl as Idl);
+    console.log('✅ [UNLOCK TX] Injected BorshAccountsCoder manually.');
+  }
 
   // Dériver les PDAs
   console.log('🔍 [UNLOCK TX] Deriving PDAs...');
