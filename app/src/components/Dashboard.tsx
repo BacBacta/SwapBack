@@ -374,7 +374,7 @@ export const Dashboard = () => {
                   <span className="font-semibold text-white">
                     $
                     {(
-                      userStats?.totalVolume || 0 / (userStats?.totalSwaps || 1)
+                      (userStats?.totalVolume || 0) / (userStats?.totalSwaps || 1)
                     ).toFixed(2)}
                   </span>
                 </div>
@@ -383,7 +383,7 @@ export const Dashboard = () => {
                   <span className="font-semibold text-[var(--secondary)]">
                     $
                     {(
-                      userStats?.totalNPI || 0 / (userStats?.totalSwaps || 1)
+                      (userStats?.totalNPI || 0) / (userStats?.totalSwaps || 1)
                     ).toFixed(2)}
                   </span>
                 </div>
