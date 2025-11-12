@@ -37,23 +37,11 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
 
-      - name: Generate clean Cargo.lock
+      - name: Prepare for build (skip Cargo.lock)
         run: |
-          echo "📦 Generating fresh Cargo.lock with stable Rust..."
-          cargo generate-lockfile
-          
-          # Verify version
-          LOCK_VERSION=$(grep -m1 "^version = " Cargo.lock | grep -o '[0-9]*')
-          echo "✅ Generated Cargo.lock version: $LOCK_VERSION"
-          
-          if [ "$LOCK_VERSION" != "3" ]; then
-            echo "❌ ERROR: Generated Cargo.lock is not version 3"
-            echo "Content of Cargo.lock header:"
-            head -10 Cargo.lock
-            exit 1
-          fi
-          
-          echo "✅ Cargo.lock is ready for build"
+          echo "📦 Build will generate Cargo.lock as needed..."
+          echo "✅ Rust: $(rustc --version)"
+          echo "✅ Cargo: $(cargo --version)"
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
@@ -277,7 +265,10 @@ jobs:
           fi
           
           echo "✅ cargo-build-sbf: $(which cargo-build-sbf)"
-          echo "✅ Cargo version: $(cargo --version)"
+          
+          # Get cargo-build-sbf version info
+          echo "Checking cargo-build-sbf environment..."
+          cargo-build-sbf --version 2>&1 || echo "Version info unavailable"
           echo ""
           
           cd programs/${{ github.event.inputs.program_name }}
@@ -288,11 +279,12 @@ jobs:
             rm Cargo.lock
           fi
           
-          # Build with cargo-build-sbf
+          # Build with cargo-build-sbf (it handles Cargo.lock internally)
           echo "Starting compilation..."
           echo ""
           
-          if cargo-build-sbf --verbose 2>&1 | tee ../../build.log; then
+          # cargo-build-sbf manages its own Rust toolchain and Cargo.lock
+          if cargo-build-sbf 2>&1 | tee ../../build.log; then
             BUILD_SUCCESS=true
           else
             BUILD_SUCCESS=false
@@ -306,9 +298,19 @@ jobs:
             echo "❌ BUILD FAILED"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo ""
-            tail -100 build.log
+            echo "Last 150 lines of build log:"
+            tail -150 build.log
             echo ""
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            
+            # Check for common errors
+            if grep -q "Cargo.lock" build.log; then
+              echo ""
+              echo "💡 Cargo.lock related error detected"
+              echo "Attempting to show relevant context:"
+              grep -A5 -B5 "Cargo.lock" build.log || true
+            fi
+            
             exit 1
           fi
           
