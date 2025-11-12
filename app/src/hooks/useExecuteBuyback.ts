@@ -6,6 +6,7 @@ import { toast } from 'react-hot-toast';
 import { trackBuyback } from '@/lib/analytics';
 import { parseBuybackTransaction } from '@/lib/parsers';
 import { getExplorerTxUrl } from '@/utils/explorer';
+import { lamportsToUiSafe } from '@/lib/bnUtils';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -112,7 +113,7 @@ export function useExecuteBuyback() {
 
       // Track buyback analytics with actual values
       trackBuyback({
-        usdcAmount: usdcAmountBN.toNumber(),
+        usdcAmount: lamportsToUiSafe(usdcAmountBN, 6) || 0,
         backBurned, // ✅ Real value parsed from logs
         executor: wallet.publicKey.toString(),
         signature,

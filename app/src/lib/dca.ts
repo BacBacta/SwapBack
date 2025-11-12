@@ -183,23 +183,8 @@ export function uiToLamports(amount: number, decimals: number): BN {
  * Safely handles large amounts by checking MAX_SAFE_INTEGER
  */
 export function lamportsToUi(amount: BN, decimals: number): number {
-  // Vérifier la plage sûre
-  const divisor = new BN(10).pow(new BN(decimals));
-  const whole = amount.div(divisor);
-  const maxSafeBN = new BN(Number.MAX_SAFE_INTEGER);
-  
-  if (whole.gt(maxSafeBN)) {
-    console.warn('lamportsToUi: Amount exceeds MAX_SAFE_INTEGER, precision may be lost');
-    // Retourner une approximation ou MAX_SAFE_INTEGER
-    return Number.MAX_SAFE_INTEGER;
-  }
-  
-  try {
-    return amount.toNumber() / Math.pow(10, decimals);
-  } catch (error) {
-    console.error('lamportsToUi: Failed to convert BN to number', error);
-    return 0;
-  }
+  // Use safe conversion utility
+  return lamportsToUiSafe(amount, decimals) || 0;
 }
 
 /**
@@ -713,7 +698,7 @@ export async function cancelDcaPlanTransaction(
  */
 export function isPlanReadyForExecution(dcaPlan: DcaPlan): boolean {
   const now = Date.now() / 1000; // Current time in seconds
-  const nextExecution = dcaPlan.nextExecution.toNumber();
+  const nextExecution = bnToNumberWithFallback(dcaPlan.nextExecution, 0);
   
   return (
     dcaPlan.isActive &&
@@ -726,7 +711,7 @@ export function isPlanReadyForExecution(dcaPlan: DcaPlan): boolean {
  * Format timestamp to readable date
  */
 export function formatTimestamp(timestamp: BN | number): string {
-  const ts = typeof timestamp === 'number' ? timestamp : timestamp.toNumber();
+  const ts = typeof timestamp === 'number' ? timestamp : bnToNumberWithFallback(timestamp, 0);
   return new Date(ts * 1000).toLocaleString();
 }
 
@@ -735,7 +720,7 @@ export function formatTimestamp(timestamp: BN | number): string {
  */
 export function getTimeUntilNextExecution(nextExecution: BN): string {
   const now = Date.now() / 1000;
-  const next = nextExecution.toNumber();
+  const next = bnToNumberWithFallback(nextExecution, 0);
   const diff = next - now;
   
   if (diff <= 0) return 'Ready now';

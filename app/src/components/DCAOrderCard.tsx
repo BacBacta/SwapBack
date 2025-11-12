@@ -10,9 +10,10 @@
 
 "use client";
 
-import { useState } from "react";
-import { DcaPlanUI } from "@/hooks/useDCA";
-import { useExecuteDcaSwap, usePauseDcaPlan, useResumeDcaPlan, useCancelDcaPlan } from "@/hooks/useDCA";
+import React, { useState } from "react";
+import { DcaPlan } from "@/types/dca";
+import { toast } from "react-hot-toast";
+import { bnToNumberWithFallback } from "@/lib/bnUtils";
 import { lamportsToUi } from "@/lib/dca";
 
 interface DCAOrderCardProps {
@@ -143,7 +144,7 @@ export const DCAOrderCard = ({ plan }: DCAOrderCardProps) => {
             <div>
               <p className="text-xs text-gray-400 terminal-text mb-1">INTERVAL</p>
               <p className="text-white terminal-text font-mono">
-                {plan.intervalSeconds.toNumber() / 3600}h
+                {bnToNumberWithFallback(plan.intervalSeconds, 0) / 3600}h
               </p>
             </div>
           </div>

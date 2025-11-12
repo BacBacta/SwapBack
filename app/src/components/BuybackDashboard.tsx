@@ -7,6 +7,7 @@ import { PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js'
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token';
 import { BN } from '@coral-xyz/anchor';
 import { getExplorerAddressUrl } from '@/utils/explorer';
+import { bnToNumberWithFallback, lamportsToUiSafe } from '@/lib/bnUtils';
 
 // Program IDs et constants
 const BUYBACK_PROGRAM_ID = new PublicKey('92znK8METYTFW5dGDJUnHUMqubVGnPBTyjZ4HzjWQzir');
@@ -61,19 +62,26 @@ export default function BuybackDashboard() {
         const authority = new PublicKey(data.slice(8, 40)).toBase58();
         const backMint = new PublicKey(data.slice(40, 72)).toBase58();
         const usdcVault = new PublicKey(data.slice(72, 104)).toBase58();
-        const totalUsdcCollected = new BN(data.slice(104, 112), 'le').toNumber();
-        const totalBackBurned = new BN(data.slice(112, 120), 'le').toNumber();
-        const minBuybackAmount = new BN(data.slice(120, 128), 'le').toNumber();
-        const lastBuybackTime = new BN(data.slice(128, 136), 'le').toNumber();
+        
+        // Safe BN conversions with fallback
+        const totalUsdcCollectedBN = new BN(data.slice(104, 112), 'le');
+        const totalBackBurnedBN = new BN(data.slice(112, 120), 'le');
+        const minBuybackAmountBN = new BN(data.slice(120, 128), 'le');
+        const lastBuybackTimeBN = new BN(data.slice(128, 136), 'le');
+        
+        const totalUsdcCollected = lamportsToUiSafe(totalUsdcCollectedBN, 6) || 0;
+        const totalBackBurned = lamportsToUiSafe(totalBackBurnedBN, 9) || 0;
+        const minBuybackAmount = lamportsToUiSafe(minBuybackAmountBN, 6) || 0;
+        const lastBuybackTime = bnToNumberWithFallback(lastBuybackTimeBN, 0);
         const bump = data[136];
 
         setBuybackState({
           authority,
           backMint,
           usdcVault,
-          totalUsdcCollected: totalUsdcCollected / 1e6, // USDC has 6 decimals
-          totalBackBurned: totalBackBurned / 1e9, // $BACK has 9 decimals
-          minBuybackAmount: minBuybackAmount / 1e6,
+          totalUsdcCollected,
+          totalBackBurned,
+          minBuybackAmount,
           lastBuybackTime,
           bump,
         });

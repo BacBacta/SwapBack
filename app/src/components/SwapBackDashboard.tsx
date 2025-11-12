@@ -197,17 +197,17 @@ export const SwapBackDashboard = () => {
   };
 
   const formatDate = (timestamp: BN) => {
-    // Timestamps are seconds since epoch, always < 2^32, safe to convert
-    const ts = timestamp.toNumber();
+    // Timestamps are seconds since epoch, use safe conversion
+    const ts = bnToNumberWithFallback(timestamp, 0);
     if (ts === 0) return "Jamais";
     const date = new Date(ts * 1000);
     return date.toLocaleString("fr-FR");
   };
 
   const getNextSwapTime = (plan: DcaPlan) => {
-    // Timestamps safe: < 2^32
-    const lastSwap = plan.account.lastSwapTime.toNumber();
-    const interval = plan.account.dcaInterval.toNumber();
+    // Timestamps safe: use safe conversion
+    const lastSwap = bnToNumberWithFallback(plan.account.lastSwapTime, 0);
+    const interval = bnToNumberWithFallback(plan.account.dcaInterval, 0);
 
     if (lastSwap === 0) return "En attente";
 
@@ -216,8 +216,8 @@ export const SwapBackDashboard = () => {
   };
 
   const getProgress = (plan: DcaPlan) => {
-    const executed = plan.account.swapsExecuted.toNumber();
-    const total = plan.account.numberOfSwaps.toNumber();
+    const executed = bnToNumberWithFallback(plan.account.swapsExecuted, 0);
+    const total = bnToNumberWithFallback(plan.account.numberOfSwaps, 1); // Avoid division by 0
     return Math.round((executed / total) * 100);
   };
 
@@ -267,11 +267,10 @@ export const SwapBackDashboard = () => {
           <div className="bg-gray-900 rounded-lg p-4">
             <div className="text-sm text-gray-400 mb-1">Total investi</div>
             <div className="text-3xl font-bold text-white">
-              {plans
-                .reduce((sum, p) => sum.add(p.account.inputAmount), new BN(0))
-                .div(new BN(1e9))
-                .toNumber()
-                .toFixed(2)}{" "}
+              {(lamportsToUiSafe(
+                plans.reduce((sum, p) => sum.add(p.account.inputAmount), new BN(0)),
+                9
+              ) || 0).toFixed(2)}{" "}
               SOL
             </div>
           </div>
@@ -279,7 +278,7 @@ export const SwapBackDashboard = () => {
             <div className="text-sm text-gray-400 mb-1">Swaps exécutés</div>
             <div className="text-3xl font-bold text-white">
               {plans.reduce(
-                (sum, p) => sum + p.account.swapsExecuted.toNumber(),
+                (sum, p) => sum + bnToNumberWithFallback(p.account.swapsExecuted, 0),
                 0
               )}
             </div>
@@ -408,7 +407,7 @@ export const SwapBackDashboard = () => {
                   <div className="bg-gray-900 rounded-lg p-4">
                     <div className="text-xs text-gray-400 mb-1">Intervalle</div>
                     <div className="text-lg font-bold text-white">
-                      {(plan.account.dcaInterval.toNumber() / 3600).toFixed(1)}h
+                      {(bnToNumberWithFallback(plan.account.dcaInterval, 0) / 3600).toFixed(1)}h
                     </div>
                   </div>
 
