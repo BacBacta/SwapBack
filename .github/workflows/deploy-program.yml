@@ -47,12 +47,11 @@ jobs:
 
       - name: Install Solana CLI
         run: |
-          sh -c "$(curl -sSfL https://release.solana.com/stable/install)"
+          sh -c "$(curl -sSfL https://release.solana.com/v1.18.18/install)"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
           
       - name: Verify Solana installation
         run: |
-          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           solana --version
           cargo --version
 
@@ -78,7 +77,6 @@ jobs:
 
       - name: Build program
         run: |
-          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           cd programs/${{ github.event.inputs.program_name }}
           cargo build-sbf
           cd ../..
@@ -86,7 +84,6 @@ jobs:
 
       - name: Display build info
         run: |
-          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           BINARY="target/deploy/${{ github.event.inputs.program_name }}.so"
           KEYPAIR="target/deploy/${{ github.event.inputs.program_name }}-keypair.json"
           
@@ -95,14 +92,12 @@ jobs:
 
       - name: Setup Solana wallet
         run: |
-          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           echo "${{ secrets.SOLANA_DEPLOYER_PRIVATE_KEY }}" > /tmp/deployer-keypair.json
           solana config set --keypair /tmp/deployer-keypair.json
           solana config set --url devnet
 
       - name: Check wallet balance
         run: |
-          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           WALLET_ADDRESS=$(solana address)
           BALANCE=$(solana balance --url devnet | awk '{print $1}')
           
@@ -111,7 +106,6 @@ jobs:
 
       - name: Deploy program
         run: |
-          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           PROGRAM_ID=$(solana-keygen pubkey target/deploy/${{ github.event.inputs.program_name }}-keypair.json)
           
           echo "🚀 Deploying ${{ github.event.inputs.program_name }} to devnet..."
@@ -124,7 +118,6 @@ jobs:
 
       - name: Verify deployment
         run: |
-          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           PROGRAM_ID=$(solana-keygen pubkey target/deploy/${{ github.event.inputs.program_name }}-keypair.json)
           
           echo "🔍 Verifying deployment..."
