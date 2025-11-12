@@ -1,0 +1,212 @@
+name: Deploy with Anchor CLI (Fix Cargo.lock v4)
+
+on:
+  workflow_dispatch:
+    inputs:
+      program_name:
+        description: 'Programme à déployer'
+        required: true
+        default: 'swapback_cnft'
+        type: choice
+        options:
+          - swapback_cnft
+          - swapback_router
+
+env:
+  SOLANA_VERSION: v1.18.26
+  ANCHOR_VERSION: v0.30.1
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            ~/.local/share/solana/
+            target/
+          key: ${{ runner.os }}-anchor-${{ env.ANCHOR_VERSION }}-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-anchor-${{ env.ANCHOR_VERSION }}-
+            ${{ runner.os }}-anchor-
+
+      - name: NUCLEAR - Remove ALL Cargo.lock files
+        run: |
+          echo "🔥 Obliterating all Cargo.lock files..."
+          find . -name "Cargo.lock" -type f -print -delete 2>/dev/null || true
+          rm -f Cargo.lock 2>/dev/null || true
+          git rm --cached -f Cargo.lock 2>/dev/null || true
+          git rm --cached -f "**/Cargo.lock" 2>/dev/null || true
+          
+          REMAINING=$(find . -name "Cargo.lock" -type f 2>/dev/null | wc -l)
+          if [ "$REMAINING" -gt 0 ]; then
+            echo "❌ $REMAINING Cargo.lock files remain"
+            exit 1
+          fi
+          echo "✅ All Cargo.lock obliterated"
+
+      - name: Install Solana CLI
+        run: |
+          echo "📦 Installing Solana CLI ${{ env.SOLANA_VERSION }}..."
+          sh -c "$(curl -sSfL https://release.solana.com/${{ env.SOLANA_VERSION }}/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          solana --version
+          solana-keygen --version
+          echo "✅ Solana CLI installed"
+
+      - name: Install Anchor CLI
+        run: |
+          echo "📦 Installing Anchor CLI ${{ env.ANCHOR_VERSION }}..."
+          cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+          avm install ${{ env.ANCHOR_VERSION }}
+          avm use ${{ env.ANCHOR_VERSION }}
+          echo "✅ Anchor installed: $(anchor --version)"
+
+      - name: Configure Solana
+        run: |
+          solana config set --url devnet
+          echo "${{ secrets.DEPLOYER_PRIVATE_KEY }}" > deployer-keypair.json
+          solana config set --keypair deployer-keypair.json
+          
+          PUBKEY=$(solana address)
+          echo "💼 Deployer: $PUBKEY"
+          
+          BALANCE=$(solana balance --url devnet | grep -oE '[0-9]+\.[0-9]+' | head -n1 || echo "0")
+          echo "💰 Balance: $BALANCE SOL"
+          
+          if (( $(echo "$BALANCE < 1.0" | bc -l) )); then
+            echo "⚠️ Low balance, requesting airdrop..."
+            solana airdrop 2 --url devnet || echo "Airdrop failed, continuing..."
+          fi
+
+      - name: Verify declare_id!
+        run: |
+          PROGRAM_ID="${{ github.event.inputs.program_name == 'swapback_cnft' && '26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru' || 'opPhGcth2dGQQ7njYmkAYwfxspJ1DjgP9LV2y1jygCx' }}"
+          
+          CURRENT_ID=$(grep -A1 "declare_id!" programs/${{ github.event.inputs.program_name }}/src/lib.rs | grep -oE '[A-Za-z0-9]{32,}' | head -1)
+          
+          if [ "$CURRENT_ID" != "$PROGRAM_ID" ]; then
+            echo "❌ declare_id! mismatch!"
+            echo "Expected: $PROGRAM_ID"
+            echo "Found: $CURRENT_ID"
+            exit 1
+          fi
+          
+          echo "✅ declare_id! correct: $CURRENT_ID"
+
+      - name: Pre-build Cargo.lock check
+        run: |
+          echo "🔍 Final pre-build check..."
+          if find . -name "Cargo.lock" -type f | grep -q .; then
+            echo "❌ Cargo.lock found:"
+            find . -name "Cargo.lock" -type f -exec ls -lah {} \; -exec head -5 {} \;
+            exit 1
+          fi
+          echo "✅ No Cargo.lock files present"
+
+      - name: Build with Anchor
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🔨 BUILDING: ${{ github.event.inputs.program_name }}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          # Build with Anchor
+          set +e
+          anchor build --program-name ${{ github.event.inputs.program_name }} 2>&1 | tee build.log
+          BUILD_EXIT_CODE=${PIPESTATUS[0]}
+          set -e
+          
+          # Check for Cargo.lock v4 error
+          if grep -q "lock file version 4 requires" build.log; then
+            echo "❌ CARGO.LOCK VERSION 4 ERROR"
+            grep -A10 -B5 "lock file version 4" build.log
+            exit 1
+          fi
+          
+          if [ $BUILD_EXIT_CODE -ne 0 ]; then
+            echo "❌ BUILD FAILED (Exit code: $BUILD_EXIT_CODE)"
+            tail -200 build.log
+            exit $BUILD_EXIT_CODE
+          fi
+          
+          echo "✅ BUILD SUCCESSFUL"
+
+      - name: Verify build artifacts
+        run: |
+          SO_FILE="target/deploy/${{ github.event.inputs.program_name }}.so"
+          KEYPAIR_FILE="target/deploy/${{ github.event.inputs.program_name }}-keypair.json"
+          
+          if [ ! -f "$SO_FILE" ]; then
+            echo "❌ Binary not found: $SO_FILE"
+            exit 1
+          fi
+          
+          if [ ! -f "$KEYPAIR_FILE" ]; then
+            echo "❌ Keypair not found: $KEYPAIR_FILE"
+            exit 1
+          fi
+          
+          echo "✅ Binary: $SO_FILE ($(du -h $SO_FILE | cut -f1))"
+          echo "✅ Keypair: $KEYPAIR_FILE"
+          
+          PROGRAM_ID=$(solana-keygen pubkey $KEYPAIR_FILE)
+          echo "📌 Program ID: $PROGRAM_ID"
+
+      - name: Deploy to devnet
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🚀 DEPLOYING: ${{ github.event.inputs.program_name }}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          PROGRAM_ID="${{ github.event.inputs.program_name == 'swapback_cnft' && '26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru' || 'opPhGcth2dGQQ7njYmkAYwfxspJ1DjgP9LV2y1jygCx' }}"
+          
+          solana program deploy \
+            target/deploy/${{ github.event.inputs.program_name }}.so \
+            --program-id target/deploy/${{ github.event.inputs.program_name }}-keypair.json \
+            --url devnet \
+            --upgrade-authority deployer-keypair.json \
+            --max-retries 10 \
+            --use-rpc \
+            2>&1 | tee deploy.log
+          
+          if grep -q "successfully" deploy.log; then
+            echo "✅ DEPLOYMENT SUCCESSFUL"
+          else
+            echo "❌ DEPLOYMENT FAILED"
+            cat deploy.log
+            exit 1
+          fi
+
+      - name: Verify deployment
+        run: |
+          PROGRAM_ID="${{ github.event.inputs.program_name == 'swapback_cnft' && '26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru' || 'opPhGcth2dGQQ7njYmkAYwfxspJ1DjgP9LV2y1jygCx' }}"
+          
+          echo "🔍 Verifying deployment..."
+          solana program show $PROGRAM_ID --url devnet
+          
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ DEPLOYMENT COMPLETE"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Program ID: $PROGRAM_ID"
+          echo "Network: Devnet"
+          echo ""
+          echo "Test on Vercel:"
+          echo "https://swap-back-pc5qkn6em-bactas-projects.vercel.app/"
