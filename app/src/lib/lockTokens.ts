@@ -15,8 +15,7 @@ import {
   getAssociatedTokenAddress,
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import cnftIdl from "@/idl/swapback_cnft.json";
-import type { Idl } from "@coral-xyz/anchor";
+import { IDL as cnftIdl, type SwapbackCnft } from "@/idl/swapback_cnft";
 import { validateEnv } from "./validateEnv";
 
 /**
@@ -115,9 +114,9 @@ export async function createLockTokensTransaction(
     { commitment: "confirmed", skipPreflight: false }
   );
 
-  // Charger le programme avec l'ID explicite pour éviter DeclaredProgramIdMismatch
+  // Charger le programme avec l'ID explicite et le type correct pour éviter DeclaredProgramIdMismatch
   console.log('🔍 [LOCK TX] Loading program...');
-  const program = new Program(cnftIdl as Idl, CNFT_PROGRAM_ID, provider);
+  const program = new Program<SwapbackCnft>(cnftIdl, CNFT_PROGRAM_ID, provider);
   console.log('✅ [LOCK TX] Program loaded:', CNFT_PROGRAM_ID.toString());
 
   // Convertir le montant en lamports (9 decimals pour BACK)
@@ -292,9 +291,9 @@ export async function createUnlockTokensTransaction(
     { commitment: "confirmed" }
   );
 
-  // Charger le programme avec l'ID explicite pour éviter DeclaredProgramIdMismatch
+  // Charger le programme avec l'ID explicite et le type correct pour éviter DeclaredProgramIdMismatch
   console.log('🔍 [UNLOCK TX] Loading program...');
-  const program = new Program(cnftIdl as Idl, CNFT_PROGRAM_ID, provider);
+  const program = new Program<SwapbackCnft>(cnftIdl, CNFT_PROGRAM_ID, provider);
   console.log('✅ [UNLOCK TX] Program loaded:', CNFT_PROGRAM_ID.toString());
 
   // Dériver les PDAs
