@@ -4,6 +4,8 @@ import "./globals.css";
 import { ClientWalletProvider } from "@/components/ClientWalletProvider";
 import { QueryProvider } from "@/components/QueryProvider";
 import { Toaster } from "react-hot-toast";
+import { GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
+import { DebugLogPanel } from "@/components/DebugLogPanel";
 // import { WalletConnectionGuide } from "@/components/WalletConnectionGuide";
 // import { NetworkStatusIndicator } from "@/components/NetworkStatusIndicator";
 // import { NetworkInfoModal } from "@/components/NetworkInfoModal";
@@ -31,36 +33,39 @@ export default function RootLayout({
         <a href="#main-content" className="skip-link">
           Skip to main content
         </a>
-        <QueryProvider>
-          <ClientWalletProvider>
-            {children}
-            {/* <WalletConnectionGuide /> */}
-            {/* <NetworkStatusIndicator /> */}
-            {/* <NetworkInfoModal /> */}
-            <Toaster
-              position="bottom-right"
-              toastOptions={{
-                duration: 4000,
-                style: {
-                  background: "#333",
-                  color: "#fff",
-                },
-                success: {
-                  iconTheme: {
-                    primary: "#10b981",
-                    secondary: "#fff",
+        <GlobalErrorBoundary>
+          <QueryProvider>
+            <ClientWalletProvider>
+              {children}
+              {/* <WalletConnectionGuide /> */}
+              {/* <NetworkStatusIndicator /> */}
+              {/* <NetworkInfoModal /> */}
+              <Toaster
+                position="bottom-right"
+                toastOptions={{
+                  duration: 4000,
+                  style: {
+                    background: "#333",
+                    color: "#fff",
                   },
-                },
-                error: {
-                  iconTheme: {
-                    primary: "#ef4444",
-                    secondary: "#fff",
+                  success: {
+                    iconTheme: {
+                      primary: "#10b981",
+                      secondary: "#fff",
+                    },
                   },
-                },
-              }}
-            />
-          </ClientWalletProvider>
-        </QueryProvider>
+                  error: {
+                    iconTheme: {
+                      primary: "#ef4444",
+                      secondary: "#fff",
+                    },
+                  },
+                }}
+              />
+              <DebugLogPanel />
+            </ClientWalletProvider>
+          </QueryProvider>
+        </GlobalErrorBoundary>
       </body>
     </html>
   );

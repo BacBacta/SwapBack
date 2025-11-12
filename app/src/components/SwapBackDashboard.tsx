@@ -16,7 +16,7 @@ function getRouterProgramId(): PublicKey {
   if (!_routerProgramId) {
     _routerProgramId = new PublicKey(
       process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID ||
-        "opPhGcth2dGQQ7njYmkAYwfxspJ1DjgP9LV2y1jygCx"
+        "BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz"
     );
   }
   return _routerProgramId;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CNFTCard } from "./CNFTCard";
 import { useCNFT } from "../hooks/useCNFT";
 import { useRealtimeStats } from "../hooks/useRealtimeStats";
@@ -10,6 +10,7 @@ import { NoActivityState, NoConnectionState } from "./EmptyState";
 import { SwapBackDashboard } from "./SwapBackDashboard";
 import LockInterface from "./LockInterface";
 import UnlockInterface from "./UnlockInterface";
+import { logError } from "@/lib/errorLogger";
 // Import charts directly instead of lazy loading to avoid chunk errors
 import { VolumeChart, ActivityChart } from "./Charts";
 
@@ -22,6 +23,49 @@ export const Dashboard = () => {
   const { cnftData } = useCNFT();
   const { userStats, globalStats, loading, refresh, lastRefresh } =
     useRealtimeStats(publicKey?.toString());
+
+  // Log le montage du composant
+  useEffect(() => {
+    console.log("📊 Dashboard mounted", {
+      connected,
+      publicKey: publicKey?.toString(),
+      hasUserStats: !!userStats,
+      hasGlobalStats: !!globalStats,
+      loading,
+    });
+
+    // Capturer toutes les erreurs non gérées dans Dashboard
+    const errorHandler = (event: ErrorEvent) => {
+      logError(event.error, {
+        component: "Dashboard",
+        action: "windowError",
+        additionalData: {
+          message: event.message,
+          filename: event.filename,
+          lineno: event.lineno,
+          colno: event.colno,
+        },
+      });
+    };
+
+    const promiseRejectionHandler = (event: PromiseRejectionEvent) => {
+      logError(event.reason, {
+        component: "Dashboard",
+        action: "unhandledRejection",
+        additionalData: {
+          promise: "PromiseRejection",
+        },
+      });
+    };
+
+    window.addEventListener("error", errorHandler);
+    window.addEventListener("unhandledrejection", promiseRejectionHandler);
+
+    return () => {
+      window.removeEventListener("error", errorHandler);
+      window.removeEventListener("unhandledrejection", promiseRejectionHandler);
+    };
+  }, [connected, publicKey, userStats, globalStats, loading]);
 
   // Mock chart data
   const volumeData = {

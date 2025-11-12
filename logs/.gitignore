@@ -1,0 +1,6 @@
+# Ignorer les fichiers de logs mais garder le dossier
+*.jsonl
+*.log
+
+# Garder le README
+!README.md
