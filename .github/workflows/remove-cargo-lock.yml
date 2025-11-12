@@ -1,0 +1,32 @@
+name: Remove Cargo.lock from Git History
+
+on:
+  workflow_dispatch:
+
+jobs:
+  remove-lockfile:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Remove Cargo.lock from git
+        run: |
+          echo "Removing Cargo.lock from git index..."
+          git rm --cached Cargo.lock 2>/dev/null || echo "Cargo.lock not in index"
+          git rm --cached programs/*/Cargo.lock 2>/dev/null || echo "No program Cargo.lock in index"
+          
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Remove Cargo.lock from version control (auto-generated)"
+            git push
+          fi

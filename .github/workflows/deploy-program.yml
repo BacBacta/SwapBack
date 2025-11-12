@@ -25,30 +25,35 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Force clean Cargo.lock (definitive fix)
+        run: |
+          echo "🧹 Removing all Cargo.lock files to force clean generation..."
+          find . -name "Cargo.lock" -type f -delete
+          echo "✅ All Cargo.lock files removed"
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
           components: rustfmt, clippy
 
-      - name: Fix Cargo.lock if needed
+      - name: Generate clean Cargo.lock
         run: |
-          if [ -f "Cargo.lock" ]; then
-            # Check Cargo.lock version
-            LOCK_VERSION=$(grep -m1 "^version = " Cargo.lock | grep -o '[0-9]*')
-            echo "Current Cargo.lock version: $LOCK_VERSION"
-            
-            if [ "$LOCK_VERSION" = "4" ]; then
-              echo "⚠️ Cargo.lock version 4 detected, regenerating..."
-              rm Cargo.lock
-              cargo generate-lockfile
-              echo "✅ Cargo.lock regenerated with stable version"
-            else
-              echo "✅ Cargo.lock version is compatible"
-            fi
-          else
-            echo "No Cargo.lock found, will be generated during build"
+          echo "📦 Generating fresh Cargo.lock with stable Rust..."
+          cargo generate-lockfile
+          
+          # Verify version
+          LOCK_VERSION=$(grep -m1 "^version = " Cargo.lock | grep -o '[0-9]*')
+          echo "✅ Generated Cargo.lock version: $LOCK_VERSION"
+          
+          if [ "$LOCK_VERSION" != "3" ]; then
+            echo "❌ ERROR: Generated Cargo.lock is not version 3"
+            echo "Content of Cargo.lock header:"
+            head -10 Cargo.lock
+            exit 1
           fi
+          
+          echo "✅ Cargo.lock is ready for build"
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
@@ -259,76 +264,77 @@ jobs:
 
       - name: Build Solana program
         run: |
-          echo "🔨 Building program: ${{ github.event.inputs.program_name }}"
-          
-          # Ensure PATH includes Solana
-          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🔨 BUILDING: ${{ github.event.inputs.program_name }}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           
           # Verify cargo-build-sbf is available
           if ! command -v cargo-build-sbf &> /dev/null; then
-            echo "❌ cargo-build-sbf not found"
-            echo "Available Solana commands:"
-            ls -la $HOME/.local/share/solana/install/active_release/bin/ 2>/dev/null || echo "Directory not found"
+            echo "❌ cargo-build-sbf not found in PATH"
+            echo "Searching for Solana binaries..."
+            find $HOME/.local -name "cargo-build-sbf" -type f 2>/dev/null || echo "Not found"
             exit 1
           fi
+          
+          echo "✅ cargo-build-sbf: $(which cargo-build-sbf)"
+          echo "✅ Cargo version: $(cargo --version)"
+          echo ""
           
           cd programs/${{ github.event.inputs.program_name }}
           
-          # Check and fix Cargo.lock in program directory
+          # Verify no local Cargo.lock
           if [ -f "Cargo.lock" ]; then
-            LOCK_VERSION=$(grep -m1 "^version = " Cargo.lock | grep -o '[0-9]*' || echo "unknown")
-            echo "Program Cargo.lock version: $LOCK_VERSION"
-            
-            if [ "$LOCK_VERSION" = "4" ] || [ "$LOCK_VERSION" = "unknown" ]; then
-              echo "⚠️ Incompatible Cargo.lock detected, regenerating..."
-              rm Cargo.lock
-              cargo generate-lockfile
-              echo "✅ Cargo.lock regenerated"
-            fi
+            echo "⚠️ Found local Cargo.lock, removing..."
+            rm Cargo.lock
           fi
           
-          # Update dependencies if needed
-          echo "Updating dependencies..."
-          cargo update --workspace 2>&1 || echo "Warning: cargo update had issues, continuing..."
+          # Build with cargo-build-sbf
+          echo "Starting compilation..."
+          echo ""
           
-          # Build with verbose output
-          echo "Starting build..."
-          cargo-build-sbf --verbose 2>&1 | tee ../../build.log
-          
-          BUILD_STATUS=${PIPESTATUS[0]}
+          if cargo-build-sbf --verbose 2>&1 | tee ../../build.log; then
+            BUILD_SUCCESS=true
+          else
+            BUILD_SUCCESS=false
+          fi
           
           cd ../..
           
-          if [ $BUILD_STATUS -ne 0 ]; then
-            echo "❌ Build failed with status $BUILD_STATUS"
+          if [ "$BUILD_SUCCESS" = "false" ]; then
             echo ""
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "BUILD LOG:"
+            echo "❌ BUILD FAILED"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            cat build.log
+            echo ""
+            tail -100 build.log
+            echo ""
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             exit 1
           fi
           
-          # Verify build artifacts exist
+          # Verify build artifacts
           BINARY="target/deploy/${{ github.event.inputs.program_name }}.so"
           KEYPAIR="target/deploy/${{ github.event.inputs.program_name }}-keypair.json"
           
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ BUILD SUCCESSFUL"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
           if [ ! -f "$BINARY" ]; then
-            echo "❌ ERROR: Binary not found: $BINARY"
-            echo "Contents of target/deploy/:"
-            ls -la target/deploy/ || echo "Directory not found"
+            echo "❌ Binary not found: $BINARY"
+            ls -la target/deploy/ 2>/dev/null || echo "target/deploy/ not found"
             exit 1
           fi
           
           if [ ! -f "$KEYPAIR" ]; then
-            echo "❌ ERROR: Keypair not found: $KEYPAIR"
+            echo "❌ Keypair not found: $KEYPAIR"
             exit 1
           fi
           
-          echo "✅ Build successful"
-          echo "📦 Build artifacts:"
-          ls -lh target/deploy/
+          echo "📦 Binary: $BINARY ($(du -h $BINARY | cut -f1))"
+          echo "🔑 Keypair: $KEYPAIR"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       - name: Display build info
         run: |
