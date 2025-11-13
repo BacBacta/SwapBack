@@ -1,4 +1,4 @@
-name: Deploy with Anchor CLI (Fix Cargo.lock v4)
+name: Deploy with Anchor CLI (Modern Stack - Cargo.lock v4)
 
 on:
   workflow_dispatch:
@@ -25,26 +25,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Rust toolchain (1.75.0 - Last stable with v3 support)
-        uses: dtolnay/rust-toolchain@1.75.0
+      - name: Setup Rust stable (with Cargo.lock v4 native support)
+        uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
 
-      - name: Configure Cargo to use stable resolver (prevent v4)
+      - name: Verify Rust version
         run: |
-          echo "🔧 Configuring Cargo for Cargo.lock v3..."
-          
-          # Force Cargo to use stable resolver (not nightly v4)
-          export CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback
-          echo "CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback" >> $GITHUB_ENV
-          
-          echo "Rust version: $(rustc --version)"
-          echo "Cargo version: $(cargo --version)"
+          echo "✅ Using modern Rust with native Cargo.lock v4 support"
+          rustc --version
+          cargo --version
 
       - name: NO CACHE - Fresh build every time
         run: |
-          echo "⚠️ Cache DISABLED to prevent Cargo.lock v4 restoration"
-          echo "Building fresh every time to guarantee Cargo.lock v3"
+          echo "⚠️ Cache DISABLED for clean Cargo.lock v4 generation"
+          echo "Modern Rust + Anchor support v4 natively"
 
       - name: NUCLEAR - Remove ALL Cargo.lock files
         run: |
@@ -61,38 +56,23 @@ jobs:
           fi
           echo "✅ All Cargo.lock obliterated"
 
-      - name: Generate Cargo.lock v3 with Rust 1.75.0
+      - name: Generate fresh Cargo.lock (v4 native)
         run: |
-          echo "🔧 Generating Cargo.lock v3 with Rust 1.75.0..."
+          echo "🔧 Generating fresh Cargo.lock with modern Rust..."
           echo "Rust version: $(rustc --version)"
           echo "Cargo version: $(cargo --version)"
           
-          # Generate Cargo.lock
+          # Generate Cargo.lock (v4 is native and supported)
           cargo generate-lockfile
           
-          # Verify version
+          # Display version (informational only)
           echo ""
           echo "Generated Cargo.lock:"
           head -5 Cargo.lock
           
-          LOCK_VERSION=$(head -5 Cargo.lock | grep "version = " | grep -oE '[0-9]+' || echo "3")
+          LOCK_VERSION=$(head -5 Cargo.lock | grep "version = " | grep -oE '[0-9]+' || echo "unknown")
           echo ""
-          echo "Detected version: $LOCK_VERSION"
-          
-          if [ "$LOCK_VERSION" = "4" ]; then
-            echo "⚠️ WARNING: Generated v4, converting to v3..."
-            rm -f Cargo.lock
-            
-            # Force v3 by setting environment
-            CARGO_RESOLVER_PRECEDENCE=rust-version cargo generate-lockfile
-            
-            LOCK_VERSION=$(head -5 Cargo.lock | grep "version" | grep -oE '[0-9]+' || echo "3")
-            if [ "$LOCK_VERSION" = "4" ]; then
-              echo "❌ Still v4, but continuing (may work with anchor build)"
-            fi
-          fi
-          
-          echo "✅ Cargo.lock generated (version $LOCK_VERSION)"
+          echo "✅ Cargo.lock version: $LOCK_VERSION (natively supported)"
 
       - name: Install Solana CLI (GitHub releases - reliable)
         run: |
@@ -175,25 +155,20 @@ jobs:
           
           echo "✅ declare_id! correct: $CURRENT_ID"
 
-      - name: Pre-build Cargo.lock check
+      - name: Pre-build verification
         run: |
-          echo "🔍 Final pre-build check..."
+          echo "🔍 Pre-build check..."
           
           if [ ! -f "Cargo.lock" ]; then
-            echo "❌ Cargo.lock v3 not found! Should have been generated."
+            echo "❌ Cargo.lock not found!"
             exit 1
           fi
           
-          # Verify it's version 3
-          LOCK_VERSION=$(head -5 Cargo.lock | grep "version" | grep -oE '[0-9]+')
-          if [ "$LOCK_VERSION" != "3" ]; then
-            echo "❌ Cargo.lock is version $LOCK_VERSION, expected 3"
-            head -10 Cargo.lock
-            exit 1
-          fi
-          
-          echo "✅ Cargo.lock v3 confirmed:"
+          echo "✅ Cargo.lock ready:"
           head -5 Cargo.lock
+          
+          echo ""
+          echo "📦 Ready to build with modern Rust + Anchor + Cargo.lock v4"
 
       - name: Build with Anchor
         run: |
@@ -207,10 +182,10 @@ jobs:
           BUILD_EXIT_CODE=${PIPESTATUS[0]}
           set -e
           
-          # Check for Cargo.lock v4 error
+          # Check for any Cargo.lock version errors (should not happen with modern stack)
           if grep -q "lock file version 4 requires" build.log; then
-            echo "❌ CARGO.LOCK VERSION 4 ERROR"
-            grep -A10 -B5 "lock file version 4" build.log
+            echo "❌ CARGO.LOCK VERSION ERROR (unexpected with modern Rust)"
+            grep -A10 -B5 "lock file version" build.log
             exit 1
           fi
           
