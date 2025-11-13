@@ -59,5 +59,21 @@
   "editor.codeActionsOnSave": {},
   "extensions.autoUpdate": false,
   "git.autorefresh": false,
-  "git.autofetch": false
+  "git.autofetch": false,
+  
+  // Rust - Configuration PATH et environnement
+  "rust-analyzer.server.extraEnv": {
+    "RUSTUP_HOME": "/home/codespace/.rustup",
+    "CARGO_HOME": "/home/codespace/.cargo",
+    "PATH": "/home/codespace/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  },
+  "rust-analyzer.cargo.extraEnv": {
+    "RUSTUP_HOME": "/home/codespace/.rustup",
+    "CARGO_HOME": "/home/codespace/.cargo"
+  },
+  "terminal.integrated.env.linux": {
+    "RUSTUP_HOME": "/home/codespace/.rustup",
+    "CARGO_HOME": "/home/codespace/.cargo",
+    "PATH": "/home/codespace/.cargo/bin:${env:PATH}"
+  }
 }

@@ -2,10 +2,10 @@
 members = [
     "programs/swapback_cnft",
     "programs/swapback_router",
-    "programs/swapback_transfer_hook",
 ]
 exclude = [
     "programs/swapback_buyback",
+    "programs/swapback_transfer_hook",
     "programs/common_swap",
 ]
 resolver = "2"

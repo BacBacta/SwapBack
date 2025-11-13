@@ -1,0 +1,3 @@
+[33m17bd628[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Merge pull request #25 from BacBacta/copilot/fix-ci-remove-cargo-lock
+[33m0d81fc1[m[33m ([m[1;31morigin/copilot/fix-ci-remove-cargo-lock[m[33m)[m ci: build Solana program inside Solana docker; remove root Cargo.lock to avoid lockfile v4 CI error
+[33mbc332ec[m Initial plan
