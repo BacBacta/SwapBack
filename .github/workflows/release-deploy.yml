@@ -73,8 +73,8 @@ jobs:
         working-directory: ./app
         env:
           NODE_ENV: production
-          NEXT_PUBLIC_RPC_ENDPOINT: ${{ secrets.PROD_RPC_ENDPOINT }}
-          NEXT_PUBLIC_HELIUS_API_KEY: ${{ secrets.PROD_HELIUS_API_KEY }}
+          NEXT_PUBLIC_SOLANA_NETWORK: mainnet-beta
+          NEXT_PUBLIC_SOLANA_RPC_URL: ${{ secrets.PROD_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com' }}
 
       - name: 🏗️ Build SDK
         run: npm run build

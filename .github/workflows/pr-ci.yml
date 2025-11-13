@@ -269,7 +269,7 @@ jobs:
             </details>
             
             ---
-            *Last updated: ${{ new Date().toISOString() }}*
+            *Last updated: ${{ github.event.head_commit.timestamp }}*
             `;
             
             if (botComment) {

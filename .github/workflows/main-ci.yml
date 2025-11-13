@@ -79,8 +79,8 @@ jobs:
         run: npm run build
         working-directory: ./app
         env:
-          NEXT_PUBLIC_RPC_ENDPOINT: ${{ secrets.NEXT_PUBLIC_RPC_ENDPOINT }}
-          NEXT_PUBLIC_HELIUS_API_KEY: ${{ secrets.NEXT_PUBLIC_HELIUS_API_KEY }}
+          NEXT_PUBLIC_SOLANA_NETWORK: devnet
+          NEXT_PUBLIC_SOLANA_RPC_URL: https://api.devnet.solana.com
 
       - name: 📏 Analyze bundle size
         run: |
