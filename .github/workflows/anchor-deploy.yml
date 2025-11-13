@@ -25,29 +25,48 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Rust stable (generates Cargo.lock v4)
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust 1.75.0 (Last version generating Cargo.lock v3)
+        uses: dtolnay/rust-toolchain@1.75.0
         with:
           components: rustfmt, clippy
 
       - name: Verify Rust version
         run: |
-          echo "✅ Using Rust stable (generates Cargo.lock v4)"
-          echo "📦 Solana 1.18.26 with Rust stable"
+          echo "✅ Using Rust 1.75.0 (generates Cargo.lock v3)"
+          echo "⚠️ Solana 1.18.26 requires Cargo.lock v3"
           rustc --version
           cargo --version
 
-      - name: Generate Cargo.lock (Rust stable → v4)
+      - name: Generate Cargo.lock v3 (REQUIRED by Solana 1.18.26)
         run: |
-          echo "🔧 Generating Cargo.lock with Rust stable"
+          echo "🔧 CRITICAL: Solana CLI 1.18.26 requires Cargo.lock v3"
+          echo "Using Rust 1.75.0 to generate v3"
           echo "Rust: $(rustc --version)"
           echo "Cargo: $(cargo --version)"
           
+          # Delete any existing lockfile
+          rm -f Cargo.lock
+          
+          # Generate with Rust 1.75.0 (produces v3)
           cargo generate-lockfile
           
+          # Verify version
           LOCK_VERSION=$(head -5 Cargo.lock | grep "version = " | grep -oE '[0-9]+' || echo "unknown")
-          echo "✅ Cargo.lock version $LOCK_VERSION generated"
-          echo "📦 Modern Rust generates v4 by default"
+          echo "Generated Cargo.lock version: $LOCK_VERSION"
+          
+          if [ "$LOCK_VERSION" != "3" ]; then
+            echo "❌ ERROR: Expected v3 but got v$LOCK_VERSION"
+            echo "Forcing v3..."
+            sed -i 's/^version = [0-9]\+$/version = 3/' Cargo.lock
+            
+            LOCK_VERSION=$(head -5 Cargo.lock | grep "version = " | grep -oE '[0-9]+')
+            if [ "$LOCK_VERSION" != "3" ]; then
+              echo "❌ Failed to force v3"
+              exit 1
+            fi
+          fi
+          
+          echo "✅ Cargo.lock v3 ready (Solana 1.18.26 compatible)"
 
       - name: Install Solana CLI ${{ env.SOLANA_VERSION }}
         run: |
@@ -134,7 +153,7 @@ jobs:
 
       - name: Pre-build verification
         run: |
-          echo "🔍 Verifying Cargo.lock..."
+          echo "🔍 Verifying Cargo.lock v3 (REQUIRED by Solana 1.18.26)..."
           
           if [ ! -f "Cargo.lock" ]; then
             echo "❌ Cargo.lock not found!"
@@ -144,13 +163,15 @@ jobs:
           LOCK_VERSION=$(head -5 Cargo.lock | grep "version = " | grep -oE '[0-9]+')
           echo "Cargo.lock version: $LOCK_VERSION"
           
-          if [ "$LOCK_VERSION" != "3" ] && [ "$LOCK_VERSION" != "4" ]; then
-            echo "❌ Unexpected Cargo.lock version: v$LOCK_VERSION"
+          if [ "$LOCK_VERSION" != "3" ]; then
+            echo "❌ INVALID: Solana 1.18.26 requires v3, found v$LOCK_VERSION"
+            echo "Current Cargo.lock header:"
+            head -10 Cargo.lock
             exit 1
           fi
           
-          echo "✅ Cargo.lock v$LOCK_VERSION ready"
-          echo "📦 Modern Rust + Solana 1.18.26"
+          echo "✅ Cargo.lock v3 confirmed"
+          echo "📦 Ready to build with Solana 1.18.26"
 
       - name: Build with Anchor
         run: |
