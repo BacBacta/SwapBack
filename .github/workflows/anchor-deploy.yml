@@ -1,4 +1,4 @@
-name: Deploy with Anchor v0.31.0 (Solana 1.18.26 + Rust stable)
+name: Deploy with Anchor v0.30.1 (Solana 1.18.26 + Rust 1.75.0)
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ on:
 
 env:
   SOLANA_VERSION: v1.18.26
-  ANCHOR_VERSION: v0.31.0
+  ANCHOR_VERSION: 0.30.1
 
 jobs:
   build-and-deploy:
@@ -106,18 +106,23 @@ jobs:
       - name: Install Anchor CLI v0.30.1 (compatible with Rust 1.75.0 and Solana 1.18.26)
         run: |
           echo "📦 Installing Anchor CLI v0.30.1 (compatible with Rust 1.75.0)..."
-          
-          # Use v0.30.1 which is compatible with Rust 1.75.0 and Solana 1.18.26
-          cargo install --git https://github.com/coral-xyz/anchor \
-            --tag v0.30.1 \
-            anchor-cli \
-            --locked \
-            --force
-          
+
+          # Install Anchor Version Manager so the CLI can manage versions cleanly
+          cargo install avm --locked --force
+
+          # Install and activate the required Anchor CLI version via avm
+          avm install ${{ env.ANCHOR_VERSION }}
+          avm use ${{ env.ANCHOR_VERSION }}
+
+          # Ensure avm-managed binaries are on PATH for all subsequent steps
+          echo "$HOME/.local/share/avm/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.local/share/avm/bin:$PATH"
+
           anchor --version
-          echo "✅ Anchor CLI v0.30.1 installed"
-          
-          # Disable avm version check by setting environment variable
+          avm list
+          echo "✅ Anchor CLI v${{ env.ANCHOR_VERSION }} installed via avm"
+
+          # Disable avm auto-upgrade attempts during builds
           echo "ANCHOR_SKIP_VERSION_CHECK=1" >> $GITHUB_ENV
 
 
