@@ -103,19 +103,19 @@ jobs:
           solana-keygen --version
           echo "✅ Solana CLI installed successfully"
 
-      - name: Install Anchor CLI v0.31.0 (modern, v4 compatible)
+      - name: Install Anchor CLI v0.30.1 (compatible with Rust 1.75.0 and Solana 1.18.26)
         run: |
-          echo "📦 Installing Anchor CLI ${{ env.ANCHOR_VERSION }}..."
+          echo "📦 Installing Anchor CLI v0.30.1 (compatible with Rust 1.75.0)..."
           
-          # Install directly from git tag
+          # Use v0.30.1 which is compatible with Rust 1.75.0 and Solana 1.18.26
           cargo install --git https://github.com/coral-xyz/anchor \
-            --tag ${{ env.ANCHOR_VERSION }} \
+            --tag v0.30.1 \
             anchor-cli \
             --locked \
             --force
           
           anchor --version
-          echo "✅ Anchor CLI ${{ env.ANCHOR_VERSION }} installed"
+          echo "✅ Anchor CLI v0.30.1 installed"
 
 
 
