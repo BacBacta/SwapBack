@@ -53,8 +53,18 @@ jobs:
         run: |
           echo "📦 Installing Solana CLI ${{ env.SOLANA_VERSION }}..."
           
-          # Use official Solana installer
-          sh -c "$(curl -sSfL https://release.solana.com/${{ env.SOLANA_VERSION }}/install)"
+          # Use GitHub releases directly
+          wget https://github.com/solana-labs/solana/releases/download/${{ env.SOLANA_VERSION }}/solana-release-x86_64-unknown-linux-gnu.tar.bz2 -O solana.tar.bz2
+          
+          echo "Extracting..."
+          tar xjf solana.tar.bz2
+          
+          echo "Installing to ~/.local/share/solana..."
+          mkdir -p $HOME/.local/share/solana/install/active_release
+          cp -r solana-release/* $HOME/.local/share/solana/install/active_release/
+          
+          echo "Cleaning up..."
+          rm -rf solana-release solana.tar.bz2
           
           echo "Adding to PATH..."
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
