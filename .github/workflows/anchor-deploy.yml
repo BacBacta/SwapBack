@@ -1,4 +1,4 @@
-name: Deploy with Anchor CLI (Modern Stack - Cargo.lock v4)
+name: Deploy with Anchor CLI v0.31.0 (Modern Stack)
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ on:
 
 env:
   SOLANA_VERSION: v1.18.26
-  ANCHOR_VERSION: v0.30.1
+  ANCHOR_VERSION: v0.31.0
 
 jobs:
   build-and-deploy:
@@ -25,14 +25,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Rust stable (with Cargo.lock v4 native support)
+      - name: Setup Rust stable (Anchor v0.31.0 compatible)
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
 
       - name: Verify Rust version
         run: |
-          echo "✅ Using modern Rust with native Cargo.lock v4 support"
+          echo "✅ Using Rust stable (Anchor v0.31.0 supports Rust 1.77.0 - 1.83.0+)"
           rustc --version
           cargo --version
 
@@ -109,11 +109,11 @@ jobs:
           solana-keygen --version
           echo "✅ Solana CLI installed successfully"
 
-      - name: Install Anchor CLI v0.30.1 (direct from tag)
+      - name: Install Anchor CLI v0.31.0 (modern, v4 compatible)
         run: |
           echo "📦 Installing Anchor CLI ${{ env.ANCHOR_VERSION }}..."
           
-          # Install directly from git tag (not avm)
+          # Install directly from git tag
           cargo install --git https://github.com/coral-xyz/anchor \
             --tag ${{ env.ANCHOR_VERSION }} \
             anchor-cli \
@@ -121,7 +121,7 @@ jobs:
             --force
           
           anchor --version
-          echo "✅ Anchor CLI ${{ env.ANCHOR_VERSION }} installed"
+          echo "✅ Anchor CLI ${{ env.ANCHOR_VERSION }} installed (Rust stable + Cargo.lock v4 compatible)"
 
       - name: Configure Solana
         run: |
