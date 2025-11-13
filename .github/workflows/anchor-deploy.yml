@@ -79,12 +79,55 @@ jobs:
           
           echo "✅ Cargo.lock v3 generated successfully with Rust 1.70.0"
 
-      - name: Install Solana CLI
+      - name: Install Solana CLI (with retry + fallback)
         run: |
           echo "📦 Installing Solana CLI ${{ env.SOLANA_VERSION }}..."
-          sh -c "$(curl -sSfL https://release.solana.com/${{ env.SOLANA_VERSION }}/install)"
+          
+          # Method 1: Official installer (with retry)
+          for i in {1..5}; do
+            echo "Attempt $i/5: Official Solana installer..."
+            if sh -c "$(curl -sSfL https://release.solana.com/${{ env.SOLANA_VERSION }}/install)" 2>&1; then
+              echo "✅ Official installer succeeded"
+              break
+            else
+              echo "⚠️ Attempt $i failed, waiting 10s..."
+              sleep 10
+            fi
+            
+            if [ $i -eq 5 ]; then
+              echo "❌ Official installer failed after 5 attempts"
+              echo "Trying fallback method..."
+              
+              # Method 2: Direct GitHub release download
+              VERSION_NUM="${{ env.SOLANA_VERSION }}"
+              VERSION_NUM="${VERSION_NUM#v}"  # Remove 'v' prefix
+              
+              echo "Downloading from GitHub releases..."
+              wget -q https://github.com/solana-labs/solana/releases/download/${{ env.SOLANA_VERSION }}/solana-release-x86_64-unknown-linux-gnu.tar.bz2 -O solana.tar.bz2 || {
+                echo "❌ GitHub download failed"
+                
+                # Method 3: Use apt (older version but works)
+                echo "Installing via apt-get (may be older version)..."
+                sudo apt-get update -qq
+                sudo apt-get install -y wget bzip2
+                
+                # Try downloading latest stable
+                wget -q https://github.com/solana-labs/solana/releases/download/v1.18.18/solana-release-x86_64-unknown-linux-gnu.tar.bz2 -O solana.tar.bz2 || {
+                  echo "❌ All methods failed"
+                  exit 1
+                }
+              }
+              
+              tar xjf solana.tar.bz2
+              mkdir -p $HOME/.local/share/solana/install/active_release
+              cp -r solana-release/* $HOME/.local/share/solana/install/active_release/
+              rm -rf solana-release solana.tar.bz2
+            fi
+          done
+          
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
           export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          
           solana --version
           solana-keygen --version
           echo "✅ Solana CLI installed"
