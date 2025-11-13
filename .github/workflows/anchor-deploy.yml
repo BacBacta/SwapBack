@@ -116,6 +116,9 @@ jobs:
           
           anchor --version
           echo "✅ Anchor CLI v0.30.1 installed"
+          
+          # Disable avm version check by setting environment variable
+          echo "ANCHOR_SKIP_VERSION_CHECK=1" >> $GITHUB_ENV
 
 
 
