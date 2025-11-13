@@ -1,11 +1,25 @@
+`anchor` 0.30.1 is not installed with `avm`. Installing...
+
+    Updating git repository `https://github.com/coral-xyz/anchor`
+warning: skipping duplicate package `docs` found at `/home/codespace/.cargo/git/checkouts/anchor-50c4b9c8b5e0501f/e6d7daf/tests/docs/programs/docs`
+warning: skipping duplicate package `external` found at `/home/codespace/.cargo/git/checkouts/anchor-50c4b9c8b5e0501f/e6d7daf/tests/declare-program/programs/external`
+warning: skipping duplicate package `shared` found at `/home/codespace/.cargo/git/checkouts/anchor-50c4b9c8b5e0501f/e6d7daf/tests/typescript/programs/shared`
+warning: skipping duplicate package `relations-derivation` found at `/home/codespace/.cargo/git/checkouts/anchor-50c4b9c8b5e0501f/e6d7daf/tests/relations-derivation/programs/relations-derivation`
+warning: skipping duplicate package `shared` found at `/home/codespace/.cargo/git/checkouts/anchor-50c4b9c8b5e0501f/e6d7daf/tests/misc/programs/shared`
+warning: skipping duplicate package `swap` found at `/home/codespace/.cargo/git/checkouts/anchor-50c4b9c8b5e0501f/e6d7daf/tests/cfo/deps/swap/programs/swap`
+error: binary `anchor` already exists in destination
+Add --force to overwrite
+Error: Failed to install 0.30.1, is it a valid version?
+Failed to install `anchor`: failed to install `anchor` 0.30.1 with avm, using 0.32.1 instead
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.17s
+     Running unittests src/lib.rs (/workspaces/SwapBack/target/debug/deps/swapback_cnft-bc81d30d1c9c1fd9)
 {
   "address": "9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq",
   "metadata": {
     "name": "swapback_cnft",
     "version": "0.1.0",
     "spec": "0.1.0",
-    "description": "Programme de gestion des compressed NFTs pour les niveaux SwapBack",
-    "address": "9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq"
+    "description": "Programme de gestion des compressed NFTs pour les niveaux SwapBack"
   },
   "instructions": [
     {
@@ -121,6 +135,182 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "lock_tokens",
+      "docs": [
+        "Lock des tokens BACK avec transfert vers un PDA",
+        "Cette instruction combine le mint du cNFT ET le transfert des tokens"
+      ],
+      "discriminator": [
+        136,
+        11,
+        32,
+        232,
+        161,
+        117,
+        54,
+        211
+      ],
+      "accounts": [
+        {
+          "name": "collection_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  108,
+                  108,
+                  101,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "global_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_nft",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  110,
+                  102,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_token_account",
+          "docs": [
+            "Token Account de l'utilisateur (source)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "vault_token_account",
+          "docs": [
+            "Vault PDA pour stocker les tokens verrouillés"
+          ],
+          "writable": true
+        },
+        {
+          "name": "vault_authority",
+          "docs": [
+            "Autorité du vault (PDA)"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "back_mint",
+          "docs": [
+            "Mint du token BACK (Token-2022)"
+          ]
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "lock_duration",
+          "type": "i64"
+        }
+      ]
     },
     {
       "name": "mint_level_nft",
@@ -242,6 +432,134 @@
       ]
     },
     {
+      "name": "unlock_tokens",
+      "docs": [
+        "Unlock des tokens BACK et retour vers l'utilisateur",
+        "Permet l'unlock anticipé avec une pénalité de 1,5% des tokens brûlés"
+      ],
+      "discriminator": [
+        233,
+        35,
+        95,
+        159,
+        37,
+        185,
+        47,
+        88
+      ],
+      "accounts": [
+        {
+          "name": "user_nft",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  110,
+                  102,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "global_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_token_account",
+          "docs": [
+            "Token Account de l'utilisateur (destination)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "vault_token_account",
+          "docs": [
+            "Vault PDA qui contient les tokens verrouillés"
+          ],
+          "writable": true
+        },
+        {
+          "name": "vault_authority",
+          "docs": [
+            "Autorité du vault (PDA)"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "back_mint",
+          "docs": [
+            "Mint du token BACK (Token-2022)"
+          ]
+        },
+        {
+          "name": "user",
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "update_nft_status",
       "docs": [
         "Met à jour le statut d'un NFT (lors du unlock)"
@@ -332,12 +650,7 @@
         157,
         106,
         255
-      ],
-      "type": {
-        "defined": {
-          "name": "CollectionConfig"
-        }
-      }
+      ]
     },
     {
       "name": "GlobalState",
@@ -350,12 +663,7 @@
         123,
         133,
         98
-      ],
-      "type": {
-        "defined": {
-          "name": "GlobalState"
-        }
-      }
+      ]
     },
     {
       "name": "UserNft",
@@ -368,12 +676,7 @@
         180,
         173,
         226
-      ],
-      "type": {
-        "defined": {
-          "name": "UserNft"
-        }
-      }
+      ]
     }
   ],
   "events": [
@@ -402,6 +705,32 @@
         55,
         16
       ]
+    },
+    {
+      "name": "TokensLocked",
+      "discriminator": [
+        63,
+        184,
+        201,
+        20,
+        203,
+        194,
+        249,
+        138
+      ]
+    },
+    {
+      "name": "TokensUnlocked",
+      "discriminator": [
+        32,
+        143,
+        250,
+        162,
+        63,
+        131,
+        83,
+        163
+      ]
     }
   ],
   "errors": [
@@ -419,6 +748,16 @@
       "code": 6002,
       "name": "MathOverflow",
       "msg": "Dépassement arithmétique"
+    },
+    {
+      "code": 6003,
+      "name": "LockNotExpired",
+      "msg": "Période de verrouillage non expirée"
+    },
+    {
+      "code": 6004,
+      "name": "AlreadyUnlocked",
+      "msg": "Déjà déverrouillé"
     }
   ],
   "types": [
@@ -553,6 +892,62 @@
           {
             "name": "is_active",
             "type": "bool"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokensLocked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "level",
+            "type": {
+              "defined": {
+                "name": "LockLevel"
+              }
+            }
+          },
+          {
+            "name": "boost",
+            "type": "u16"
+          },
+          {
+            "name": "unlock_time",
+            "type": "i64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokensUnlocked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
           },
           {
             "name": "timestamp",
