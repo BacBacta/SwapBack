@@ -1,4 +1,4 @@
-name: Deploy with Anchor CLI v0.31.0 (Modern Stack)
+name: Deploy with Anchor v0.31.0 (Cargo.lock v3 for cargo-build-sbf)
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ on:
           - swapback_router
 
 env:
-  SOLANA_VERSION: v1.18.26
+  SOLANA_VERSION: v2.0.15
   ANCHOR_VERSION: v0.31.0
 
 jobs:
@@ -56,23 +56,23 @@ jobs:
           fi
           echo "✅ All Cargo.lock obliterated"
 
-      - name: Generate fresh Cargo.lock (v4 native)
+      - name: Generate Cargo.lock (v4 native support)
         run: |
-          echo "🔧 Generating fresh Cargo.lock with modern Rust..."
-          echo "Rust version: $(rustc --version)"
-          echo "Cargo version: $(cargo --version)"
+          echo "🔧 Generating Cargo.lock with modern toolchain..."
+          echo "Rust: $(rustc --version)"
+          echo "Cargo: $(cargo --version)"
+          echo "Solana CLI: v2.0.x supports Cargo.lock v4 natively!"
           
-          # Generate Cargo.lock (v4 is native and supported)
+          # Generate lockfile (v4 is fine with Solana 2.0+)
           cargo generate-lockfile
           
-          # Display version (informational only)
           echo ""
           echo "Generated Cargo.lock:"
           head -5 Cargo.lock
           
           LOCK_VERSION=$(head -5 Cargo.lock | grep "version = " | grep -oE '[0-9]+' || echo "unknown")
           echo ""
-          echo "✅ Cargo.lock version: $LOCK_VERSION (natively supported)"
+          echo "✅ Cargo.lock version $LOCK_VERSION (supported by Solana CLI 2.0+)"
 
       - name: Install Solana CLI (GitHub releases - reliable)
         run: |
@@ -168,7 +168,7 @@ jobs:
           head -5 Cargo.lock
           
           echo ""
-          echo "📦 Ready to build with modern Rust + Anchor + Cargo.lock v4"
+          echo "📦 Ready to build with Solana CLI 2.0 (Cargo.lock v4 native support)"
 
       - name: Build with Anchor
         run: |
@@ -182,9 +182,9 @@ jobs:
           BUILD_EXIT_CODE=${PIPESTATUS[0]}
           set -e
           
-          # Check for any Cargo.lock version errors (should not happen with modern stack)
-          if grep -q "lock file version 4 requires" build.log; then
-            echo "❌ CARGO.LOCK VERSION ERROR (unexpected with modern Rust)"
+          # Check for Cargo.lock errors (should not happen with Solana 2.0)
+          if grep -q "lock file version" build.log; then
+            echo "❌ CARGO.LOCK VERSION ERROR"
             grep -A10 -B5 "lock file version" build.log
             exit 1
           fi
