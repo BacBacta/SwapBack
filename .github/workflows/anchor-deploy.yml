@@ -1,4 +1,4 @@
-name: Deploy with Anchor v0.31.0 (Cargo.lock v3 for cargo-build-sbf)
+name: Deploy with Anchor v0.31.0 (Solana 3.0.10 - Native v4 support)
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ on:
           - swapback_router
 
 env:
-  SOLANA_VERSION: v2.0.15
+  SOLANA_VERSION: v3.0.10
   ANCHOR_VERSION: v0.31.0
 
 jobs:
@@ -25,80 +25,36 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Rust stable (Anchor v0.31.0 compatible)
+      - name: Setup Rust stable (Solana 3.0.10 supports Cargo.lock v4)
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
 
       - name: Verify Rust version
         run: |
-          echo "✅ Using Rust stable (Anchor v0.31.0 supports Rust 1.77.0 - 1.83.0+)"
+          echo "✅ Using Rust stable with Cargo.lock v4 support"
+          echo "Solana 3.0.10 supports v4 natively!"
           rustc --version
           cargo --version
 
-      - name: NO CACHE - Fresh build every time
+      - name: Generate Cargo.lock v4 (Native support in Solana 3.0.10)
         run: |
-          echo "⚠️ Cache DISABLED for clean Cargo.lock v4 generation"
-          echo "Modern Rust + Anchor support v4 natively"
-
-      - name: NUCLEAR - Remove ALL Cargo.lock files
-        run: |
-          echo "🔥 Obliterating all Cargo.lock files..."
-          find . -name "Cargo.lock" -type f -print -delete 2>/dev/null || true
-          rm -f Cargo.lock 2>/dev/null || true
-          git rm --cached -f Cargo.lock 2>/dev/null || true
-          git rm --cached -f "**/Cargo.lock" 2>/dev/null || true
-          
-          REMAINING=$(find . -name "Cargo.lock" -type f 2>/dev/null | wc -l)
-          if [ "$REMAINING" -gt 0 ]; then
-            echo "❌ $REMAINING Cargo.lock files remain"
-            exit 1
-          fi
-          echo "✅ All Cargo.lock obliterated"
-
-      - name: Generate Cargo.lock (v4 native support)
-        run: |
-          echo "🔧 Generating Cargo.lock with modern toolchain..."
+          echo "🔧 Generating Cargo.lock with native v4 support"
           echo "Rust: $(rustc --version)"
           echo "Cargo: $(cargo --version)"
-          echo "Solana CLI: v2.0.x supports Cargo.lock v4 natively!"
           
-          # Generate lockfile (v4 is fine with Solana 2.0+)
           cargo generate-lockfile
           
-          echo ""
-          echo "Generated Cargo.lock:"
-          head -5 Cargo.lock
-          
           LOCK_VERSION=$(head -5 Cargo.lock | grep "version = " | grep -oE '[0-9]+' || echo "unknown")
-          echo ""
-          echo "✅ Cargo.lock version $LOCK_VERSION (supported by Solana CLI 2.0+)"
+          echo "✅ Cargo.lock version $LOCK_VERSION generated"
+          echo "Solana 3.0.10 supports v4 natively - no forcing needed!"
 
-      - name: Install Solana CLI (GitHub releases - reliable)
+      - name: Install Solana CLI v3.0.10 (Native v4 support)
         run: |
           echo "📦 Installing Solana CLI ${{ env.SOLANA_VERSION }}..."
           
-          # Use GitHub releases directly (more reliable than release.solana.com)
-          VERSION_NUM="${{ env.SOLANA_VERSION }}"
-          
-          echo "Downloading from GitHub releases..."
-          wget https://github.com/solana-labs/solana/releases/download/${VERSION_NUM}/solana-release-x86_64-unknown-linux-gnu.tar.bz2 -O solana.tar.bz2 || {
-            echo "⚠️ ${VERSION_NUM} unavailable, trying v1.18.18..."
-            wget https://github.com/solana-labs/solana/releases/download/v1.18.18/solana-release-x86_64-unknown-linux-gnu.tar.bz2 -O solana.tar.bz2 || {
-              echo "❌ Download failed"
-              exit 1
-            }
-          }
-          
-          echo "Extracting..."
-          tar xjf solana.tar.bz2
-          
-          echo "Installing to ~/.local/share/solana..."
-          mkdir -p $HOME/.local/share/solana/install/active_release
-          cp -r solana-release/* $HOME/.local/share/solana/install/active_release/
-          
-          echo "Cleaning up..."
-          rm -rf solana-release solana.tar.bz2
+          # Use official Solana installer
+          sh -c "$(curl -sSfL https://release.solana.com/${{ env.SOLANA_VERSION }}/install)"
           
           echo "Adding to PATH..."
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
@@ -107,7 +63,7 @@ jobs:
           echo "Verifying installation..."
           solana --version
           solana-keygen --version
-          echo "✅ Solana CLI installed successfully"
+          echo "✅ Solana CLI ${{ env.SOLANA_VERSION }} installed successfully"
 
       - name: Install Anchor CLI v0.31.0 (modern, v4 compatible)
         run: |
@@ -121,7 +77,9 @@ jobs:
             --force
           
           anchor --version
-          echo "✅ Anchor CLI ${{ env.ANCHOR_VERSION }} installed (Rust stable + Cargo.lock v4 compatible)"
+          echo "✅ Anchor CLI ${{ env.ANCHOR_VERSION }} installed"
+
+
 
       - name: Configure Solana
         run: |
@@ -157,18 +115,18 @@ jobs:
 
       - name: Pre-build verification
         run: |
-          echo "🔍 Pre-build check..."
+          echo "🔍 Verifying Cargo.lock..."
           
           if [ ! -f "Cargo.lock" ]; then
             echo "❌ Cargo.lock not found!"
             exit 1
           fi
           
-          echo "✅ Cargo.lock ready:"
-          head -5 Cargo.lock
+          LOCK_VERSION=$(head -5 Cargo.lock | grep "version = " | grep -oE '[0-9]+')
+          echo "Cargo.lock version: $LOCK_VERSION"
           
-          echo ""
-          echo "📦 Ready to build with Solana CLI 2.0 (Cargo.lock v4 native support)"
+          echo "✅ Cargo.lock v$LOCK_VERSION ready"
+          echo "📦 Solana 3.0.10 supports v4 natively!"
 
       - name: Build with Anchor
         run: |
