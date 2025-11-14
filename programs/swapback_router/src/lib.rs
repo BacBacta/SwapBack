@@ -28,7 +28,7 @@ pub const JUPITER_PROGRAM_ID: Pubkey = pubkey!("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZ
 pub const BUYBACK_PROGRAM_ID: Pubkey = pubkey!("EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf");
 
 // cNFT Program ID for boost verification (deployed Nov 14, 2025)
-pub const CNFT_PROGRAM_ID: Pubkey = pubkey!("AaN2BwpGWbvDo7NHfpyC6zGYxsbg2xtcikToW9xYy4Xq");
+pub const CNFT_PROGRAM_ID: Pubkey = pubkey!("9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq");
 
 // Oracle constants
 pub const MAX_STALENESS_SECS: i64 = 300; // 5 minutes max staleness

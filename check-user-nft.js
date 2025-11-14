@@ -5,7 +5,7 @@
 
 const { Connection, PublicKey } = require('@solana/web3.js');
 
-const CNFT_PROGRAM_ID = new PublicKey('2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G');
+const CNFT_PROGRAM_ID = new PublicKey('AaN2BwpGWbvDo7NHfpyC6zGYxsbg2xtcikToW9xYy4Xq');
 const RPC_URL = 'https://api.devnet.solana.com';
 
 async function checkUserNft(userPubkey) {

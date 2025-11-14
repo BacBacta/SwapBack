@@ -213,7 +213,7 @@ export default function LockInterface({
       try {
         const CNFT_PROGRAM_ID = new PublicKey(
           process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID ||
-            "2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G"
+            "AaN2BwpGWbvDo7NHfpyC6zGYxsbg2xtcikToW9xYy4Xq"
         );
 
         const [userNftPda] = PublicKey.findProgramAddressSync(
@@ -546,7 +546,7 @@ export default function LockInterface({
           // Rafraîchir les données du NFT
           const CNFT_PROGRAM_ID = new PublicKey(
             process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID ||
-              "2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G"
+              "AaN2BwpGWbvDo7NHfpyC6zGYxsbg2xtcikToW9xYy4Xq"
           );
 
           const [userNftPda] = PublicKey.findProgramAddressSync(

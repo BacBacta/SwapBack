@@ -15,7 +15,7 @@ function getCnftProgramId(): PublicKey {
   if (!_cnftProgramId) {
     const envId = process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID;
     _cnftProgramId = new PublicKey(
-      envId || "2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G"
+      envId || "AaN2BwpGWbvDo7NHfpyC6zGYxsbg2xtcikToW9xYy4Xq"
     );
   }
   return _cnftProgramId;

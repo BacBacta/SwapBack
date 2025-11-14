@@ -33,7 +33,7 @@ const bs58 = require("bs58");
 // 🎯 CONFIGURATION
 // ============================
 
-const CNFT_PROGRAM_ID = new PublicKey("2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G");
+const CNFT_PROGRAM_ID = new PublicKey("AaN2BwpGWbvDo7NHfpyC6zGYxsbg2xtcikToW9xYy4Xq");
 const BUYBACK_PROGRAM_ID = new PublicKey("EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf");
 const BACK_TOKEN_MINT = new PublicKey("862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux");
 

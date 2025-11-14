@@ -8,7 +8,7 @@ const { Connection, PublicKey } = require('@solana/web3.js');
 const { Program, AnchorProvider, Wallet } = require('@coral-xyz/anchor');
 const { Keypair } = require('@solana/web3.js');
 
-const CNFT_PROGRAM_ID = new PublicKey('2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G');
+const CNFT_PROGRAM_ID = new PublicKey('AaN2BwpGWbvDo7NHfpyC6zGYxsbg2xtcikToW9xYy4Xq');
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'https://api.devnet.solana.com';
 
 async function checkProgramState() {

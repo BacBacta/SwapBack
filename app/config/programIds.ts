@@ -34,11 +34,11 @@ export const RPC_ENDPOINTS: Record<NetworkEnvironment, string> = {
 /**
  * Program IDs - DEVNET
  * 
- * ✅ Redéployé le 14 Novembre 2025 (Rust 1.75.0 + Cargo.lock v3)
- * Program ID: AaN2BwpGWbvDo7NHfpyC6zGYxsbg2xtcikToW9xYy4Xq
+ * ✅ Programme déployé sur devnet (vérifié Nov 14, 2025)
+ * Program ID: 9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq
  */
 const DEVNET_PROGRAM_IDS: ProgramIds = {
-  cnftProgram: new PublicKey('AaN2BwpGWbvDo7NHfpyC6zGYxsbg2xtcikToW9xYy4Xq'),
+  cnftProgram: new PublicKey('9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq'),
   routerProgram: new PublicKey('GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt'),
   buybackProgram: new PublicKey('EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf'),
 };
@@ -52,7 +52,7 @@ const DEVNET_PROGRAM_IDS: ProgramIds = {
  * Coût total: ~6.5 SOL
  */
 const TESTNET_PROGRAM_IDS: ProgramIds = {
-  cnftProgram: new PublicKey('AaN2BwpGWbvDo7NHfpyC6zGYxsbg2xtcikToW9xYy4Xq'),
+  cnftProgram: new PublicKey('9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq'),
   routerProgram: new PublicKey('GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt'),
   buybackProgram: new PublicKey('EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf'),
 };

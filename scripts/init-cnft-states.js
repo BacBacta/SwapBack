@@ -16,7 +16,7 @@ const fs = require("fs");
 const bs58 = require("bs58");
 const crypto = require("crypto");
 
-const CNFT_PROGRAM_ID = new PublicKey("2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G");
+const CNFT_PROGRAM_ID = new PublicKey("AaN2BwpGWbvDo7NHfpyC6zGYxsbg2xtcikToW9xYy4Xq");
 const RPC_URL = "https://api.devnet.solana.com";
 const KEYPAIR_PATH = "/workspaces/SwapBack/devnet-keypair-base58.txt";
 

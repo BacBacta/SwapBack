@@ -24,7 +24,7 @@ const path = require("path");
 
 // Configuration
 const DEVNET_RPC = "https://api.devnet.solana.com";
-const CNFT_PROGRAM_ID = new PublicKey("2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G");
+const CNFT_PROGRAM_ID = new PublicKey("AaN2BwpGWbvDo7NHfpyC6zGYxsbg2xtcikToW9xYy4Xq");
 const ROUTER_PROGRAM_ID = new PublicKey("GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt");
 const BACK_TOKEN_MINT = new PublicKey("3Y6RXZUBHCeUj6VsWuyBY2Zy1RixY6BHkM4tf3euDdrE");
 
