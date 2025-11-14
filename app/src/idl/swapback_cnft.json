@@ -1,11 +1,11 @@
 {
-  "address": "9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq",
+  "address": "26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru",
   "metadata": {
     "name": "swapback_cnft",
     "version": "0.1.0",
     "spec": "0.1.0",
     "description": "Programme de gestion des compressed NFTs pour les niveaux SwapBack",
-    "address": "9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq"
+    "address": "26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru"
   },
   "instructions": [
     {
