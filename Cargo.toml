@@ -8,6 +8,10 @@ anchor-spl = "=0.30.1"
 solana-program = "=1.18.26"
 solana-sdk = "=1.18.26"
 
+# Pin dependencies for Rust 1.75 compatibility (Solana BPF toolchain)
+indexmap = "=2.6.0"
+ahash = "=0.8.11"
+
 [profile.release]
 overflow-checks = true
 lto = "fat"

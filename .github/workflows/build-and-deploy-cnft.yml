@@ -85,6 +85,12 @@ jobs:
         # Clean build
         rm -rf target/ Cargo.lock
         
+        # Pin problematic dependencies for Rust 1.75 compatibility
+        echo "📌 Pinning dependencies for BPF toolchain compatibility..."
+        cargo update indexmap --precise 2.6.0 || true
+        cargo update ahash --precise 0.8.11 || true
+        cargo update hashbrown --precise 0.15.1 || true
+        
         anchor build -p swapback_cnft --skip-lint
         echo ""
         echo "=== Build Artifacts ==="
