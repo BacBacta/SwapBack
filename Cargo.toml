@@ -1,5 +1,13 @@
 [workspace]
-members = ["programs/swapback_cnft"]
+members = [
+    "programs/swapback_cnft",
+    "programs/swapback_router",
+]
+exclude = [
+    "programs/swapback_buyback",
+    "programs/swapback_transfer_hook",
+    "programs/common_swap",
+]
 resolver = "2"
 
 [workspace.dependencies]
@@ -8,11 +16,19 @@ anchor-spl = "=0.30.1"
 solana-program = "=1.18.26"
 solana-sdk = "=1.18.26"
 
-# Pin dependencies for Rust 1.75 compatibility (Solana BPF toolchain)
+# Contraintes pour compatibilité Rust 1.75 (Solana platform-tools v1.41)
+borsh = "=0.10.3"
+proc-macro-crate = "=1.3.1"
 indexmap = "=2.6.0"
-ahash = "=0.8.11"
+toml_edit = "=0.20.2"
+toml_datetime = "=0.6.3"
 
 [profile.release]
 overflow-checks = true
 lto = "fat"
+codegen-units = 1
+
+[profile.release.build-override]
+opt-level = 3
+incremental = false
 codegen-units = 1

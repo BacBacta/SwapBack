@@ -1,10 +1,11 @@
 {
-  "address": "2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G",
+  "address": "AaN2BwpGWbvDo7NHfpyC6zGYxsbg2xtcikToW9xYy4Xq",
   "metadata": {
     "name": "swapback_cnft",
     "version": "0.1.0",
     "spec": "0.1.0",
-    "description": "Programme de gestion des compressed NFTs pour les niveaux SwapBack"
+    "description": "Programme de gestion des compressed NFTs pour les niveaux SwapBack",
+    "address": "AaN2BwpGWbvDo7NHfpyC6zGYxsbg2xtcikToW9xYy4Xq"
   },
   "instructions": [
     {
@@ -120,182 +121,6 @@
         }
       ],
       "args": []
-    },
-    {
-      "name": "lock_tokens",
-      "docs": [
-        "Lock des tokens BACK avec transfert vers un PDA",
-        "Cette instruction combine le mint du cNFT ET le transfert des tokens"
-      ],
-      "discriminator": [
-        136,
-        11,
-        32,
-        232,
-        161,
-        117,
-        54,
-        211
-      ],
-      "accounts": [
-        {
-          "name": "collection_config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  108,
-                  108,
-                  101,
-                  99,
-                  116,
-                  105,
-                  111,
-                  110,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "global_state",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  108,
-                  111,
-                  98,
-                  97,
-                  108,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  101
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "user_nft",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  117,
-                  115,
-                  101,
-                  114,
-                  95,
-                  110,
-                  102,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "user"
-              }
-            ]
-          }
-        },
-        {
-          "name": "user_token_account",
-          "docs": [
-            "Token Account de l'utilisateur (source)"
-          ],
-          "writable": true
-        },
-        {
-          "name": "vault_token_account",
-          "docs": [
-            "Vault PDA pour stocker les tokens verrouillés"
-          ],
-          "writable": true
-        },
-        {
-          "name": "vault_authority",
-          "docs": [
-            "Autorité du vault (PDA)"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  97,
-                  117,
-                  108,
-                  116,
-                  95,
-                  97,
-                  117,
-                  116,
-                  104,
-                  111,
-                  114,
-                  105,
-                  116,
-                  121
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "back_mint",
-          "docs": [
-            "Mint du token BACK (Token-2022)"
-          ]
-        },
-        {
-          "name": "user",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "token_program",
-          "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
-        },
-        {
-          "name": "associated_token_program",
-          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "amount",
-          "type": "u64"
-        },
-        {
-          "name": "lock_duration",
-          "type": "i64"
-        }
-      ]
     },
     {
       "name": "mint_level_nft",
@@ -417,134 +242,6 @@
       ]
     },
     {
-      "name": "unlock_tokens",
-      "docs": [
-        "Unlock des tokens BACK et retour vers l'utilisateur",
-        "Permet l'unlock anticipé avec une pénalité de 1,5% des tokens brûlés"
-      ],
-      "discriminator": [
-        233,
-        35,
-        95,
-        159,
-        37,
-        185,
-        47,
-        88
-      ],
-      "accounts": [
-        {
-          "name": "user_nft",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  117,
-                  115,
-                  101,
-                  114,
-                  95,
-                  110,
-                  102,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "user"
-              }
-            ]
-          }
-        },
-        {
-          "name": "global_state",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  108,
-                  111,
-                  98,
-                  97,
-                  108,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  101
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "user_token_account",
-          "docs": [
-            "Token Account de l'utilisateur (destination)"
-          ],
-          "writable": true
-        },
-        {
-          "name": "vault_token_account",
-          "docs": [
-            "Vault PDA qui contient les tokens verrouillés"
-          ],
-          "writable": true
-        },
-        {
-          "name": "vault_authority",
-          "docs": [
-            "Autorité du vault (PDA)"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  97,
-                  117,
-                  108,
-                  116,
-                  95,
-                  97,
-                  117,
-                  116,
-                  104,
-                  111,
-                  114,
-                  105,
-                  116,
-                  121
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "back_mint",
-          "docs": [
-            "Mint du token BACK (Token-2022)"
-          ]
-        },
-        {
-          "name": "user",
-          "signer": true
-        },
-        {
-          "name": "token_program",
-          "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "update_nft_status",
       "docs": [
         "Met à jour le statut d'un NFT (lors du unlock)"
@@ -635,7 +332,12 @@
         157,
         106,
         255
-      ]
+      ],
+      "type": {
+        "defined": {
+          "name": "CollectionConfig"
+        }
+      }
     },
     {
       "name": "GlobalState",
@@ -648,7 +350,12 @@
         123,
         133,
         98
-      ]
+      ],
+      "type": {
+        "defined": {
+          "name": "GlobalState"
+        }
+      }
     },
     {
       "name": "UserNft",
@@ -661,7 +368,12 @@
         180,
         173,
         226
-      ]
+      ],
+      "type": {
+        "defined": {
+          "name": "UserNft"
+        }
+      }
     }
   ],
   "events": [
@@ -690,32 +402,6 @@
         55,
         16
       ]
-    },
-    {
-      "name": "TokensLocked",
-      "discriminator": [
-        63,
-        184,
-        201,
-        20,
-        203,
-        194,
-        249,
-        138
-      ]
-    },
-    {
-      "name": "TokensUnlocked",
-      "discriminator": [
-        32,
-        143,
-        250,
-        162,
-        63,
-        131,
-        83,
-        163
-      ]
     }
   ],
   "errors": [
@@ -733,16 +419,6 @@
       "code": 6002,
       "name": "MathOverflow",
       "msg": "Dépassement arithmétique"
-    },
-    {
-      "code": 6003,
-      "name": "LockNotExpired",
-      "msg": "Période de verrouillage non expirée"
-    },
-    {
-      "code": 6004,
-      "name": "AlreadyUnlocked",
-      "msg": "Déjà déverrouillé"
     }
   ],
   "types": [
@@ -877,62 +553,6 @@
           {
             "name": "is_active",
             "type": "bool"
-          },
-          {
-            "name": "timestamp",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "TokensLocked",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "user",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "level",
-            "type": {
-              "defined": {
-                "name": "LockLevel"
-              }
-            }
-          },
-          {
-            "name": "boost",
-            "type": "u16"
-          },
-          {
-            "name": "unlock_time",
-            "type": "i64"
-          },
-          {
-            "name": "timestamp",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "TokensUnlocked",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "user",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
           },
           {
             "name": "timestamp",

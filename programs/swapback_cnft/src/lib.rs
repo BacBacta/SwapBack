@@ -3,7 +3,7 @@ use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token_2022::{transfer_checked, Token2022, TransferChecked};
 use anchor_spl::token_interface::{Mint, TokenAccount};
 
-// Program ID - Matches keypair in target/deploy/swapback_cnft-keypair.json
+// Program ID - Deployed Nov 14, 2025 with Rust 1.75.0 + Cargo.lock v3
 declare_id!("AaN2BwpGWbvDo7NHfpyC6zGYxsbg2xtcikToW9xYy4Xq");
 
 #[program]
