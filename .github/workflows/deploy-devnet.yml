@@ -18,7 +18,7 @@ jobs:
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.75.0
+          toolchain: 1.76.0
           components: rust-src
       
       - name: Install Solana CLI
@@ -41,11 +41,8 @@ jobs:
         run: |
           export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           cd programs/swapback_cnft
-          cargo build-sbf || {
-            echo "⚠️ cargo build-sbf failed, using pre-built binary"
-            mkdir -p ../../target/sbf-solana-solana/release
-            cp ../artifacts/swapback_cnft.so ../../target/sbf-solana-solana/release/
-          }
+          cargo build-sbf
+          ls -lh ../../target/sbf-solana-solana/release/swapback_cnft.so
       
       - name: Check artifact
         run: |
