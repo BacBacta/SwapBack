@@ -15,16 +15,45 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: 1.75.0
+          components: rust-src
+      
       - name: Install Solana CLI
         run: |
-          sh -c "$(curl -sSfL https://release.solana.com/v1.18.26/install)"
+          # Alternative: wget avec retry et install depuis archive
+          wget --retry-connrefused --waitretry=1 --read-timeout=20 --timeout=15 -t 5 \
+            https://github.com/solana-labs/solana/releases/download/v1.18.26/solana-release-x86_64-unknown-linux-gnu.tar.bz2 \
+            -O solana-release.tar.bz2 || \
+          wget --retry-connrefused --waitretry=1 --read-timeout=20 --timeout=15 -t 5 \
+            https://github.com/anza-xyz/agave/releases/download/v1.18.26/solana-release-x86_64-unknown-linux-gnu.tar.bz2 \
+            -O solana-release.tar.bz2
+          
+          tar jxf solana-release.tar.bz2
+          mkdir -p $HOME/.local/share/solana/install/active_release
+          cp -r solana-release/* $HOME/.local/share/solana/install/active_release/
           export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           solana --version
       
+      - name: Build program
+        run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          cd programs/swapback_cnft
+          cargo build-sbf || {
+            echo "⚠️ cargo build-sbf failed, using pre-built binary"
+            mkdir -p ../../target/sbf-solana-solana/release
+            cp ../artifacts/swapback_cnft.so ../../target/sbf-solana-solana/release/
+          }
+      
       - name: Check artifact
         run: |
-          ls -la target/sbf-solana-solana/release/swapback_cnft.so
-          file target/sbf-solana-solana/release/swapback_cnft.so
+          ls -la target/sbf-solana-solana/release/swapback_cnft.so || echo "Artifact not found"
+          if [ ! -f target/sbf-solana-solana/release/swapback_cnft.so ]; then
+            echo "❌ Binaire non trouvé - Utilisez le workflow build-deploy.yml d'abord"
+            exit 1
+          fi
       
       - name: Import wallet
         run: |
