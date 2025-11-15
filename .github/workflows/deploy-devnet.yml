@@ -42,10 +42,11 @@ jobs:
           export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           cd programs/swapback_cnft
           
-          # Downgrade ALL toml dependencies pour Rust 1.75
-          cargo update toml_datetime@0.7.3 --precise 0.6.3
-          cargo update toml_datetime@0.6.11 --precise 0.6.3
+          # Downgrade toml dependencies pour Rust 1.75
+          # Chaîne: proc-macro-crate -> toml_edit -> toml_datetime
+          cargo update proc-macro-crate --precise 3.1.0
           cargo update toml_edit --precise 0.20.2
+          cargo update toml_datetime --precise 0.6.3
           
           cargo build-sbf
           ls -lh ../../target/sbf-solana-solana/release/swapback_cnft.so
