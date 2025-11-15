@@ -1,0 +1,76 @@
+name: Deploy to Devnet
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_deployment:
+        description: 'Confirmer le déploiement'
+        required: true
+        default: 'false'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.solana.com/v1.18.26/install)"
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          solana --version
+      
+      - name: Check artifact
+        run: |
+          ls -la target/sbf-solana-solana/release/swapback_cnft.so
+          file target/sbf-solana-solana/release/swapback_cnft.so
+      
+      - name: Import wallet
+        run: |
+          mkdir -p ~/.config/solana
+          echo '${{ secrets.DEVNET_WALLET }}' > ~/.config/solana/devnet-keypair.json
+          echo '${{ secrets.DEVNET_PROGRAM_KEYPAIR }}' > ~/.config/solana/program-keypair.json
+      
+      - name: Configure Solana
+        run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          solana config set --url https://api.devnet.solana.com
+          solana config get
+      
+      - name: Check balance
+        run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          solana balance -k ~/.config/solana/devnet-keypair.json
+      
+      - name: Deploy program
+        if: github.event.inputs.confirm_deployment == 'true'
+        run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          solana program deploy target/sbf-solana-solana/release/swapback_cnft.so \
+            --program-id ~/.config/solana/program-keypair.json \
+            -k ~/.config/solana/devnet-keypair.json \
+            --url https://api.devnet.solana.com
+      
+      - name: Verify deployment
+        run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          solana program show GEkXCcq87yUjQSp5EqcWf7bw9GKrB39A1LWdsE7V3V2E \
+            --url https://api.devnet.solana.com
+      
+      - name: Generate deployment report
+        if: always()
+        run: |
+          echo "# Deployment Report" > deployment-report.md
+          echo "" >> deployment-report.md
+          echo "**Program ID:** GEkXCcq87yUjQSp5EqcWf7bw9GKrB39A1LWdsE7V3V2E" >> deployment-report.md
+          echo "**Network:** Devnet" >> deployment-report.md
+          echo "**Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> deployment-report.md
+          echo "**Binary Size:** $(stat --format=%s target/sbf-solana-solana/release/swapback_cnft.so) bytes" >> deployment-report.md
+      
+      - name: Upload deployment report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-report
+          path: deployment-report.md

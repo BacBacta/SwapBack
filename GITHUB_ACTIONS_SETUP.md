@@ -23,16 +23,30 @@ https://github.com/BacBacta/SwapBack/settings/secrets/actions
 - ✅ Si présent : passez à l'Étape 2
 - ❌ Si absent : continuez ci-dessous
 
-### 1.3 Créer le secret (si nécessaire)
+### 1.3 Créer les secrets (si nécessaire)
+
+#### Secret 1: DEVNET_WALLET
 1. Cliquez sur **"New repository secret"**
-2. **Name :** `SOLANA_DEVNET_KEYPAIR`
-3. **Value :** Copiez EXACTEMENT cette ligne (sans guillemets) :
+2. **Name :** `DEVNET_WALLET`
+3. **Value :** Copiez EXACTEMENT cette ligne (sans guillemets ni crochets supplémentaires) :
 ```
-[121,51,43,44,196,12,42,101,237,153,148,183,28,46,218,217,111,10,96,56,158,226,88,182,52,132,230,180,209,20,234,189,178,73,199,26,102,157,89,95,149,154,12,255,70,196,167,59,203,120,72,235,154,205,183,201,112,177,220,4,54,12,109,12]
+[90,26,218,77,239,187,24,160,170,87,205,64,8,18,240,143,187,138,116,91,122,90,31,210,209,253,191,253,32,251,224,81,180,195,214,219,68,27,121,67,47,86,39,53,229,178,235,253,76,3,234,196,203,138,156,142,148,236,168,23,35,45,59,40]
 ```
 4. Cliquez sur **"Add secret"**
 
-⚠️ **IMPORTANT :** Ne modifiez PAS le format, n'ajoutez PAS de guillemets !
+#### Secret 2: DEVNET_PROGRAM_KEYPAIR
+1. Cliquez sur **"New repository secret"**
+2. **Name :** `DEVNET_PROGRAM_KEYPAIR`
+3. **Value :** Copiez EXACTEMENT cette ligne (sans guillemets ni crochets supplémentaires) :
+```
+[105,157,116,248,125,206,122,152,241,21,111,208,7,196,211,254,254,239,9,186,171,17,33,41,152,151,15,15,26,24,124,235,226,101,16,60,73,102,207,168,206,145,222,74,199,81,16,207,37,19,98,222,236,89,120,111,92,190,193,238,44,71,132,71]
+```
+4. Cliquez sur **"Add secret"**
+
+⚠️ **IMPORTANT :** 
+- Ne modifiez PAS le format des keypairs
+- N'ajoutez PAS de guillemets supplémentaires
+- Les deux secrets sont nécessaires pour le déploiement
 
 ---
 
@@ -41,14 +55,22 @@ https://github.com/BacBacta/SwapBack/settings/secrets/actions
 ### 2.1 Accéder au Workflow
 Ouvrez ce lien :
 ```
-https://github.com/BacBacta/SwapBack/actions/workflows/build-and-deploy-cnft.yml
+https://github.com/BacBacta/SwapBack/actions/workflows/deploy-devnet.yml
 ```
 
 ### 2.2 Déclencher le Workflow
 1. Cliquez sur le bouton **"Run workflow"** (en haut à droite, bouton bleu)
 2. **Branch :** Laissez `main` sélectionné ✅
-3. **Deploy to devnet after build :** ✅ **COCHEZ CETTE CASE** (très important !)
-4. Cliquez sur **"Run workflow"** (bouton vert)
+3. **confirm_deployment :** Saisissez `true` ✅
+4. Cliquez sur **"Run workflow"**
+
+Le workflow va automatiquement :
+- ✅ Installer Solana CLI v1.18.26
+- ✅ Charger les keypairs depuis les secrets
+- ✅ Vérifier le binaire compilé (swapback_cnft.so)
+- ✅ Vérifier le solde du wallet
+- ✅ Déployer le programme sur devnet
+- ✅ Générer un rapport de déploiement4. Cliquez sur **"Run workflow"** (bouton vert)
 
 ### 2.3 Monitorer l'Exécution
 - La page devrait se rafraîchir et afficher un nouveau workflow en cours
