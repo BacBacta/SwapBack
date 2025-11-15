@@ -43,13 +43,17 @@ jobs:
         run: |
           sh -c "$(curl -sSfL https://release.solana.com/${{ env.SOLANA_VERSION }}/install)"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
 
       - name: Verify Solana Installation
-        run: solana --version
+        run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          solana --version
 
       - name: Build Solana program
         working-directory: ./programs/swapback_cnft
         run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           echo "Building SwapBack cNFT program..."
           cargo-build-sbf --manifest-path Cargo.toml || {
             echo "cargo-build-sbf failed, using alternative build method..."
@@ -105,9 +109,11 @@ jobs:
         run: |
           sh -c "$(curl -sSfL https://release.solana.com/${{ env.SOLANA_VERSION }}/install)"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
 
       - name: Setup Solana CLI configuration
         run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           mkdir -p ~/.config/solana
           cat > ~/.config/solana/cli/config.yml << EOF
           json_rpc_url: https://api.devnet.solana.com
@@ -118,6 +124,7 @@ jobs:
 
       - name: Create devnet wallet from secret
         run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           mkdir -p /tmp
           echo "${{ secrets.SOLANA_DEVNET_KEYPAIR }}" > /tmp/devnet-keypair.json
           chmod 600 /tmp/devnet-keypair.json
@@ -127,6 +134,7 @@ jobs:
 
       - name: Check wallet balance
         run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           BALANCE=$(solana balance -k /tmp/devnet-keypair.json --url https://api.devnet.solana.com)
           echo "Wallet balance: $BALANCE"
           
@@ -141,6 +149,7 @@ jobs:
 
       - name: Deploy program to devnet
         run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           if [ ! -f "target/deploy/swapback_cnft-keypair.json" ]; then
             mkdir -p target/deploy
             solana-keygen new --no-bip39-passphrase -o target/deploy/swapback_cnft-keypair.json --force
