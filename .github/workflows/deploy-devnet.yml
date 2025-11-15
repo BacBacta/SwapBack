@@ -43,7 +43,7 @@ jobs:
           cd programs/swapback_cnft
           
           # Downgrade toml dependencies pour Rust 1.75
-          cargo update toml_datetime --precise 0.6.3
+          cargo update toml_datetime@0.7.3 --precise 0.6.3
           cargo update toml_edit --precise 0.20.2
           
           cargo build-sbf
