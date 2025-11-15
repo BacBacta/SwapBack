@@ -1,9 +1,9 @@
 [workspace]
 members = [
     "programs/swapback_cnft",
-    "programs/swapback_router",
 ]
 exclude = [
+    "programs/swapback_router",
     "programs/swapback_buyback",
     "programs/swapback_transfer_hook",
     "programs/common_swap",
