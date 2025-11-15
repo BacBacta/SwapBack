@@ -43,11 +43,11 @@ jobs:
           cd programs/swapback_cnft
           
           # Downgrade toml dependency chain pour Rust 1.75
-          cargo update -p proc-macro-crate:3.4.0 --precise 3.1.0
-          cargo update -p toml_edit:0.22.27 --precise 0.20.2
-          cargo update -p toml_edit:0.21.1 --precise 0.20.2
-          cargo update -p toml_datetime:0.7.3 --precise 0.6.3
-          cargo update -p toml_datetime:0.6.11 --precise 0.6.3
+            cargo update -p proc-macro-crate:3.4.0 --precise 3.1.0
+            cargo update -p toml_edit:0.23.7 --precise 0.22.27
+            cargo update -p toml_edit:0.21.1 --precise 0.21.1
+            cargo update -p toml_datetime:0.7.3 --precise 0.6.3
+            cargo update -p toml_datetime:0.6.11 --precise 0.6.3
           
           cargo build-sbf
           ls -lh ../../target/sbf-solana-solana/release/swapback_cnft.so
