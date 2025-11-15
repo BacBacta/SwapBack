@@ -65,12 +65,15 @@ jobs:
         run: |
           export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           solana config set --url https://api.devnet.solana.com
+          solana config set --keypair ~/.config/solana/devnet-keypair.json
           solana config get
       
       - name: Check balance
         run: |
           export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
-          solana balance -k ~/.config/solana/devnet-keypair.json
+          PUBKEY=$(solana-keygen pubkey ~/.config/solana/devnet-keypair.json)
+          echo "Wallet address: $PUBKEY"
+          solana balance $PUBKEY --url https://api.devnet.solana.com
       
       - name: Deploy program
         if: github.event.inputs.confirm_deployment == 'true'
@@ -78,7 +81,7 @@ jobs:
           export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           solana program deploy target/sbf-solana-solana/release/swapback_cnft.so \
             --program-id ~/.config/solana/program-keypair.json \
-            -k ~/.config/solana/devnet-keypair.json \
+            --keypair ~/.config/solana/devnet-keypair.json \
             --url https://api.devnet.solana.com
       
       - name: Verify deployment
