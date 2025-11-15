@@ -9,6 +9,7 @@ on:
 env:
   RUST_BACKTRACE: 1
   SOLANA_VERSION: v1.18.26
+  BUILD_VERSION: v2
 
 jobs:
   build:
