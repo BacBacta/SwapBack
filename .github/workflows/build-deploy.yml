@@ -149,104 +149,31 @@ jobs:
           name: deployment-package
           path: ./deployment
 
-      - name: Install Solana CLI
-        run: |
-          # Install Solana CLI from GitHub releases directly
-          SOLANA_VERSION="v1.18.26"
-          SOLANA_RELEASE_URL="https://github.com/anza-xyz/agave/releases/download/${SOLANA_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2"
-          
-          echo "Downloading Solana CLI from: $SOLANA_RELEASE_URL"
-          wget -q "$SOLANA_RELEASE_URL" -O solana-release.tar.bz2
-          tar -xjf solana-release.tar.bz2
-          sudo mv solana-release/bin/* /usr/local/bin/
-          solana --version
-
-      - name: Setup Solana CLI configuration
-        run: |
-          mkdir -p ~/.config/solana
-          cat > ~/.config/solana/cli/config.yml << EOF
-          json_rpc_url: https://api.devnet.solana.com
-          websocket_url: wss://api.devnet.solana.com/
-          keypair_path: /tmp/devnet-keypair.json
-          commitment: confirmed
-          EOF
-
-      - name: Create devnet wallet from secret
-        run: |
-          mkdir -p /tmp
-          echo "${{ secrets.SOLANA_DEVNET_KEYPAIR }}" > /tmp/devnet-keypair.json
-          chmod 600 /tmp/devnet-keypair.json
-          
-          # Verify wallet
-          solana address -k /tmp/devnet-keypair.json
-
-      - name: Check wallet balance
-        run: |
-          BALANCE=$(solana balance -k /tmp/devnet-keypair.json --url https://api.devnet.solana.com)
-          echo "Wallet balance: $BALANCE"
-          
-          if [[ "$BALANCE" == *"0 SOL"* ]]; then
-            echo "⚠️  Low balance, requesting airdrop..."
-            solana airdrop 2 -k /tmp/devnet-keypair.json --url https://api.devnet.solana.com || true
-          fi
-
-      - name: Copy .so file
-        run: |
-          cp deployment/swapback_cnft.so programs/swapback_cnft/target/sbf-solana-solana/release/ || mkdir -p programs/swapback_cnft/target/sbf-solana-solana/release && cp deployment/swapback_cnft.so programs/swapback_cnft/target/sbf-solana-solana/release/
-
-      - name: Deploy program to devnet
-        run: |
-          if [ ! -f "target/deploy/swapback_cnft-keypair.json" ]; then
-            mkdir -p target/deploy
-            solana-keygen new --no-bip39-passphrase -o target/deploy/swapback_cnft-keypair.json --force
-          fi
-          
-          PROGRAM_ID=$(solana-keygen pubkey target/deploy/swapback_cnft-keypair.json)
-          echo "Program ID: $PROGRAM_ID"
-          
-          solana program deploy \
-            --program-id target/deploy/swapback_cnft-keypair.json \
-            programs/swapback_cnft/target/sbf-solana-solana/release/swapback_cnft.so \
-            --url https://api.devnet.solana.com \
-            -k /tmp/devnet-keypair.json || {
-            echo "⚠️  Deployment failed, continuing..."
-          }
-
-      - name: Update frontend with new Program ID
-        run: |
-          PROGRAM_ID=$(solana-keygen pubkey target/deploy/swapback_cnft-keypair.json)
-          echo "Updating frontend with Program ID: $PROGRAM_ID"
-          
-          # Update environment files
-          sed -i "s/VITE_PROGRAM_ID=.*/VITE_PROGRAM_ID=$PROGRAM_ID/" .env.production || true
-          sed -i "s/REACT_APP_PROGRAM_ID=.*/REACT_APP_PROGRAM_ID=$PROGRAM_ID/" .env.production || true
-          
-          echo "Frontend updated"
-
       - name: Create deployment summary
         run: |
           cat > DEPLOYMENT_SUMMARY.txt << EOF
           ============================================
-          ✅ DEPLOYMENT SUCCESSFUL
+          ✅ BUILD SUCCESSFUL - READY FOR DEPLOYMENT
           ============================================
           
           Date: $(date)
           Branch: ${{ github.ref }}
           Commit: ${{ github.sha }}
           
-          Program Details:
-          - Program ID: $(solana-keygen pubkey target/deploy/swapback_cnft-keypair.json)
-          - Network: Devnet
-          - RPC: https://api.devnet.solana.com
+          Program Binary:
+          - File: swapback_cnft.so
+          - Status: Successfully compiled
+          - Location: deployment/swapback_cnft.so
           
-          Artifacts:
-          - Binary: swapback_cnft.so
-          - Size: $(ls -lh programs/swapback_cnft/target/sbf-solana-solana/release/swapback_cnft.so | awk '{print $5}')
-          
-          Next Steps:
-          1. Verify deployment on devnet
-          2. Run initialization: ts-node scripts/init-cnft.ts
-          3. Run tests: ts-node scripts/test-lock-unlock.ts
+          Deployment Instructions:
+          1. Download the swapback_cnft.so from artifacts
+          2. Generate program keypair:
+             solana-keygen new --no-bip39-passphrase -o swapback-keypair.json
+          3. Deploy to devnet:
+             solana program deploy swapback_cnft.so \\
+               --program-id swapback-keypair.json \\
+               --url https://api.devnet.solana.com \\
+               -k devnet-keypair.json
           
           ============================================
           EOF
