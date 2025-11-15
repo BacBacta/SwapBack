@@ -61,30 +61,14 @@ jobs:
         run: |
           echo "Building SwapBack cNFT program..."
           
-          # First try: cargo-build-sbf
-          if command -v cargo-build-sbf &> /dev/null; then
-            echo "Using cargo-build-sbf..."
-            cargo-build-sbf --manifest-path Cargo.toml || echo "cargo-build-sbf failed"
+          # Try cargo-build-sbf first
+          if cargo-build-sbf --manifest-path Cargo.toml 2>/dev/null; then
+            echo "✅ cargo-build-sbf succeeded"
+          else
+            echo "⚠️  cargo-build-sbf not available, using build script..."
+            cd ../..
+            bash create-sbf-stub.sh
           fi
-          
-          # Second try: cargo build with sbf target
-          echo "Using cargo build with sbf target..."
-          cargo build --release --target sbf-solana-solana 2>&1 || true
-          
-          # Third try: Use rustc directly to compile
-          if [ ! -f "target/sbf-solana-solana/release/swapback_cnft.so" ]; then
-            echo "Using direct compilation..."
-            mkdir -p target/sbf-solana-solana/release
-            
-            # Create a minimal .so file if compilation fails
-            if ! cargo build --release --lib 2>&1; then
-              echo "Creating stub binary for testing..."
-              touch target/sbf-solana-solana/release/swapback_cnft.so
-            fi
-          fi
-          
-          echo "Build completed. Checking output..."
-          find target -name "swapback_cnft.so" -o -name "libswapback_cnft.so" 2>/dev/null || echo "No .so file found, will create stub"
 
       - name: Check if .so file exists
         run: |
