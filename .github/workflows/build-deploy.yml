@@ -41,19 +41,19 @@ jobs:
 
       - name: Install Solana CLI
         run: |
-          sh -c "$(curl -sSfL https://release.solana.com/${{ env.SOLANA_VERSION }}/install)"
-          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
-          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          # Install Solana CLI using apt
+          sudo bash -c "echo 'deb [signed-by=/usr/share/keyrings/solana-keyring.gpg] https://packages.solana.com/ stable main' > /etc/apt/sources.list.d/solana.list"
+          sudo wget -O /usr/share/keyrings/solana-keyring.gpg https://packages.solana.com/solana.gpg
+          sudo apt update && sudo apt install -y solana
+          solana --version
 
       - name: Verify Solana Installation
         run: |
-          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           solana --version
 
       - name: Build Solana program
         working-directory: ./programs/swapback_cnft
         run: |
-          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           echo "Building SwapBack cNFT program..."
           cargo-build-sbf --manifest-path Cargo.toml || {
             echo "cargo-build-sbf failed, using alternative build method..."
@@ -107,13 +107,14 @@ jobs:
 
       - name: Install Solana CLI
         run: |
-          sh -c "$(curl -sSfL https://release.solana.com/${{ env.SOLANA_VERSION }}/install)"
-          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
-          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          # Install Solana CLI using apt
+          sudo bash -c "echo 'deb [signed-by=/usr/share/keyrings/solana-keyring.gpg] https://packages.solana.com/ stable main' > /etc/apt/sources.list.d/solana.list"
+          sudo wget -O /usr/share/keyrings/solana-keyring.gpg https://packages.solana.com/solana.gpg
+          sudo apt update && sudo apt install -y solana
+          solana --version
 
       - name: Setup Solana CLI configuration
         run: |
-          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           mkdir -p ~/.config/solana
           cat > ~/.config/solana/cli/config.yml << EOF
           json_rpc_url: https://api.devnet.solana.com
@@ -124,7 +125,6 @@ jobs:
 
       - name: Create devnet wallet from secret
         run: |
-          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           mkdir -p /tmp
           echo "${{ secrets.SOLANA_DEVNET_KEYPAIR }}" > /tmp/devnet-keypair.json
           chmod 600 /tmp/devnet-keypair.json
@@ -134,7 +134,6 @@ jobs:
 
       - name: Check wallet balance
         run: |
-          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           BALANCE=$(solana balance -k /tmp/devnet-keypair.json --url https://api.devnet.solana.com)
           echo "Wallet balance: $BALANCE"
           
@@ -149,7 +148,6 @@ jobs:
 
       - name: Deploy program to devnet
         run: |
-          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           if [ ! -f "target/deploy/swapback_cnft-keypair.json" ]; then
             mkdir -p target/deploy
             solana-keygen new --no-bip39-passphrase -o target/deploy/swapback_cnft-keypair.json --force
