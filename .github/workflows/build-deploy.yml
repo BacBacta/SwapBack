@@ -41,10 +41,14 @@ jobs:
 
       - name: Install Solana CLI
         run: |
-          # Install Solana CLI using apt
-          sudo bash -c "echo 'deb [signed-by=/usr/share/keyrings/solana-keyring.gpg] https://packages.solana.com/ stable main' > /etc/apt/sources.list.d/solana.list"
-          sudo wget -O /usr/share/keyrings/solana-keyring.gpg https://packages.solana.com/solana.gpg
-          sudo apt update && sudo apt install -y solana
+          # Install Solana CLI from GitHub releases directly
+          SOLANA_VERSION="v1.18.26"
+          SOLANA_RELEASE_URL="https://github.com/anza-xyz/agave/releases/download/${SOLANA_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2"
+          
+          echo "Downloading Solana CLI from: $SOLANA_RELEASE_URL"
+          wget -q "$SOLANA_RELEASE_URL" -O solana-release.tar.bz2
+          tar -xjf solana-release.tar.bz2
+          sudo mv solana-release/bin/* /usr/local/bin/
           solana --version
 
       - name: Verify Solana Installation
@@ -107,10 +111,14 @@ jobs:
 
       - name: Install Solana CLI
         run: |
-          # Install Solana CLI using apt
-          sudo bash -c "echo 'deb [signed-by=/usr/share/keyrings/solana-keyring.gpg] https://packages.solana.com/ stable main' > /etc/apt/sources.list.d/solana.list"
-          sudo wget -O /usr/share/keyrings/solana-keyring.gpg https://packages.solana.com/solana.gpg
-          sudo apt update && sudo apt install -y solana
+          # Install Solana CLI from GitHub releases directly
+          SOLANA_VERSION="v1.18.26"
+          SOLANA_RELEASE_URL="https://github.com/anza-xyz/agave/releases/download/${SOLANA_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2"
+          
+          echo "Downloading Solana CLI from: $SOLANA_RELEASE_URL"
+          wget -q "$SOLANA_RELEASE_URL" -O solana-release.tar.bz2
+          tar -xjf solana-release.tar.bz2
+          sudo mv solana-release/bin/* /usr/local/bin/
           solana --version
 
       - name: Setup Solana CLI configuration
