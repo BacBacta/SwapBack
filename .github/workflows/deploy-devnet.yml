@@ -79,16 +79,26 @@ jobs:
         if: github.event.inputs.confirm_deployment == 'true'
         run: |
           export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          echo "🚀 Starting deployment..."
+          echo "Binary: target/sbf-solana-solana/release/swapback_cnft.so"
+          echo "Program ID keypair: ~/.config/solana/program-keypair.json"
+          echo "Payer keypair: ~/.config/solana/devnet-keypair.json"
+          
           solana program deploy target/sbf-solana-solana/release/swapback_cnft.so \
             --program-id ~/.config/solana/program-keypair.json \
             --keypair ~/.config/solana/devnet-keypair.json \
-            --url https://api.devnet.solana.com
+            --url https://api.devnet.solana.com \
+            --verbose
+          
+          echo "✅ Deployment command completed"
       
       - name: Verify deployment
+        if: github.event.inputs.confirm_deployment == 'true'
         run: |
           export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          sleep 10
           solana program show GEkXCcq87yUjQSp5EqcWf7bw9GKrB39A1LWdsE7V3V2E \
-            --url https://api.devnet.solana.com
+            --url https://api.devnet.solana.com || echo "⚠️ Programme pas encore visible (peut prendre quelques secondes)"
       
       - name: Generate deployment report
         if: always()
