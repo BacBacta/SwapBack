@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token_2022::{transfer_checked, Token2022, TransferChecked};
+use anchor_spl::token::{transfer_checked, Token, TransferChecked};
 use anchor_spl::token_interface::{Mint, TokenAccount};
 
 // ⚠️ IMPORTANT: Ce program ID sera généré lors du premier build
@@ -355,7 +355,7 @@ pub struct LockTokens<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
 
-    pub token_program: Program<'info, Token2022>,
+    pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
@@ -393,7 +393,7 @@ pub struct UnlockTokens<'info> {
 
     pub user: Signer<'info>,
 
-    pub token_program: Program<'info, Token2022>,
+    pub token_program: Program<'info, Token>,
 }
 
 // ============================================================================
