@@ -185,7 +185,7 @@ export function getGlobalStatePDA(): [PublicKey, number] {
  */
 export function getUserNftPDA(userPubkey: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("user_nft"), userPubkey.toBuffer()],
+    [Buffer.from("user_lock"), userPubkey.toBuffer()],
     getCnftProgramId()
   );
 }

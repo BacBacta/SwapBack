@@ -322,11 +322,11 @@ export async function createUnlockTokensTransaction(
 
   // Dériver les PDAs
   console.log('🔍 [UNLOCK TX] Deriving PDAs...');
-  const [userNft] = PublicKey.findProgramAddressSync(
-    [Buffer.from("user_nft"), wallet.publicKey.toBuffer()],
+  const [userLock] = PublicKey.findProgramAddressSync(
+    [Buffer.from("user_lock"), wallet.publicKey.toBuffer()],
     CNFT_PROGRAM_ID
   );
-  console.log('✅ [UNLOCK TX] User NFT:', userNft.toString());
+  console.log('✅ [UNLOCK TX] User Lock:', userLock.toString());
 
   const [globalState] = PublicKey.findProgramAddressSync(
     [Buffer.from("global_state")],
@@ -361,29 +361,29 @@ export async function createUnlockTokensTransaction(
   // Construire l'instruction
   console.log('🔍 [UNLOCK TX] Building instruction...');
   console.log('📋 [UNLOCK TX] Accounts in order:', {
-    '1_userNft': userNft.toString(),
+    '1_userLock': userLock.toString(),
     '2_globalState': globalState.toString(),
     '3_userTokenAccount': userTokenAccount.toString(),
     '4_vaultTokenAccount': vaultTokenAccount.toString(),
     '5_vaultAuthority': vaultAuthority.toString(),
     '6_backMint': BACK_MINT.toString(),
     '7_user': wallet.publicKey.toString(),
-    '8_tokenProgram': TOKEN_2022_PROGRAM_ID.toString(),
+    '8_tokenProgram': TOKEN_PROGRAM_ID.toString(),
   });
   
   try {
-    // Use update_nft_status instruction (the actual instruction name in the IDL)
+    // Use unlock_tokens instruction (the actual instruction name in the program)
     const instruction = await program.methods
-      .updateNftStatus()
+      .unlockTokens()
       .accounts({
-        userNft,
+        userLock,
         globalState,
         userTokenAccount,
         vaultTokenAccount,
         vaultAuthority,
         backMint: BACK_MINT,
         user: wallet.publicKey,
-        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        tokenProgram: TOKEN_PROGRAM_ID,
       })
       .instruction();
 

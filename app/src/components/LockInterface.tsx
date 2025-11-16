@@ -221,12 +221,12 @@ export default function LockInterface({
             "AaN2BwpGWbvDo7NHfpyC6zGYxsbg2xtcikToW9xYy4Xq"
         );
 
-        const [userNftPda] = PublicKey.findProgramAddressSync(
-          [Buffer.from("user_nft"), publicKey.toBuffer()],
+        const [userLockPda] = PublicKey.findProgramAddressSync(
+          [Buffer.from("user_lock"), publicKey.toBuffer()],
           CNFT_PROGRAM_ID
         );
 
-        const accountInfo = await connection.getAccountInfo(userNftPda);
+        const accountInfo = await connection.getAccountInfo(userLockPda);
 
         if (accountInfo && accountInfo.data.length > 0) {
           // Le NFT existe, lire ses données
@@ -555,7 +555,7 @@ export default function LockInterface({
           );
 
           const [userNftPda] = PublicKey.findProgramAddressSync(
-            [Buffer.from("user_nft"), publicKey.toBuffer()],
+            [Buffer.from("user_lock"), publicKey.toBuffer()],
             CNFT_PROGRAM_ID
           );
 
