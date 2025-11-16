@@ -13,6 +13,7 @@ import UnlockInterface from "./UnlockInterface";
 import { logError } from "@/lib/errorLogger";
 // Import charts directly instead of lazy loading to avoid chunk errors
 import { VolumeChart, ActivityChart } from "./Charts";
+import RevenueAdminPanel from "./RevenueAdminPanel";
 
 export const Dashboard = () => {
   const { connected, publicKey } = useWallet();
@@ -221,6 +222,8 @@ export const Dashboard = () => {
           unlockDate={new Date(cnftData.unlockTime * 1000)}
         />
       )}
+
+      <RevenueAdminPanel />
 
       {/* Tabs Navigation */}
       <div className="flex gap-1 p-1 bg-gray-900 rounded-xl border border-[var(--primary)]/20">

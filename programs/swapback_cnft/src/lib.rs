@@ -7,6 +7,56 @@ use anchor_spl::token_interface::{Mint, TokenAccount};
 // Ne PAS hardcoder l'ancien ID ici - laisser Anchor le générer
 declare_id!("GEkXCcq87yUjQSp5EqcWf7bw9GKrB39A1LWdsE7V3V2E");
 
+// ============================================================================
+// CONSTANTES ÉCONOMIQUES
+// ============================================================================
+
+/// Frais de swap prélevés par le routeur (30 bps = 0.30 %)
+pub const PLATFORM_FEE_BPS: u64 = 30;
+pub const BASIS_POINTS_DIVISOR: u64 = 10_000;
+
+/// Répartition des frais de swap (Flux 1)
+pub const SWAP_TREASURY_SHARE_BPS: u64 = 8500; // 85 % pour la trésorerie
+pub const SWAP_BUYBACK_SHARE_BPS: u64 = 1500; // 15 % pour le buyback & burn
+
+/// Répartition des NPI générés par le routeur (Flux 2)
+pub const NPI_USER_SHARE_BPS: u64 = 7000; // 70 % pour l'utilisateur
+pub const NPI_TREASURY_SHARE_BPS: u64 = 2000; // 20 % pour la plateforme
+pub const NPI_BOOST_VAULT_BPS: u64 = 500; // 5 % pour le vault boost
+pub const NPI_BUYBACK_SHARE_BPS: u64 = 500; // 5 % pour buyback & burn
+
+/// Boosts maximaux en basis points
+pub const MAX_DURATION_BOOST_BPS: u64 = 500; // +5 %
+pub const MAX_AMOUNT_BOOST_BPS: u64 = 500; // +5 %
+pub const MAX_TOTAL_BOOST_BPS: u64 = 1000; // +10 % global
+
+/// Facteur d'échelle pour convertir les montants BACK (6 décimales)
+pub const BACK_DECIMALS: u64 = 1_000_000;
+
+/// Tiers de durée exprimés en jours
+pub const DURATION_TIER1_DAYS: u64 = 30;
+pub const DURATION_TIER2_DAYS: u64 = 90;
+pub const DURATION_TIER3_DAYS: u64 = 180;
+pub const DURATION_TIER4_DAYS: u64 = 365;
+
+/// Boost attribué par palier de durée
+pub const DURATION_TIER1_BPS: u64 = 50; // +0.5 %
+pub const DURATION_TIER2_BPS: u64 = 150; // +1.5 %
+pub const DURATION_TIER3_BPS: u64 = 300; // +3.0 %
+pub const DURATION_TIER4_BPS: u64 = 500; // +5.0 %
+
+/// Paliers de montants (BACK entiers)
+pub const AMOUNT_TIER1_MIN: u64 = 1_000;
+pub const AMOUNT_TIER2_MIN: u64 = 10_000;
+pub const AMOUNT_TIER3_MIN: u64 = 50_000;
+pub const AMOUNT_TIER4_MIN: u64 = 100_000;
+
+/// Boost attribué par palier de montant
+pub const AMOUNT_TIER1_BPS: u64 = 100; // +1.0 %
+pub const AMOUNT_TIER2_BPS: u64 = 200; // +2.0 %
+pub const AMOUNT_TIER3_BPS: u64 = 350; // +3.5 %
+pub const AMOUNT_TIER4_BPS: u64 = 500; // +5.0 %
+
 #[program]
 pub mod swapback_cnft {
     use super::*;
@@ -14,11 +64,21 @@ pub mod swapback_cnft {
     /// Initialise le GlobalState pour tracker les locks
     pub fn initialize_global_state(ctx: Context<InitializeGlobalState>) -> Result<()> {
         let global_state = &mut ctx.accounts.global_state;
-        
+
         global_state.authority = ctx.accounts.authority.key();
         global_state.total_community_boost = 0;
         global_state.active_locks_count = 0;
         global_state.total_value_locked = 0;
+        global_state.total_swap_volume = 0;
+        global_state.total_swap_fees_collected = 0;
+        global_state.swap_treasury_accrued = 0;
+        global_state.swap_buyback_accrued = 0;
+        global_state.total_npi_volume = 0;
+        global_state.npi_user_distributed = 0;
+        global_state.npi_treasury_accrued = 0;
+        global_state.npi_boost_vault_accrued = 0;
+        global_state.npi_boost_vault_distributed = 0;
+        global_state.npi_buyback_accrued = 0;
 
         msg!("✅ GlobalState initialisé");
         Ok(())
@@ -36,11 +96,7 @@ pub mod swapback_cnft {
     }
 
     /// Lock des tokens BACK avec calcul de boost
-    pub fn lock_tokens(
-        ctx: Context<LockTokens>,
-        amount: u64,
-        lock_duration: i64,
-    ) -> Result<()> {
+    pub fn lock_tokens(ctx: Context<LockTokens>, amount: u64, lock_duration: i64) -> Result<()> {
         require!(amount > 0, ErrorCode::InvalidAmount);
         require!(lock_duration >= 7 * 86400, ErrorCode::DurationTooShort); // Min 7 jours
 
@@ -48,7 +104,11 @@ pub mod swapback_cnft {
         let global_state = &mut ctx.accounts.global_state;
         let user_lock = &mut ctx.accounts.user_lock;
 
-        msg!("🔒 Lock tokens: amount={}, duration={}", amount, lock_duration);
+        msg!(
+            "🔒 Lock tokens: amount={}, duration={}",
+            amount,
+            lock_duration
+        );
 
         // Vérifier si c'est un nouveau lock ou un ajout
         let is_new_lock = user_lock.user == Pubkey::default();
@@ -57,7 +117,8 @@ pub mod swapback_cnft {
         let new_total_amount = if is_new_lock {
             amount
         } else {
-            user_lock.amount_locked
+            user_lock
+                .amount_locked
                 .checked_add(amount)
                 .ok_or(ErrorCode::MathOverflow)?
         };
@@ -74,7 +135,11 @@ pub mod swapback_cnft {
         let new_level = LockLevel::from_lock_params(new_total_amount, duration_days);
         let new_boost = calculate_boost(new_total_amount, max_duration);
 
-        msg!("📊 Nouveau niveau: {:?}, boost: {} BP", new_level, new_boost);
+        msg!(
+            "📊 Nouveau niveau: {:?}, boost: {} BP",
+            new_level,
+            new_boost
+        );
 
         // Si lock existant et actif, retirer l'ancien boost
         if !is_new_lock && user_lock.is_active {
@@ -94,7 +159,7 @@ pub mod swapback_cnft {
         user_lock.boost = new_boost;
         user_lock.lock_time = Clock::get()?.unix_timestamp;
         user_lock.is_active = true;
-        
+
         if is_new_lock {
             user_lock.bump = ctx.bumps.user_lock;
         }
@@ -114,9 +179,7 @@ pub mod swapback_cnft {
         global_state.total_community_boost = global_state
             .total_community_boost
             .saturating_add(new_boost as u64);
-        global_state.total_value_locked = global_state
-            .total_value_locked
-            .saturating_add(amount);
+        global_state.total_value_locked = global_state.total_value_locked.saturating_add(amount);
 
         // Transférer les tokens vers le vault
         let cpi_accounts = TransferChecked {
@@ -138,10 +201,11 @@ pub mod swapback_cnft {
             timestamp: Clock::get()?.unix_timestamp,
         });
 
-        msg!("✅ {} tokens BACK verrouillés - Niveau: {:?} - Boost: {}%",
-            amount / 1_000_000_000,
+        msg!(
+            "✅ {} BACK verrouillés - Niveau: {:?} - Boost: {:.2}%",
+            amount / BACK_DECIMALS,
             new_level,
-            new_boost / 100
+            (new_boost as f64) / 100.0
         );
 
         Ok(())
@@ -168,32 +232,37 @@ pub mod swapback_cnft {
         let safe_amount = user_lock.amount_locked.min(vault_balance);
 
         if safe_amount < user_lock.amount_locked {
-            msg!("⚠️ Vault insuffisant! Demandé: {}, Disponible: {}",
-                user_lock.amount_locked, vault_balance);
+            msg!(
+                "⚠️ Vault insuffisant! Demandé: {}, Disponible: {}",
+                user_lock.amount_locked,
+                vault_balance
+            );
         }
 
         // Calculer la pénalité si unlock anticipé (1.5%)
         let (user_amount, burn_amount) = if is_early_unlock {
             let penalty_bps = 150; // 1.5% = 150 basis points
-            let burn = (safe_amount * penalty_bps) / 10_000;
+            let burn = (safe_amount * penalty_bps) / BASIS_POINTS_DIVISOR;
             (safe_amount - burn, burn)
         } else {
             (safe_amount, 0)
         };
 
-        msg!("🔓 Unlock: total={}, user={}, burn={}, early={}",
-            safe_amount, user_amount, burn_amount, is_early_unlock);
+        msg!(
+            "🔓 Unlock: total={}, user={}, burn={}, early={}",
+            safe_amount,
+            user_amount,
+            burn_amount,
+            is_early_unlock
+        );
 
         // Mettre à jour les statistiques globales
         global_state.total_community_boost = global_state
             .total_community_boost
             .saturating_sub(user_lock.boost as u64);
-        global_state.active_locks_count = global_state
-            .active_locks_count
-            .saturating_sub(1);
-        global_state.total_value_locked = global_state
-            .total_value_locked
-            .saturating_sub(safe_amount);
+        global_state.active_locks_count = global_state.active_locks_count.saturating_sub(1);
+        global_state.total_value_locked =
+            global_state.total_value_locked.saturating_sub(safe_amount);
 
         // Transférer les tokens du vault à l'utilisateur
         if user_amount > 0 {
@@ -229,11 +298,149 @@ pub mod swapback_cnft {
             timestamp: Clock::get()?.unix_timestamp,
         });
 
-        msg!("✅ {} tokens déverrouillés - Pénalité: {} - Anticipé: {}",
-            user_amount / 1_000_000_000,
-            burn_amount / 1_000_000_000,
+        msg!(
+            "✅ {} BACK déverrouillés - Pénalité: {} - Anticipé: {}",
+            user_amount / BACK_DECIMALS,
+            burn_amount / BACK_DECIMALS,
             is_early_unlock
         );
+
+        Ok(())
+    }
+
+    /// Enregistre la répartition des frais de swap (Flux 1)
+    pub fn record_swap_fees(ctx: Context<RecordSwapFees>, swap_volume: u64) -> Result<()> {
+        require!(swap_volume > 0, ErrorCode::InvalidAmount);
+
+        let total_fee = swap_volume
+            .checked_mul(PLATFORM_FEE_BPS)
+            .ok_or(ErrorCode::MathOverflow)?
+            .checked_div(BASIS_POINTS_DIVISOR)
+            .ok_or(ErrorCode::MathOverflow)?;
+
+        let treasury_amount = total_fee
+            .checked_mul(SWAP_TREASURY_SHARE_BPS)
+            .ok_or(ErrorCode::MathOverflow)?
+            .checked_div(BASIS_POINTS_DIVISOR)
+            .ok_or(ErrorCode::MathOverflow)?;
+
+        let buyback_amount = total_fee
+            .checked_sub(treasury_amount)
+            .ok_or(ErrorCode::MathOverflow)?;
+
+        let global_state = &mut ctx.accounts.global_state;
+        global_state.total_swap_volume = global_state
+            .total_swap_volume
+            .checked_add(swap_volume)
+            .ok_or(ErrorCode::MathOverflow)?;
+        global_state.total_swap_fees_collected = global_state
+            .total_swap_fees_collected
+            .checked_add(total_fee)
+            .ok_or(ErrorCode::MathOverflow)?;
+        global_state.swap_treasury_accrued = global_state
+            .swap_treasury_accrued
+            .checked_add(treasury_amount)
+            .ok_or(ErrorCode::MathOverflow)?;
+        global_state.swap_buyback_accrued = global_state
+            .swap_buyback_accrued
+            .checked_add(buyback_amount)
+            .ok_or(ErrorCode::MathOverflow)?;
+
+        emit!(SwapFeesRecorded {
+            volume: swap_volume,
+            total_fee,
+            treasury_amount,
+            buyback_amount,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        Ok(())
+    }
+
+    /// Répartit les NPI du routeur (Flux 2)
+    pub fn distribute_npi(
+        ctx: Context<DistributeNpi>,
+        npi_amount: u64,
+        user_boost_bps: u16,
+    ) -> Result<()> {
+        require!(npi_amount > 0, ErrorCode::InvalidAmount);
+
+        let base_user_amount = npi_amount
+            .checked_mul(NPI_USER_SHARE_BPS)
+            .ok_or(ErrorCode::MathOverflow)?
+            .checked_div(BASIS_POINTS_DIVISOR)
+            .ok_or(ErrorCode::MathOverflow)?;
+
+        let treasury_amount = npi_amount
+            .checked_mul(NPI_TREASURY_SHARE_BPS)
+            .ok_or(ErrorCode::MathOverflow)?
+            .checked_div(BASIS_POINTS_DIVISOR)
+            .ok_or(ErrorCode::MathOverflow)?;
+
+        let boost_vault_allocation = npi_amount
+            .checked_mul(NPI_BOOST_VAULT_BPS)
+            .ok_or(ErrorCode::MathOverflow)?
+            .checked_div(BASIS_POINTS_DIVISOR)
+            .ok_or(ErrorCode::MathOverflow)?;
+
+        let buyback_amount = npi_amount
+            .checked_mul(NPI_BUYBACK_SHARE_BPS)
+            .ok_or(ErrorCode::MathOverflow)?
+            .checked_div(BASIS_POINTS_DIVISOR)
+            .ok_or(ErrorCode::MathOverflow)?;
+
+        let clamped_boost = (user_boost_bps as u64).min(MAX_TOTAL_BOOST_BPS);
+        let boost_bonus_target = base_user_amount
+            .checked_mul(clamped_boost)
+            .ok_or(ErrorCode::MathOverflow)?
+            .checked_div(BASIS_POINTS_DIVISOR)
+            .ok_or(ErrorCode::MathOverflow)?;
+        let boost_bonus = boost_bonus_target.min(boost_vault_allocation);
+        let total_user_amount = base_user_amount
+            .checked_add(boost_bonus)
+            .ok_or(ErrorCode::MathOverflow)?;
+        let remaining_boost_vault = boost_vault_allocation
+            .checked_sub(boost_bonus)
+            .ok_or(ErrorCode::MathOverflow)?;
+
+        let global_state = &mut ctx.accounts.global_state;
+        global_state.total_npi_volume = global_state
+            .total_npi_volume
+            .checked_add(npi_amount)
+            .ok_or(ErrorCode::MathOverflow)?;
+        global_state.npi_user_distributed = global_state
+            .npi_user_distributed
+            .checked_add(total_user_amount)
+            .ok_or(ErrorCode::MathOverflow)?;
+        global_state.npi_treasury_accrued = global_state
+            .npi_treasury_accrued
+            .checked_add(treasury_amount)
+            .ok_or(ErrorCode::MathOverflow)?;
+        global_state.npi_boost_vault_accrued = global_state
+            .npi_boost_vault_accrued
+            .checked_add(boost_vault_allocation)
+            .ok_or(ErrorCode::MathOverflow)?;
+        global_state.npi_boost_vault_distributed = global_state
+            .npi_boost_vault_distributed
+            .checked_add(boost_bonus)
+            .ok_or(ErrorCode::MathOverflow)?;
+        global_state.npi_buyback_accrued = global_state
+            .npi_buyback_accrued
+            .checked_add(buyback_amount)
+            .ok_or(ErrorCode::MathOverflow)?;
+
+        emit!(NpiDistributed {
+            total_npi: npi_amount,
+            user_base: base_user_amount,
+            user_boost_bonus: boost_bonus,
+            user_total: total_user_amount,
+            treasury_amount,
+            boost_vault_allocation,
+            remaining_boost_vault,
+            buyback_amount,
+            applied_boost_bps: clamped_boost as u16,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
 
         Ok(())
     }
@@ -258,7 +465,7 @@ impl anchor_lang::Space for LockLevel {
 
 impl LockLevel {
     pub fn from_lock_params(amount: u64, duration_days: u64) -> Self {
-        let amount_tokens = amount / 1_000_000_000;
+        let amount_tokens = amount / BACK_DECIMALS;
 
         if amount_tokens >= 100_000 && duration_days >= 365 {
             LockLevel::Diamond
@@ -396,6 +603,32 @@ pub struct UnlockTokens<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+#[derive(Accounts)]
+pub struct RecordSwapFees<'info> {
+    #[account(
+        mut,
+        seeds = [b"global_state"],
+        bump,
+        has_one = authority
+    )]
+    pub global_state: Account<'info, GlobalState>,
+
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct DistributeNpi<'info> {
+    #[account(
+        mut,
+        seeds = [b"global_state"],
+        bump,
+        has_one = authority
+    )]
+    pub global_state: Account<'info, GlobalState>,
+
+    pub authority: Signer<'info>,
+}
+
 // ============================================================================
 // STATE ACCOUNTS
 // ============================================================================
@@ -407,6 +640,16 @@ pub struct GlobalState {
     pub total_community_boost: u64,
     pub active_locks_count: u64,
     pub total_value_locked: u64,
+    pub total_swap_volume: u64,
+    pub total_swap_fees_collected: u64,
+    pub swap_treasury_accrued: u64,
+    pub swap_buyback_accrued: u64,
+    pub total_npi_volume: u64,
+    pub npi_user_distributed: u64,
+    pub npi_treasury_accrued: u64,
+    pub npi_boost_vault_accrued: u64,
+    pub npi_boost_vault_distributed: u64,
+    pub npi_buyback_accrued: u64,
 }
 
 #[account]
@@ -452,6 +695,29 @@ pub struct TokensUnlocked {
     pub timestamp: i64,
 }
 
+#[event]
+pub struct SwapFeesRecorded {
+    pub volume: u64,
+    pub total_fee: u64,
+    pub treasury_amount: u64,
+    pub buyback_amount: u64,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct NpiDistributed {
+    pub total_npi: u64,
+    pub user_base: u64,
+    pub user_boost_bonus: u64,
+    pub user_total: u64,
+    pub treasury_amount: u64,
+    pub boost_vault_allocation: u64,
+    pub remaining_boost_vault: u64,
+    pub buyback_amount: u64,
+    pub applied_boost_bps: u16,
+    pub timestamp: i64,
+}
+
 // ============================================================================
 // ERRORS
 // ============================================================================
@@ -474,20 +740,57 @@ pub enum ErrorCode {
 // UTILITAIRES
 // ============================================================================
 
-/// Calcule le boost dynamique basé sur montant et durée
-/// Max: 2000 basis points (20%)
+/// Calcule le boost dynamique basé sur la durée et le montant verrouillé
+/// Formule multiplicative: (boost_durée + boost_montant + produit croisé)
 fn calculate_boost(amount: u64, duration: i64) -> u16 {
-    let days = (duration / 86400) as u64;
-    let amount_tokens = amount / 1_000_000_000;
+    if amount == 0 || duration <= 0 {
+        return 0;
+    }
 
-    // Score montant: max 1000 BP (10%)
-    let amount_score = ((amount_tokens / 10_000) * 100).min(1000);
+    let days = (duration.max(0) as u64) / 86_400;
+    let amount_tokens = amount / BACK_DECIMALS;
 
-    // Score durée: max 1000 BP (10%)
-    let duration_score = ((days / 5) * 10).min(1000);
+    let duration_boost = duration_boost_from_days(days);
+    let amount_boost = amount_boost_from_tokens(amount_tokens);
+    let cross = duration_boost
+        .saturating_mul(amount_boost)
+        .checked_div(BASIS_POINTS_DIVISOR)
+        .unwrap_or(0);
 
-    // Total: max 2000 BP (20%)
-    (amount_score + duration_score).min(2000) as u16
+    let total = duration_boost
+        .saturating_add(amount_boost)
+        .saturating_add(cross)
+        .min(MAX_TOTAL_BOOST_BPS);
+
+    total as u16
+}
+
+fn duration_boost_from_days(days: u64) -> u64 {
+    if days >= DURATION_TIER4_DAYS {
+        DURATION_TIER4_BPS
+    } else if days >= DURATION_TIER3_DAYS {
+        DURATION_TIER3_BPS
+    } else if days >= DURATION_TIER2_DAYS {
+        DURATION_TIER2_BPS
+    } else if days >= DURATION_TIER1_DAYS {
+        DURATION_TIER1_BPS
+    } else {
+        0
+    }
+}
+
+fn amount_boost_from_tokens(amount_tokens: u64) -> u64 {
+    if amount_tokens >= AMOUNT_TIER4_MIN {
+        AMOUNT_TIER4_BPS
+    } else if amount_tokens >= AMOUNT_TIER3_MIN {
+        AMOUNT_TIER3_BPS
+    } else if amount_tokens >= AMOUNT_TIER2_MIN {
+        AMOUNT_TIER2_BPS
+    } else if amount_tokens >= AMOUNT_TIER1_MIN {
+        AMOUNT_TIER1_BPS
+    } else {
+        0
+    }
 }
 
 #[cfg(test)]
@@ -496,28 +799,28 @@ mod tests {
 
     #[test]
     fn test_boost_bronze() {
-        let amount = 1_000 * 1_000_000_000;
+        let amount = 1_000 * BACK_DECIMALS;
         let duration = 30 * 86400;
         let boost = calculate_boost(amount, duration);
-        assert_eq!(boost, 60); // 0.6%
+        assert_eq!(boost, 150); // 1.5%
     }
 
     #[test]
     fn test_boost_diamond() {
-        let amount = 100_000 * 1_000_000_000;
+        let amount = 100_000 * BACK_DECIMALS;
         let duration = 365 * 86400;
         let boost = calculate_boost(amount, duration);
-        assert_eq!(boost, 1730); // 17.3%
+        assert_eq!(boost, 1000); // 10.0% (cap)
     }
 
     #[test]
     fn test_level_assignment() {
         assert_eq!(
-            LockLevel::from_lock_params(1_000 * 1_000_000_000, 30),
+            LockLevel::from_lock_params(1_000 * BACK_DECIMALS, 30),
             LockLevel::Silver
         );
         assert_eq!(
-            LockLevel::from_lock_params(100_000 * 1_000_000_000, 365),
+            LockLevel::from_lock_params(100_000 * BACK_DECIMALS, 365),
             LockLevel::Diamond
         );
     }

@@ -4,14 +4,73 @@
     "name": "swapback_cnft",
     "version": "0.1.0",
     "spec": "0.1.0",
-    "description": "Programme de gestion des compressed NFTs pour les niveaux SwapBack",
-    "address": "GEkXCcq87yUjQSp5EqcWf7bw9GKrB39A1LWdsE7V3V2E"
+    "description": "Programme de gestion des compressed NFTs pour les niveaux SwapBack"
   },
   "instructions": [
     {
+      "name": "distribute_npi",
+      "docs": [
+        "Répartit les NPI du routeur (Flux 2)"
+      ],
+      "discriminator": [
+        41,
+        100,
+        125,
+        127,
+        151,
+        220,
+        117,
+        73
+      ],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "global_state"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "npi_amount",
+          "type": "u64"
+        },
+        {
+          "name": "user_boost_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
       "name": "initialize_collection",
       "docs": [
-        "Initialise la collection cNFT pour les niveaux SwapBack"
+        "Initialise la configuration de la collection"
       ],
       "discriminator": [
         112,
@@ -69,7 +128,7 @@
     {
       "name": "initialize_global_state",
       "docs": [
-        "Initialise le GlobalState pour tracker le boost total de la communauté"
+        "Initialise le GlobalState pour tracker les locks"
       ],
       "discriminator": [
         232,
@@ -260,10 +319,12 @@
           "signer": true
         },
         {
-          "name": "token_program"
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
-          "name": "associated_token_program"
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
           "name": "system_program",
@@ -278,6 +339,62 @@
         {
           "name": "lock_duration",
           "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "record_swap_fees",
+      "docs": [
+        "Enregistre la répartition des frais de swap (Flux 1)"
+      ],
+      "discriminator": [
+        204,
+        17,
+        225,
+        4,
+        236,
+        171,
+        81,
+        49
+      ],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "global_state"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "swap_volume",
+          "type": "u64"
         }
       ]
     },
@@ -391,88 +508,11 @@
           "signer": true
         },
         {
-          "name": "token_program"
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         }
       ],
       "args": []
-    },
-    {
-      "name": "update_nft_status",
-      "docs": [
-        "Met à jour le statut d'un NFT (lors du unlock)"
-      ],
-      "discriminator": [
-        231,
-        58,
-        220,
-        50,
-        152,
-        42,
-        231,
-        232
-      ],
-      "accounts": [
-        {
-          "name": "user_nft",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  117,
-                  115,
-                  101,
-                  114,
-                  95,
-                  110,
-                  102,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "user"
-              }
-            ]
-          }
-        },
-        {
-          "name": "global_state",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  108,
-                  111,
-                  98,
-                  97,
-                  108,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  101
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "user",
-          "signer": true
-        }
-      ],
-      "args": [
-        {
-          "name": "is_active",
-          "type": "bool"
-        }
-      ]
     }
   ],
   "accounts": [
@@ -487,12 +527,7 @@
         157,
         106,
         255
-      ],
-      "type": {
-        "defined": {
-          "name": "CollectionConfig"
-        }
-      }
+      ]
     },
     {
       "name": "GlobalState",
@@ -505,75 +540,101 @@
         123,
         133,
         98
-      ],
-      "type": {
-        "defined": {
-          "name": "GlobalState"
-        }
-      }
+      ]
     },
     {
-      "name": "UserNft",
+      "name": "UserLock",
       "discriminator": [
-        118,
-        117,
-        125,
-        216,
-        67,
-        180,
+        107,
+        42,
+        69,
         173,
-        226
-      ],
-      "type": {
-        "defined": {
-          "name": "UserNft"
-        }
-      }
+        232,
+        188,
+        205,
+        98
+      ]
     }
   ],
   "events": [
     {
-      "name": "LevelNftMinted",
+      "name": "NpiDistributed",
       "discriminator": [
-        238,
-        24,
-        138,
-        45,
-        180,
-        70,
-        246,
-        33
+        136,
+        126,
+        6,
+        147,
+        111,
+        136,
+        77,
+        139
       ]
     },
     {
-      "name": "NftStatusUpdated",
+      "name": "SwapFeesRecorded",
       "discriminator": [
-        165,
-        106,
-        121,
-        27,
-        1,
-        29,
-        55,
-        16
+        41,
+        99,
+        124,
+        209,
+        107,
+        160,
+        22,
+        118
+      ]
+    },
+    {
+      "name": "TokensLocked",
+      "discriminator": [
+        63,
+        184,
+        201,
+        20,
+        203,
+        194,
+        249,
+        138
+      ]
+    },
+    {
+      "name": "TokensUnlocked",
+      "discriminator": [
+        32,
+        143,
+        250,
+        162,
+        63,
+        131,
+        83,
+        163
       ]
     }
   ],
   "errors": [
     {
       "code": 6000,
-      "name": "InsufficientBoost",
-      "msg": "Boost insuffisant pour ce niveau"
+      "name": "InvalidAmount",
+      "msg": "Montant invalide"
     },
     {
       "code": 6001,
+      "name": "DurationTooShort",
+      "msg": "Durée trop courte (min 7 jours)"
+    },
+    {
+      "code": 6002,
       "name": "Unauthorized",
       "msg": "Non autorisé"
     },
     {
-      "code": 6002,
+      "code": 6003,
       "name": "MathOverflow",
       "msg": "Dépassement arithmétique"
+    },
+    {
+      "code": 6004,
+      "name": "AlreadyUnlocked",
+      "msg": "Déjà déverrouillé"
     }
   ],
   "types": [
@@ -587,26 +648,14 @@
             "type": "pubkey"
           },
           {
-            "name": "tree_config",
-            "type": "pubkey"
-          },
-          {
             "name": "total_minted",
             "type": "u64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
           }
         ]
       }
     },
     {
       "name": "GlobalState",
-      "docs": [
-        "GlobalState pour tracker le boost total de la communauté",
-        "Utilisé pour calculer la distribution du buyback proportionnellement au boost de chaque utilisateur"
-      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -625,42 +674,46 @@
           {
             "name": "total_value_locked",
             "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "LevelNftMinted",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "user",
-            "type": "pubkey"
           },
           {
-            "name": "level",
-            "type": {
-              "defined": {
-                "name": "LockLevel"
-              }
-            }
-          },
-          {
-            "name": "amount_locked",
+            "name": "total_swap_volume",
             "type": "u64"
           },
           {
-            "name": "lock_duration",
-            "type": "i64"
+            "name": "total_swap_fees_collected",
+            "type": "u64"
           },
           {
-            "name": "boost",
-            "type": "u16"
+            "name": "swap_treasury_accrued",
+            "type": "u64"
           },
           {
-            "name": "timestamp",
-            "type": "i64"
+            "name": "swap_buyback_accrued",
+            "type": "u64"
+          },
+          {
+            "name": "total_npi_volume",
+            "type": "u64"
+          },
+          {
+            "name": "npi_user_distributed",
+            "type": "u64"
+          },
+          {
+            "name": "npi_treasury_accrued",
+            "type": "u64"
+          },
+          {
+            "name": "npi_boost_vault_accrued",
+            "type": "u64"
+          },
+          {
+            "name": "npi_boost_vault_distributed",
+            "type": "u64"
+          },
+          {
+            "name": "npi_buyback_accrued",
+            "type": "u64"
           }
         ]
       }
@@ -689,13 +742,93 @@
       }
     },
     {
-      "name": "NftStatusUpdated",
+      "name": "NpiDistributed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "total_npi",
+            "type": "u64"
+          },
+          {
+            "name": "user_base",
+            "type": "u64"
+          },
+          {
+            "name": "user_boost_bonus",
+            "type": "u64"
+          },
+          {
+            "name": "user_total",
+            "type": "u64"
+          },
+          {
+            "name": "treasury_amount",
+            "type": "u64"
+          },
+          {
+            "name": "boost_vault_allocation",
+            "type": "u64"
+          },
+          {
+            "name": "remaining_boost_vault",
+            "type": "u64"
+          },
+          {
+            "name": "buyback_amount",
+            "type": "u64"
+          },
+          {
+            "name": "applied_boost_bps",
+            "type": "u16"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SwapFeesRecorded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "volume",
+            "type": "u64"
+          },
+          {
+            "name": "total_fee",
+            "type": "u64"
+          },
+          {
+            "name": "treasury_amount",
+            "type": "u64"
+          },
+          {
+            "name": "buyback_amount",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokensLocked",
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "user",
             "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
           },
           {
             "name": "level",
@@ -706,7 +839,39 @@
             }
           },
           {
-            "name": "is_active",
+            "name": "boost",
+            "type": "u16"
+          },
+          {
+            "name": "unlock_time",
+            "type": "i64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokensUnlocked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "burn_amount",
+            "type": "u64"
+          },
+          {
+            "name": "early_unlock",
             "type": "bool"
           },
           {
@@ -717,7 +882,7 @@
       }
     },
     {
-      "name": "UserNft",
+      "name": "UserLock",
       "type": {
         "kind": "struct",
         "fields": [
@@ -746,7 +911,7 @@
             "type": "u16"
           },
           {
-            "name": "mint_time",
+            "name": "lock_time",
             "type": "i64"
           },
           {
