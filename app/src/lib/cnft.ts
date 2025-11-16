@@ -3,11 +3,9 @@ import {
   PublicKey,
   Transaction,
   SystemProgram,
-  TransactionInstruction,
 } from "@solana/web3.js";
 import { WalletContextState } from "@solana/wallet-adapter-react";
-import type { Idl } from "@coral-xyz/anchor";
-import cnftIdl from "@/idl/swapback_cnft.json";
+import { createUnlockTokensTransaction } from "./lockTokens";
 import { TOKEN_DECIMALS } from "@/config/constants";
 
 // Lazy load CNFT_PROGRAM_ID to avoid module-level env access
@@ -25,28 +23,6 @@ function getCnftProgramId(): PublicKey {
 // Export for backward compatibility
 export const CNFT_PROGRAM_ID = getCnftProgramId();
 
-type AnchorInstruction = {
-  name: string;
-  discriminator?: number[];
-};
-
-type AnchorIdl = Idl & {
-  instructions: AnchorInstruction[];
-};
-
-const CNFT_IDL = cnftIdl as AnchorIdl;
-
-const getInstructionDiscriminator = (name: string): Buffer => {
-  const instruction = CNFT_IDL.instructions.find((ix) => ix.name === name);
-  if (!instruction?.discriminator) {
-    throw new Error(`Missing discriminator for instruction ${name} in swapback_cnft IDL`);
-  }
-  return Buffer.from(instruction.discriminator);
-};
-
-// Discriminators et constantes - Conservés pour compatibilité future
-// const MINT_LEVEL_NFT_DISCRIMINATOR = getInstructionDiscriminator("mint_level_nft");
-const UPDATE_NFT_STATUS_DISCRIMINATOR = getInstructionDiscriminator("update_nft_status");
 // const LAMPORTS_PER_BACK = 1_000_000_000;
 
 export enum LockLevel {
@@ -273,24 +249,10 @@ export async function createUnlockTransaction(
   _connection: Connection,
   wallet: WalletContextState
 ): Promise<Transaction> {
-  if (!wallet.publicKey) {
-    throw new Error("Wallet not connected");
-  }
-
-  const [globalState] = getGlobalStatePDA();
-  const [userNft] = getUserNftPDA(wallet.publicKey);
-
-  const instruction = new TransactionInstruction({
-    programId: getCnftProgramId(),
-    keys: [
-      { pubkey: userNft, isSigner: false, isWritable: true },
-      { pubkey: globalState, isSigner: false, isWritable: true },
-      { pubkey: wallet.publicKey, isSigner: true, isWritable: false },
-    ],
-    data: Buffer.concat([UPDATE_NFT_STATUS_DISCRIMINATOR, Buffer.from([0])]),
-  });
-
-  return new Transaction().add(instruction);
+  console.warn(
+    "[swapback_cnft] createUnlockTransaction est dépréciée. Utilisez createUnlockTokensTransaction qui appelle unlock_tokens."
+  );
+  return createUnlockTokensTransaction(_connection, wallet);
 }
 
 /**
