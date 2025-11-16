@@ -1,5 +1,7 @@
 # SwapBack Homepage Concepts - Visualisations
 
+> 🚧 Visual previews are live at `/preview/option1`, `/preview/option2`, and `/preview/option3` when running the app locally (`npm run dev`).
+
 ## Option 1: Hero-Driven Layout
 
 ```
@@ -279,3 +281,38 @@
 3. Tester sur mobile
 4. A/B testing si possible
 5. Intégrer l'option gagnante dans page.tsx
+
+---
+
+## Swap UX Review (EnhancedSwapInterface)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                          SWAP INTERFACE                         │
+├─────────────────────────────────────────────────────────────────┤
+│ Header: SwapBack logo + router toggle (SwapBack / Jupiter)       │
+│                                                                 │
+│ ◾ Inputs: You Pay (amount + token picker, balance, MAX/HALF)     │
+│ ◾ Swap button in center with dynamic label (Search / Execute)    │
+│ ◾ Outputs: You Receive (read-only amount + token selector)       │
+│ ◾ Route info panel (Rate, Price impact, Slippage, SwapBack perks)│
+│ ◾ Route visualization + savings highlights                       │
+│ ◾ Footer: contextual hint (Rebates/Burn or Powered by Jupiter)   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Observations
+- **Modular layout** : La carte unique garde l’attention sur la transaction en cours (principes de Hick's Law et de minimalisme). Les contrôles sont regroupés logiquement (inputs, swap, résultats). Les modals (slippage, token list) restent hors écran principal.
+- **Habilié de feedback** : Les états successifs sont explicités dans le CTA central, les badges `MAX/HALF` et le mock de route permettent de percevoir l’impact instantané. Le bouton ≪ Search Route ≫ passe à ≪ Execute Swap ≫ lorsqu’un itinéraire est validé.
+- **Transparence** : Le tableau des avantages SwapBack (NPI, rebate, burn), la visualisation des venues et l’indication du taux assurent que l’utilisateur comprend ce qu’il paie et ce qu’il gagne.
+- **Accessibilité à renforcer** : Les couleurs néon sur fond noir peuvent manquer de contraste si elles ne suivent pas WCAG. Pas de gestion explicite des erreurs (ex. route introuvable) ou d’annonce de chargement via `aria-live`.
+
+### Suggestions d’amélioration (best practices)
+1. **Feedback de chargement et d’erreur** – Ajouter une barre de progression ou un skeleton alors que `fetchRoutes()` tourne et un message clair si aucune route n’est trouvée, comme le recommande le principe de communication de l’état du système.
+2. **Token selection optimisée** – Intégrer un champ de recherche + filtres (favoris, plus de liquidité) dans `TokenSelector`, réduisant la friction constatée dans des DEX concurrents (cf. Raydium, PancakeSwap). Ajouter aussi des presets (25 %, 50 %, 100 %) à côté des boutons `MAX/HALF` pour favoriser la rapidité.
+3. **Router comparison / signal de confiance** – Afficher un petit badge ou ratio (ex. `PriceConfidence 99%`) pour chaque route, ou un CTA secondaire « Compare route » pour permettre à l’utilisateur de choisir en connaissance de cause, suivant la recommandation Nielsen sur la reconnaissance plutôt que le rappel.
+4. **Explications contextuelles** – Ajouter des tooltips/accordéons sur les termes SwapBack (NPI, rebate, burn) afin que chaque icône/article de la section avantages soit compréhensible sans quitter la page, conformément au principe de correspondance système/monde réel.
+5. **Améliorer la hiérarchie des CTA** – Séparer le petit bouton « Switch tokens » des actions principales en le rendant moins intrusif (ex: un chip transparent) et agrandir/multiples CTAs (par ex. un lien secondaire « Save route ») pour répondre aux usages multitâches.
+6. **Monitor metrics en temps réel** – Ajouter une vignette en haut de la carte indiquant le slippage estimé, le solde disponible, et un indicateur de volatilité (ex. `Volatility: Medium`), ce qui permet de suivre les suggestions de DEX UX leaders.
+
+Souhaitez-vous que j’illustre ces recommandations dans un mockup Figma/ASCII plus détaillé ou que je crée un document séparé avec une grille RICE pour prioriser ?
