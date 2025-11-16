@@ -75,7 +75,7 @@ export const Navigation = () => {
                   DEVNET
                 </div>
 
-                {/* Bouton wallet - Client-only pour éviter erreurs SSR */}
+                {/* Wallet button - Client-only to avoid SSR errors */}
                 <ClientOnlyWallet />
               </div>
 
@@ -159,7 +159,7 @@ export const Navigation = () => {
                 </span>
               </div>
 
-              {/* Wallet button for mobile - Client-only pour éviter erreurs SSR */}
+              {/* Wallet button for mobile - Client-only to avoid SSR errors */}
               <div className="mt-auto">
                 <ClientOnlyWallet />
               </div>

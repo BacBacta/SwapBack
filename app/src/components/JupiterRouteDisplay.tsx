@@ -23,7 +23,7 @@ export const JupiterRouteDisplay: React.FC<JupiterRouteDisplayProps> = ({
   inputSymbol,
   outputSymbol,
 }) => {
-  // Calculer les montants en format lisible
+  // Calculate amounts in readable format
   const inputAmount = Number(quote.inAmount) / Math.pow(10, inputDecimals);
   const outputAmount = Number(quote.outAmount) / Math.pow(10, outputDecimals);
   const priceImpact = routeInfo.priceImpactPct;
@@ -47,7 +47,7 @@ export const JupiterRouteDisplay: React.FC<JupiterRouteDisplayProps> = ({
         </span>
       </div>
 
-      {/* Montants */}
+      {/* Amounts */}
       <div className="grid grid-cols-2 gap-4">
         <div>
           <p className="text-xs text-gray-500">Vous payez</p>

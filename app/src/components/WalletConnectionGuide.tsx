@@ -25,7 +25,7 @@ export const WalletConnectionGuide = () => {
       setShowGuide(false);
       localStorage.setItem('swapback-wallet-guide-seen', 'true');
     } catch (error) {
-      console.error('Erreur de connexion Phantom:', error);
+      console.error('Phantom connection error:', error);
     }
   };
 

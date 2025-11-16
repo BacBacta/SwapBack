@@ -19,8 +19,8 @@ interface Transaction {
   burn?: number;
   status: "success" | "pending" | "failed";
   explorerUrl: string;
-  // Champs spécifiques pour DCA
-  dcaInterval?: number; // En jours
+  // DCA-specific fields
+  dcaInterval?: number; // In days
   dcaSwapsExecuted?: number;
   dcaTotalSwaps?: number;
   // Champs spécifiques pour Lock/Unlock
@@ -54,7 +54,7 @@ export const TransactionHistory = ({
           const parsed = JSON.parse(stored);
           setTransactions(parsed);
         } catch (e) {
-          console.error("Erreur lors du chargement de l'historique:", e);
+          console.error("Error loading history:", e);
         }
       }
     }
@@ -226,7 +226,7 @@ export const TransactionHistory = ({
                           </div>
                         )}
 
-                        {/* Détails DCA */}
+                        {/* DCA Details */}
                         {tx.type === "dca" && (
                           <div className="flex gap-4 text-xs terminal-text opacity-70 mt-2">
                             {tx.dcaInterval && (
@@ -472,7 +472,7 @@ export const addUnlockTransaction = (
   });
 };
 
-// Helper spécifique pour DCA
+// DCA-specific helper
 export const addDCATransaction = (
   walletAddress: string,
   params: {

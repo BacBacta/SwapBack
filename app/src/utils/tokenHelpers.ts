@@ -29,7 +29,7 @@ export const getTokenMint = (token: string): PublicKey => {
 };
 
 /**
- * Convertit une fréquence DCA en secondes
+ * Convert DCA frequency to seconds
  */
 export const frequencyToSeconds = (frequency: "hourly" | "daily" | "weekly" | "monthly"): number => {
   const secondsMap = {
@@ -42,7 +42,7 @@ export const frequencyToSeconds = (frequency: "hourly" | "daily" | "weekly" | "m
 };
 
 /**
- * Convertit un intervalle en secondes vers une fréquence
+ * Convert interval in seconds to a frequency
  */
 export const secondsToFrequency = (seconds: number): "hourly" | "daily" | "weekly" | "monthly" => {
   if (seconds <= 3600) return "hourly";

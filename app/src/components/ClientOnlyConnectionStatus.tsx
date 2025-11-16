@@ -13,7 +13,7 @@ const ConnectionStatusDynamic = dynamic(
 
 /**
  * Client-only wrapper pour ConnectionStatus
- * Évite les erreurs SSR de WalletContext en utilisant dynamic import
+ * Avoids WalletContext SSR errors using dynamic import
  */
 export const ClientOnlyConnectionStatus = () => {
   return <ConnectionStatusDynamic />;

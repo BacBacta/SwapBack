@@ -349,7 +349,7 @@ export async function createDcaPlanTransaction(
   const [planPda] = getDcaPlanPDA(userPublicKey, planId);
   const [statePda] = getRouterStatePDA();
   
-  // 🔒 VALIDATION CRITIQUE: Vérifier la cohérence du Program ID
+  // 🔒 CRITICAL VALIDATION: Check Program ID consistency
   console.log('🔍 [DCA CREATE] Environment validation:');
   console.log('   ROUTER_PROGRAM_ID:', ROUTER_PROGRAM_ID.toString());
   console.log('   IDL address:', routerIdl.address);

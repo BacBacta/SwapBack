@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Panneau de debug pour afficher les logs d'erreur en temps réel
+ * Debug panel to display error logs in real-time
  * Press Ctrl+Shift+L to open/close
  */
 
@@ -149,9 +149,9 @@ export function DebugLogPanel() {
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {logs.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
-              <p className="text-lg">Aucune erreur enregistrée 🎉</p>
+              <p className="text-lg">No errors recorded 🎉</p>
               <p className="text-sm mt-2">
-                Les erreurs apparaîtront ici automatiquement
+                Errors will appear here automatically
               </p>
             </div>
           ) : (

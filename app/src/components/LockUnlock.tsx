@@ -20,7 +20,7 @@ export const LockUnlock = () => {
     }
 
     if (!lockAmount || Number.parseFloat(lockAmount) <= 0) {
-      alert("⚠️ Veuillez entrer un montant valide");
+      alert("⚠️ Please enter a valid amount");
       return;
     }
 

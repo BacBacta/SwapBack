@@ -27,7 +27,7 @@ function getBackTokenMint(): PublicKey {
 // Types pour les niveaux de cNFT - Étendus
 type CNFTLevel = "Bronze" | "Silver" | "Gold" | "Platinum" | "Diamond";
 
-// Seuils pour les niveaux (en nombre de jours) - Visuels uniquement
+// Level thresholds (in number of days) - Visual only
 const LEVEL_THRESHOLDS = {
   Bronze: 7,
   Silver: 30,
@@ -95,7 +95,7 @@ export default function LockInterface({
     boost: number;
   } | null>(null);
 
-  // Calcul du niveau basé sur la durée et le montant CUMULÉ (visuel uniquement)
+  // Calculate level based on duration and CUMULATIVE amount (visual only)
   // Seuils MUST match the Rust program (lib.rs)
   const predictedLevel: CNFTLevel = useMemo(() => {
     const days = parseInt(duration) || 0;
@@ -118,12 +118,12 @@ export default function LockInterface({
     return "Bronze";
   }, [duration, amount, currentNftData]);
 
-  // Niveau affiché : TOUJOURS utiliser la prédiction basée sur le montant cumulé
+  // Displayed level: ALWAYS use prediction based on cumulative amount
   const displayLevel: CNFTLevel = useMemo(() => {
     return predictedLevel;
   }, [predictedLevel]);
 
-  // Calcul du boost basé sur le montant CUMULÉ ET la durée (DYNAMIQUE)
+  // Calculate boost based on CUMULATIVE amount AND duration (DYNAMIC)
   const predictedBoost = useMemo(() => {
     const amt = parseFloat(amount) || 0;
     const days = parseInt(duration) || 0;
@@ -428,7 +428,7 @@ export default function LockInterface({
           signatures: transaction.signatures.length,
         });
 
-        // Approche alternative : signer puis envoyer manuellement pour capturer l'erreur
+        // Alternative approach: sign then send manually to capture error
         console.log(
           "🔍 [LOCK DEBUG] Asking wallet to sign transaction..."
         );
@@ -443,7 +443,7 @@ export default function LockInterface({
         try {
           console.log("⏳ [LOCK DEBUG] Waiting for user signature (check your wallet popup)...");
           
-          // Créer une promesse avec timeout pour la signature
+          // Create a promise with timeout for signature
           const signPromise = wallet.signTransaction(transaction);
           const timeoutPromise = new Promise<never>((_, reject) => 
             setTimeout(() => reject(new Error("Signature timeout after 60s - Did you approve the transaction in your wallet?")), 60000)
@@ -612,7 +612,7 @@ export default function LockInterface({
         }
       }, 2000);
 
-      // Callback de succès
+      // Success callback
       if (onLockSuccess) {
         onLockSuccess();
       }
@@ -630,7 +630,7 @@ export default function LockInterface({
         console.error("❌ [LOCK ERROR] Error message:", err.message);
         console.error("❌ [LOCK ERROR] Error name:", err.name);
 
-        // Afficher l'erreur complète pour debug
+        // Display full error for debugging
         message = `❌ ${err.message}`;
 
         // Check for specific errors with clearer messages
@@ -661,7 +661,7 @@ export default function LockInterface({
     }
   };
 
-  // Boutons de montant rapide - Adaptés pour supply de 1B
+  // Quick amount buttons - Adapted for 1B supply
   const quickAmounts = [100000, 500000, 1000000, 5000000];
 
   return (
@@ -715,7 +715,7 @@ export default function LockInterface({
           </p>
         )}
 
-        {/* Boutons de montant rapide */}
+        {/* Quick amount buttons */}
         <div className="flex gap-2 mt-3">
           {quickAmounts.map((amt) => (
             <button
