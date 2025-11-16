@@ -16,7 +16,7 @@ pub use state::{DcaPlan, RouterState, UserRebate};
 pub use error::SwapbackError;
 
 // Program ID - Deployed on devnet (Nov 12, 2025)
-declare_id!("BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz");
+declare_id!("H3LLiKAvjPWk9Br14m7bjiWkaJFzeMVB9qvMsFaA14k5");
 
 // DEX Program IDs (example - would need to be updated with actual deployed programs)
 pub const RAYDIUM_AMM_PROGRAM_ID: Pubkey = pubkey!("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8");

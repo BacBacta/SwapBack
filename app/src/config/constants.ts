@@ -19,7 +19,7 @@ let _routerProgramId: PublicKey | null = null;
 export function getRouterProgramId(): PublicKey {
   if (!_routerProgramId) {
     _routerProgramId = new PublicKey(
-      process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || 'BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz'
+      process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || 'H3LLiKAvjPWk9Br14m7bjiWkaJFzeMVB9qvMsFaA14k5'
     );
   }
   return _routerProgramId;
@@ -33,7 +33,7 @@ let _buybackProgramId: PublicKey | null = null;
 export function getBuybackProgramId(): PublicKey {
   if (!_buybackProgramId) {
     _buybackProgramId = new PublicKey(
-      process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || 'EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf'
+      process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || '746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6'
     );
   }
   return _buybackProgramId;

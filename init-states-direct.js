@@ -12,12 +12,12 @@ const { Buffer } = require("buffer");
 const borsh = require("borsh");
 
 // Configuration
-const RPC_URL = "https://api.testnet.solana.com";
+const RPC_URL = "https://api.devnet.solana.com";
 const ROUTER_PROGRAM = new PublicKey(
-  "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
+  "H3LLiKAvjPWk9Br14m7bjiWkaJFzeMVB9qvMsFaA14k5"
 );
 const BUYBACK_PROGRAM = new PublicKey(
-  "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"
+  "746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6"
 );
 const BACK_MINT = new PublicKey("862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux");
 const USDC_MOCK = new PublicKey("BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR");
@@ -34,7 +34,7 @@ const GLOBAL_INIT_DISCRIMINATOR = Buffer.from([
 ]); // initialize_global
 
 async function loadKeypair() {
-  const keypairPath = path.join(process.env.HOME, ".config/solana/id.json");
+  const keypairPath = path.join(__dirname, "devnet-keypair.json");
   const keypairData = JSON.parse(fs.readFileSync(keypairPath, "utf8"));
   return Keypair.fromSecretKey(new Uint8Array(keypairData));
 }

@@ -4,7 +4,7 @@ use anchor_spl::token_2022::{self};
 use pyth_solana_receiver_sdk::price_update::{get_feed_id_from_hex, PriceUpdateV2};
 
 // Program ID déployé sur devnet - 31 Oct 2025 (nouveau déploiement avec Token-2022)
-declare_id!("92znK8METYTFW5dGDJUnHUMqubVGnPBTyjZ4HzjWQzir");
+declare_id!("746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6");
 
 // Program ID du cNFT pour lire GlobalState et UserNft (mis à jour)
 pub const CNFT_PROGRAM_ID: Pubkey = pubkey!("9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw");

@@ -28,7 +28,7 @@ function getRouterIdl() {
       routerIdl = require("@/idl/swapback_router.json");
     } catch (error) {
       console.warn("Could not load Router IDL:", error);
-      routerIdl = { address: "BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz" };
+      routerIdl = { address: "H3LLiKAvjPWk9Br14m7bjiWkaJFzeMVB9qvMsFaA14k5" };
     }
   }
   return routerIdl;
@@ -96,7 +96,7 @@ export function validateEnv(): EnvConfig {
     network: network || 'devnet',
     rpcUrl: rpcUrl || 'https://api.devnet.solana.com',
     cnftProgramId: cnftProgramId || 'VOTRE_NOUVEAU_PROGRAM_ID',
-    routerProgramId: routerProgramId || 'BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz',
+    routerProgramId: routerProgramId || 'H3LLiKAvjPWk9Br14m7bjiWkaJFzeMVB9qvMsFaA14k5',
     backMint: backMint || '6tFCrUr3mZpL3BzNV2cLjYDkoL7toYA74TpMCSxFg45E',
     collectionConfig: collectionConfig || '5eM6KdFGJ63597ayYYtUqcNRhzxKtpx5qfL5mqRHwBom',
   };

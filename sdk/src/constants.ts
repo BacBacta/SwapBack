@@ -27,9 +27,9 @@ export const BACK_TOKEN_CONFIG = {
  */
 export const SWAPBACK_PROGRAM_IDS = {
   devnet: {
-    router: new PublicKey("GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"),
-    buyback: new PublicKey("EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"),
-    cnft: new PublicKey("2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G"),
+    router: new PublicKey("H3LLiKAvjPWk9Br14m7bjiWkaJFzeMVB9qvMsFaA14k5"),
+    buyback: new PublicKey("746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6"),
+    cnft: new PublicKey("GEkXCcq87yUjQSp5EqcWf7bw9GKrB39A1LWdsE7V3V2E"),
   },
   mainnet: {
     router: new PublicKey("11111111111111111111111111111111"), // À déployer

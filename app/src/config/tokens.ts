@@ -15,8 +15,8 @@ export const BACK_TOKEN_DEVNET = {
 
 // IDs des programmes SwapBack sur Devnet (pour référence)
 export const PROGRAM_IDS_DEVNET = {
-  router: "BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz",
-  buyback: "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf",
+  router: "H3LLiKAvjPWk9Br14m7bjiWkaJFzeMVB9qvMsFaA14k5",
+  buyback: "746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6",
   cnft: "VOTRE_NOUVEAU_PROGRAM_ID",
 } as const;
 

@@ -1,11 +1,11 @@
 import { PublicKey } from "@solana/web3.js";
 
 export const ROUTER_PROGRAM_ID = new PublicKey(
-  "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
+  "H3LLiKAvjPWk9Br14m7bjiWkaJFzeMVB9qvMsFaA14k5"
 );
 
 export const BUYBACK_PROGRAM_ID = new PublicKey(
-  "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"
+  "746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6"
 );
 
 export const CNFT_PROGRAM_ID = new PublicKey(
