@@ -55,9 +55,6 @@
           }
         },
         {
-          "name": "tree_config"
-        },
-        {
           "name": "authority",
           "writable": true,
           "signer": true
