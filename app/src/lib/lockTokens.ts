@@ -346,7 +346,7 @@ export async function createUnlockTokensTransaction(
     BACK_MINT,
     wallet.publicKey,
     false,
-    TOKEN_2022_PROGRAM_ID
+    TOKEN_PROGRAM_ID
   );
   console.log('✅ [UNLOCK TX] User Token Account:', userTokenAccount.toString());
 
@@ -354,7 +354,7 @@ export async function createUnlockTokensTransaction(
     BACK_MINT,
     vaultAuthority,
     true, // allowOwnerOffCurve = true pour PDA
-    TOKEN_2022_PROGRAM_ID
+    TOKEN_PROGRAM_ID
   );
   console.log('✅ [UNLOCK TX] Vault Token Account:', vaultTokenAccount.toString());
 
