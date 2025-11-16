@@ -8,6 +8,7 @@ import {
   TOKEN_2022_PROGRAM_ID,
 } from "@solana/spl-token";
 import { createLockTokensTransaction } from "@/lib/lockTokens";
+import { TOKEN_DECIMALS } from "@/config/constants";
 // Fallback: import { createLockTransaction } from '@/lib/cnft';
 
 // Lazy load BACK_TOKEN_MINT to avoid module-level env access
@@ -201,7 +202,8 @@ export default function LockInterface({
 
         // Amount commence à l'offset 64 (32 + 32) pour Token-2022
         const amount = data.readBigUInt64LE(64);
-        const bal = Number(amount) / Math.pow(10, 9); // 9 décimales pour BACK
+        const bal = Number(amount) / Math.pow(10, TOKEN_DECIMALS);
+        console.log(`💰 LockInterface: BACK balance = ${bal.toFixed(TOKEN_DECIMALS)} (raw: ${amount})`);
         setBalance(bal);
       } catch (err) {
         console.error("Error fetching balance:", err);

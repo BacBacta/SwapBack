@@ -3,6 +3,8 @@
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useEffect, useState } from "react";
 import { PublicKey } from "@solana/web3.js";
+import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { TOKEN_DECIMALS } from "@/config/constants";
 
 export const useTokenData = (tokenMint: string) => {
   const { connection } = useConnection();
@@ -39,20 +41,53 @@ export const useTokenData = (tokenMint: string) => {
           console.log(`✅ SOL balance: ${solBalance.toFixed(6)} SOL`);
           setBalance(solBalance);
         } else {
-          // SPL Token
-          const tokenAccounts =
-            await connection.getParsedTokenAccountsByOwner(publicKey, {
-              mint: new PublicKey(tokenMint),
-            });
-
-          if (tokenAccounts.value.length > 0) {
-            const tokenBalance =
-              tokenAccounts.value[0].account.data.parsed.info.tokenAmount
-                .uiAmount || 0;
-            console.log(`✅ Token ${tokenMint.substring(0, 8)}... balance: ${tokenBalance.toFixed(6)}`);
-            setBalance(tokenBalance);
-          } else {
-            console.log(`⚠️ No token account found for ${tokenMint.substring(0, 8)}...`);
+          // SPL Token or Token-2022
+          const mintPubkey = new PublicKey(tokenMint);
+          
+          // Try Token-2022 first (for BACK)
+          try {
+            const ata = await getAssociatedTokenAddress(
+              mintPubkey,
+              publicKey,
+              false,
+              TOKEN_2022_PROGRAM_ID
+            );
+            
+            const accountInfo = await connection.getAccountInfo(ata);
+            if (accountInfo && accountInfo.data.length >= 72) {
+              // Token-2022 account found - parse manually
+              const amount = accountInfo.data.readBigUInt64LE(64);
+              const tokenBalance = Number(amount) / Math.pow(10, TOKEN_DECIMALS);
+              console.log(`✅ Token-2022 ${tokenMint.substring(0, 8)}... balance: ${tokenBalance.toFixed(TOKEN_DECIMALS)} (raw: ${amount})`);
+              setBalance(tokenBalance);
+              return;
+            }
+          } catch (token2022Error) {
+            console.log(`⚠️ Token-2022 account not found for ${tokenMint.substring(0, 8)}..., trying standard SPL token`);
+          }
+          
+          // Fallback to standard SPL Token
+          try {
+            const ata = await getAssociatedTokenAddress(
+              mintPubkey,
+              publicKey,
+              false,
+              TOKEN_PROGRAM_ID
+            );
+            
+            const accountInfo = await connection.getAccountInfo(ata);
+            if (accountInfo && accountInfo.data.length >= 72) {
+              const amount = accountInfo.data.readBigUInt64LE(64);
+              // For standard tokens, try to get decimals from mint (fallback to 6)
+              const tokenBalance = Number(amount) / 1e6; // Most SPL tokens use 6 decimals
+              console.log(`✅ SPL Token ${tokenMint.substring(0, 8)}... balance: ${tokenBalance.toFixed(6)}`);
+              setBalance(tokenBalance);
+            } else {
+              console.log(`⚠️ No token account found for ${tokenMint.substring(0, 8)}...`);
+              setBalance(0);
+            }
+          } catch (splError) {
+            console.log(`⚠️ SPL Token account not found for ${tokenMint.substring(0, 8)}...`);
             setBalance(0);
           }
         }
