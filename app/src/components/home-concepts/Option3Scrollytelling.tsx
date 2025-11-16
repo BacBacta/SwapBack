@@ -34,13 +34,48 @@ export default function Option3Scrollytelling() {
 
   return (
     <div className="bg-black min-h-screen relative">
-      {/* Scroll Progress Bar */}
-      <div className="fixed top-0 left-0 right-0 h-1 bg-black z-50 border-b-2 border-[var(--primary)]/30">
-        <div 
-          className="h-full bg-[var(--primary)] transition-all duration-100"
-          style={{ width: `${scrollProgress}%` }}
-        />
-      </div>
+      {/* Fixed Navigation Bar */}
+      <nav className="fixed top-0 left-0 right-0 bg-black/95 backdrop-blur-sm border-b-2 border-[var(--primary)]/30 z-40">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex justify-between items-center">
+            {/* Logo */}
+            <button
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              className="text-2xl font-bold terminal-text terminal-glow hover:text-[var(--accent)] transition-colors flex items-center gap-3 uppercase tracking-wider cursor-pointer"
+            >
+              <span className="text-3xl">⚡</span>
+              <span>SWAPBACK</span>
+            </button>
+
+            {/* Navigation Links */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push('/swap')}
+                className="terminal-text px-4 py-2 border-2 border-[var(--primary)]/30 text-[var(--primary)] hover:border-[var(--primary)] hover:bg-[var(--primary)] hover:text-black transition-all uppercase tracking-wider"
+              >
+                SWAP
+              </button>
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="terminal-text px-4 py-2 border-2 border-[var(--secondary)]/30 text-[var(--secondary)] hover:border-[var(--secondary)] hover:bg-[var(--secondary)] hover:text-black transition-all uppercase tracking-wider"
+              >
+                DASHBOARD
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        {/* Scroll Progress Bar */}
+        <div className="h-1 bg-black">
+          <div 
+            className="h-full bg-[var(--primary)] transition-all duration-100"
+            style={{ width: `${scrollProgress}%` }}
+          />
+        </div>
+      </nav>
+
+      {/* Spacer for fixed nav */}
+      <div className="h-[73px]"></div>
 
       {/* SECTION 1: HERO WITH ANIMATION */}
       <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
@@ -414,12 +449,21 @@ export default function Option3Scrollytelling() {
               </div>
             </div>
 
-            <button
-              onClick={() => router.push('/swap')}
-              className="terminal-text text-sm text-[var(--primary)] hover:text-[var(--accent)] transition-colors cursor-pointer uppercase tracking-wider mt-4 underline"
-            >
-              [CLICK_TO_LAUNCH_APP]
-            </button>
+            <div className="flex gap-4 justify-center mt-6">
+              <button
+                onClick={() => router.push('/swap')}
+                className="terminal-text text-sm text-[var(--primary)] hover:text-[var(--accent)] transition-colors cursor-pointer uppercase tracking-wider underline"
+              >
+                [START_TRADING]
+              </button>
+              <span className="terminal-text text-sm text-[var(--muted)]">•</span>
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="terminal-text text-sm text-[var(--secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer uppercase tracking-wider underline"
+              >
+                [VIEW_FULL_DASHBOARD]
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -435,12 +479,20 @@ export default function Option3Scrollytelling() {
           <p className="terminal-text text-2xl text-[var(--muted)] mb-12">
             Start earning on every swap today
           </p>
-          <button 
-            onClick={() => router.push('/swap')}
-            className="terminal-box border-2 border-[var(--primary)] bg-[var(--primary)] text-black px-16 py-8 font-bold terminal-text text-2xl uppercase tracking-wider hover:bg-transparent hover:text-[var(--primary)] transition-all hover:scale-105 cursor-pointer"
-          >
-            [LAUNCH_APP]
-          </button>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
+            <button 
+              onClick={() => router.push('/swap')}
+              className="terminal-box border-2 border-[var(--primary)] bg-[var(--primary)] text-black px-12 py-6 font-bold terminal-text text-xl uppercase tracking-wider hover:bg-transparent hover:text-[var(--primary)] transition-all hover:scale-105 cursor-pointer"
+            >
+              [LAUNCH_APP]
+            </button>
+            <button 
+              onClick={() => router.push('/dashboard')}
+              className="terminal-box border-2 border-[var(--secondary)] bg-transparent text-[var(--secondary)] px-12 py-6 font-bold terminal-text text-xl uppercase tracking-wider hover:bg-[var(--secondary)] hover:text-black transition-all hover:scale-105 cursor-pointer"
+            >
+              [VIEW_DASHBOARD]
+            </button>
+          </div>
           <div className="terminal-text text-sm text-[var(--muted)] mt-8">
             No account required • Connect wallet & start trading
           </div>
