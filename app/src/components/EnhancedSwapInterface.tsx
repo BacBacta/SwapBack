@@ -52,6 +52,8 @@ export function EnhancedSwapInterface() {
   const [customSlippage, setCustomSlippage] = useState("");
   const [hasSearchedRoute, setHasSearchedRoute] = useState(false);
   const [priceImpact, setPriceImpact] = useState(0);
+  const [showTooltip, setShowTooltip] = useState<string | null>(null);
+  const [routeError, setRouteError] = useState<string | null>(null);
 
   // ⚠️ AUTO-FETCH DÉSACTIVÉ pour éviter les boucles infinies
   // User must click "Search Route" manually
@@ -111,12 +113,32 @@ export function EnhancedSwapInterface() {
     }
   };
 
-  const handleSearchRoute = () => {
+  const handleAmountPreset = (percentage: number) => {
+    if (swap.inputToken?.balance) {
+      const amount = (swap.inputToken.balance * percentage / 100).toFixed(swap.inputToken.decimals > 6 ? 6 : swap.inputToken.decimals);
+      setInputAmount(amount);
+    }
+  };
+
+  const getBalancePercentage = () => {
+    if (!swap.inputToken?.balance || !swap.inputAmount) return 0;
+    return Math.min((parseFloat(swap.inputAmount) / swap.inputToken.balance) * 100, 100);
+  };
+
+  const routerConfidenceScore = selectedRouter === "swapback" ? 98 : 95;
+
+  const handleSearchRoute = async () => {
     const amount = parseFloat(swap.inputAmount);
 
     if (swap.inputToken && swap.outputToken && amount > 0) {
-      fetchRoutes();
-      setHasSearchedRoute(true);
+      setRouteError(null);
+      try {
+        await fetchRoutes();
+        setHasSearchedRoute(true);
+      } catch (error) {
+        setRouteError("No route found. Try adjusting the amount or selecting different tokens.");
+        setHasSearchedRoute(false);
+      }
     }
   };
 
@@ -198,34 +220,46 @@ export function EnhancedSwapInterface() {
           <div className="flex gap-2 mb-4">
             <button
               onClick={() => setSelectedRouter("swapback")}
-              className={`flex-1 py-2.5 px-4 rounded-lg font-semibold transition-all ${
+              className={`flex-1 py-2.5 px-4 rounded-lg font-semibold transition-all relative ${
                 selectedRouter === "swapback"
                   ? "bg-[var(--primary)] text-black"
                   : "bg-gray-900 text-gray-400 hover:bg-gray-800"
               }`}
+              aria-pressed={selectedRouter === "swapback"}
             >
               <div className="flex items-center justify-center gap-2">
                 <span>⚡</span>
                 <span>SwapBack</span>
               </div>
               {selectedRouter === "swapback" && (
-                <div className="text-xs mt-1 opacity-80">+Rebates +Burn</div>
+                <>
+                  <div className="text-xs mt-1 opacity-80">+Rebates +Burn</div>
+                  <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                    {routerConfidenceScore}%
+                  </div>
+                </>
               )}
             </button>
             <button
               onClick={() => setSelectedRouter("jupiter")}
-              className={`flex-1 py-2.5 px-4 rounded-lg font-semibold transition-all ${
+              className={`flex-1 py-2.5 px-4 rounded-lg font-semibold transition-all relative ${
                 selectedRouter === "jupiter"
                   ? "bg-[var(--secondary)] text-black"
                   : "bg-gray-900 text-gray-400 hover:bg-gray-800"
               }`}
+              aria-pressed={selectedRouter === "jupiter"}
             >
               <div className="flex items-center justify-center gap-2">
                 <span>🪐</span>
                 <span>Jupiter</span>
               </div>
               {selectedRouter === "jupiter" && (
-                <div className="text-xs mt-1 opacity-80">Best Market</div>
+                <>
+                  <div className="text-xs mt-1 opacity-80">Best Market</div>
+                  <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                    {routerConfidenceScore}%
+                  </div>
+                </>
               )}
             </button>
           </div>
@@ -239,20 +273,8 @@ export function EnhancedSwapInterface() {
               {swap.inputToken?.balance && (
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-gray-500">
-                    Balance: {swap.inputToken.balance.toFixed(4)}
+                    Balance: {swap.inputToken.balance.toFixed(4)} ({getBalancePercentage().toFixed(0)}%)
                   </span>
-                  <button
-                    onClick={setHalfBalance}
-                    className="text-xs text-[var(--primary)] hover:text-[var(--primary)]/80"
-                  >
-                    HALF
-                  </button>
-                  <button
-                    onClick={setMaxBalance}
-                    className="text-xs text-[var(--primary)] hover:text-[var(--primary)]/80"
-                  >
-                    MAX
-                  </button>
                 </div>
               )}
             </div>
@@ -305,6 +327,20 @@ export function EnhancedSwapInterface() {
               </div>
             )}
           </div>
+          {/* Amount Presets */}
+          {swap.inputToken?.balance && (
+            <div className="flex gap-2 mt-2">
+              {[25, 50, 75, 100].map((pct) => (
+                <button
+                  key={pct}
+                  onClick={() => handleAmountPreset(pct)}
+                  className="flex-1 text-xs py-1.5 bg-gray-800 hover:bg-[var(--primary)] hover:text-black rounded-lg transition-all font-semibold text-gray-400"
+                >
+                  {pct}%
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Switch Button */}
@@ -391,8 +427,38 @@ export function EnhancedSwapInterface() {
           </div>
         </div>
 
+        {/* Loading Skeleton */}
+        {routes.isLoading && (
+          <div className="mb-6 space-y-3 animate-pulse" role="status" aria-live="polite" aria-label="Searching for best route">
+            <div className="bg-gray-900 rounded-lg p-4">
+              <div className="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
+              <div className="h-4 bg-gray-700 rounded w-1/2"></div>
+            </div>
+            <div className="bg-gray-900 rounded-lg p-4">
+              <div className="h-4 bg-gray-700 rounded w-full mb-2"></div>
+              <div className="h-4 bg-gray-700 rounded w-2/3"></div>
+            </div>
+            <div className="text-center text-sm text-[var(--primary)] mt-2">
+              🔍 Finding best route...
+            </div>
+          </div>
+        )}
+
+        {/* Error State */}
+        {routeError && (
+          <div className="mb-6 bg-red-500/10 border border-red-500/30 rounded-lg p-4" role="alert" aria-live="assertive">
+            <div className="flex items-start gap-3">
+              <span className="text-red-400 text-xl">⚠️</span>
+              <div>
+                <div className="text-red-400 font-semibold mb-1">Route Error</div>
+                <div className="text-sm text-red-300">{routeError}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Route Info - Show after search */}
-        {hasSearchedRoute && routes.selectedRoute && (
+        {hasSearchedRoute && routes.selectedRoute && !routes.isLoading && (
           <div className="mb-6 space-y-3">
             {/* Price Info */}
             <div className="bg-gray-900 rounded-lg p-3">
@@ -434,8 +500,25 @@ export function EnhancedSwapInterface() {
             {/* SwapBack Benefits (if SwapBack router selected) */}
             {selectedRouter === "swapback" && mockRouteInfo && (
               <div className="bg-gradient-to-r from-[var(--primary)]/10 to-[var(--secondary)]/10 border border-[var(--primary)]/30 rounded-lg p-4">
-                <div className="text-sm font-semibold text-[var(--primary)] mb-3">
-                  ⚡ Your SwapBack Savings
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-sm font-semibold text-[var(--primary)]">
+                    ⚡ Your SwapBack Savings
+                  </div>
+                  <div className="relative">
+                    <button
+                      onMouseEnter={() => setShowTooltip("npi")}
+                      onMouseLeave={() => setShowTooltip(null)}
+                      className="text-gray-400 hover:text-white text-xs"
+                      aria-label="What is NPI?"
+                    >
+                      ℹ️
+                    </button>
+                    {showTooltip === "npi" && (
+                      <div className="absolute right-0 top-6 w-64 bg-gray-900 border border-gray-700 rounded-lg p-3 text-xs text-gray-300 z-50">
+                        <strong>NPI (Net Positive Impact)</strong>: 70% of protocol fees are returned to you as rebates, making your trades more profitable.
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
@@ -512,8 +595,11 @@ export function EnhancedSwapInterface() {
               ? "bg-gray-800 text-gray-600 cursor-not-allowed"
               : routes.isLoading
                 ? "bg-[var(--primary)]/50 text-black cursor-wait"
-                : "bg-[var(--primary)] text-black hover:bg-[var(--primary)]/90"
+                : hasSearchedRoute && routes.selectedRoute
+                  ? "bg-green-600 text-white hover:bg-green-700"
+                  : "bg-[var(--primary)] text-black hover:bg-[var(--primary)]/90"
           }`}
+          aria-label={!connected ? "Connect wallet to swap" : hasSearchedRoute ? "Execute swap" : "Search for best route"}
         >
           {!connected
             ? "Connect Wallet"
@@ -522,7 +608,7 @@ export function EnhancedSwapInterface() {
               : inputAmount <= 0
                 ? "Enter Amount"
                 : routes.isLoading
-                  ? "🔍 Finding Best Route..."
+                  ? "🔍 Searching..."
                   : hasSearchedRoute && routes.selectedRoute
                     ? "✅ Execute Swap"
                     : "🔍 Search Route"}
