@@ -97,7 +97,7 @@ export function validateEnv(): EnvConfig {
     rpcUrl: rpcUrl || 'https://api.devnet.solana.com',
     cnftProgramId: cnftProgramId || 'VOTRE_NOUVEAU_PROGRAM_ID',
     routerProgramId: routerProgramId || 'BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz',
-    backMint: backMint || '862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux',
+    backMint: backMint || '6tFCrUr3mZpL3BzNV2cLjYDkoL7toYA74TpMCSxFg45E',
     collectionConfig: collectionConfig || '5eM6KdFGJ63597ayYYtUqcNRhzxKtpx5qfL5mqRHwBom',
   };
 }

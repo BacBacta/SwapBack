@@ -3,7 +3,7 @@ import { PublicKey } from "@solana/web3.js";
 // Mapping des tokens connus
 export const tokenAddresses: { [key: string]: string } = {
   SOL: "So11111111111111111111111111111111111111112",
-  BACK: process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
+  BACK: process.env.NEXT_PUBLIC_BACK_MINT || "6tFCrUr3mZpL3BzNV2cLjYDkoL7toYA74TpMCSxFg45E",
   USDC: process.env.NEXT_PUBLIC_USDC_MINT || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
   BONK: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
   USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",

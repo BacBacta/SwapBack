@@ -26,7 +26,7 @@ function getTokenMints(): Record<string, string> {
       USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
       BACK:
         process.env.NEXT_PUBLIC_BACK_MINT ||
-        "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
+        "6tFCrUr3mZpL3BzNV2cLjYDkoL7toYA74TpMCSxFg45E",
     };
   }
   return _tokenMints;

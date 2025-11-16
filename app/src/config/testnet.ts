@@ -8,7 +8,7 @@ import { PublicKey } from "@solana/web3.js";
 export const TESTNET_TOKENS = {
   BACK: {
     mint: new PublicKey(
-      process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
+      process.env.NEXT_PUBLIC_BACK_MINT || "6tFCrUr3mZpL3BzNV2cLjYDkoL7toYA74TpMCSxFg45E"
     ),
     symbol: "BACK",
     name: "SwapBack Token",

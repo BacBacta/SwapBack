@@ -37,8 +37,8 @@ export const USDC_MINT = new PublicKey(
   'BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR'
 );
 export const BACK_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_BACK_MINT || 
-  '862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux'
+  process.env.NEXT_PUBLIC_BACK_MINT ||
+  '6tFCrUr3mZpL3BzNV2cLjYDkoL7toYA74TpMCSxFg45E'
 );
 
 // Token symbol to mint mapping

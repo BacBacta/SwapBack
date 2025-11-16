@@ -25,7 +25,7 @@ let _backTokenMint: PublicKey | null = null;
 function getBackTokenMint(): PublicKey {
   if (!_backTokenMint) {
     _backTokenMint = new PublicKey(
-      process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
+      process.env.NEXT_PUBLIC_BACK_MINT || "6tFCrUr3mZpL3BzNV2cLjYDkoL7toYA74TpMCSxFg45E"
     );
   }
   return _backTokenMint;
