@@ -9,7 +9,7 @@ export default function DCAPage() {
       <div className="max-w-6xl mx-auto">
         <PageHeader
           title="📊 Dollar Cost Averaging"
-          description="Investissez automatiquement à intervalles réguliers pour lisser le prix d'achat"
+          description="Invest automatically at regular intervals to smooth out the purchase price"
           breadcrumbItems={[
             { label: "Home", href: "/" },
             { label: "DCA", href: "/dca" }

@@ -118,7 +118,7 @@ export const SwapBackInterface = () => {
   }, [connection]);
 
   // ============================
-  // 🚀 CRÉER UN PLAN DCA
+  // 🚀 CREATE A DCA PLAN
   // ============================
 
   const handleCreatePlan = useCallback(async () => {
@@ -286,7 +286,7 @@ export const SwapBackInterface = () => {
       {connected && (
         <div className="bg-[var(--primary)] rounded-2xl shadow-xl p-8">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">
-            Créer un plan DCA
+            Create a DCA plan
           </h2>
 
           {/* Input Amount */}

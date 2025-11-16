@@ -254,19 +254,19 @@ export const SwapBackDashboard = () => {
     <div className="max-w-6xl mx-auto space-y-6">
       {/* HEADER */}
       <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-8">
-        <h1 className="text-4xl font-bold mb-2 text-white">Mes Plans DCA</h1>
+        <h1 className="text-4xl font-bold mb-2 text-white">My DCA Plans</h1>
         <p className="text-gray-400 text-lg">
-          Gérez vos stratégies de Dollar-Cost Averaging
+          Manage your Dollar-Cost Averaging strategies
         </p>
         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-gray-900 rounded-lg p-4">
-            <div className="text-sm text-gray-400 mb-1">Plans actifs</div>
+            <div className="text-sm text-gray-400 mb-1">Active Plans</div>
             <div className="text-3xl font-bold text-white">
               {plans.filter((p) => !p.account.isPaused).length}
             </div>
           </div>
           <div className="bg-gray-900 rounded-lg p-4">
-            <div className="text-sm text-gray-400 mb-1">Total investi</div>
+            <div className="text-sm text-gray-400 mb-1">Total Invested</div>
             <div className="text-3xl font-bold text-white">
               {(lamportsToUiSafe(
                 plans.reduce((sum, p) => sum.add(p.account.inputAmount), new BN(0)),
@@ -276,7 +276,7 @@ export const SwapBackDashboard = () => {
             </div>
           </div>
           <div className="bg-gray-900 rounded-lg p-4">
-            <div className="text-sm text-gray-400 mb-1">Swaps exécutés</div>
+            <div className="text-sm text-gray-400 mb-1">Swaps Executed</div>
             <div className="text-3xl font-bold text-white">
               {plans.reduce(
                 (sum, p) => sum + bnToNumberWithFallback(p.account.swapsExecuted, 0),
@@ -307,16 +307,16 @@ export const SwapBackDashboard = () => {
         <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-12 text-center">
           <div className="text-6xl mb-6">📊</div>
           <h2 className="text-2xl font-bold text-white mb-4">
-            Aucun plan DCA actif
+            No active DCA plan
           </h2>
           <p className="text-gray-400 mb-8">
-            Créez votre premier plan pour commencer à investir automatiquement
+            Create your first plan to start investing automatically
           </p>
           <a
             href="/dca"
             className="inline-block bg-[var(--primary)] text-black px-8 py-3 rounded-lg font-semibold hover:bg-[var(--primary)]/90 transition-colors"
           >
-            Créer un plan DCA
+            Create a DCA plan
           </a>
         </div>
       )}
@@ -495,13 +495,13 @@ export const SwapBackDashboard = () => {
       {/* INFO FOOTER */}
       <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-6">
         <h3 className="text-lg font-semibold text-blue-400 mb-3">
-          💡 Comment ça marche ?
+          💡 How does it work?
         </h3>
         <ul className="space-y-2 text-sm text-gray-300">
           <li className="flex items-start">
             <span className="mr-2">•</span>
             <span>
-              Vos plans DCA s'exécutent automatiquement selon l'intervalle
+              Your DCA plans execute automatically according to the defined interval
               défini
             </span>
           </li>

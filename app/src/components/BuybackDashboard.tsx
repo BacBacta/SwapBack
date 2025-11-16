@@ -345,7 +345,7 @@ export default function BuybackDashboard() {
 
       {/* Info Section */}
       <div className="mt-6 bg-gray-800/30 rounded-xl p-4 border border-gray-700">
-        <h4 className="text-white font-semibold mb-2">ℹ️ Comment ça marche?</h4>
+        <h4 className="text-white font-semibold mb-2">ℹ️ How does it work?</h4>
         <ul className="text-gray-400 text-sm space-y-1">
           <li>• 25% des frais de swap sont collectés en USDC dans le vault</li>
           <li>• Quand le seuil est atteint, n'importe qui peut exécuter un buyback</li>
