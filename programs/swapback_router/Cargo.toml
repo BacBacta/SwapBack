@@ -34,7 +34,7 @@ switchboard-solana = { version = "0.30.4", optional = true }
 # pyth-sdk-solana = "0.10.6"
 
 # getrandom avec custom feature pour notre stub BPF
-getrandom = { version = "0.2", default-features = false, features = ["custom"] }
+getrandom = { version = "0.3", default-features = false, features = ["custom"] }
 
 # Forcer les versions compatibles avec Rust 1.79
 indexmap = "=2.6.0"
