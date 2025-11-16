@@ -91,7 +91,7 @@ export default function Error({
             onClick={() => window.location.href = "/"}
             className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded transition"
           >
-            Retour à l'accueil
+            Back to home
           </button>
         </div>
 

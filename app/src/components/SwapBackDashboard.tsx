@@ -67,7 +67,7 @@ export const SwapBackDashboard = () => {
   const [error, setError] = useState<string | null>(null);
 
   // ============================
-  // 📊 CHARGER LES PLANS DCA
+  // 📊 LOAD DCA PLANS
   // ============================
 
   useEffect(() => {
@@ -87,7 +87,7 @@ export const SwapBackDashboard = () => {
           getRouterProgramId(),
           {
             filters: [
-              // Filtrer par discriminator (si connu) ou par authority
+              // Filter by discriminator (if known) or by authority
               {
                 memcmp: {
                   offset: 8, // Après le discriminator
@@ -182,7 +182,7 @@ export const SwapBackDashboard = () => {
     // Vérifier la plage sûre avant toNumber()
     const maxSafeBN = new BN(Number.MAX_SAFE_INTEGER);
     if (whole.gt(maxSafeBN)) {
-      // Retourner en format string si trop grand
+      // Return as string if too large
       const wholeStr = whole.toString();
       const remainderStr = remainder.toString().padStart(decimals, '0');
       return `${wholeStr}.${remainderStr.slice(0, 4)}`;
@@ -482,7 +482,7 @@ export const SwapBackDashboard = () => {
                       disabled
                       className="flex-1 bg-gray-900/50 text-gray-500 px-4 py-2 rounded-lg font-medium cursor-not-allowed border border-gray-800"
                     >
-                      ❌ Annuler (bientôt)
+                      ❌ Cancel (soon)
                     </button>
                   )}
                 </div>
@@ -515,7 +515,7 @@ export const SwapBackDashboard = () => {
           <li className="flex items-start">
             <span className="mr-2">•</span>
             <span>
-              Vous pouvez mettre en pause ou annuler un plan à tout moment
+              You can pause or cancel a plan at any time
             </span>
           </li>
         </ul>

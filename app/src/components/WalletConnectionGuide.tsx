@@ -37,14 +37,14 @@ export const WalletConnectionGuide = () => {
         <div className="text-2xl">👻</div>
         <div className="flex-1">
           <h3 className="font-bold text-white">
-            Connecter Phantom
+            Connect Phantom
           </h3>
           <p className="text-sm text-gray-300 mb-3">
             Pour utiliser SwapBack, connectez votre wallet Phantom sur Solana Mainnet.
           </p>
           <div className="space-y-2 text-xs text-gray-400">
             <p>🔧 <strong>Vérifier le réseau :</strong></p>
-            <p>1. Ouvrez Phantom → Paramètres</p>
+            <p>1. Open Phantom → Settings</p>
             <p>2. Developer Settings → Change Network</p>
             <p>3. Sélectionnez "Mainnet Beta"</p>
           </div>

@@ -415,7 +415,7 @@ export const SwapInterface = () => {
         {showSettings && (
           <div className="mb-6 p-6 bg-black/60 backdrop-blur-sm border-2 border-[var(--primary)]/30 animate-fade-in">
             <h3 className="text-lg font-bold terminal-text mb-4 uppercase tracking-wider">
-              ⚙️ Paramètres
+              ⚙️ Settings
             </h3>
             <div>
               <label className="block text-sm font-semibold terminal-text uppercase tracking-wider mb-2">

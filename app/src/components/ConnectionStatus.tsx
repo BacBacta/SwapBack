@@ -48,7 +48,7 @@ export const ConnectionStatus = () => {
           className="px-2 py-1 border-2 border-[var(--accent)] hover:bg-[var(--accent)] hover:text-black text-[var(--accent)] text-xs uppercase tracking-wider transition-colors"
           disabled={isReconnecting}
         >
-          {isReconnecting ? "[RECONNEXION...]" : "[RECONNECTER]"}
+          {isReconnecting ? "[RECONNECTING...]" : "[RECONNECT]"}
         </button>
       </div>
     );

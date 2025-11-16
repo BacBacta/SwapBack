@@ -183,7 +183,7 @@ export const JupiterSwapWidget: React.FC = () => {
       {!jupiter.isReady && (
         <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
           <p className="text-sm text-yellow-800">
-            ⚠️ Veuillez connecter votre wallet pour continuer
+            ⚠️ Please connect your wallet to continue
           </p>
         </div>
       )}

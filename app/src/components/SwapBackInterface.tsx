@@ -123,7 +123,7 @@ export const SwapBackInterface = () => {
 
   const handleCreatePlan = useCallback(async () => {
     if (!publicKey || !connected) {
-      setError("Veuillez connecter votre wallet");
+      setError("Please connect your wallet");
       return;
     }
 
@@ -146,7 +146,7 @@ export const SwapBackInterface = () => {
         { commitment: "confirmed" }
       );
 
-      // 2. Charger le programme
+      // 2. Load program
       const program = new Program(
         ROUTER_IDL,
         provider
@@ -275,7 +275,7 @@ export const SwapBackInterface = () => {
             Connectez votre wallet
           </h2>
           <p className="text-gray-600 mb-6">
-            Pour créer un plan DCA, vous devez d'abord connecter votre wallet
+            To create a DCA plan, you must first connect your wallet
             Solana
           </p>
           <WalletMultiButton className="mx-auto" />

@@ -64,7 +64,7 @@ export interface CNFTLockParams {
 }
 
 /**
- * Calcule le niveau de cNFT basé sur le montant et la durée
+ * Calculate cNFT level based on amount and duration
  * Nouveau système: 5 tiers (Bronze, Silver, Gold, Platinum, Diamond)
  */
 export function calculateLevel(
@@ -205,7 +205,7 @@ export async function createLockTransaction(
 
   // ⚠️ ATTENTION: Version simplifiée - Lock local uniquement
   // Le programme cNFT ne gère pas encore le transfert de tokens BACK
-  // TODO: Ajouter les instructions de transfert de tokens vers un PDA de lock
+  // TODO: Add instructions to transfer tokens to a lock PDA
   
   // Pour l'instant, on crée une transaction vide qui sera toujours rejetée
   // mais on stocke les données en local
@@ -233,7 +233,7 @@ export async function createLockTransaction(
     SystemProgram.transfer({
       fromPubkey: wallet.publicKey,
       toPubkey: wallet.publicKey,
-      lamports: 0, // Transaction de 0 SOL pour simuler le succès
+      lamports: 0, // 0 SOL transaction to simulate success
     })
   );
 
@@ -250,7 +250,7 @@ export async function createUnlockTransaction(
   wallet: WalletContextState
 ): Promise<Transaction> {
   console.warn(
-    "[swapback_cnft] createUnlockTransaction est dépréciée. Utilisez createUnlockTokensTransaction qui appelle unlock_tokens."
+    "[swapback_cnft] createUnlockTransaction is deprecated. Use createUnlockTokensTransaction which calls unlock_tokens."
   );
   return createUnlockTokensTransaction(_connection, wallet);
 }

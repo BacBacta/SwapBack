@@ -1,5 +1,5 @@
 /**
- * Utilitaires pour verrouiller des tokens BACK avec transfert on-chain
+ * Utilities for locking BACK tokens with on-chain transfer
  */
 
 import {
@@ -47,7 +47,7 @@ function getBackMint(): PublicKey | null {
 }
 
 /**
- * Crée une transaction pour verrouiller des tokens BACK avec transfert on-chain
+ * Create a transaction to lock BACK tokens with on-chain transfer
  */
 export async function createLockTokensTransaction(
   connection: Connection,
@@ -60,7 +60,7 @@ export async function createLockTokensTransaction(
   console.log('🔍 [LOCK TX] Creating lock transaction...');
   console.log('🔍 [LOCK TX] Params:', params);
   
-  // Valider la configuration AVANT de construire la transaction
+  // Validate configuration BEFORE building the transaction
   // Resolve program IDs / mints lazily
   const CNFT_PROGRAM_ID = getCnftProgramId();
   const BACK_MINT = getBackMint();
@@ -218,7 +218,7 @@ export async function createLockTokensTransaction(
     
     console.log('✅ [LOCK TX] Instruction created successfully');
 
-    // Ajouter les instructions de compute budget pour éviter les erreurs
+    // Add compute budget instructions to avoid errors
     const { ComputeBudgetProgram } = await import('@solana/web3.js');
     
     const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({
@@ -247,7 +247,7 @@ export async function createLockTokensTransaction(
 }
 
 /**
- * Crée une transaction pour déverrouiller des tokens BACK
+ * Create a transaction to unlock BACK tokens
  */
 export async function createUnlockTokensTransaction(
   connection: Connection,
@@ -389,7 +389,7 @@ export async function createUnlockTokensTransaction(
 
     console.log('✅ [UNLOCK TX] Instruction created successfully');
 
-    // Créer la transaction et configurer les paramètres requis
+    // Create transaction and configure required parameters
     const transaction = new Transaction().add(instruction);
     
     // Définir le fee payer

@@ -44,7 +44,7 @@ export const TransactionHistory = ({
     "all" | "swap" | "lock" | "unlock" | "dca"
   >("all");
 
-  // Charger l'historique depuis localStorage
+  // Load history from localStorage
   useEffect(() => {
     if (connected && publicKey) {
       const storageKey = `swapback_history_${publicKey.toString()}`;
@@ -401,7 +401,7 @@ export const TransactionHistory = ({
   );
 };
 
-// Fonctions helper pour ajouter des transactions dans l'historique
+// Helper functions to add transactions to history
 export const addTransactionToHistory = (
   walletAddress: string,
   tx: Omit<Transaction, "id" | "timestamp">

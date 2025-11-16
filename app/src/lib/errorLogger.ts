@@ -1,6 +1,6 @@
 /**
- * Système de logging détaillé pour capturer les erreurs
- * Enregistre les erreurs côté client et serveur avec contexte complet
+ * Detailed logging system to capture errors
+ * Records client-side and server-side errors with full context
  */
 
 export interface ErrorLog {
@@ -32,7 +32,7 @@ class ErrorLogger {
   private maxLogs = 100;
 
   /**
-   * Enregistre une erreur avec contexte complet
+   * Record an error with full context
    */
   log(
     error: Error | unknown,
@@ -61,7 +61,7 @@ class ErrorLogger {
       additionalData: context.additionalData,
     };
 
-    // Ajouter au buffer
+    // Add to buffer
     this.logs.push(errorLog);
     if (this.logs.length > this.maxLogs) {
       this.logs.shift();
@@ -79,7 +79,7 @@ class ErrorLogger {
   }
 
   /**
-   * Sérialise une erreur pour le logging
+   * Serialize an error for logging
    */
   private serializeError(error: unknown): ErrorLog["error"] {
     if (error instanceof Error) {
@@ -105,7 +105,7 @@ class ErrorLogger {
   }
 
   /**
-   * Affiche l'erreur dans la console avec formatage
+   * Display error in console with formatting
    */
   private logToConsole(log: ErrorLog): void {
     console.group(`🔴 ERROR: ${log.error.name}`);
@@ -142,7 +142,7 @@ class ErrorLogger {
   }
 
   /**
-   * Envoie l'erreur au serveur pour persistence
+   * Send error to server for persistence
    */
   private async sendToServer(log: ErrorLog): Promise<void> {
     try {

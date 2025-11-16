@@ -72,7 +72,7 @@ export async function fetchBackPrice(network?: 'mainnet' | 'devnet' | 'mainnet-b
 }
 
 /**
- * Obtient le Price Update Account pour transactions on-chain
+ * Get Price Update Account for on-chain transactions
  * Ce compte est nécessaire pour que le programme puisse lire le prix
  */
 export async function getPriceUpdateAccount(
@@ -103,7 +103,7 @@ export async function getPriceUpdateAccount(
     // import { getPythProgramKeyForCluster } from '@pythnetwork/pyth-solana-receiver';
     // const pythProgram = getPythProgramKeyForCluster(network);
     
-    // Pour le moment, retourner un compte mock pour dev
+    // For now, return mock account for dev
     // TODO: Implémenter la création du price update account
     const mockPriceUpdateAccount = new PublicKey('PyTHMockAccountxxxxxxxxxxxxxxxxxxxxxxxxxxx');
     
@@ -116,10 +116,10 @@ export async function getPriceUpdateAccount(
 }
 
 /**
- * Calcule le montant minimum de $BACK attendu avec slippage protection
- * @param usdcAmount - Montant en USDC (UI units, ex: 100 = 100 USDC)
+ * Calculate minimum $BACK amount expected with slippage protection
+ * @param usdcAmount - Amount in USDC (UI units, ex: 100 = 100 USDC)
  * @param slippageBps - Slippage en basis points (ex: 100 = 1%)
- * @returns Montant minimum de $BACK en lamports (6 decimals)
+ * @returns Minimum $BACK amount in lamports (6 decimals)
  */
 export async function calculateMinBackAmount(
   usdcAmount: number,

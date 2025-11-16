@@ -107,7 +107,7 @@ export class GlobalErrorBoundary extends React.Component<Props, State> {
                 onClick={() => window.location.reload()}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition"
               >
-                Recharger la page
+                Reload page
               </button>
               
               <button
@@ -118,7 +118,7 @@ export class GlobalErrorBoundary extends React.Component<Props, State> {
                 }}
                 className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded transition"
               >
-                Télécharger les logs
+                Download logs
               </button>
             </div>
 

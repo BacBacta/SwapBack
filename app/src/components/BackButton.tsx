@@ -13,7 +13,7 @@ interface BackButtonProps {
 
 export const BackButton = ({ 
   fallbackUrl = "/", 
-  label = "Retour",
+  label = "Back",
   variant = "default",
   className = ""
 }: BackButtonProps) => {

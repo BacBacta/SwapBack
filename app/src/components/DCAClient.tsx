@@ -131,7 +131,7 @@ export const DCAClient = () => {
     }
 
     if (!connected || !publicKey) {
-      alert("❌ Veuillez connecter votre wallet pour créer un ordre DCA");
+      alert("❌ Please connect your wallet to create a DCA order");
       return;
     }
 
@@ -296,7 +296,7 @@ export const DCAClient = () => {
           {/* DCA Information */}
           <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4">
             <h4 className="text-blue-300 font-bold mb-2 terminal-text">
-              <span className="terminal-prefix">&gt;</span> [À PROPOS DU DCA]
+              <span className="terminal-prefix">&gt;</span> [ABOUT DCA]
             </h4>
             <p className="text-blue-200 text-sm mb-2">
               Le Dollar Cost Averaging (DCA) vous permet d'investir
@@ -503,7 +503,7 @@ export const DCAClient = () => {
               </button>
               {!connected && walletReady && (
                 <p className="text-red-400 text-sm mt-2 text-center">
-                  Veuillez connecter votre wallet pour créer un ordre DCA
+                  Please connect your wallet to create a DCA order
                 </p>
               )}
             </div>

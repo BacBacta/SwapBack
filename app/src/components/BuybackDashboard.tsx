@@ -52,10 +52,10 @@ export default function BuybackDashboard() {
     BUYBACK_PROGRAM_ID
   );
 
-  // Charger l'état du buyback
+  // Load buyback state
   const loadBuybackState = async () => {
     try {
-      // Charger le compte buyback state
+      // Load buyback state account
       const accountInfo = await connection.getAccountInfo(buybackStatePDA);
       if (accountInfo) {
         // Parser les données (simplifié - à adapter selon votre struct)
@@ -88,7 +88,7 @@ export default function BuybackDashboard() {
         });
       }
 
-      // Charger le balance du vault
+      // Load vault balance
       const vaultInfo = await connection.getTokenAccountBalance(usdcVaultPDA);
       setVaultBalance(parseFloat(vaultInfo.value.uiAmount?.toString() || '0'));
     } catch (error) {

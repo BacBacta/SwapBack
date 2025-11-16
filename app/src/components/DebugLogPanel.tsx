@@ -2,7 +2,7 @@
 
 /**
  * Panneau de debug pour afficher les logs d'erreur en temps réel
- * Appuyez sur Ctrl+Shift+L pour ouvrir/fermer
+ * Press Ctrl+Shift+L to open/close
  */
 
 import { useState, useEffect } from "react";
@@ -37,7 +37,7 @@ export function DebugLogPanel() {
     return () => clearInterval(interval);
   }, [isOpen, autoRefresh]);
 
-  // Charger les logs à l'ouverture
+  // Load logs on open
   useEffect(() => {
     if (isOpen) {
       setLogs(errorLogger.getLogs());
@@ -227,7 +227,7 @@ export function DebugLogPanel() {
         <div className="p-3 border-t border-gray-700 bg-gray-800 text-xs text-gray-400">
           💡 Raccourci: <kbd className="bg-gray-700 px-2 py-1 rounded">Ctrl</kbd> +{" "}
           <kbd className="bg-gray-700 px-2 py-1 rounded">Shift</kbd> +{" "}
-          <kbd className="bg-gray-700 px-2 py-1 rounded">L</kbd> pour ouvrir/fermer
+          <kbd className="bg-gray-700 px-2 py-1 rounded">L</kbd> to open/close
           | Console: <code className="bg-gray-700 px-2 py-1 rounded">window.errorLogger.getLogs()</code>
         </div>
       </div>

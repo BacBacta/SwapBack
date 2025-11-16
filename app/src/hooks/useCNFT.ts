@@ -32,7 +32,7 @@ export function useCNFT() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  // Charger les données cNFT depuis la blockchain
+  // Load cNFT data from blockchain
   const fetchCNFTData = useCallback(async () => {
     if (!publicKey || !connection) {
       setCnftData(null);

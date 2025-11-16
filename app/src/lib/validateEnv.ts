@@ -1,6 +1,6 @@
 /**
  * Validation stricte des variables d'environnement critiques
- * Fail-fast pour éviter les erreurs AccountOwnedByWrongProgram
+ * Fail-fast to avoid AccountOwnedByWrongProgram errors
  */
 
 import { PublicKey } from "@solana/web3.js";

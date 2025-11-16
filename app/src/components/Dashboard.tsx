@@ -37,7 +37,7 @@ export const Dashboard = () => {
       loading,
     });
 
-    // Capturer toutes les erreurs non gérées dans Dashboard
+    // Capture all unhandled errors in Dashboard
     const errorHandler = (event: ErrorEvent) => {
       logError(event.error, {
         component: "Dashboard",
@@ -121,7 +121,7 @@ export const Dashboard = () => {
             Protocol Statistics
           </h2>
           <div className="flex items-center gap-3">
-            {/* Bouton de rafraîchissement manuel */}
+            {/* Manual refresh button */}
             <button
               onClick={() => {
                 refresh();
@@ -129,7 +129,7 @@ export const Dashboard = () => {
               }}
               disabled={loading || globalStateLoading}
               className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg border border-[var(--primary)]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Rafraîchir les statistiques"
+              title="Refresh statistics"
             >
               <svg
                 className={`w-4 h-4 text-[var(--primary)] ${loading ? "animate-spin" : ""}`}

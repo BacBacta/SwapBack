@@ -158,7 +158,7 @@ const getJupiterUrl = (endpoint: string) => {
 /**
  * Solana RPC Endpoint
  * Default: devnet
- * Vercel: Ajouter NEXT_PUBLIC_SOLANA_RPC_URL dans Environment Variables
+ * Vercel: Add NEXT_PUBLIC_SOLANA_RPC_URL in Environment Variables
  */
 const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
@@ -167,7 +167,7 @@ const RPC_ENDPOINT =
 /**
  * Mock Mode (pour dev/test sans réseau)
  * Default: false
- * Vercel: Ajouter USE_MOCK_QUOTES=false (ou true pour staging)
+ * Vercel: Add USE_MOCK_QUOTES=false (or true for staging)
  */
 const USE_MOCK_DATA = process.env.USE_MOCK_QUOTES === "true";
 

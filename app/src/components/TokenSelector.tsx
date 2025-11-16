@@ -220,7 +220,7 @@ export const TokenSelector = ({
   };
 
   useEffect(() => {
-    // Fermer avec Escape
+    // Close with Escape
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };

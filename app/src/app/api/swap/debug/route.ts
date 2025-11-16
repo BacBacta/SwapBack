@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
 
     const parsedAmount = typeof amount === "string" ? parseFloat(amount) : amount;
 
-    // Construction exacte des paramètres comme dans route.ts
+    // Exact construction of parameters as in route.ts
     const params = new URLSearchParams({
       inputMint,
       outputMint,

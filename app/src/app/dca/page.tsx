@@ -11,7 +11,7 @@ export default function DCAPage() {
           title="📊 Dollar Cost Averaging"
           description="Investissez automatiquement à intervalles réguliers pour lisser le prix d'achat"
           breadcrumbItems={[
-            { label: "Accueil", href: "/" },
+            { label: "Home", href: "/" },
             { label: "DCA", href: "/dca" }
           ]}
           showBackButton={true}

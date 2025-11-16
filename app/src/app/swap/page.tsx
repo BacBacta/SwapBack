@@ -10,7 +10,7 @@ export default function SwapPage() {
         <div className="mb-6">
           <Breadcrumb 
             items={[
-              { label: "Accueil", href: "/" },
+              { label: "Home", href: "/" },
               { label: "Swap", href: "/swap" }
             ]} 
           />

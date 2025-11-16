@@ -54,7 +54,7 @@ export function EnhancedSwapInterface() {
   const [priceImpact, setPriceImpact] = useState(0);
 
   // ⚠️ AUTO-FETCH DÉSACTIVÉ pour éviter les boucles infinies
-  // L'utilisateur doit cliquer sur "Rechercher Route" manuellement
+  // User must click "Search Route" manually
 
   // Debounced route fetching - DÉSACTIVÉ
   // const debouncedFetchRoutes = useCallback(

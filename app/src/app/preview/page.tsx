@@ -140,7 +140,7 @@ export default function PreviewIndex() {
             <table className="w-full terminal-text text-sm">
               <thead>
                 <tr className="border-b border-[var(--primary)]/30">
-                  <th className="text-left py-3 px-4 text-[var(--muted)] font-normal">Critère</th>
+                  <th className="text-left py-3 px-4 text-[var(--muted)] font-normal">Criteria</th>
                   <th className="text-center py-3 px-4 text-[var(--primary)]">Option 1</th>
                   <th className="text-center py-3 px-4 text-[var(--secondary)]">Option 2</th>
                   <th className="text-center py-3 px-4 text-[var(--accent)]">Option 3</th>
@@ -148,12 +148,12 @@ export default function PreviewIndex() {
               </thead>
               <tbody>
                 {[
-                  { label: "First Impression", values: ["🚀 Impact fort", "💼 Professionnel", "✨ Immersif"] },
-                  { label: "Swap Interface", values: ["Lien vers /swap", "Intégrée en hero", "Lien en fin"] },
-                  { label: "Metrics Display", values: ["Hero + stats", "Barre sticky", "Intégrées au récit"] },
-                  { label: "Best For", values: ["Expérimentés", "Nouveaux users", "Discovery"] },
+                  { label: "First Impression", values: ["🚀 Strong impact", "💼 Professional", "✨ Immersive"] },
+                  { label: "Swap Interface", values: ["Link to /swap", "Embedded in hero", "Link at end"] },
+                  { label: "Metrics Display", values: ["Hero + stats", "Sticky bar", "Integrated in story"] },
+                  { label: "Best For", values: ["Experienced", "New users", "Discovery"] },
                   { label: "Dev Complexity", values: ["⭐⭐⭐", "⭐⭐⭐⭐", "⭐⭐⭐⭐⭐"] },
-                  { label: "Mobile Support", values: ["✅ Excellent", "✅ Excellent", "⚠️ Complexe"] },
+                  { label: "Mobile Support", values: ["✅ Excellent", "✅ Excellent", "⚠️ Complex"] },
                 ].map((row, idx) => (
                   <tr key={idx} className="border-b border-[var(--primary)]/10">
                     <td className="py-3 px-4 text-[var(--muted)]">{row.label}</td>
