@@ -5,6 +5,7 @@
 
 import { Connection, PublicKey } from '@solana/web3.js';
 import { HermesClient } from '@pythnetwork/hermes-client';
+import { DEFAULT_SOLANA_NETWORK, TOKEN_DECIMALS } from '@/config/constants';
 
 // Pyth Price Service (Hermes) - Mainnet & Devnet
 const PYTH_PRICE_SERVICE_MAINNET = 'https://hermes.pyth.network';
@@ -26,7 +27,7 @@ const MANUAL_BACK_PRICE = parseFloat(process.env.NEXT_PUBLIC_BACK_MANUAL_PRICE |
 export async function fetchBackPrice(network?: 'mainnet' | 'devnet' | 'mainnet-beta'): Promise<number> {
   try {
     // Utiliser le réseau de l'environnement par défaut
-    const defaultNetwork = (process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'mainnet-beta') as 'mainnet' | 'devnet' | 'mainnet-beta';
+    const defaultNetwork = (process.env.NEXT_PUBLIC_SOLANA_NETWORK || DEFAULT_SOLANA_NETWORK) as 'mainnet' | 'devnet' | 'mainnet-beta';
     const actualNetwork = network || defaultNetwork;
     
     const priceServiceUrl = (actualNetwork === 'mainnet' || actualNetwork === 'mainnet-beta')
@@ -79,7 +80,7 @@ export async function getPriceUpdateAccount(
   network?: 'mainnet' | 'devnet' | 'mainnet-beta'
 ): Promise<PublicKey> {
   try {
-    const defaultNetwork = (process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'mainnet-beta') as 'mainnet' | 'devnet' | 'mainnet-beta';
+    const defaultNetwork = (process.env.NEXT_PUBLIC_SOLANA_NETWORK || DEFAULT_SOLANA_NETWORK) as 'mainnet' | 'devnet' | 'mainnet-beta';
     const actualNetwork = network || defaultNetwork;
     
     const priceServiceUrl = (actualNetwork === 'mainnet' || actualNetwork === 'mainnet-beta')
@@ -118,14 +119,14 @@ export async function getPriceUpdateAccount(
  * Calcule le montant minimum de $BACK attendu avec slippage protection
  * @param usdcAmount - Montant en USDC (UI units, ex: 100 = 100 USDC)
  * @param slippageBps - Slippage en basis points (ex: 100 = 1%)
- * @returns Montant minimum de $BACK en lamports (9 decimals)
+ * @returns Montant minimum de $BACK en lamports (6 decimals)
  */
 export async function calculateMinBackAmount(
   usdcAmount: number,
   slippageBps: number = 100, // 1% par défaut
   network?: 'mainnet' | 'devnet' | 'mainnet-beta'
 ): Promise<bigint> {
-  const defaultNetwork = (process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'mainnet-beta') as 'mainnet' | 'devnet' | 'mainnet-beta';
+  const defaultNetwork = (process.env.NEXT_PUBLIC_SOLANA_NETWORK || DEFAULT_SOLANA_NETWORK) as 'mainnet' | 'devnet' | 'mainnet-beta';
   const actualNetwork = network || defaultNetwork;
   
   const backPrice = await fetchBackPrice(actualNetwork);
@@ -139,7 +140,8 @@ export async function calculateMinBackAmount(
   const minBackUi = expectedBackUi * slippageMultiplier;
   
   // Convertir en lamports (9 decimals)
-  const minBackLamports = BigInt(Math.floor(minBackUi * 1e9));
+  const decimalMultiplier = Math.pow(10, TOKEN_DECIMALS);
+  const minBackLamports = BigInt(Math.floor(minBackUi * decimalMultiplier));
   
   console.log('Swap calculation:', {
     usdcAmount,

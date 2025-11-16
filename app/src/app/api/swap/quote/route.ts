@@ -11,6 +11,7 @@ export const revalidate = 0;
 import { NextRequest, NextResponse } from "next/server";
 import { Connection } from "@solana/web3.js";
 import { getTokenByMint } from "@/constants/tokens";
+import { DEFAULT_SOLANA_RPC_URL } from "@/config/constants";
 
 // ============================================================================
 // ENVIRONMENT VARIABLES - Configurables sur Vercel
@@ -156,12 +157,12 @@ const getJupiterUrl = (endpoint: string) => {
 
 /**
  * Solana RPC Endpoint
- * Default: testnet
+ * Default: devnet
  * Vercel: Ajouter NEXT_PUBLIC_SOLANA_RPC_URL dans Environment Variables
  */
 const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
-  "https://api.mainnet-beta.solana.com";
+  DEFAULT_SOLANA_RPC_URL;
 
 /**
  * Mock Mode (pour dev/test sans réseau)

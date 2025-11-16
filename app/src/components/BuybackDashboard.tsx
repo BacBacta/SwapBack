@@ -8,10 +8,11 @@ import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token';
 import { BN } from '@coral-xyz/anchor';
 import { getExplorerAddressUrl } from '@/utils/explorer';
 import { bnToNumberWithFallback, lamportsToUiSafe } from '@/lib/bnUtils';
+import { getBackTokenMint, TOKEN_DECIMALS } from '@/config/constants';
 
 // Program IDs et constants
 const BUYBACK_PROGRAM_ID = new PublicKey('92znK8METYTFW5dGDJUnHUMqubVGnPBTyjZ4HzjWQzir');
-const BACK_TOKEN_MINT = new PublicKey('3Y6RXZUBHCeUj6VsWuyBY2Zy1RixY6BHkM4tf3euDdrE');
+const BACK_TOKEN_MINT = getBackTokenMint();
 const USDC_MINT = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
 
 // Discriminators
@@ -70,7 +71,7 @@ export default function BuybackDashboard() {
         const lastBuybackTimeBN = new BN(data.slice(128, 136), 'le');
         
         const totalUsdcCollected = lamportsToUiSafe(totalUsdcCollectedBN, 6) || 0;
-        const totalBackBurned = lamportsToUiSafe(totalBackBurnedBN, 9) || 0;
+        const totalBackBurned = lamportsToUiSafe(totalBackBurnedBN, TOKEN_DECIMALS) || 0;
         const minBuybackAmount = lamportsToUiSafe(minBuybackAmountBN, 6) || 0;
         const lastBuybackTime = bnToNumberWithFallback(lastBuybackTimeBN, 0);
         const bump = data[136];

@@ -1,5 +1,10 @@
 import { PublicKey } from '@solana/web3.js';
 
+// Devnet defaults remain in effect until mainnet launch
+export const DEFAULT_SOLANA_NETWORK = 'devnet';
+export const DEFAULT_SOLANA_RPC_URL = 'https://api.devnet.solana.com';
+export const DEFAULT_BACK_MINT = '6tFCrUr3mZpL3BzNV2cLjYDkoL7toYA74TpMCSxFg45E';
+
 /**
  * Configuration centralisée pour SwapBack
  * Toutes les constantes importantes du projet
@@ -54,7 +59,7 @@ let _backTokenMint: PublicKey | null = null;
 export function getBackTokenMint(): PublicKey {
   if (!_backTokenMint) {
     _backTokenMint = new PublicKey(
-      process.env.NEXT_PUBLIC_BACK_MINT || '3Y6RXZUBHCeUj6VsWuyBY2Zy1RixY6BHkM4tf3euDdrE'
+      process.env.NEXT_PUBLIC_BACK_MINT || DEFAULT_BACK_MINT
     );
   }
   return _backTokenMint;
@@ -114,7 +119,7 @@ export const LEVEL_COLORS: Record<CNFTLevel, string> = {
 
 // Lazy load to avoid module-level env access
 export function getSolanaNetwork(): string {
-  return process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
+  return process.env.NEXT_PUBLIC_SOLANA_NETWORK || DEFAULT_SOLANA_NETWORK;
 }
 
 // DO NOT export SOLANA_NETWORK at module level - use getSolanaNetwork() instead
@@ -134,7 +139,7 @@ export const SOLANA_EXPLORER_BASE_URL = 'https://explorer.solana.com';
 // ============================================
 
 export const DEFAULT_COMMITMENT = 'confirmed';
-export const TOKEN_DECIMALS = 9; // Pour $BACK token
+export const TOKEN_DECIMALS = 6; // $BACK mint configured with 6 decimals
 
 // ============================================
 // UI CONSTANTS

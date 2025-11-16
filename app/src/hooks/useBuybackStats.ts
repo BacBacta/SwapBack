@@ -5,6 +5,7 @@
 import { useConnection } from '@solana/wallet-adapter-react';
 import { useEffect, useState, useCallback } from 'react';
 import { PublicKey, Connection } from '@solana/web3.js';
+import { TOKEN_DECIMALS } from '@/config/constants';
 
 // TODO: Import from @swapback/sdk when installed
 // import { getBuybackStats, formatBuybackStats, estimateNextBuyback } from '@swapback/sdk';
@@ -64,9 +65,11 @@ async function getBuybackStatsFromChain(connection: Connection): Promise<Buyback
     offset += 8;
     const buybackCount = readU64(offset);
 
+    const backDivisor = Math.pow(10, TOKEN_DECIMALS);
+
     return {
       totalUsdcSpent: (totalUsdcSpent / 1e6).toFixed(2),
-      totalBackBurned: (totalBackBurned / 1e9).toFixed(2),
+      totalBackBurned: (totalBackBurned / backDivisor).toFixed(2),
       buybackCount: buybackCount.toString(),
       minBuybackAmount: (minBuybackAmount / 1e6).toFixed(2),
     };

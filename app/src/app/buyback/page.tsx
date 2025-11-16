@@ -7,9 +7,11 @@ import ExecuteBuybackButton from './components/ExecuteBuybackButton';
 import BuybackChart from './components/BuybackChart';
 import RecentBuybacks from './components/RecentBuybacks';
 import { getNetworkLabel } from '@/utils/explorer';
+import { getBackTokenMint } from '@/config/constants';
 
 export default function BuybackPage() {
   const { buybackState, isLoading, error } = useBuybackState();
+  const backMintAddress = getBackTokenMint().toBase58();
 
   if (error) {
     return (
@@ -184,7 +186,7 @@ export default function BuybackPage() {
               <div>
                 <div className="text-gray-400 mb-1">$BACK Mint (Token-2022)</div>
                 <code className="text-green-400 break-all">
-                  3Y6RXZUBHCeUj6VsWuyBY2Zy1RixY6BHkM4tf3euDdrE
+                  {backMintAddress}
                 </code>
               </div>
               <div>

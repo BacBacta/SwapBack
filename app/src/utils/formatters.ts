@@ -1,3 +1,5 @@
+import { DEFAULT_SOLANA_NETWORK } from '@/config/constants';
+
 /**
  * Format USDC amount to human-readable string
  * @param amount USDC amount in base units (1e6)
@@ -10,7 +12,7 @@ export function formatUSDC(amount: number | undefined, decimals = 2): string {
 
 /**
  * Format $BACK amount to human-readable string
- * @param amount BACK amount in base units (1e9)
+ * @param amount BACK amount in base units (1e6)
  * @param decimals Number of decimal places (default 2)
  */
 export function formatBACK(amount: number | undefined, decimals = 2): string {
@@ -97,7 +99,7 @@ export function getTimeRemaining(unlockTimestamp: number): string {
  */
 export function getExplorerUrl(signature: string, cluster?: 'mainnet' | 'devnet' | 'testnet' | 'mainnet-beta'): string {
   // Utiliser le réseau de l'environnement par défaut
-  const defaultCluster = (process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'mainnet-beta') as 'mainnet' | 'devnet' | 'testnet' | 'mainnet-beta';
+  const defaultCluster = (process.env.NEXT_PUBLIC_SOLANA_NETWORK || DEFAULT_SOLANA_NETWORK) as 'mainnet' | 'devnet' | 'testnet' | 'mainnet-beta';
   const actualCluster = cluster || defaultCluster;
   
   // Normaliser mainnet-beta vers mainnet pour l'URL

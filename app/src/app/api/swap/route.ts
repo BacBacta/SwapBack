@@ -7,10 +7,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { Connection } from "@solana/web3.js";
 import { checkRateLimit, getClientIdentifier } from "../../../lib/rateLimit";
 import { sanitizeAmount, isValidPublicKey } from "../../../lib/validation";
+import { DEFAULT_SOLANA_RPC_URL } from "@/config/constants";
 
 const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
-  "https://api.mainnet-beta.solana.com";
+  DEFAULT_SOLANA_RPC_URL;
 
 export async function POST(request: NextRequest) {
   try {

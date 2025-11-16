@@ -8,6 +8,7 @@ import {
 import { WalletContextState } from "@solana/wallet-adapter-react";
 import type { Idl } from "@coral-xyz/anchor";
 import cnftIdl from "@/idl/swapback_cnft.json";
+import { TOKEN_DECIMALS } from "@/config/constants";
 
 // Lazy load CNFT_PROGRAM_ID to avoid module-level env access
 let _cnftProgramId: PublicKey | null = null;
@@ -64,6 +65,8 @@ const LOCK_LEVEL_VARIANTS: LockLevel[] = [
   LockLevel.Diamond,
 ];
 
+const BACK_DECIMAL_MULTIPLIER = Math.pow(10, TOKEN_DECIMALS);
+
 export interface CNFTLockParams {
   amount: number;
   duration: number; // en secondes
@@ -77,26 +80,31 @@ export function calculateLevel(
   amount: number,
   durationDays: number
 ): LockLevel {
-  const amountLamports = amount * 1e9; // Convertir en lamports
+  const amountLamports = amount * BACK_DECIMAL_MULTIPLIER; // Convertir selon décimales BACK
+  const diamondThreshold = 100_000 * BACK_DECIMAL_MULTIPLIER;
+  const platinumThreshold = 50_000 * BACK_DECIMAL_MULTIPLIER;
+  const goldThreshold = 10_000 * BACK_DECIMAL_MULTIPLIER;
+  const silverThreshold = 1_000 * BACK_DECIMAL_MULTIPLIER;
+  const bronzeThreshold = 100 * BACK_DECIMAL_MULTIPLIER;
 
   // Diamond: 100,000+ $BACK AND 365+ days
-  if (amountLamports >= 100_000_000_000_000 && durationDays >= 365) {
+  if (amountLamports >= diamondThreshold && durationDays >= 365) {
     return LockLevel.Diamond;
   }
   // Platinum: 50,000+ $BACK AND 180+ days
-  else if (amountLamports >= 50_000_000_000_000 && durationDays >= 180) {
+  else if (amountLamports >= platinumThreshold && durationDays >= 180) {
     return LockLevel.Platinum;
   }
   // Gold: 10,000+ $BACK AND 90+ days
-  else if (amountLamports >= 10_000_000_000_000 && durationDays >= 90) {
+  else if (amountLamports >= goldThreshold && durationDays >= 90) {
     return LockLevel.Gold;
   }
   // Silver: 1,000+ $BACK AND 30+ days
-  else if (amountLamports >= 1_000_000_000_000 && durationDays >= 30) {
+  else if (amountLamports >= silverThreshold && durationDays >= 30) {
     return LockLevel.Silver;
   }
   // Bronze: 100+ $BACK AND 7+ days
-  else if (amountLamports >= 100_000_000_000 && durationDays >= 7) {
+  else if (amountLamports >= bronzeThreshold && durationDays >= 7) {
     return LockLevel.Bronze;
   }
 

@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Connection, VersionedTransaction } from "@solana/web3.js";
 import { checkRateLimit, getClientIdentifier } from "../../../lib/rateLimit";
+import { DEFAULT_SOLANA_RPC_URL } from "@/config/constants";
 
 // ============================================================================
 // CONFIGURATION
@@ -13,7 +14,7 @@ import { checkRateLimit, getClientIdentifier } from "../../../lib/rateLimit";
 
 const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
-  "https://api.mainnet-beta.solana.com";
+  DEFAULT_SOLANA_RPC_URL;
 
 // ============================================================================
 // API HANDLER

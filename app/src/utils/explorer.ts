@@ -1,3 +1,5 @@
+import { DEFAULT_SOLANA_NETWORK } from '@/config/constants';
+
 /**
  * Utilitaires pour générer les URLs Solana Explorer
  * Utilise automatiquement le réseau configuré dans NEXT_PUBLIC_SOLANA_NETWORK
@@ -9,7 +11,7 @@ type ClusterType = 'mainnet' | 'mainnet-beta' | 'devnet' | 'testnet';
  * Obtient le cluster actuel depuis les variables d'environnement
  */
 function getCurrentCluster(): ClusterType {
-  return (process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'mainnet-beta') as ClusterType;
+  return (process.env.NEXT_PUBLIC_SOLANA_NETWORK || DEFAULT_SOLANA_NETWORK) as ClusterType;
 }
 
 /**

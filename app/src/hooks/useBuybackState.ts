@@ -3,13 +3,14 @@ import { useQuery } from '@tanstack/react-query';
 import { PublicKey } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
 import { lamportsToUiSafe, bnToNumberWithFallback } from '@/lib/bnUtils';
+import { getBackTokenMint, TOKEN_DECIMALS } from '@/config/constants';
 
 // Buyback Program addresses (devnet)
 export const BUYBACK_PROGRAM_ID = new PublicKey('92znK8METYTFW5dGDJUnHUMqubVGnPBTyjZ4HzjWQzir');
 export const BUYBACK_STATE_PDA = new PublicKey('74N3kmNZiRSJCFaYBFjmiQGMwv8vx3aJvMMKJECLNUNM');
 export const USDC_VAULT_PDA = new PublicKey('HiBn2KFwVUDuW9z1aiYcR1jVyBjSMirqzSQ7vpaLQKDT');
 export const USDC_MINT = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
-export const BACK_TOKEN_MINT = new PublicKey('3Y6RXZUBHCeUj6VsWuyBY2Zy1RixY6BHkM4tf3euDdrE');
+export const BACK_TOKEN_MINT = getBackTokenMint();
 
 export interface BuybackState {
   authority: PublicKey;
@@ -60,7 +61,7 @@ export function useBuybackState() {
         usdcVault: new PublicKey(data.slice(72, 104)),
         minBuybackAmount: lamportsToUiSafe(new BN(data.slice(104, 112), 'le'), 6),
         totalUsdcSpent: lamportsToUiSafe(new BN(data.slice(112, 120), 'le'), 6),
-        totalBackBurned: lamportsToUiSafe(new BN(data.slice(120, 128), 'le'), 9),
+        totalBackBurned: lamportsToUiSafe(new BN(data.slice(120, 128), 'le'), TOKEN_DECIMALS),
         buybackCount: bnToNumberWithFallback(new BN(data.slice(128, 136), 'le'), 0),
         bump: data[136],
       };

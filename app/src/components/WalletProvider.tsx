@@ -12,6 +12,7 @@ import {
   SolflareWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
 import { clusterApiUrl } from "@solana/web3.js";
+import { DEFAULT_SOLANA_NETWORK, DEFAULT_SOLANA_RPC_URL } from "@/config/constants";
 
 // Import des styles du wallet adapter
 import "@solana/wallet-adapter-react-ui/styles.css";
@@ -19,7 +20,7 @@ import "@solana/wallet-adapter-react-ui/styles.css";
 export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
   // Configuration du réseau - MAINNET pour production
   // Le réseau est déterminé par NEXT_PUBLIC_SOLANA_NETWORK dans .env.local
-  const networkEnv = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'mainnet-beta';
+  const networkEnv = (process.env.NEXT_PUBLIC_SOLANA_NETWORK || DEFAULT_SOLANA_NETWORK).toLowerCase();
   
   // Map network string to WalletAdapterNetwork enum
   const getNetwork = () => {
@@ -30,16 +31,21 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
         return WalletAdapterNetwork.Testnet;
       case 'mainnet-beta':
       case 'mainnet':
-      default:
         return WalletAdapterNetwork.Mainnet;
+      default:
+        return WalletAdapterNetwork.Devnet;
     }
   };
   
   const network = getNetwork();
   const endpoint = useMemo(() => {
     // Utiliser la RPC URL de l'environnement si disponible
-    if (process.env.NEXT_PUBLIC_SOLANA_RPC_URL) {
-      return process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
+    const rpcFromEnv = process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
+    if (rpcFromEnv && rpcFromEnv.trim() !== "") {
+      return rpcFromEnv;
+    }
+    if (network === WalletAdapterNetwork.Devnet) {
+      return DEFAULT_SOLANA_RPC_URL;
     }
     return clusterApiUrl(network);
   }, [network]);

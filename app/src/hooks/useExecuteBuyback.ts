@@ -7,6 +7,7 @@ import { trackBuyback } from '@/lib/analytics';
 import { parseBuybackTransaction } from '@/lib/parsers';
 import { getExplorerTxUrl } from '@/utils/explorer';
 import { lamportsToUiSafe } from '@/lib/bnUtils';
+import { TOKEN_DECIMALS } from '@/config/constants';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -60,7 +61,7 @@ export function useExecuteBuyback() {
 
       // Convert amounts to BN (lamports)
       const usdcAmountBN = new BN(usdcAmount * 1e6);
-      const minBackAmountBN = new BN(minBackAmount * 1e9);
+      const minBackAmountBN = new BN(Math.floor(minBackAmount * Math.pow(10, TOKEN_DECIMALS)));
 
       console.log('🔥 Executing buyback:', {
         usdcAmount,
