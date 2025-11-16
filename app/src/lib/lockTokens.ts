@@ -11,7 +11,8 @@ import {
 import { WalletContextState } from "@solana/wallet-adapter-react";
 import { Program, AnchorProvider, BN, type Idl } from "@coral-xyz/anchor";
 import { 
-  TOKEN_2022_PROGRAM_ID, 
+  TOKEN_2022_PROGRAM_ID,
+  TOKEN_PROGRAM_ID, 
   getAssociatedTokenAddress,
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
@@ -156,14 +157,14 @@ export async function createLockTokensTransaction(
   );
   console.log('✅ [LOCK TX] Global State:', globalState.toString());
 
-  const [userNft] = PublicKey.findProgramAddressSync(
-    [Buffer.from("user_nft"), wallet.publicKey.toBuffer()],
+  const [userLock] = PublicKey.findProgramAddressSync(
+    [Buffer.from("user_lock"), wallet.publicKey.toBuffer()],
     CNFT_PROGRAM_ID
   );
-  console.log('✅ [LOCK TX] User NFT:', userNft.toString());
+  console.log('✅ [LOCK TX] User Lock:', userLock.toString());
 
   // Note: Permettre plusieurs locks - l'utilisateur peut lock à plusieurs reprises
-  // Si un NFT existe déjà, il sera mis à jour ou un nouveau sera créé
+  // Si un lock existe déjà, il sera mis à jour ou un nouveau sera créé
   console.log('🔍 [LOCK TX] Multiple locks allowed - proceeding...');
 
   const vaultAuthority = PublicKey.findProgramAddressSync(
@@ -182,7 +183,7 @@ export async function createLockTokensTransaction(
     BACK_MINT,
     wallet.publicKey,
     false,
-    TOKEN_2022_PROGRAM_ID
+    TOKEN_PROGRAM_ID // BACK utilise le programme SPL Token standard
   );
   console.log('✅ [LOCK TX] User Token Account:', userTokenAccount.toString());
 
@@ -192,28 +193,27 @@ export async function createLockTokensTransaction(
     BACK_MINT,
     vaultAuthority[0],
     true, // allowOwnerOffCurve = true pour PDA
-    TOKEN_2022_PROGRAM_ID
+    TOKEN_PROGRAM_ID // BACK utilise le programme SPL Token standard
   );
-  console.log('✅ [LOCK TX] Vault Token Account (calculated):', vaultTokenAccount.toString());
   console.log('✅ [LOCK TX] Vault Token Account (calculated):', vaultTokenAccount.toString());
 
   // Construire l'instruction via Anchor
   console.log('🔍 [LOCK TX] Building instruction...');
   try {
-    // Use mint_level_nft instruction (the actual instruction name in the IDL)
-    console.log('✅ [LOCK TX] Using mint_level_nft instruction');
+    // Use lockTokens instruction (the actual instruction name in the program)
+    console.log('✅ [LOCK TX] Using lockTokens instruction');
     const instruction = await program.methods
-      .mintLevelNft(amountLamports, lockDuration)
+      .lockTokens(amountLamports, lockDuration)
       .accounts({
         collectionConfig,
         globalState,
-        userNft,
+        userLock, // Changed from userNft to userLock
         userTokenAccount,
         vaultTokenAccount,
         vaultAuthority: vaultAuthority[0],
         backMint: BACK_MINT,
         user: wallet.publicKey,
-        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        tokenProgram: TOKEN_PROGRAM_ID, // BACK utilise SPL Token standard
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       })

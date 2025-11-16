@@ -123,21 +123,19 @@
       "args": []
     },
     {
-      "name": "mint_level_nft",
+      "name": "lock_tokens",
       "docs": [
-        "Crée un cNFT de niveau pour un utilisateur",
-        "Note: Version simplifiée sans Bubblegum pour éviter les conflits de dépendances",
-        "L'intégration Bubblegum sera ajoutée après résolution des versions"
+        "Lock des tokens BACK avec calcul de boost"
       ],
       "discriminator": [
-        101,
+        109,
+        156,
+        220,
+        254,
+        77,
+        166,
         210,
-        207,
-        137,
-        3,
-        113,
-        177,
-        171
+        24
       ],
       "accounts": [
         {
@@ -196,7 +194,7 @@
           }
         },
         {
-          "name": "user_nft",
+          "name": "user_lock",
           "writable": true,
           "pda": {
             "seeds": [
@@ -208,9 +206,10 @@
                   101,
                   114,
                   95,
-                  110,
-                  102,
-                  116
+                  108,
+                  111,
+                  99,
+                  107
                 ]
               },
               {
@@ -221,9 +220,53 @@
           }
         },
         {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "vault_token_account",
+          "writable": true
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "back_mint"
+        },
+        {
           "name": "user",
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "associated_token_program"
         },
         {
           "name": "system_program",
@@ -232,7 +275,7 @@
       ],
       "args": [
         {
-          "name": "amount_locked",
+          "name": "amount",
           "type": "u64"
         },
         {
