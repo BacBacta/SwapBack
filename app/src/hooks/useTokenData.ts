@@ -44,29 +44,7 @@ export const useTokenData = (tokenMint: string) => {
           // SPL Token or Token-2022
           const mintPubkey = new PublicKey(tokenMint);
           
-          // Try Token-2022 first (for BACK)
-          try {
-            const ata = await getAssociatedTokenAddress(
-              mintPubkey,
-              publicKey,
-              false,
-              TOKEN_2022_PROGRAM_ID
-            );
-            
-            const accountInfo = await connection.getAccountInfo(ata);
-            if (accountInfo && accountInfo.data.length >= 72) {
-              // Token-2022 account found - parse manually
-              const amount = accountInfo.data.readBigUInt64LE(64);
-              const tokenBalance = Number(amount) / Math.pow(10, TOKEN_DECIMALS);
-              console.log(`✅ Token-2022 ${tokenMint.substring(0, 8)}... balance: ${tokenBalance.toFixed(TOKEN_DECIMALS)} (raw: ${amount})`);
-              setBalance(tokenBalance);
-              return;
-            }
-          } catch (token2022Error) {
-            console.log(`⚠️ Token-2022 account not found for ${tokenMint.substring(0, 8)}..., trying standard SPL token`);
-          }
-          
-          // Fallback to standard SPL Token
+          // Try standard SPL Token first (BACK mint is on standard program)
           try {
             const ata = await getAssociatedTokenAddress(
               mintPubkey,
@@ -75,21 +53,50 @@ export const useTokenData = (tokenMint: string) => {
               TOKEN_PROGRAM_ID
             );
             
+            console.log(`🔍 Checking SPL Token ATA: ${ata.toBase58()}`);
             const accountInfo = await connection.getAccountInfo(ata);
+            
             if (accountInfo && accountInfo.data.length >= 72) {
               const amount = accountInfo.data.readBigUInt64LE(64);
-              // For standard tokens, try to get decimals from mint (fallback to 6)
-              const tokenBalance = Number(amount) / 1e6; // Most SPL tokens use 6 decimals
-              console.log(`✅ SPL Token ${tokenMint.substring(0, 8)}... balance: ${tokenBalance.toFixed(6)}`);
+              const tokenBalance = Number(amount) / Math.pow(10, TOKEN_DECIMALS);
+              console.log(`✅ SPL Token ${tokenMint.substring(0, 8)}... balance: ${tokenBalance.toFixed(TOKEN_DECIMALS)} (raw: ${amount}, decimals: ${TOKEN_DECIMALS})`);
               setBalance(tokenBalance);
+              return;
             } else {
-              console.log(`⚠️ No token account found for ${tokenMint.substring(0, 8)}...`);
-              setBalance(0);
+              console.log(`⚠️ SPL Token account exists but invalid size: ${accountInfo?.data.length || 0} bytes`);
             }
           } catch (splError) {
-            console.log(`⚠️ SPL Token account not found for ${tokenMint.substring(0, 8)}...`);
-            setBalance(0);
+            console.log(`⚠️ SPL Token account not found for ${tokenMint.substring(0, 8)}..., error:`, splError);
           }
+          
+          // Fallback to Token-2022
+          try {
+            const ata = await getAssociatedTokenAddress(
+              mintPubkey,
+              publicKey,
+              false,
+              TOKEN_2022_PROGRAM_ID
+            );
+            
+            console.log(`🔍 Checking Token-2022 ATA: ${ata.toBase58()}`);
+            const accountInfo = await connection.getAccountInfo(ata);
+            
+            if (accountInfo && accountInfo.data.length >= 72) {
+              const amount = accountInfo.data.readBigUInt64LE(64);
+              const tokenBalance = Number(amount) / Math.pow(10, TOKEN_DECIMALS);
+              console.log(`✅ Token-2022 ${tokenMint.substring(0, 8)}... balance: ${tokenBalance.toFixed(TOKEN_DECIMALS)} (raw: ${amount})`);
+              setBalance(tokenBalance);
+              return;
+            } else {
+              console.log(`⚠️ Token-2022 account exists but invalid size: ${accountInfo?.data.length || 0} bytes`);
+            }
+          } catch (token2022Error) {
+            console.log(`⚠️ Token-2022 account not found for ${tokenMint.substring(0, 8)}..., error:`, token2022Error);
+          }
+          
+          // No account found
+          console.log(`❌ No token account found for ${tokenMint.substring(0, 8)}... in either program`);
+          setBalance(0);
         }
       } catch (error) {
         console.error("❌ Error fetching balance:", error);
