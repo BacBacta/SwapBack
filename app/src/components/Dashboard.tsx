@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { CNFTCard } from "./CNFTCard";
 import { useCNFT } from "../hooks/useCNFT";
 import { useRealtimeStats } from "../hooks/useRealtimeStats";
+import { useGlobalState } from "../hooks/useGlobalState";
 import { SkeletonLoader } from "./Skeletons";
 import { NoActivityState, NoConnectionState } from "./EmptyState";
 import { SwapBackDashboard } from "./SwapBackDashboard";
@@ -13,7 +14,6 @@ import UnlockInterface from "./UnlockInterface";
 import { logError } from "@/lib/errorLogger";
 // Import charts directly instead of lazy loading to avoid chunk errors
 import { VolumeChart, ActivityChart } from "./Charts";
-import RevenueAdminPanel from "./RevenueAdminPanel";
 
 export const Dashboard = () => {
   const { connected, publicKey } = useWallet();
@@ -24,6 +24,8 @@ export const Dashboard = () => {
   const { cnftData } = useCNFT();
   const { userStats, globalStats, loading, refresh, lastRefresh } =
     useRealtimeStats(publicKey?.toString());
+  const { globalState, isLoading: globalStateLoading, refresh: refreshGlobalState } =
+    useGlobalState();
 
   // Log le montage du composant
   useEffect(() => {
@@ -121,8 +123,11 @@ export const Dashboard = () => {
           <div className="flex items-center gap-3">
             {/* Bouton de rafraîchissement manuel */}
             <button
-              onClick={refresh}
-              disabled={loading}
+              onClick={() => {
+                refresh();
+                refreshGlobalState();
+              }}
+              disabled={loading || globalStateLoading}
               className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg border border-[var(--primary)]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               title="Rafraîchir les statistiques"
             >
@@ -165,7 +170,7 @@ export const Dashboard = () => {
         >
           <div className="bg-gray-900 rounded-lg p-4 text-center group hover:border hover:border-[var(--primary)]/30 transition-all">
             <div className="text-sm text-gray-400 mb-2" id="total-volume-label">
-              Total Volume
+              Total Swap Volume
             </div>
             <div
               className="text-3xl font-bold text-white"
@@ -173,33 +178,50 @@ export const Dashboard = () => {
               aria-live="polite"
             >
               $
-              {globalStats.totalVolume.toLocaleString("en-US", {
-                maximumFractionDigits: 0,
-              })}
+              {globalState
+                ? globalState.totalSwapVolume.toLocaleString("en-US", {
+                    maximumFractionDigits: 2,
+                  })
+                : globalStats.totalVolume.toLocaleString("en-US", {
+                    maximumFractionDigits: 0,
+                  })}
             </div>
             <div className="text-xs text-gray-500 mt-2">
-              +{globalStats.swapsLast24h} swaps (24h)
+              {globalState ? `${globalState.activeLocksCount} active locks` : `+${globalStats.swapsLast24h} swaps (24h)`}
             </div>
           </div>
           <div className="bg-gray-900 rounded-lg p-4 text-center group hover:border hover:border-[var(--primary)]/30 transition-all">
-            <div className="text-sm text-gray-400 mb-2">$BACK Burned</div>
+            <div className="text-sm text-gray-400 mb-2">Total Value Locked</div>
             <div className="text-3xl font-bold text-[var(--accent)]">
-              {globalStats.totalBurned.toLocaleString("en-US")}
+              {globalState
+                ? globalState.totalValueLocked.toLocaleString("en-US", {
+                    maximumFractionDigits: 2,
+                  })
+                : globalStats.totalBurned.toLocaleString("en-US")}{" "}
+              <span className="text-sm text-gray-400">$BACK</span>
             </div>
-            <div className="text-xs text-gray-500 mt-2">🔥 Deflationary</div>
+            <div className="text-xs text-gray-500 mt-2">
+              {globalState ? `Boost: ${(globalState.totalCommunityBoost / 100).toFixed(2)}%` : "🔥 Deflationary"}
+            </div>
           </div>
           <div className="bg-gray-900 rounded-lg p-4 text-center group hover:border hover:border-[var(--primary)]/30 transition-all">
             <div className="text-sm text-gray-400 mb-2">
-              Rebates Distributed
+              NPI Distributed to Users
             </div>
             <div className="text-3xl font-bold text-white">
               $
-              {globalStats.totalRebates.toLocaleString("en-US", {
-                maximumFractionDigits: 0,
-              })}
+              {globalState
+                ? globalState.npiUserDistributed.toLocaleString("en-US", {
+                    maximumFractionDigits: 2,
+                  })
+                : globalStats.totalRebates.toLocaleString("en-US", {
+                    maximumFractionDigits: 0,
+                  })}
             </div>
             <div className="text-xs text-gray-500 mt-2">
-              {globalStats.activeUsers.toLocaleString()} active users
+              {globalState
+                ? `Boost vault: $${globalState.npiBoostVaultAccrued.toFixed(2)}`
+                : `${globalStats.activeUsers.toLocaleString()} active users`}
             </div>
           </div>
         </div>
@@ -222,8 +244,6 @@ export const Dashboard = () => {
           unlockDate={new Date(cnftData.unlockTime * 1000)}
         />
       )}
-
-      <RevenueAdminPanel />
 
       {/* Tabs Navigation */}
       <div className="flex gap-1 p-1 bg-gray-900 rounded-xl border border-[var(--primary)]/20">
@@ -358,6 +378,36 @@ export const Dashboard = () => {
             </div>
           </div>
 
+          {/* Lock & Boost Card */}
+          {cnftData && cnftData.exists && cnftData.isActive && (
+            <div className="bg-gray-900 rounded-lg p-5 border border-[var(--primary)]/30">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 border border-[var(--accent)] rounded flex items-center justify-center">
+                  <span className="text-lg">🔒</span>
+                </div>
+                <span className="text-gray-400 text-sm">Your Lock Status</span>
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-400">Locked Amount:</span>
+                  <span className="text-lg font-bold text-white">{cnftData.lockedAmount.toLocaleString()} $BACK</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-400">Current Boost:</span>
+                  <span className="text-lg font-bold text-[var(--primary)]">+{(cnftData.boostBps / 100).toFixed(2)}%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-400">Level:</span>
+                  <span className="text-lg font-bold text-[var(--accent)]">{cnftData.level}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-400">Unlock Date:</span>
+                  <span className="text-sm text-gray-300">{new Date(cnftData.unlockTime * 1000).toLocaleDateString()}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Pending Rebates Card */}
           {userStats.pendingRebates > 0 && (
             <div className="bg-black border border-[var(--primary)] rounded-xl p-6 hover:scale-[1.01] transition-all">
@@ -387,6 +437,61 @@ export const Dashboard = () => {
       {/* Analytics Tab */}
       {activeTab === "analytics" && (
         <div className="space-y-6">
+          {/* Protocol Revenue Metrics */}
+          {globalState && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6">
+                <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-white">
+                  <span>💸</span>
+                  <span>Swap Fees (85/15 Split)</span>
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-3 bg-gray-900 rounded-lg">
+                    <span className="text-gray-400">Total Collected:</span>
+                    <span className="text-lg font-bold text-white">${globalState.totalSwapFeesCollected.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-gray-900 rounded-lg">
+                    <span className="text-gray-400">Treasury (85%):</span>
+                    <span className="text-lg font-bold text-[var(--secondary)]">${globalState.swapTreasuryAccrued.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-gray-900 rounded-lg">
+                    <span className="text-gray-400">Buyback (15%):</span>
+                    <span className="text-lg font-bold text-[var(--accent)]">${globalState.swapBuybackAccrued.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6">
+                <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-white">
+                  <span>📊</span>
+                  <span>NPI Distribution (70/20/5/5)</span>
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-3 bg-gray-900 rounded-lg">
+                    <span className="text-gray-400">Total NPI Volume:</span>
+                    <span className="text-lg font-bold text-white">${globalState.totalNpiVolume.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-gray-900 rounded-lg">
+                    <span className="text-gray-400">Users (70%+boost):</span>
+                    <span className="text-lg font-bold text-[var(--primary)]">${globalState.npiUserDistributed.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-gray-900 rounded-lg">
+                    <span className="text-gray-400">Treasury (20%):</span>
+                    <span className="text-lg font-bold text-[var(--secondary)]">${globalState.npiTreasuryAccrued.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-gray-900 rounded-lg">
+                    <span className="text-gray-400">Boost Vault (5%):</span>
+                    <span className="text-lg font-bold text-[var(--accent)]">${globalState.npiBoostVaultAccrued.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-gray-900 rounded-lg">
+                    <span className="text-gray-400">Buyback (5%):</span>
+                    <span className="text-lg font-bold text-[var(--accent)]">${globalState.npiBuybackAccrued.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Volume Chart */}
           <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6">
             <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-white">
