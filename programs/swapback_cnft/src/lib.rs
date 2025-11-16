@@ -5,7 +5,7 @@ use anchor_spl::token_interface::{Mint, TokenAccount};
 
 // ⚠️ IMPORTANT: Ce program ID sera généré lors du premier build
 // Ne PAS hardcoder l'ancien ID ici - laisser Anchor le générer
-declare_id!("c5aEUgYctZv5Yh7fiTWN18jr6seP7KThJsRPmxs2kKR");
+declare_id!("GEkXCcq87yUjQSp5EqcWf7bw9GKrB39A1LWdsE7V3V2E");
 
 #[program]
 pub mod swapback_cnft {
