@@ -64,7 +64,7 @@ export const parseBackFromLogs = (logs: string[]): number => {
     const match = backLog.match(pattern);
     if (match && match[1]) {
       const lamports = parseInt(match[1]);
-      return lamports / 1_000_000_000; // Convert to BACK units
+      return lamports / 1_000_000; // Convert to BACK units (6 decimals)
     }
   }
   

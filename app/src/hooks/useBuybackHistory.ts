@@ -105,7 +105,7 @@ const fetchBuybackHistory = async (): Promise<DailyBuyback[]> => {
       result.push({
         date,
         usdcSpent: data.usdc / 1_000_000, // Convert to USDC units
-        backBurned: data.back / 1_000_000_000, // Convert to BACK units
+        backBurned: data.back / 1_000_000, // Convert to BACK units (6 decimals)
       });
     }
     

@@ -23,7 +23,7 @@ const parseBackFromLogs = (logs: string[]): number => {
   if (!backLog) return 0;
   
   const match = backLog.match(/(\d+)/);
-  return match ? parseInt(match[1]) / 1_000_000_000 : 0; // Convert lamports to BACK
+  return match ? parseInt(match[1]) / 1_000_000 : 0; // Convert lamports to BACK (6 decimals)
 };
 
 // Fetch recent buyback transactions from Helius API
