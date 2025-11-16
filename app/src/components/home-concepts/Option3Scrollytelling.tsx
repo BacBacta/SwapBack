@@ -2,7 +2,14 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useGlobalState } from "@/hooks/useGlobalState";
+
+// Import wallet with ssr: false
+const ClientOnlyWallet = dynamic(
+  () => import("@/components/ClientOnlyWallet").then(mod => ({ default: mod.ClientOnlyWallet })),
+  { ssr: false, loading: () => <div className="w-[140px] h-[40px] bg-gray-800 animate-pulse rounded" /> }
+);
 
 export default function Option3Scrollytelling() {
   const router = useRouter();
@@ -61,6 +68,7 @@ export default function Option3Scrollytelling() {
               >
                 DASHBOARD
               </button>
+              <ClientOnlyWallet />
             </div>
           </div>
         </div>
@@ -484,7 +492,7 @@ export default function Option3Scrollytelling() {
               onClick={() => router.push('/swap')}
               className="terminal-box border-2 border-[var(--primary)] bg-[var(--primary)] text-black px-12 py-6 font-bold terminal-text text-xl uppercase tracking-wider hover:bg-transparent hover:text-[var(--primary)] transition-all hover:scale-105 cursor-pointer"
             >
-              [LAUNCH_APP]
+              [START_TRADING]
             </button>
             <button 
               onClick={() => router.push('/dashboard')}
