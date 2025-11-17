@@ -8,6 +8,10 @@ import cnftIdl from "@/idl/swapback_cnft.json";
 
 interface GlobalStateData {
   authority: string;
+  treasuryWallet: string;
+  boostVaultWallet: string;
+  buybackWallet: string;
+  npiVaultWallet: string;
   totalCommunityBoost: number;
   activeLocksCount: number;
   totalValueLocked: number;
@@ -20,7 +24,6 @@ interface GlobalStateData {
   npiTreasuryAccrued: number;
   npiBoostVaultAccrued: number;
   npiBoostVaultDistributed: number;
-  npiBuybackAccrued: number;
 }
 
 function getCnftProgramId(): PublicKey {
@@ -87,6 +90,10 @@ export function useGlobalState() {
 
       setGlobalState({
         authority: decoded.authority.toString(),
+        treasuryWallet: decoded.treasuryWallet.toString(),
+        boostVaultWallet: decoded.boostVaultWallet.toString(),
+        buybackWallet: decoded.buybackWallet.toString(),
+        npiVaultWallet: decoded.npiVaultWallet.toString(),
         totalCommunityBoost: Number(decoded.totalCommunityBoost),
         activeLocksCount: Number(decoded.activeLocksCount),
         totalValueLocked: Number(decoded.totalValueLocked) / LAMPORTS_PER_BACK,
@@ -99,7 +106,6 @@ export function useGlobalState() {
         npiTreasuryAccrued: Number(decoded.npiTreasuryAccrued) / LAMPORTS_PER_BACK,
         npiBoostVaultAccrued: Number(decoded.npiBoostVaultAccrued) / LAMPORTS_PER_BACK,
         npiBoostVaultDistributed: Number(decoded.npiBoostVaultDistributed) / LAMPORTS_PER_BACK,
-        npiBuybackAccrued: Number(decoded.npiBuybackAccrued) / LAMPORTS_PER_BACK,
       });
     } catch (err) {
       console.error("Error fetching GlobalState:", err);

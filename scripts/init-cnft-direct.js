@@ -9,6 +9,27 @@ const path = require("path");
 // Discriminator pour "initialize_global_state"
 const INITIALIZE_DISCRIMINATOR = Buffer.from([232, 254, 209, 244, 123, 89, 154, 207]);
 
+function resolveWallet(envVar, fallbackPubkey) {
+  const raw = process.env[envVar];
+  if (!raw) {
+    return fallbackPubkey;
+  }
+  try {
+    return new PublicKey(raw);
+  } catch (error) {
+    throw new Error(`Adresse invalide pour ${envVar}: ${raw}`);
+  }
+}
+
+function buildWalletConfig(defaultPubkey) {
+  return {
+    treasury: resolveWallet("SWAPBACK_TREASURY_WALLET", defaultPubkey),
+    boost: resolveWallet("SWAPBACK_BOOST_WALLET", defaultPubkey),
+    buyback: resolveWallet("SWAPBACK_BUYBACK_WALLET", defaultPubkey),
+    npiVault: resolveWallet("SWAPBACK_NPI_VAULT_WALLET", defaultPubkey),
+  };
+}
+
 async function main() {
   console.log("\n🔧 Initialisation de CNFT GlobalState (Approche directe)\n");
 
@@ -25,6 +46,7 @@ async function main() {
   console.log(`💰 Solde: ${(balance / 1e9).toFixed(4)} SOL\n`);
 
   const cnftProgramId = new PublicKey("9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw");
+  const walletConfig = buildWalletConfig(wallet.publicKey);
 
   // Dériver le PDA GlobalState
   const [globalStatePDA, bump] = PublicKey.findProgramAddressSync(
@@ -34,7 +56,12 @@ async function main() {
 
   console.log(`📍 Program ID: ${cnftProgramId.toString()}`);
   console.log(`🔑 Global State PDA: ${globalStatePDA.toString()}`);
-  console.log(`🔢 Bump: ${bump}\n`);
+  console.log(`🔢 Bump: ${bump}`);
+  console.log("🔐 Wallets:");
+  console.log(`   Treasury: ${walletConfig.treasury.toBase58()}`);
+  console.log(`   Boost:    ${walletConfig.boost.toBase58()}`);
+  console.log(`   Buyback:  ${walletConfig.buyback.toBase58()}`);
+  console.log(`   NPI Vault: ${walletConfig.npiVault.toBase58()}\n`);
 
   // Vérifier si déjà initialisé
   try {
@@ -50,7 +77,13 @@ async function main() {
 
   console.log("📝 Création de l'instruction initialize_global_state...\n");
 
-  const instructionData = INITIALIZE_DISCRIMINATOR;
+  const instructionData = Buffer.concat([
+    INITIALIZE_DISCRIMINATOR,
+    walletConfig.treasury.toBuffer(),
+    walletConfig.boost.toBuffer(),
+    walletConfig.buyback.toBuffer(),
+    walletConfig.npiVault.toBuffer(),
+  ]);
 
   const keys = [
     { pubkey: globalStatePDA, isSigner: false, isWritable: true }, // global_state

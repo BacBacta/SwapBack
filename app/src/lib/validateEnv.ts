@@ -40,6 +40,7 @@ export interface EnvConfig {
   cnftProgramId: string;
   routerProgramId: string;
   backMint: string;
+  npiMint: string;
   collectionConfig: string;
 }
 
@@ -75,6 +76,7 @@ export function validateEnv(): EnvConfig {
   const cnftProgramId = process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID;
   const routerProgramId = process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID;
   const backMint = process.env.NEXT_PUBLIC_BACK_MINT;
+  const npiMint = process.env.NEXT_PUBLIC_NPI_MINT;
   const collectionConfig = process.env.NEXT_PUBLIC_COLLECTION_CONFIG;
 
   // Only log warnings instead of throwing errors during build
@@ -98,6 +100,7 @@ export function validateEnv(): EnvConfig {
     cnftProgramId: cnftProgramId || 'VOTRE_NOUVEAU_PROGRAM_ID',
     routerProgramId: routerProgramId || 'H3LLiKAvjPWk9Br14m7bjiWkaJFzeMVB9qvMsFaA14k5',
     backMint: backMint || '6tFCrUr3mZpL3BzNV2cLjYDkoL7toYA74TpMCSxFg45E',
+    npiMint: npiMint || 'So11111111111111111111111111111111111111112',
     collectionConfig: collectionConfig || '5eM6KdFGJ63597ayYYtUqcNRhzxKtpx5qfL5mqRHwBom',
   };
 }

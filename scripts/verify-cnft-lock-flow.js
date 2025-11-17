@@ -50,6 +50,27 @@ function discriminator(name) {
   return Buffer.from(ix.discriminator);
 }
 
+function resolveWallet(envVar, fallbackPubkey) {
+  const raw = process.env[envVar];
+  if (!raw) {
+    return fallbackPubkey;
+  }
+  try {
+    return new PublicKey(raw);
+  } catch (error) {
+    throw new Error(`Invalid ${envVar} value: ${raw}`);
+  }
+}
+
+function buildWalletConfig(defaultPubkey) {
+  return {
+    treasury: resolveWallet("SWAPBACK_TREASURY_WALLET", defaultPubkey),
+    boost: resolveWallet("SWAPBACK_BOOST_WALLET", defaultPubkey),
+    buyback: resolveWallet("SWAPBACK_BUYBACK_WALLET", defaultPubkey),
+    npiVault: resolveWallet("SWAPBACK_NPI_VAULT_WALLET", defaultPubkey),
+  };
+}
+
 function loadKeypair(filePath) {
   const resolved = path.resolve(filePath);
   if (!fs.existsSync(resolved)) {
@@ -76,23 +97,59 @@ function formatLamports(value) {
 function parseGlobalState(accountInfo) {
   if (!accountInfo) return null;
   const data = accountInfo.data;
-  if (data.length < 8 + 32 + 8 + 8 + 8) {
+  const minSize = 8 + 32 * 5 + 8 * 12;
+  if (data.length < minSize) {
     throw new Error(`Unexpected global_state size: ${data.length}`);
   }
   let offset = 8; // skip discriminator
   const authority = new PublicKey(data.slice(offset, offset + 32)).toBase58();
   offset += 32;
-  const totalCommunityBoost = data.readBigUInt64LE(offset);
-  offset += 8;
-  const activeLocksCount = data.readBigUInt64LE(offset);
-  offset += 8;
-  const totalValueLocked = data.readBigUInt64LE(offset);
+  const treasuryWallet = new PublicKey(data.slice(offset, offset + 32)).toBase58();
+  offset += 32;
+  const boostWallet = new PublicKey(data.slice(offset, offset + 32)).toBase58();
+  offset += 32;
+  const buybackWallet = new PublicKey(data.slice(offset, offset + 32)).toBase58();
+  offset += 32;
+  const npiVaultWallet = new PublicKey(data.slice(offset, offset + 32)).toBase58();
+  offset += 32;
+
+  const readU64 = () => {
+    const value = data.readBigUInt64LE(offset);
+    offset += 8;
+    return value;
+  };
+
+  const totalCommunityBoost = readU64();
+  const activeLocksCount = readU64();
+  const totalValueLocked = readU64();
+  const totalSwapVolume = readU64();
+  const totalSwapFees = readU64();
+  const swapTreasuryAccrued = readU64();
+  const swapBuybackAccrued = readU64();
+  const totalNpiVolume = readU64();
+  const npiUserDistributed = readU64();
+  const npiTreasuryAccrued = readU64();
+  const npiBoostVaultAccrued = readU64();
+  const npiBoostVaultDistributed = readU64();
 
   return {
     authority,
+    treasuryWallet,
+    boostWallet,
+    buybackWallet,
+    npiVaultWallet,
     totalCommunityBoost,
     activeLocksCount,
     totalValueLocked,
+    totalSwapVolume,
+    totalSwapFees,
+    swapTreasuryAccrued,
+    swapBuybackAccrued,
+    totalNpiVolume,
+    npiUserDistributed,
+    npiTreasuryAccrued,
+    npiBoostVaultAccrued,
+    npiBoostVaultDistributed,
   };
 }
 
@@ -156,8 +213,14 @@ function buildInitializeCollectionIx(pdas, payer) {
   return new TransactionInstruction({ programId: PROGRAM_ID, keys, data });
 }
 
-function buildInitializeGlobalStateIx(pdas, payer) {
-  const data = discriminator("initialize_global_state");
+function buildInitializeGlobalStateIx(pdas, payer, walletConfig) {
+  const data = Buffer.concat([
+    discriminator("initialize_global_state"),
+    walletConfig.treasury.toBuffer(),
+    walletConfig.boost.toBuffer(),
+    walletConfig.buyback.toBuffer(),
+    walletConfig.npiVault.toBuffer(),
+  ]);
   const keys = [
     { pubkey: pdas.globalState, isSigner: false, isWritable: true },
     { pubkey: payer.publicKey, isSigner: true, isWritable: true },
@@ -211,7 +274,7 @@ async function ensureCollection(connection, payer, pdas) {
   return true;
 }
 
-async function ensureGlobalState(connection, payer, pdas) {
+async function ensureGlobalState(connection, payer, pdas, walletConfig) {
   const info = await connection.getAccountInfo(pdas.globalState);
   if (info) {
     console.log(`✅ global_state exists (${info.data.length} bytes)`);
@@ -221,7 +284,7 @@ async function ensureGlobalState(connection, payer, pdas) {
   await sendInstruction(
     connection,
     payer,
-    buildInitializeGlobalStateIx(pdas, payer),
+    buildInitializeGlobalStateIx(pdas, payer, walletConfig),
     "initialize_global_state"
   );
   return true;
@@ -231,6 +294,10 @@ function formatGlobalState(state) {
   if (!state) return null;
   return {
     authority: state.authority,
+    treasuryWallet: state.treasuryWallet,
+    boostWallet: state.boostWallet,
+    buybackWallet: state.buybackWallet,
+    npiVaultWallet: state.npiVaultWallet,
     totalCommunityBoost: state.totalCommunityBoost.toString(),
     activeLocksCount: state.activeLocksCount.toString(),
     totalValueLocked: `${formatLamports(state.totalValueLocked)} BACK`,
@@ -243,6 +310,12 @@ function formatGlobalState(state) {
 
   console.log("🔑 Wallet:", payer.publicKey.toBase58());
   console.log("🌐 RPC:", RPC_URL);
+  const walletConfig = buildWalletConfig(payer.publicKey);
+  console.log("🔐 Wallet config:");
+  console.log("  Treasury:", walletConfig.treasury.toBase58());
+  console.log("  Boost:", walletConfig.boost.toBase58());
+  console.log("  Buyback:", walletConfig.buyback.toBase58());
+  console.log("  NPI Vault:", walletConfig.npiVault.toBase58());
 
   const connection = new Connection(RPC_URL, "confirmed");
 
@@ -267,7 +340,7 @@ function formatGlobalState(state) {
   console.log(`💰 Wallet balance: ${(solBalance / 1e9).toFixed(4)} SOL`);
 
   await ensureCollection(connection, payer, pdas);
-  await ensureGlobalState(connection, payer, pdas);
+  await ensureGlobalState(connection, payer, pdas, walletConfig);
 
   const globalBefore = parseGlobalState(await connection.getAccountInfo(pdas.globalState));
   console.log("\n🌍 Global state (before):", formatGlobalState(globalBefore));

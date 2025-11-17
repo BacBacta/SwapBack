@@ -14,6 +14,7 @@ declare_id!("GEkXCcq87yUjQSp5EqcWf7bw9GKrB39A1LWdsE7V3V2E");
 /// Frais de swap prélevés par le routeur (30 bps = 0.30 %)
 pub const PLATFORM_FEE_BPS: u64 = 30;
 pub const BASIS_POINTS_DIVISOR: u64 = 10_000;
+pub const EARLY_UNLOCK_PENALTY_BPS: u64 = 200; // 2 %
 
 /// Répartition des frais de swap (Flux 1)
 pub const SWAP_TREASURY_SHARE_BPS: u64 = 8500; // 85 % pour la trésorerie
@@ -22,8 +23,7 @@ pub const SWAP_BUYBACK_SHARE_BPS: u64 = 1500; // 15 % pour le buyback & burn
 /// Répartition des NPI générés par le routeur (Flux 2)
 pub const NPI_USER_SHARE_BPS: u64 = 7000; // 70 % pour l'utilisateur
 pub const NPI_TREASURY_SHARE_BPS: u64 = 2000; // 20 % pour la plateforme
-pub const NPI_BOOST_VAULT_BPS: u64 = 500; // 5 % pour le vault boost
-pub const NPI_BUYBACK_SHARE_BPS: u64 = 500; // 5 % pour buyback & burn
+pub const NPI_BOOST_VAULT_BPS: u64 = 1000; // 10 % pour le vault boost
 
 /// Boosts maximaux en basis points
 pub const MAX_DURATION_BOOST_BPS: u64 = 500; // +5 %
@@ -62,10 +62,20 @@ pub mod swapback_cnft {
     use super::*;
 
     /// Initialise le GlobalState pour tracker les locks
-    pub fn initialize_global_state(ctx: Context<InitializeGlobalState>) -> Result<()> {
+    pub fn initialize_global_state(
+        ctx: Context<InitializeGlobalState>,
+        treasury_wallet: Pubkey,
+        boost_vault_wallet: Pubkey,
+        buyback_wallet: Pubkey,
+        npi_vault_wallet: Pubkey,
+    ) -> Result<()> {
         let global_state = &mut ctx.accounts.global_state;
 
         global_state.authority = ctx.accounts.authority.key();
+        global_state.treasury_wallet = treasury_wallet;
+        global_state.boost_vault_wallet = boost_vault_wallet;
+        global_state.buyback_wallet = buyback_wallet;
+        global_state.npi_vault_wallet = npi_vault_wallet;
         global_state.total_community_boost = 0;
         global_state.active_locks_count = 0;
         global_state.total_value_locked = 0;
@@ -78,7 +88,6 @@ pub mod swapback_cnft {
         global_state.npi_treasury_accrued = 0;
         global_state.npi_boost_vault_accrued = 0;
         global_state.npi_boost_vault_distributed = 0;
-        global_state.npi_buyback_accrued = 0;
 
         msg!("✅ GlobalState initialisé");
         Ok(())
@@ -211,7 +220,7 @@ pub mod swapback_cnft {
         Ok(())
     }
 
-    /// Unlock des tokens BACK avec pénalité de 1.5% si anticipé
+    /// Unlock des tokens BACK avec pénalité de 2% si anticipé
     pub fn unlock_tokens(ctx: Context<UnlockTokens>) -> Result<()> {
         let user_lock = &mut ctx.accounts.user_lock;
         let global_state = &mut ctx.accounts.global_state;
@@ -239,20 +248,23 @@ pub mod swapback_cnft {
             );
         }
 
-        // Calculer la pénalité si unlock anticipé (1.5%)
-        let (user_amount, burn_amount) = if is_early_unlock {
-            let penalty_bps = 150; // 1.5% = 150 basis points
-            let burn = (safe_amount * penalty_bps) / BASIS_POINTS_DIVISOR;
-            (safe_amount - burn, burn)
+        // Calculer la pénalité si unlock anticipé (2%)
+        let (user_amount, penalty_amount) = if is_early_unlock {
+            let penalty = safe_amount
+                .checked_mul(EARLY_UNLOCK_PENALTY_BPS)
+                .ok_or(ErrorCode::MathOverflow)?
+                .checked_div(BASIS_POINTS_DIVISOR)
+                .ok_or(ErrorCode::MathOverflow)?;
+            (safe_amount.saturating_sub(penalty), penalty)
         } else {
             (safe_amount, 0)
         };
 
         msg!(
-            "🔓 Unlock: total={}, user={}, burn={}, early={}",
+            "🔓 Unlock: total={}, user={}, penalty={}, early={}",
             safe_amount,
             user_amount,
-            burn_amount,
+            penalty_amount,
             is_early_unlock
         );
 
@@ -286,6 +298,30 @@ pub mod swapback_cnft {
             transfer_checked(transfer_ctx, user_amount, ctx.accounts.back_mint.decimals)?;
         }
 
+        if penalty_amount > 0 {
+            let bump = ctx.bumps.vault_authority;
+            let seeds: &[&[u8]] = &[b"vault_authority", &[bump]];
+            let signer_seeds = &[seeds];
+
+            let penalty_accounts = TransferChecked {
+                from: ctx.accounts.vault_token_account.to_account_info(),
+                to: ctx
+                    .accounts
+                    .buyback_wallet_token_account
+                    .to_account_info(),
+                authority: ctx.accounts.vault_authority.to_account_info(),
+                mint: ctx.accounts.back_mint.to_account_info(),
+            };
+
+            let penalty_ctx = CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                penalty_accounts,
+                signer_seeds,
+            );
+
+            transfer_checked(penalty_ctx, penalty_amount, ctx.accounts.back_mint.decimals)?;
+        }
+
         // Désactiver le lock
         user_lock.is_active = false;
         user_lock.amount_locked = 0;
@@ -293,7 +329,7 @@ pub mod swapback_cnft {
         emit!(TokensUnlocked {
             user: ctx.accounts.user.key(),
             amount: user_amount,
-            burn_amount,
+            penalty_amount,
             early_unlock: is_early_unlock,
             timestamp: Clock::get()?.unix_timestamp,
         });
@@ -301,7 +337,7 @@ pub mod swapback_cnft {
         msg!(
             "✅ {} BACK déverrouillés - Pénalité: {} - Anticipé: {}",
             user_amount / BACK_DECIMALS,
-            burn_amount / BACK_DECIMALS,
+            penalty_amount / BACK_DECIMALS,
             is_early_unlock
         );
 
@@ -357,7 +393,7 @@ pub mod swapback_cnft {
         Ok(())
     }
 
-    /// Répartit les NPI du routeur (Flux 2)
+    /// Répartit les NPI du routeur (Flux 2) - Accumule dans le solde utilisateur
     pub fn distribute_npi(
         ctx: Context<DistributeNpi>,
         npi_amount: u64,
@@ -383,17 +419,11 @@ pub mod swapback_cnft {
             .checked_div(BASIS_POINTS_DIVISOR)
             .ok_or(ErrorCode::MathOverflow)?;
 
-        let buyback_amount = npi_amount
-            .checked_mul(NPI_BUYBACK_SHARE_BPS)
-            .ok_or(ErrorCode::MathOverflow)?
-            .checked_div(BASIS_POINTS_DIVISOR)
-            .ok_or(ErrorCode::MathOverflow)?;
-
         let clamped_boost = (user_boost_bps as u64).min(MAX_TOTAL_BOOST_BPS);
-        let boost_bonus_target = base_user_amount
+        let boost_bonus_target = boost_vault_allocation
             .checked_mul(clamped_boost)
             .ok_or(ErrorCode::MathOverflow)?
-            .checked_div(BASIS_POINTS_DIVISOR)
+            .checked_div(MAX_TOTAL_BOOST_BPS)
             .ok_or(ErrorCode::MathOverflow)?;
         let boost_bonus = boost_bonus_target.min(boost_vault_allocation);
         let total_user_amount = base_user_amount
@@ -401,6 +431,21 @@ pub mod swapback_cnft {
             .ok_or(ErrorCode::MathOverflow)?;
         let remaining_boost_vault = boost_vault_allocation
             .checked_sub(boost_bonus)
+            .ok_or(ErrorCode::MathOverflow)?;
+
+        // Initialiser le compte utilisateur si nouveau
+        let user_balance = &mut ctx.accounts.user_npi_balance;
+        if user_balance.user == Pubkey::default() {
+            user_balance.user = ctx.accounts.user.key();
+            user_balance.pending_npi = 0;
+            user_balance.total_claimed = 0;
+            user_balance.bump = ctx.bumps.user_npi_balance;
+        }
+
+        // Accumuler les NPI dans le solde pending
+        user_balance.pending_npi = user_balance
+            .pending_npi
+            .checked_add(total_user_amount)
             .ok_or(ErrorCode::MathOverflow)?;
 
         let global_state = &mut ctx.accounts.global_state;
@@ -424,11 +469,6 @@ pub mod swapback_cnft {
             .npi_boost_vault_distributed
             .checked_add(boost_bonus)
             .ok_or(ErrorCode::MathOverflow)?;
-        global_state.npi_buyback_accrued = global_state
-            .npi_buyback_accrued
-            .checked_add(buyback_amount)
-            .ok_or(ErrorCode::MathOverflow)?;
-
         emit!(NpiDistributed {
             total_npi: npi_amount,
             user_base: base_user_amount,
@@ -437,10 +477,85 @@ pub mod swapback_cnft {
             treasury_amount,
             boost_vault_allocation,
             remaining_boost_vault,
-            buyback_amount,
             applied_boost_bps: clamped_boost as u16,
             timestamp: Clock::get()?.unix_timestamp,
         });
+
+        msg!(
+            "💰 NPI distribué à {} - Pending: {} (base: {}, boost: {})",
+            ctx.accounts.user.key(),
+            user_balance.pending_npi,
+            base_user_amount,
+            boost_bonus
+        );
+
+        Ok(())
+    }
+
+    /// Permet à l'utilisateur de réclamer ses NPI accumulés
+    pub fn claim_npi(ctx: Context<ClaimNpi>, amount: u64) -> Result<()> {
+        let user_balance = &mut ctx.accounts.user_npi_balance;
+        
+        require!(
+            ctx.accounts.user.key() == user_balance.user,
+            ErrorCode::Unauthorized
+        );
+        require!(amount > 0, ErrorCode::InvalidAmount);
+        require!(
+            user_balance.pending_npi >= amount,
+            ErrorCode::InsufficientBalance
+        );
+
+        // Vérifier que le vault a assez de tokens
+        let vault_balance = ctx.accounts.npi_vault.amount;
+        require!(
+            vault_balance >= amount,
+            ErrorCode::InsufficientVaultBalance
+        );
+
+        // Déduire du solde pending
+        user_balance.pending_npi = user_balance
+            .pending_npi
+            .checked_sub(amount)
+            .ok_or(ErrorCode::MathOverflow)?;
+        
+        user_balance.total_claimed = user_balance
+            .total_claimed
+            .checked_add(amount)
+            .ok_or(ErrorCode::MathOverflow)?;
+
+        // Transférer les NPI du vault vers l'utilisateur
+        let bump = ctx.bumps.vault_authority;
+        let seeds: &[&[u8]] = &[b"npi_vault_authority", &[bump]];
+        let signer_seeds = &[seeds];
+
+        let transfer_accounts = TransferChecked {
+            from: ctx.accounts.npi_vault.to_account_info(),
+            to: ctx.accounts.user_npi_account.to_account_info(),
+            authority: ctx.accounts.vault_authority.to_account_info(),
+            mint: ctx.accounts.npi_mint.to_account_info(),
+        };
+
+        let transfer_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            transfer_accounts,
+            signer_seeds,
+        );
+
+        transfer_checked(transfer_ctx, amount, ctx.accounts.npi_mint.decimals)?;
+
+        emit!(NpiClaimed {
+            user: ctx.accounts.user.key(),
+            amount,
+            remaining_pending: user_balance.pending_npi,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        msg!(
+            "✅ {} NPI réclamés - Restant: {}",
+            amount / 1_000_000_000,
+            user_balance.pending_npi / 1_000_000_000
+        );
 
         Ok(())
     }
@@ -550,6 +665,12 @@ pub struct LockTokens<'info> {
     #[account(mut)]
     pub vault_token_account: InterfaceAccount<'info, TokenAccount>,
 
+    #[account(
+        mut,
+        constraint = buyback_wallet_token_account.key() == global_state.buyback_wallet @ ErrorCode::InvalidBuybackWallet
+    )]
+    pub buyback_wallet_token_account: InterfaceAccount<'info, TokenAccount>,
+
     /// CHECK: PDA vault authority
     #[account(
         seeds = [b"vault_authority"],
@@ -589,6 +710,12 @@ pub struct UnlockTokens<'info> {
     #[account(mut)]
     pub vault_token_account: InterfaceAccount<'info, TokenAccount>,
 
+    #[account(
+        mut,
+        constraint = buyback_wallet_token_account.key() == global_state.buyback_wallet @ ErrorCode::InvalidBuybackWallet
+    )]
+    pub buyback_wallet_token_account: InterfaceAccount<'info, TokenAccount>,
+
     /// CHECK: PDA vault authority
     #[account(
         seeds = [b"vault_authority"],
@@ -626,7 +753,60 @@ pub struct DistributeNpi<'info> {
     )]
     pub global_state: Account<'info, GlobalState>,
 
+    #[account(
+        init_if_needed,
+        payer = authority,
+        space = 8 + UserNpiBalance::INIT_SPACE,
+        seeds = [b"user_npi_balance", user.key().as_ref()],
+        bump
+    )]
+    pub user_npi_balance: Account<'info, UserNpiBalance>,
+
+    /// CHECK: User receiving the NPI allocation
+    pub user: AccountInfo<'info>,
+
+    #[account(mut)]
     pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ClaimNpi<'info> {
+    #[account(
+        mut,
+        seeds = [b"user_npi_balance", user.key().as_ref()],
+        bump = user_npi_balance.bump
+    )]
+    pub user_npi_balance: Account<'info, UserNpiBalance>,
+
+    #[account(
+        mut,
+        seeds = [b"global_state"],
+        bump
+    )]
+    pub global_state: Account<'info, GlobalState>,
+
+    #[account(
+        mut,
+        constraint = npi_vault.key() == global_state.npi_vault_wallet @ ErrorCode::InvalidNpiVault
+    )]
+    pub npi_vault: InterfaceAccount<'info, TokenAccount>,
+
+    #[account(mut)]
+    pub user_npi_account: InterfaceAccount<'info, TokenAccount>,
+
+    /// CHECK: PDA authority for NPI vault
+    #[account(
+        seeds = [b"npi_vault_authority"],
+        bump
+    )]
+    pub vault_authority: AccountInfo<'info>,
+
+    pub npi_mint: InterfaceAccount<'info, Mint>,
+
+    pub user: Signer<'info>,
+
+    pub token_program: Program<'info, Token>,
 }
 
 // ============================================================================
@@ -637,6 +817,10 @@ pub struct DistributeNpi<'info> {
 #[derive(InitSpace)]
 pub struct GlobalState {
     pub authority: Pubkey,
+    pub treasury_wallet: Pubkey,
+    pub boost_vault_wallet: Pubkey,
+    pub buyback_wallet: Pubkey,
+    pub npi_vault_wallet: Pubkey,
     pub total_community_boost: u64,
     pub active_locks_count: u64,
     pub total_value_locked: u64,
@@ -649,7 +833,6 @@ pub struct GlobalState {
     pub npi_treasury_accrued: u64,
     pub npi_boost_vault_accrued: u64,
     pub npi_boost_vault_distributed: u64,
-    pub npi_buyback_accrued: u64,
 }
 
 #[account]
@@ -672,6 +855,15 @@ pub struct UserLock {
     pub bump: u8,
 }
 
+#[account]
+#[derive(InitSpace)]
+pub struct UserNpiBalance {
+    pub user: Pubkey,
+    pub pending_npi: u64,
+    pub total_claimed: u64,
+    pub bump: u8,
+}
+
 // ============================================================================
 // EVENTS
 // ============================================================================
@@ -690,7 +882,7 @@ pub struct TokensLocked {
 pub struct TokensUnlocked {
     pub user: Pubkey,
     pub amount: u64,
-    pub burn_amount: u64,
+    pub penalty_amount: u64,
     pub early_unlock: bool,
     pub timestamp: i64,
 }
@@ -713,8 +905,15 @@ pub struct NpiDistributed {
     pub treasury_amount: u64,
     pub boost_vault_allocation: u64,
     pub remaining_boost_vault: u64,
-    pub buyback_amount: u64,
     pub applied_boost_bps: u16,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct NpiClaimed {
+    pub user: Pubkey,
+    pub amount: u64,
+    pub remaining_pending: u64,
     pub timestamp: i64,
 }
 
@@ -734,6 +933,14 @@ pub enum ErrorCode {
     MathOverflow,
     #[msg("Déjà déverrouillé")]
     AlreadyUnlocked,
+    #[msg("Wallet buyback invalide")]
+    InvalidBuybackWallet,
+    #[msg("Wallet NPI vault invalide")]
+    InvalidNpiVault,
+    #[msg("Solde pending insuffisant")]
+    InsufficientBalance,
+    #[msg("Vault NPI insuffisant")]
+    InsufficientVaultBalance,
 }
 
 // ============================================================================

@@ -1,31 +1,76 @@
 "use client";
 
-import { useWallet } from "@solana/wallet-adapter-react";
-import { useState, useEffect } from "react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { useState, useEffect, useCallback } from "react";
 import { CNFTCard } from "./CNFTCard";
 import { useCNFT } from "../hooks/useCNFT";
 import { useRealtimeStats } from "../hooks/useRealtimeStats";
 import { useGlobalState } from "../hooks/useGlobalState";
+import { useUserNpiBalance } from "../hooks/useUserNpiBalance";
 import { SkeletonLoader } from "./Skeletons";
 import { NoActivityState, NoConnectionState } from "./EmptyState";
 import { SwapBackDashboard } from "./SwapBackDashboard";
 import LockInterface from "./LockInterface";
 import UnlockInterface from "./UnlockInterface";
 import { logError } from "@/lib/errorLogger";
+import toast from "react-hot-toast";
+import { createClaimNpiTransaction } from "@/lib/claimNpi";
 // Import charts directly instead of lazy loading to avoid chunk errors
 import { VolumeChart, ActivityChart } from "./Charts";
 
 export const Dashboard = () => {
-  const { connected, publicKey } = useWallet();
+  const { connection } = useConnection();
+  const walletCtx = useWallet();
+  const { connected, publicKey, sendTransaction } = walletCtx;
   const [activeTab, setActiveTab] = useState<
     "dca" | "lock-unlock" | "overview" | "analytics"
   >("dca");
+  const [isClaiming, setIsClaiming] = useState(false);
 
   const { cnftData } = useCNFT();
   const { userStats, globalStats, loading, refresh, lastRefresh } =
     useRealtimeStats(publicKey?.toString());
   const { globalState, isLoading: globalStateLoading, refresh: refreshGlobalState } =
     useGlobalState();
+  const {
+    pendingNpi,
+    totalClaimed,
+    hasBalance,
+    refresh: refreshNpiBalance,
+    isLoading: npiLoading,
+  } = useUserNpiBalance();
+
+  const handleClaimNpi = useCallback(async () => {
+    if (!connection || !publicKey || !sendTransaction) {
+      toast.error("Connect your wallet to claim NPI");
+      return;
+    }
+    if (pendingNpi <= 0) {
+      toast("No NPI to claim yet");
+      return;
+    }
+
+    try {
+      setIsClaiming(true);
+      const transaction = await createClaimNpiTransaction(
+        connection,
+        walletCtx,
+        pendingNpi
+      );
+      const signature = await sendTransaction(transaction, connection);
+      toast.success(`Claim submitted: ${signature.slice(0, 8)}...`);
+      await Promise.all([
+        refreshNpiBalance(),
+        refreshGlobalState(),
+        refresh(),
+      ]);
+    } catch (err) {
+      console.error("Failed to claim NPI", err);
+      toast.error(err instanceof Error ? err.message : "Claim failed");
+    } finally {
+      setIsClaiming(false);
+    }
+  }, [connection, publicKey, walletCtx, sendTransaction, pendingNpi, refreshNpiBalance, refreshGlobalState, refresh]);
 
   // Log le montage du composant
   useEffect(() => {
@@ -126,6 +171,7 @@ export const Dashboard = () => {
               onClick={() => {
                 refresh();
                 refreshGlobalState();
+                refreshNpiBalance();
               }}
               disabled={loading || globalStateLoading}
               className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg border border-[var(--primary)]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -409,7 +455,7 @@ export const Dashboard = () => {
           )}
 
           {/* Pending Rebates Card */}
-          {userStats.pendingRebates > 0 && (
+          {hasBalance && pendingNpi > 0 && (
             <div className="bg-black border border-[var(--primary)] rounded-xl p-6 hover:scale-[1.01] transition-all">
               <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="flex items-center gap-4">
@@ -418,15 +464,22 @@ export const Dashboard = () => {
                   </div>
                   <div>
                     <div className="font-bold text-lg mb-1 text-gray-400">
-                      Pending Rebates
+                      Pending NPI Rebates
                     </div>
                     <div className="text-3xl font-bold text-white">
-                      ${userStats.pendingRebates.toFixed(2)}
+                      {pendingNpi.toFixed(4)} NPI
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      Claimed lifetime: {totalClaimed.toFixed(2)} NPI
                     </div>
                   </div>
                 </div>
-                <button className="bg-[var(--primary)] text-black px-8 py-3 rounded-lg text-lg font-bold hover:bg-[var(--primary)]/90 transition-colors">
-                  🎁 Claim Now
+                <button
+                  onClick={handleClaimNpi}
+                  disabled={isClaiming || npiLoading}
+                  className="bg-[var(--primary)] text-black px-8 py-3 rounded-lg text-lg font-bold hover:bg-[var(--primary)]/90 transition-colors disabled:opacity-50"
+                >
+                  {isClaiming ? "Claiming..." : "🎁 Claim NPI"}
                 </button>
               </div>
             </div>
@@ -464,7 +517,7 @@ export const Dashboard = () => {
               <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6">
                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-white">
                   <span>📊</span>
-                  <span>NPI Distribution (70/20/5/5)</span>
+                  <span>NPI Distribution (70/20/10)</span>
                 </h3>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center p-3 bg-gray-900 rounded-lg">
@@ -480,12 +533,12 @@ export const Dashboard = () => {
                     <span className="text-lg font-bold text-[var(--secondary)]">${globalState.npiTreasuryAccrued.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-gray-900 rounded-lg">
-                    <span className="text-gray-400">Boost Vault (5%):</span>
+                    <span className="text-gray-400">Boost Vault (10%):</span>
                     <span className="text-lg font-bold text-[var(--accent)]">${globalState.npiBoostVaultAccrued.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-gray-900 rounded-lg">
-                    <span className="text-gray-400">Buyback (5%):</span>
-                    <span className="text-lg font-bold text-[var(--accent)]">${globalState.npiBuybackAccrued.toFixed(2)}</span>
+                    <span className="text-gray-400">Boost Vault Distributed:</span>
+                    <span className="text-lg font-bold text-[var(--accent)]">${globalState.npiBoostVaultDistributed.toFixed(2)}</span>
                   </div>
                 </div>
               </div>

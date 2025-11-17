@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { getNetworkLabel, isMainnet } from "@/utils/explorer";
 import { ClientOnlyWallet } from "./ClientOnlyWallet";
-import Brand from "./Brand";
+import Logo from "./Logo";
 
 export const Navigation = () => {
   const pathname = usePathname();
@@ -33,9 +33,10 @@ export const Navigation = () => {
             <div className="flex items-center space-x-8">
               <Link
                 href="/"
-                className="terminal-glow hover:opacity-90 transition-opacity"
+                className="text-2xl font-bold terminal-text terminal-glow hover:text-[var(--accent)] transition-colors flex items-center gap-3 uppercase tracking-wider"
               >
-                <Brand size={32} />
+                <Logo withText={false} size={32} />
+                <span>SWAPBACK</span>
               </Link>
 
               {/* Desktop Navigation */}

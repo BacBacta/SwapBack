@@ -295,7 +295,7 @@ export default function Option2ProductFirst() {
           {/* NPI Distribution */}
           <div className="terminal-box border-2 border-[var(--secondary)] p-6">
             <h3 className="terminal-text text-xl font-bold mb-6 uppercase">
-              NPI Distribution (70/20/5/5)
+              NPI Distribution (70/20/10)
             </h3>
             <div className="space-y-4">
               <div className="flex justify-between items-center p-3 terminal-box bg-black border border-[var(--primary)]/30">
@@ -311,9 +311,15 @@ export default function Option2ProductFirst() {
                 </span>
               </div>
               <div className="flex justify-between items-center p-3 terminal-box bg-black border border-[var(--accent)]/30">
-                <span className="terminal-text text-[var(--muted)] text-sm">Boost_Vault (5%)</span>
+                <span className="terminal-text text-[var(--muted)] text-sm">Boost_Vault (10%)</span>
                 <span className="terminal-text font-bold text-[var(--accent)]">
                   ${globalState?.npiBoostVaultAccrued.toFixed(2) || "0.00"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center p-3 terminal-box bg-black border border-[var(--accent)]/20">
+                <span className="terminal-text text-[var(--muted)] text-sm">Boost_Distributed (live)</span>
+                <span className="terminal-text font-bold text-[var(--accent)]">
+                  ${globalState?.npiBoostVaultDistributed.toFixed(2) || "0.00"}
                 </span>
               </div>
             </div>

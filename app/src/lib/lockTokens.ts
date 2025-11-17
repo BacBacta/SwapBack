@@ -46,6 +46,15 @@ function getBackMint(): PublicKey | null {
   return envVar ? new PublicKey(envVar) : null;
 }
 
+export function getNpiMint(): PublicKey | null {
+  const envVar = process.env.c;
+  if (typeof window === 'undefined') {
+    const cfg = validateEnv();
+    return new PublicKey(cfg.npiMint);
+  }
+  return envVar ? new PublicKey(envVar) : null;
+}
+
 /**
  * Create a transaction to lock BACK tokens with on-chain transfer
  */
@@ -154,6 +163,10 @@ export async function createLockTokensTransaction(
   );
   console.log('✅ [LOCK TX] Global State:', globalState.toString());
 
+  // Lire le global state pour récupérer les wallets cibles en chaîne
+  const globalStateAccount = await program.account.globalState.fetch(globalState);
+  console.log('✅ [LOCK TX] Buyback wallet:', globalStateAccount.buybackWallet.toString());
+
   const [userLock] = PublicKey.findProgramAddressSync(
     [Buffer.from("user_lock"), wallet.publicKey.toBuffer()],
     CNFT_PROGRAM_ID
@@ -194,6 +207,14 @@ export async function createLockTokensTransaction(
   );
   console.log('✅ [LOCK TX] Vault Token Account (calculated):', vaultTokenAccount.toString());
 
+  const buybackWalletTokenAccount = await getAssociatedTokenAddress(
+    BACK_MINT,
+    globalStateAccount.buybackWallet,
+    false,
+    TOKEN_PROGRAM_ID
+  );
+  console.log('✅ [LOCK TX] Buyback Wallet ATA:', buybackWalletTokenAccount.toString());
+
   // Construire l'instruction via Anchor
   console.log('🔍 [LOCK TX] Building instruction...');
   try {
@@ -207,6 +228,7 @@ export async function createLockTokensTransaction(
         userLock, // Changed from userNft to userLock
         userTokenAccount,
         vaultTokenAccount,
+        buybackWalletTokenAccount,
         vaultAuthority: vaultAuthority[0],
         backMint: BACK_MINT,
         user: wallet.publicKey,
@@ -334,6 +356,9 @@ export async function createUnlockTokensTransaction(
   );
   console.log('✅ [UNLOCK TX] Global State:', globalState.toString());
 
+  const globalStateAccount = await program.account.globalState.fetch(globalState);
+  console.log('✅ [UNLOCK TX] Buyback wallet:', globalStateAccount.buybackWallet.toString());
+
   const [vaultAuthority] = PublicKey.findProgramAddressSync(
     [Buffer.from("vault_authority")],
     CNFT_PROGRAM_ID
@@ -358,6 +383,14 @@ export async function createUnlockTokensTransaction(
   );
   console.log('✅ [UNLOCK TX] Vault Token Account:', vaultTokenAccount.toString());
 
+  const buybackWalletTokenAccount = await getAssociatedTokenAddress(
+    BACK_MINT,
+    globalStateAccount.buybackWallet,
+    false,
+    TOKEN_PROGRAM_ID
+  );
+  console.log('✅ [UNLOCK TX] Buyback Wallet ATA:', buybackWalletTokenAccount.toString());
+
   // Construire l'instruction
   console.log('🔍 [UNLOCK TX] Building instruction...');
   console.log('📋 [UNLOCK TX] Accounts in order:', {
@@ -365,10 +398,11 @@ export async function createUnlockTokensTransaction(
     '2_globalState': globalState.toString(),
     '3_userTokenAccount': userTokenAccount.toString(),
     '4_vaultTokenAccount': vaultTokenAccount.toString(),
-    '5_vaultAuthority': vaultAuthority.toString(),
-    '6_backMint': BACK_MINT.toString(),
-    '7_user': wallet.publicKey.toString(),
-    '8_tokenProgram': TOKEN_PROGRAM_ID.toString(),
+    '5_buybackWalletTokenAccount': buybackWalletTokenAccount.toString(),
+    '6_vaultAuthority': vaultAuthority.toString(),
+    '7_backMint': BACK_MINT.toString(),
+    '8_user': wallet.publicKey.toString(),
+    '9_tokenProgram': TOKEN_PROGRAM_ID.toString(),
   });
   
   try {
@@ -380,6 +414,7 @@ export async function createUnlockTokensTransaction(
         globalState,
         userTokenAccount,
         vaultTokenAccount,
+        buybackWalletTokenAccount,
         vaultAuthority,
         backMint: BACK_MINT,
         user: wallet.publicKey,

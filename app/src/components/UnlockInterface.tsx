@@ -134,14 +134,14 @@ export default function UnlockInterface({
     // Avertissement pour unlock anticipé
     if (!timeRemaining?.canUnlock) {
       const penaltyAmount = lockData?.amount 
-        ? (Number(lockData.amount) / 1_000_000) * 0.015  // 6 decimals
+        ? (Number(lockData.amount) / 1_000_000) * 0.02  // 6 decimals
         : 0;
       
       const confirmEarlyUnlock = window.confirm(
         `⚠️ EARLY UNLOCK WARNING\n\n` +
         `You are unlocking before the lock period ends.\n` +
-        `A penalty of 1.5% will be applied:\n\n` +
-        `• Penalty: ${penaltyAmount.toFixed(2)} BACK (will be burned)\n` +
+        `A penalty of 2% will be applied:\n\n` +
+        `• Penalty: ${penaltyAmount.toFixed(2)} BACK (sent to buyback vault)\n` +
         `• You will receive: ${((Number(lockData?.amount || 0) / 1_000_000) - penaltyAmount).toFixed(2)} BACK\n\n` +
         `Do you want to continue?`
       );
@@ -551,7 +551,7 @@ export default function UnlockInterface({
             return (
               <span className="relative flex items-center justify-center gap-2">
                 <span>⚠️</span>
-                <span>Early Unlock (1.5% penalty)</span>
+                <span>Early Unlock (2% penalty)</span>
               </span>
             );
           }
@@ -584,8 +584,8 @@ export default function UnlockInterface({
               <div className="ml-7 space-y-2">
                 <p className="text-orange-200 text-sm">
                   Unlocking before the lock period ends will incur a{" "}
-                  <strong className="text-orange-400">1.5% penalty</strong>.
-                  These tokens will be burned permanently.
+                  <strong className="text-orange-400">2% penalty</strong>.
+                  These tokens are rerouted to the buyback vault to reinforce supply reduction.
                 </p>
                 <div className="p-3 bg-black/30 rounded-lg border border-orange-500/20">
                   <div className="flex justify-between items-center mb-1">
@@ -595,16 +595,16 @@ export default function UnlockInterface({
                     </span>
                   </div>
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-gray-400 text-xs">Penalty (1.5%):</span>
+                    <span className="text-gray-400 text-xs">Penalty (2%):</span>
                     <span className="text-red-400 font-bold">
-                      -{((Number(lockData.amount) / 1_000_000) * 0.015).toFixed(2)} BACK
+                      -{((Number(lockData.amount) / 1_000_000) * 0.02).toFixed(2)} BACK
                     </span>
                   </div>
                   <div className="h-px bg-orange-500/30 my-2"></div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-300 text-sm font-medium">You will receive:</span>
                     <span className="text-green-400 font-bold text-lg">
-                      {((Number(lockData.amount) / 1_000_000) * 0.985).toFixed(2)} BACK
+                      {((Number(lockData.amount) / 1_000_000) * 0.98).toFixed(2)} BACK
                     </span>
                   </div>
                 </div>

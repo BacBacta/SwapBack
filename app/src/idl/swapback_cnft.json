@@ -1,30 +1,63 @@
 {
   "address": "GEkXCcq87yUjQSp5EqcWf7bw9GKrB39A1LWdsE7V3V2E",
   "metadata": {
-    "name": "swapback_cnft",
+    "name": "swapbackCnft",
     "version": "0.1.0",
     "spec": "0.1.0",
     "description": "Programme de gestion des compressed NFTs pour les niveaux SwapBack"
   },
   "instructions": [
     {
-      "name": "distribute_npi",
+      "name": "claimNpi",
       "docs": [
-        "Répartit les NPI du routeur (Flux 2)"
+        "Permet à l'utilisateur de réclamer ses NPI accumulés"
       ],
       "discriminator": [
-        41,
-        100,
-        125,
-        127,
-        151,
-        220,
-        117,
-        73
+        162,
+        21,
+        67,
+        169,
+        107,
+        46,
+        218,
+        185
       ],
       "accounts": [
         {
-          "name": "global_state",
+          "name": "userNpiBalance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  110,
+                  112,
+                  105,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "globalState",
           "writable": true,
           "pda": {
             "seeds": [
@@ -49,26 +82,166 @@
           }
         },
         {
-          "name": "authority",
-          "signer": true,
-          "relations": [
-            "global_state"
-          ]
+          "name": "npiVault",
+          "writable": true
+        },
+        {
+          "name": "userNpiAccount",
+          "writable": true
+        },
+        {
+          "name": "vaultAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  112,
+                  105,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "npiMint"
+        },
+        {
+          "name": "user",
+          "signer": true
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         }
       ],
       "args": [
         {
-          "name": "npi_amount",
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "distributeNpi",
+      "docs": [
+        "Répartit les NPI du routeur (Flux 2) - Accumule dans le solde utilisateur"
+      ],
+      "discriminator": [
+        41,
+        100,
+        125,
+        127,
+        151,
+        220,
+        117,
+        73
+      ],
+      "accounts": [
+        {
+          "name": "globalState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "userNpiBalance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  110,
+                  112,
+                  105,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "globalState"
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "npiAmount",
           "type": "u64"
         },
         {
-          "name": "user_boost_bps",
+          "name": "userBoostBps",
           "type": "u16"
         }
       ]
     },
     {
-      "name": "initialize_collection",
+      "name": "initializeCollection",
       "docs": [
         "Initialise la configuration de la collection"
       ],
@@ -84,7 +257,7 @@
       ],
       "accounts": [
         {
-          "name": "collection_config",
+          "name": "collectionConfig",
           "writable": true,
           "pda": {
             "seeds": [
@@ -119,14 +292,14 @@
           "signer": true
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "initialize_global_state",
+      "name": "initializeGlobalState",
       "docs": [
         "Initialise le GlobalState pour tracker les locks"
       ],
@@ -142,7 +315,7 @@
       ],
       "accounts": [
         {
-          "name": "global_state",
+          "name": "globalState",
           "writable": true,
           "pda": {
             "seeds": [
@@ -172,14 +345,31 @@
           "signer": true
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "treasuryWallet",
+          "type": "pubkey"
+        },
+        {
+          "name": "boostVaultWallet",
+          "type": "pubkey"
+        },
+        {
+          "name": "buybackWallet",
+          "type": "pubkey"
+        },
+        {
+          "name": "npiVaultWallet",
+          "type": "pubkey"
+        }
+      ]
     },
     {
-      "name": "lock_tokens",
+      "name": "lockTokens",
       "docs": [
         "Lock des tokens BACK avec calcul de boost"
       ],
@@ -195,7 +385,7 @@
       ],
       "accounts": [
         {
-          "name": "collection_config",
+          "name": "collectionConfig",
           "writable": true,
           "pda": {
             "seeds": [
@@ -225,7 +415,7 @@
           }
         },
         {
-          "name": "global_state",
+          "name": "globalState",
           "writable": true,
           "pda": {
             "seeds": [
@@ -250,7 +440,7 @@
           }
         },
         {
-          "name": "user_lock",
+          "name": "userLock",
           "writable": true,
           "pda": {
             "seeds": [
@@ -276,15 +466,19 @@
           }
         },
         {
-          "name": "user_token_account",
+          "name": "userTokenAccount",
           "writable": true
         },
         {
-          "name": "vault_token_account",
+          "name": "vaultTokenAccount",
           "writable": true
         },
         {
-          "name": "vault_authority",
+          "name": "buybackWalletTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "vaultAuthority",
           "pda": {
             "seeds": [
               {
@@ -311,7 +505,7 @@
           }
         },
         {
-          "name": "back_mint"
+          "name": "backMint"
         },
         {
           "name": "user",
@@ -319,15 +513,15 @@
           "signer": true
         },
         {
-          "name": "token_program",
+          "name": "tokenProgram",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
-          "name": "associated_token_program",
+          "name": "associatedTokenProgram",
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -337,13 +531,13 @@
           "type": "u64"
         },
         {
-          "name": "lock_duration",
+          "name": "lockDuration",
           "type": "i64"
         }
       ]
     },
     {
-      "name": "record_swap_fees",
+      "name": "recordSwapFees",
       "docs": [
         "Enregistre la répartition des frais de swap (Flux 1)"
       ],
@@ -359,7 +553,7 @@
       ],
       "accounts": [
         {
-          "name": "global_state",
+          "name": "globalState",
           "writable": true,
           "pda": {
             "seeds": [
@@ -387,21 +581,21 @@
           "name": "authority",
           "signer": true,
           "relations": [
-            "global_state"
+            "globalState"
           ]
         }
       ],
       "args": [
         {
-          "name": "swap_volume",
+          "name": "swapVolume",
           "type": "u64"
         }
       ]
     },
     {
-      "name": "unlock_tokens",
+      "name": "unlockTokens",
       "docs": [
-        "Unlock des tokens BACK avec pénalité de 1.5% si anticipé"
+        "Unlock des tokens BACK avec pénalité de 2% si anticipé"
       ],
       "discriminator": [
         233,
@@ -415,7 +609,7 @@
       ],
       "accounts": [
         {
-          "name": "user_lock",
+          "name": "userLock",
           "writable": true,
           "pda": {
             "seeds": [
@@ -441,7 +635,7 @@
           }
         },
         {
-          "name": "global_state",
+          "name": "globalState",
           "writable": true,
           "pda": {
             "seeds": [
@@ -466,15 +660,19 @@
           }
         },
         {
-          "name": "user_token_account",
+          "name": "userTokenAccount",
           "writable": true
         },
         {
-          "name": "vault_token_account",
+          "name": "vaultTokenAccount",
           "writable": true
         },
         {
-          "name": "vault_authority",
+          "name": "buybackWalletTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "vaultAuthority",
           "pda": {
             "seeds": [
               {
@@ -501,14 +699,14 @@
           }
         },
         {
-          "name": "back_mint"
+          "name": "backMint"
         },
         {
           "name": "user",
           "signer": true
         },
         {
-          "name": "token_program",
+          "name": "tokenProgram",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         }
       ],
@@ -517,7 +715,7 @@
   ],
   "accounts": [
     {
-      "name": "CollectionConfig",
+      "name": "collectionConfig",
       "discriminator": [
         223,
         110,
@@ -530,7 +728,7 @@
       ]
     },
     {
-      "name": "GlobalState",
+      "name": "globalState",
       "discriminator": [
         163,
         46,
@@ -543,7 +741,7 @@
       ]
     },
     {
-      "name": "UserLock",
+      "name": "userLock",
       "discriminator": [
         107,
         42,
@@ -554,11 +752,37 @@
         205,
         98
       ]
+    },
+    {
+      "name": "userNpiBalance",
+      "discriminator": [
+        216,
+        141,
+        168,
+        129,
+        231,
+        93,
+        201,
+        121
+      ]
     }
   ],
   "events": [
     {
-      "name": "NpiDistributed",
+      "name": "npiClaimed",
+      "discriminator": [
+        194,
+        22,
+        165,
+        64,
+        131,
+        6,
+        102,
+        92
+      ]
+    },
+    {
+      "name": "npiDistributed",
       "discriminator": [
         136,
         126,
@@ -571,7 +795,7 @@
       ]
     },
     {
-      "name": "SwapFeesRecorded",
+      "name": "swapFeesRecorded",
       "discriminator": [
         41,
         99,
@@ -584,7 +808,7 @@
       ]
     },
     {
-      "name": "TokensLocked",
+      "name": "tokensLocked",
       "discriminator": [
         63,
         184,
@@ -597,7 +821,7 @@
       ]
     },
     {
-      "name": "TokensUnlocked",
+      "name": "tokensUnlocked",
       "discriminator": [
         32,
         143,
@@ -613,33 +837,53 @@
   "errors": [
     {
       "code": 6000,
-      "name": "InvalidAmount",
+      "name": "invalidAmount",
       "msg": "Montant invalide"
     },
     {
       "code": 6001,
-      "name": "DurationTooShort",
+      "name": "durationTooShort",
       "msg": "Durée trop courte (min 7 jours)"
     },
     {
       "code": 6002,
-      "name": "Unauthorized",
+      "name": "unauthorized",
       "msg": "Non autorisé"
     },
     {
       "code": 6003,
-      "name": "MathOverflow",
+      "name": "mathOverflow",
       "msg": "Dépassement arithmétique"
     },
     {
       "code": 6004,
-      "name": "AlreadyUnlocked",
+      "name": "alreadyUnlocked",
       "msg": "Déjà déverrouillé"
+    },
+    {
+      "code": 6005,
+      "name": "invalidBuybackWallet",
+      "msg": "Wallet buyback invalide"
+    },
+    {
+      "code": 6006,
+      "name": "invalidNpiVault",
+      "msg": "Wallet NPI vault invalide"
+    },
+    {
+      "code": 6007,
+      "name": "insufficientBalance",
+      "msg": "Solde pending insuffisant"
+    },
+    {
+      "code": 6008,
+      "name": "insufficientVaultBalance",
+      "msg": "Vault NPI insuffisant"
     }
   ],
   "types": [
     {
-      "name": "CollectionConfig",
+      "name": "collectionConfig",
       "type": {
         "kind": "struct",
         "fields": [
@@ -648,14 +892,14 @@
             "type": "pubkey"
           },
           {
-            "name": "total_minted",
+            "name": "totalMinted",
             "type": "u64"
           }
         ]
       }
     },
     {
-      "name": "GlobalState",
+      "name": "globalState",
       "type": {
         "kind": "struct",
         "fields": [
@@ -664,122 +908,154 @@
             "type": "pubkey"
           },
           {
-            "name": "total_community_boost",
+            "name": "treasuryWallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "boostVaultWallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "buybackWallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "npiVaultWallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "totalCommunityBoost",
             "type": "u64"
           },
           {
-            "name": "active_locks_count",
+            "name": "activeLocksCount",
             "type": "u64"
           },
           {
-            "name": "total_value_locked",
+            "name": "totalValueLocked",
             "type": "u64"
           },
           {
-            "name": "total_swap_volume",
+            "name": "totalSwapVolume",
             "type": "u64"
           },
           {
-            "name": "total_swap_fees_collected",
+            "name": "totalSwapFeesCollected",
             "type": "u64"
           },
           {
-            "name": "swap_treasury_accrued",
+            "name": "swapTreasuryAccrued",
             "type": "u64"
           },
           {
-            "name": "swap_buyback_accrued",
+            "name": "swapBuybackAccrued",
             "type": "u64"
           },
           {
-            "name": "total_npi_volume",
+            "name": "totalNpiVolume",
             "type": "u64"
           },
           {
-            "name": "npi_user_distributed",
+            "name": "npiUserDistributed",
             "type": "u64"
           },
           {
-            "name": "npi_treasury_accrued",
+            "name": "npiTreasuryAccrued",
             "type": "u64"
           },
           {
-            "name": "npi_boost_vault_accrued",
+            "name": "npiBoostVaultAccrued",
             "type": "u64"
           },
           {
-            "name": "npi_boost_vault_distributed",
-            "type": "u64"
-          },
-          {
-            "name": "npi_buyback_accrued",
+            "name": "npiBoostVaultDistributed",
             "type": "u64"
           }
         ]
       }
     },
     {
-      "name": "LockLevel",
+      "name": "lockLevel",
       "type": {
         "kind": "enum",
         "variants": [
           {
-            "name": "Bronze"
+            "name": "bronze"
           },
           {
-            "name": "Silver"
+            "name": "silver"
           },
           {
-            "name": "Gold"
+            "name": "gold"
           },
           {
-            "name": "Platinum"
+            "name": "platinum"
           },
           {
-            "name": "Diamond"
+            "name": "diamond"
           }
         ]
       }
     },
     {
-      "name": "NpiDistributed",
+      "name": "npiClaimed",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "total_npi",
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
             "type": "u64"
           },
           {
-            "name": "user_base",
+            "name": "remainingPending",
             "type": "u64"
           },
           {
-            "name": "user_boost_bonus",
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "npiDistributed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "totalNpi",
             "type": "u64"
           },
           {
-            "name": "user_total",
+            "name": "userBase",
             "type": "u64"
           },
           {
-            "name": "treasury_amount",
+            "name": "userBoostBonus",
             "type": "u64"
           },
           {
-            "name": "boost_vault_allocation",
+            "name": "userTotal",
             "type": "u64"
           },
           {
-            "name": "remaining_boost_vault",
+            "name": "treasuryAmount",
             "type": "u64"
           },
           {
-            "name": "buyback_amount",
+            "name": "boostVaultAllocation",
             "type": "u64"
           },
           {
-            "name": "applied_boost_bps",
+            "name": "remainingBoostVault",
+            "type": "u64"
+          },
+          {
+            "name": "appliedBoostBps",
             "type": "u16"
           },
           {
@@ -790,7 +1066,7 @@
       }
     },
     {
-      "name": "SwapFeesRecorded",
+      "name": "swapFeesRecorded",
       "type": {
         "kind": "struct",
         "fields": [
@@ -799,15 +1075,15 @@
             "type": "u64"
           },
           {
-            "name": "total_fee",
+            "name": "totalFee",
             "type": "u64"
           },
           {
-            "name": "treasury_amount",
+            "name": "treasuryAmount",
             "type": "u64"
           },
           {
-            "name": "buyback_amount",
+            "name": "buybackAmount",
             "type": "u64"
           },
           {
@@ -818,7 +1094,7 @@
       }
     },
     {
-      "name": "TokensLocked",
+      "name": "tokensLocked",
       "type": {
         "kind": "struct",
         "fields": [
@@ -834,7 +1110,7 @@
             "name": "level",
             "type": {
               "defined": {
-                "name": "LockLevel"
+                "name": "lockLevel"
               }
             }
           },
@@ -843,7 +1119,7 @@
             "type": "u16"
           },
           {
-            "name": "unlock_time",
+            "name": "unlockTime",
             "type": "i64"
           },
           {
@@ -854,7 +1130,7 @@
       }
     },
     {
-      "name": "TokensUnlocked",
+      "name": "tokensUnlocked",
       "type": {
         "kind": "struct",
         "fields": [
@@ -867,11 +1143,11 @@
             "type": "u64"
           },
           {
-            "name": "burn_amount",
+            "name": "penaltyAmount",
             "type": "u64"
           },
           {
-            "name": "early_unlock",
+            "name": "earlyUnlock",
             "type": "bool"
           },
           {
@@ -882,7 +1158,7 @@
       }
     },
     {
-      "name": "UserLock",
+      "name": "userLock",
       "type": {
         "kind": "struct",
         "fields": [
@@ -894,16 +1170,16 @@
             "name": "level",
             "type": {
               "defined": {
-                "name": "LockLevel"
+                "name": "lockLevel"
               }
             }
           },
           {
-            "name": "amount_locked",
+            "name": "amountLocked",
             "type": "u64"
           },
           {
-            "name": "lock_duration",
+            "name": "lockDuration",
             "type": "i64"
           },
           {
@@ -911,12 +1187,36 @@
             "type": "u16"
           },
           {
-            "name": "lock_time",
+            "name": "lockTime",
             "type": "i64"
           },
           {
-            "name": "is_active",
+            "name": "isActive",
             "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "userNpiBalance",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "pendingNpi",
+            "type": "u64"
+          },
+          {
+            "name": "totalClaimed",
+            "type": "u64"
           },
           {
             "name": "bump",

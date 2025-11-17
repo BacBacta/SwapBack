@@ -20,6 +20,27 @@ const CNFT_PROGRAM_ID = new PublicKey("AaN2BwpGWbvDo7NHfpyC6zGYxsbg2xtcikToW9xYy
 const RPC_URL = "https://api.devnet.solana.com";
 const KEYPAIR_PATH = "/workspaces/SwapBack/devnet-keypair-base58.txt";
 
+function resolveWallet(envVar, fallbackPubkey) {
+  const raw = process.env[envVar];
+  if (!raw) {
+    return fallbackPubkey;
+  }
+  try {
+    return new PublicKey(raw);
+  } catch (error) {
+    throw new Error(`Adresse invalide pour ${envVar}: ${raw}`);
+  }
+}
+
+function buildWalletConfig(defaultPubkey) {
+  return {
+    treasury: resolveWallet("SWAPBACK_TREASURY_WALLET", defaultPubkey),
+    boost: resolveWallet("SWAPBACK_BOOST_WALLET", defaultPubkey),
+    buyback: resolveWallet("SWAPBACK_BUYBACK_WALLET", defaultPubkey),
+    npiVault: resolveWallet("SWAPBACK_NPI_VAULT_WALLET", defaultPubkey),
+  };
+}
+
 function discriminator(name) {
   return crypto.createHash("sha256").update(`global:${name}`).digest().slice(0, 8);
 }
@@ -35,9 +56,15 @@ async function main() {
   
   const connection = new Connection(RPC_URL);
   const authority = loadKeypair(KEYPAIR_PATH);
+  const walletConfig = buildWalletConfig(authority.publicKey);
   
   console.log("Program ID:", CNFT_PROGRAM_ID.toBase58());
   console.log("Authority:", authority.publicKey.toBase58());
+  console.log("🔐 Wallets:");
+  console.log("  Treasury:", walletConfig.treasury.toBase58());
+  console.log("  Boost:", walletConfig.boost.toBase58());
+  console.log("  Buyback:", walletConfig.buyback.toBase58());
+  console.log("  NPI Vault:", walletConfig.npiVault.toBase58());
   
   const balance = await connection.getBalance(authority.publicKey);
   console.log("Balance:", balance / 1e9, "SOL\n");
@@ -78,10 +105,18 @@ async function main() {
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ];
     
+    const data = Buffer.concat([
+      disc,
+      walletConfig.treasury.toBuffer(),
+      walletConfig.boost.toBuffer(),
+      walletConfig.buyback.toBuffer(),
+      walletConfig.npiVault.toBuffer(),
+    ]);
+
     const ix = new TransactionInstruction({
       programId: CNFT_PROGRAM_ID,
       keys,
-      data: disc,
+      data,
     });
     
     const tx = new Transaction().add(ix);

@@ -18,46 +18,54 @@ interface LogoProps {
  * @param className - Additional CSS classes
  * @param onClick - Optional click handler
  */
-export default function Logo({ 
-  withText = true, 
+export default function Logo({
+  withText = true,
   size = 32,
   className = "",
-  onClick 
+  onClick,
 }: LogoProps) {
-  const logoSrc = withText ? "/icons/Logo.svg" : "/icons/icon_swapback.svg";
   const altText = withText ? "SwapBack Logo" : "SwapBack Icon";
-  
-  // Calculate width based on whether text is shown
-  // Icon is square, full logo is wider
-  const width = withText ? size * 3.5 : size;
-  const height = size;
+  const wordmarkFontSize = Math.round(size * 0.9);
 
-  const imageElement = (
-    <Image 
-      src={logoSrc}
+  const icon = (
+    <Image
+      src="/icons/icon_swapback.svg"
       alt={altText}
-      width={width}
-      height={height}
+      width={size}
+      height={size}
       className="transition-transform hover:scale-110"
       priority
     />
   );
 
+  const wordmark = withText ? (
+    <span
+      className="swapback-wordmark"
+      style={{ fontSize: `${wordmarkFontSize}px` }}
+      aria-hidden="true"
+    >
+      <span className="swapback-wordmark__swap">SWAP</span>
+      <span className="swapback-wordmark__back">BACK</span>
+    </span>
+  ) : null;
+
   if (onClick) {
     return (
       <button
         onClick={onClick}
-        className={`inline-flex items-center justify-center hover:opacity-80 transition-opacity cursor-pointer ${className}`}
+        className={`inline-flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer ${className}`}
         aria-label={altText}
       >
-        {imageElement}
+        {icon}
+        {wordmark}
       </button>
     );
   }
 
   return (
-    <div className={`inline-flex items-center justify-center ${className}`}>
-      {imageElement}
+    <div className={`inline-flex items-center gap-3 ${className}`}>
+      {icon}
+      {wordmark}
     </div>
   );
 }
