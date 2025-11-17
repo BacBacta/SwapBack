@@ -7,6 +7,7 @@ import {
   Keypair,
 } from "@solana/web3.js";
 import {
+  TOKEN_PROGRAM_ID,
   TOKEN_2022_PROGRAM_ID,
   getAssociatedTokenAddressSync,
   ASSOCIATED_TOKEN_PROGRAM_ID,
@@ -56,19 +57,28 @@ async function testLockUnlock() {
     program.programId
   );
 
+  const backMintInfo = await provider.connection.getAccountInfo(BACK_MINT);
+  if (!backMintInfo) {
+    throw new Error("BACK mint introuvable on-chain");
+  }
+
+  const backTokenProgramId = backMintInfo.owner.equals(TOKEN_2022_PROGRAM_ID)
+    ? TOKEN_2022_PROGRAM_ID
+    : TOKEN_PROGRAM_ID;
+
   // Token accounts
   const userTokenAccount = getAssociatedTokenAddressSync(
     BACK_MINT,
     wallet.publicKey,
     false,
-    TOKEN_2022_PROGRAM_ID
+    backTokenProgramId
   );
 
   const vaultTokenAccount = getAssociatedTokenAddressSync(
     BACK_MINT,
     vaultAuthority,
     true,
-    TOKEN_2022_PROGRAM_ID
+    backTokenProgramId
   );
 
   console.log("📍 PDAs:");
@@ -138,7 +148,8 @@ async function testLockUnlock() {
         vaultAuthority,
         backMint: BACK_MINT,
         user: wallet.publicKey,
-        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        token2022Program: TOKEN_2022_PROGRAM_ID,
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       })
@@ -186,7 +197,8 @@ async function testLockUnlock() {
         vaultAuthority,
         backMint: BACK_MINT,
         user: wallet.publicKey,
-        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        token2022Program: TOKEN_2022_PROGRAM_ID,
       })
       .rpc();
 

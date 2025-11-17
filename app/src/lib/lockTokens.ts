@@ -259,7 +259,8 @@ export async function createLockTokensTransaction(
         vaultAuthority: vaultAuthority[0],
         backMint: BACK_MINT,
         user: wallet.publicKey,
-        tokenProgram: backTokenProgramId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        token2022Program: TOKEN_2022_PROGRAM_ID,
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       })
@@ -456,7 +457,8 @@ export async function createUnlockTokensTransaction(
         vaultAuthority,
         backMint: BACK_MINT,
         user: wallet.publicKey,
-        tokenProgram: backTokenProgramId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        token2022Program: TOKEN_2022_PROGRAM_ID,
       })
       .instruction();
 
@@ -464,8 +466,7 @@ export async function createUnlockTokensTransaction(
 
     // Create transaction and configure required parameters
     const transaction = new Transaction().add(instruction);
-    
-        tokenProgram: backTokenProgramId,
+
     transaction.feePayer = wallet.publicKey;
     console.log('✅ [UNLOCK TX] Fee payer set:', wallet.publicKey.toString());
     

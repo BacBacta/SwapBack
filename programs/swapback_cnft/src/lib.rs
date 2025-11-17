@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token::{transfer_checked, Token, TransferChecked};
+use anchor_spl::token::{transfer_checked as spl_transfer_checked, Token, TransferChecked};
+use anchor_spl::token_2022::{transfer_checked as token2022_transfer_checked, Token2022};
 use anchor_spl::token_interface::{Mint, TokenAccount};
 
 // ⚠️ IMPORTANT: Ce program ID sera généré lors du premier build
@@ -197,9 +198,15 @@ pub mod swapback_cnft {
             authority: ctx.accounts.user.to_account_info(),
             mint: ctx.accounts.back_mint.to_account_info(),
         };
-
-        let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
-        transfer_checked(cpi_ctx, amount, ctx.accounts.back_mint.decimals)?;
+        transfer_checked_dynamic(
+            &ctx.accounts.token_program,
+            &ctx.accounts.token_2022_program,
+            &ctx.accounts.back_mint,
+            cpi_accounts,
+            amount,
+            ctx.accounts.back_mint.decimals,
+            None,
+        )?;
 
         emit!(TokensLocked {
             user: ctx.accounts.user.key(),
@@ -289,13 +296,15 @@ pub mod swapback_cnft {
                 mint: ctx.accounts.back_mint.to_account_info(),
             };
 
-            let transfer_ctx = CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
+            transfer_checked_dynamic(
+                &ctx.accounts.token_program,
+                &ctx.accounts.token_2022_program,
+                &ctx.accounts.back_mint,
                 transfer_accounts,
-                signer_seeds,
-            );
-
-            transfer_checked(transfer_ctx, user_amount, ctx.accounts.back_mint.decimals)?;
+                user_amount,
+                ctx.accounts.back_mint.decimals,
+                Some(signer_seeds),
+            )?;
         }
 
         if penalty_amount > 0 {
@@ -313,13 +322,15 @@ pub mod swapback_cnft {
                 mint: ctx.accounts.back_mint.to_account_info(),
             };
 
-            let penalty_ctx = CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
+            transfer_checked_dynamic(
+                &ctx.accounts.token_program,
+                &ctx.accounts.token_2022_program,
+                &ctx.accounts.back_mint,
                 penalty_accounts,
-                signer_seeds,
-            );
-
-            transfer_checked(penalty_ctx, penalty_amount, ctx.accounts.back_mint.decimals)?;
+                penalty_amount,
+                ctx.accounts.back_mint.decimals,
+                Some(signer_seeds),
+            )?;
         }
 
         // Désactiver le lock
@@ -542,7 +553,7 @@ pub mod swapback_cnft {
             signer_seeds,
         );
 
-        transfer_checked(transfer_ctx, amount, ctx.accounts.npi_mint.decimals)?;
+        spl_transfer_checked(transfer_ctx, amount, ctx.accounts.npi_mint.decimals)?;
 
         emit!(NpiClaimed {
             user: ctx.accounts.user.key(),
@@ -684,6 +695,7 @@ pub struct LockTokens<'info> {
     pub user: Signer<'info>,
 
     pub token_program: Program<'info, Token>,
+    pub token_2022_program: Program<'info, Token2022>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
@@ -728,6 +740,7 @@ pub struct UnlockTokens<'info> {
     pub user: Signer<'info>,
 
     pub token_program: Program<'info, Token>,
+    pub token_2022_program: Program<'info, Token2022>,
 }
 
 #[derive(Accounts)]
@@ -941,11 +954,60 @@ pub enum ErrorCode {
     InsufficientBalance,
     #[msg("Vault NPI insuffisant")]
     InsufficientVaultBalance,
+    #[msg("Unsupported token program for mint")]
+    UnsupportedTokenProgram,
 }
 
 // ============================================================================
 // UTILITAIRES
 // ============================================================================
+
+fn transfer_checked_dynamic<'info>(
+    token_program: &Program<'info, Token>,
+    token_2022_program: &Program<'info, Token2022>,
+    mint: &InterfaceAccount<'info, Mint>,
+    accounts: TransferChecked<'info>,
+    amount: u64,
+    decimals: u8,
+    signer_seeds: Option<&[&[&[u8]]]>,
+) -> Result<()> {
+    let owner = mint.to_account_info().owner;
+
+    if owner == &anchor_spl::token_2022::ID {
+        let program_info = token_2022_program.to_account_info();
+        let accounts_2022 = anchor_spl::token_2022::TransferChecked {
+            from: accounts.from.clone(),
+            mint: accounts.mint.clone(),
+            to: accounts.to.clone(),
+            authority: accounts.authority.clone(),
+        };
+
+        if let Some(seeds) = signer_seeds {
+            let cpi_ctx = CpiContext::new_with_signer(program_info, accounts_2022, seeds);
+            token2022_transfer_checked(cpi_ctx, amount, decimals)?;
+        } else {
+            let cpi_ctx = CpiContext::new(program_info, accounts_2022);
+            token2022_transfer_checked(cpi_ctx, amount, decimals)?;
+        }
+
+        return Ok(());
+    }
+
+    if owner == &anchor_spl::token::ID {
+        let program_info = token_program.to_account_info();
+        if let Some(seeds) = signer_seeds {
+            let cpi_ctx = CpiContext::new_with_signer(program_info, accounts, seeds);
+            spl_transfer_checked(cpi_ctx, amount, decimals)?;
+        } else {
+            let cpi_ctx = CpiContext::new(program_info, accounts);
+            spl_transfer_checked(cpi_ctx, amount, decimals)?;
+        }
+
+        return Ok(());
+    }
+
+    Err(error!(ErrorCode::UnsupportedTokenProgram))
+}
 
 /// Calcule le boost dynamique basé sur la durée et le montant verrouillé
 /// Formule multiplicative: (boost_durée + boost_montant + produit croisé)
