@@ -5,7 +5,7 @@ use anchor_spl::token_interface::{Mint, TokenAccount};
 
 // ⚠️ IMPORTANT: Ce program ID sera généré lors du premier build
 // Ne PAS hardcoder l'ancien ID ici - laisser Anchor le générer
-declare_id!("GEkXCcq87yUjQSp5EqcWf7bw9GKrB39A1LWdsE7V3V2E");
+declare_id!("36oiDSdezLJVJp7pYN1ii1PuFepXjDD6NeSHrNc9yLaB");
 
 // ============================================================================
 // CONSTANTES ÉCONOMIQUES
