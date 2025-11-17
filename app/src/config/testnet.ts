@@ -8,7 +8,7 @@ import { PublicKey } from "@solana/web3.js";
 export const TESTNET_TOKENS = {
   BACK: {
     mint: new PublicKey(
-      process.env.NEXT_PUBLIC_BACK_MINT || "6tFCrUr3mZpL3BzNV2cLjYDkoL7toYA74TpMCSxFg45E"
+      process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
     ),
     symbol: "BACK",
     name: "SwapBack Token",
@@ -37,13 +37,13 @@ export const TESTNET_TOKENS = {
 
 export const TESTNET_PROGRAM_IDS = {
   CNFT: new PublicKey(
-    process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "VOTRE_NOUVEAU_PROGRAM_ID"
+    process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "36oiDSdezLJVJp7pYN1ii1PuFepXjDD6NeSHrNc9yLaB"
   ),
   ROUTER: new PublicKey(
-    process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "BKExqm5cetXMFmN8uk8kkLJkYw51NZCh9V1hVZNvp5Zz"
+    process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "H3LLiKAvjPWk9Br14m7bjiWkaJFzeMVB9qvMsFaA14k5"
   ),
   BUYBACK: new PublicKey(
-    process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"
+    process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || "746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6"
   ),
 };
 
@@ -52,7 +52,7 @@ export const TESTNET_INFRASTRUCTURE = {
     process.env.NEXT_PUBLIC_MERKLE_TREE || "93Tzc7btocwzDSbscW9EfL9dBzWLx85FHE6zeWrwHbNT"
   ),
   COLLECTION_CONFIG: new PublicKey(
-    process.env.NEXT_PUBLIC_COLLECTION_CONFIG || "4zhpvzBMqvGoM7j9RAaAF5ZizwDUAtgYr5Pnzn8uRh5s"
+    process.env.NEXT_PUBLIC_COLLECTION_CONFIG || "5Lz4eHdqAgVsXu3Antp3TVqncuoCdUj2WEnc6PQuVzMT"
   ),
 };
 

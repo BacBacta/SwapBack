@@ -125,10 +125,10 @@ export const TokenSelector = ({
       ...BASE_POPULAR_TOKENS,
       // Add $BACK token on devnet only - Uses NEXT_PUBLIC_BACK_MINT from env
       ...(process.env.NEXT_PUBLIC_SOLANA_NETWORK === 'devnet' ? [{
-        address: process.env.NEXT_PUBLIC_BACK_MINT || "6tFCrUr3mZpL3BzNV2cLjYDkoL7toYA74TpMCSxFg45E",
+        address: process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
         symbol: "BACK",
         name: "SwapBack Token",
-        decimals: 6,
+        decimals: 9,
         logoURI: "https://swapback.xyz/logo.png", // TODO: Add proper logo
         verified: true,
         trending: true,

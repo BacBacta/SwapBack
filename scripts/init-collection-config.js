@@ -2,9 +2,7 @@
  * Initialiser la Collection Config pour les cNFTs SwapBack
  * 
  * Cette instruction configure la collection de cNFTs de niveau
- * et la lie au Merkle Tree Bubblegum
- * 
- * Prérequis: Merkle Tree créé
+ * et prépare le compte collection_config requis par le lock
  */
 
 const { Connection, Keypair, PublicKey, Transaction, SystemProgram, TransactionInstruction } = require("@solana/web3.js");
@@ -12,10 +10,10 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-// Configuration devnet
-const NETWORK = "https://api.devnet.solana.com";
-const CNFT_PROGRAM_ID = new PublicKey("9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw");
-const MERKLE_TREE = new PublicKey("UKwWETzhjGREsYffBNoi6qShiH32hzRu4nRQ3Z8RYoa");
+// Configuration devnet (surchargée via variables d'environnement si définies)
+const NETWORK = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
+const PROGRAM_ID_RAW = process.env.CNFT_PROGRAM_ID || process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "36oiDSdezLJVJp7pYN1ii1PuFepXjDD6NeSHrNc9yLaB";
+const CNFT_PROGRAM_ID = new PublicKey(PROGRAM_ID_RAW);
 
 async function main() {
   console.log("\n╔══════════════════════════════════════════════════════════════╗");
@@ -23,6 +21,9 @@ async function main() {
   console.log("╚══════════════════════════════════════════════════════════════╝\n");
 
   const connection = new Connection(NETWORK, "confirmed");
+
+  console.log(`🌐 RPC: ${NETWORK}`);
+  console.log(`🆔 Program ID: ${CNFT_PROGRAM_ID.toString()}`);
 
   // Charger le wallet
   const walletPath = path.join(process.env.HOME || "", ".config/solana/id.json");
@@ -66,17 +67,6 @@ async function main() {
     process.exit(0);
   }
 
-  console.log(`\n🌳 Merkle Tree: ${MERKLE_TREE.toString()}`);
-
-  // Vérifier que le Merkle Tree existe
-  const treeInfo = await connection.getAccountInfo(MERKLE_TREE);
-  if (!treeInfo) {
-    console.error(`\n❌ Merkle Tree n'existe pas!`);
-    console.error(`   Exécutez d'abord: node scripts/create-merkle-tree.js`);
-    process.exit(1);
-  }
-  console.log(`✅ Merkle Tree existe (${treeInfo.data.length} bytes)`);
-
   // Calculer le discriminator pour "initialize_collection"
   const discriminator = crypto
     .createHash("sha256")
@@ -90,9 +80,8 @@ async function main() {
   // Comptes selon InitializeCollection context:
   const keys = [
     { pubkey: collectionConfigPDA, isSigner: false, isWritable: true },    // 0. collection_config (init)
-    { pubkey: MERKLE_TREE, isSigner: false, isWritable: false },           // 1. tree_config
-    { pubkey: payer.publicKey, isSigner: true, isWritable: true },         // 2. authority (signer + payer)
-    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // 3. system_program
+    { pubkey: payer.publicKey, isSigner: true, isWritable: true },         // 1. authority (signer + payer)
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // 2. system_program
   ];
 
   const initCollectionIx = new TransactionInstruction({
@@ -103,7 +92,7 @@ async function main() {
 
   console.log("\n📝 Comptes de l'instruction:");
   keys.forEach((key, idx) => {
-    const role = ["collection_config (init)", "tree_config", "authority", "system_program"][idx];
+    const role = ["collection_config (init)", "authority", "system_program"][idx];
     console.log(`   ${idx}. ${role.padEnd(25)} ${key.pubkey.toString()}`);
   });
 
@@ -164,7 +153,6 @@ async function main() {
 
     console.log(`\n📋 Résumé:`);
     console.log(`   • CollectionConfig PDA: ${collectionConfigPDA.toString()}`);
-    console.log(`   • Merkle Tree: ${MERKLE_TREE.toString()}`);
     console.log(`   • Transaction: ${signature}`);
     console.log(`   • Coût: ~0.001 SOL\n`);
 

@@ -3,7 +3,7 @@ import { PublicKey } from '@solana/web3.js';
 // Devnet defaults remain in effect until mainnet launch
 export const DEFAULT_SOLANA_NETWORK = 'devnet';
 export const DEFAULT_SOLANA_RPC_URL = 'https://api.devnet.solana.com';
-export const DEFAULT_BACK_MINT = '6tFCrUr3mZpL3BzNV2cLjYDkoL7toYA74TpMCSxFg45E';
+export const DEFAULT_BACK_MINT = '862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux';
 
 /**
  * Configuration centralisée pour SwapBack
@@ -139,7 +139,7 @@ export const SOLANA_EXPLORER_BASE_URL = 'https://explorer.solana.com';
 // ============================================
 
 export const DEFAULT_COMMITMENT = 'confirmed';
-export const TOKEN_DECIMALS = 6; // $BACK mint configured with 6 decimals
+export const TOKEN_DECIMALS = 9; // $BACK Token-2022 mint uses 9 decimals
 
 // ============================================
 // UI CONSTANTS

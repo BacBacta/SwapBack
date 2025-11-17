@@ -6,7 +6,7 @@ import { DEFAULT_BACK_MINT, DEFAULT_SOLANA_NETWORK, DEFAULT_SOLANA_RPC_URL } fro
 export const BACK_TOKEN_DEVNET = {
   name: "SwapBack Token",
   symbol: "BACK",
-  decimals: 6,
+  decimals: 9,
   mint: DEFAULT_BACK_MINT,
   program: "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", // Token-2022
   network: "devnet",

@@ -20,7 +20,7 @@ async function main() {
   // Configuration
   const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
   const CNFT_PROGRAM_ID = new PublicKey('GEkXCcq87yUjQSp5EqcWf7bw9GKrB39A1LWdsE7V3V2E');
-  const BACK_MINT = new PublicKey('6tFCrUr3mZpL3BzNV2cLjYDkoL7toYA74TpMCSxFg45E');
+  const BACK_MINT = new PublicKey('862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux');
   
   // Charger le keypair payer (votre wallet)
   const keypairPath = process.env.SOLANA_KEYPAIR || '/workspaces/SwapBack/devnet-keypair.json';
