@@ -398,15 +398,6 @@ export async function createUnlockTokensTransaction(
 
   // Obtenir les token accounts
   console.log('🔍 [UNLOCK TX] Getting token accounts...');
-  const userTokenAccount = await getAssociatedTokenAddress(
-    BACK_MINT,
-    wallet.publicKey,
-    false,
-    TOKEN_PROGRAM_ID
-  );
-  console.log('✅ [UNLOCK TX] User Token Account:', userTokenAccount.toString());
-
-  const vaultTokenAccount = await getAssociatedTokenAddress(
   const mintAccountInfo = await connection.getAccountInfo(BACK_MINT);
   if (!mintAccountInfo) {
     throw new Error('❌ BACK mint account not found on chain');
@@ -422,13 +413,22 @@ export async function createUnlockTokensTransaction(
     false,
     backTokenProgramId
   );
+  console.log('✅ [UNLOCK TX] User Token Account:', userTokenAccount.toString());
+
+  const vaultTokenAccount = await getAssociatedTokenAddress(
+    BACK_MINT,
+    vaultAuthority,
+    true,
+    backTokenProgramId
+  );
+  console.log('✅ [UNLOCK TX] Vault Token Account:', vaultTokenAccount.toString());
 
   const buybackWalletTokenAccount = await getAssociatedTokenAddress(
     BACK_MINT,
     globalStateAccount.buybackWallet,
     false,
-    TOKEN_PROGRAM_ID
     backTokenProgramId
+  );
   console.log('✅ [UNLOCK TX] Buyback Wallet ATA:', buybackWalletTokenAccount.toString());
 
   // Construire l'instruction
@@ -436,13 +436,13 @@ export async function createUnlockTokensTransaction(
   console.log('📋 [UNLOCK TX] Accounts in order:', {
     '1_userLock': userLock.toString(),
     '2_globalState': globalState.toString(),
-    backTokenProgramId
+    '3_userTokenAccount': userTokenAccount.toString(),
     '4_vaultTokenAccount': vaultTokenAccount.toString(),
     '5_buybackWalletTokenAccount': buybackWalletTokenAccount.toString(),
     '6_vaultAuthority': vaultAuthority.toString(),
     '7_backMint': BACK_MINT.toString(),
     '8_user': wallet.publicKey.toString(),
-    '9_tokenProgram': TOKEN_PROGRAM_ID.toString(),
+    '9_tokenProgram': backTokenProgramId.toString(),
   });
   
   try {
@@ -451,14 +451,12 @@ export async function createUnlockTokensTransaction(
       .unlockTokens()
       .accounts({
         userLock,
-    '9_tokenProgram': backTokenProgramId.toString(),
-        userTokenAccount,
         vaultTokenAccount,
         buybackWalletTokenAccount,
         vaultAuthority,
         backMint: BACK_MINT,
         user: wallet.publicKey,
-        tokenProgram: TOKEN_PROGRAM_ID,
+        tokenProgram: backTokenProgramId,
       })
       .instruction();
 
