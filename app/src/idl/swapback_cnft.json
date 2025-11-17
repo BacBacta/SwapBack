@@ -719,6 +719,64 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "update_buyback_wallet",
+      "docs": [
+        "Met à jour le wallet buyback (ATA) détenu par l'autorité"
+      ],
+      "discriminator": [
+        195,
+        161,
+        248,
+        155,
+        176,
+        204,
+        21,
+        44
+      ],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "global_state"
+          ]
+        },
+        {
+          "name": "buyback_wallet_token_account",
+          "writable": true
+        },
+        {
+          "name": "back_mint"
+        }
+      ],
+      "args": []
     }
   ],
   "accounts": [

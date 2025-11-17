@@ -355,6 +355,38 @@ pub mod swapback_cnft {
         Ok(())
     }
 
+    /// Met à jour le wallet buyback (ATA) détenu par l'autorité
+    pub fn update_buyback_wallet(ctx: Context<UpdateBuybackWallet>) -> Result<()> {
+        let global_state = &mut ctx.accounts.global_state;
+
+        require_keys_eq!(
+            global_state.authority,
+            ctx.accounts.authority.key(),
+            ErrorCode::Unauthorized
+        );
+
+        require_keys_eq!(
+            ctx.accounts.buyback_wallet_token_account.owner,
+            ctx.accounts.authority.key(),
+            ErrorCode::Unauthorized
+        );
+
+        require_keys_eq!(
+            ctx.accounts.buyback_wallet_token_account.mint,
+            ctx.accounts.back_mint.key(),
+            ErrorCode::InvalidBuybackWallet
+        );
+
+        global_state.buyback_wallet = ctx.accounts.buyback_wallet_token_account.key();
+
+        msg!(
+            "✅ Buyback wallet mis à jour: {}",
+            global_state.buyback_wallet
+        );
+
+        Ok(())
+    }
+
     /// Enregistre la répartition des frais de swap (Flux 1)
     pub fn record_swap_fees(ctx: Context<RecordSwapFees>, swap_volume: u64) -> Result<()> {
         require!(swap_volume > 0, ErrorCode::InvalidAmount);
@@ -741,6 +773,24 @@ pub struct UnlockTokens<'info> {
 
     pub token_program: Program<'info, Token>,
     pub token_2022_program: Program<'info, Token2022>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateBuybackWallet<'info> {
+    #[account(
+        mut,
+        seeds = [b"global_state"],
+        bump,
+        has_one = authority
+    )]
+    pub global_state: Account<'info, GlobalState>,
+
+    pub authority: Signer<'info>,
+
+    #[account(mut)]
+    pub buyback_wallet_token_account: InterfaceAccount<'info, TokenAccount>,
+
+    pub back_mint: InterfaceAccount<'info, Mint>,
 }
 
 #[derive(Accounts)]
