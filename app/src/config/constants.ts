@@ -44,7 +44,7 @@ let _cnftProgramId: PublicKey | null = null;
 export function getCnftProgramId(): PublicKey {
   if (!_cnftProgramId) {
     _cnftProgramId = new PublicKey(
-      process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || 'VOTRE_NOUVEAU_PROGRAM_ID'
+      process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || '36oiDSdezLJVJp7pYN1ii1PuFepXjDD6NeSHrNc9yLaB'
     );
   }
   return _cnftProgramId;

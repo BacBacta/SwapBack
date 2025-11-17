@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { Program, AnchorProvider, type Idl } from "@coral-xyz/anchor";
 import cnftIdl from "@/idl/swapback_cnft.json";
+import { getCnftProgramId } from "@/config/constants";
 
 interface GlobalStateData {
   authority: string;
@@ -24,14 +25,6 @@ interface GlobalStateData {
   npiTreasuryAccrued: number;
   npiBoostVaultAccrued: number;
   npiBoostVaultDistributed: number;
-}
-
-function getCnftProgramId(): PublicKey {
-  const envVar = process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID;
-  if (!envVar) {
-    throw new Error("NEXT_PUBLIC_CNFT_PROGRAM_ID is not configured");
-  }
-  return new PublicKey(envVar);
 }
 
 const LAMPORTS_PER_BACK = 1_000_000; // 6 decimals
