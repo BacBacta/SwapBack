@@ -179,35 +179,60 @@ export default function LockInterface({
 
     const fetchBalance = async () => {
       try {
-        // Try standard SPL Token first (BACK mint is on standard program)
-        const ata = await getAssociatedTokenAddress(
-          getBackTokenMint(),
-          publicKey,
-          false,
-          TOKEN_PROGRAM_ID
+        const mint = getBackTokenMint();
+        const programs = [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID];
+
+        for (const programId of programs) {
+          try {
+            const ata = await getAssociatedTokenAddress(
+              mint,
+              publicKey,
+              false,
+              programId
+            );
+
+            console.log(
+              `🔍 LockInterface: Checking BACK ATA (${programId.toBase58()}): ${ata.toBase58()}`
+            );
+            const accountInfo = await connection.getAccountInfo(ata);
+
+            if (!accountInfo) {
+              console.log(
+                `⚠️ LockInterface: No token account found for program ${programId.toBase58()}`
+              );
+              continue;
+            }
+
+            const data = accountInfo.data;
+            if (data.length < 72) {
+              console.log(
+                `⚠️ LockInterface: Invalid account size (${data.length} bytes) for program ${programId.toBase58()}`
+              );
+              continue;
+            }
+
+            // Amount is at offset 64 (32 mint + 32 owner)
+            const amount = data.readBigUInt64LE(64);
+            const bal = Number(amount) / Math.pow(10, TOKEN_DECIMALS);
+            console.log(
+              `💰 LockInterface: BACK balance via ${programId.toBase58()} = ${bal.toFixed(
+                TOKEN_DECIMALS
+              )} (raw: ${amount}, decimals: ${TOKEN_DECIMALS})`
+            );
+            setBalance(bal);
+            return;
+          } catch (programErr) {
+            console.log(
+              `⚠️ LockInterface: Unable to read via program ${programId.toBase58()}:`,
+              programErr
+            );
+          }
+        }
+
+        console.log(
+          "❌ LockInterface: No BACK token account found on either SPL program"
         );
-
-        console.log(`🔍 LockInterface: Checking BACK ATA: ${ata.toBase58()}`);
-        const accountInfo = await connection.getAccountInfo(ata);
-        
-        if (!accountInfo) {
-          console.log(`⚠️ LockInterface: No token account found`);
-          setBalance(0);
-          return;
-        }
-
-        const data = accountInfo.data;
-        if (data.length < 72) {
-          console.log(`⚠️ LockInterface: Invalid account size: ${data.length} bytes`);
-          setBalance(0);
-          return;
-        }
-
-        // Amount is at offset 64 (32 mint + 32 owner)
-        const amount = data.readBigUInt64LE(64);
-        const bal = Number(amount) / Math.pow(10, TOKEN_DECIMALS);
-        console.log(`💰 LockInterface: BACK balance = ${bal.toFixed(TOKEN_DECIMALS)} (raw: ${amount}, decimals: ${TOKEN_DECIMALS})`);
-        setBalance(bal);
+        setBalance(0);
       } catch (err) {
         console.error("❌ LockInterface: Error fetching balance:", err);
         setBalance(0);
