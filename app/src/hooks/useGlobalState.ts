@@ -3,7 +3,7 @@
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useEffect, useState, useCallback } from "react";
 import { PublicKey } from "@solana/web3.js";
-import { Program, AnchorProvider, type Idl } from "@coral-xyz/anchor";
+import { type Idl, BorshAccountsCoder } from "@coral-xyz/anchor";
 import cnftIdl from "@/idl/swapback_cnft.json";
 import { getCnftProgramId } from "@/config/constants";
 
@@ -45,27 +45,15 @@ export function useGlobalState() {
 
     try {
       const programId = getCnftProgramId();
-      
-      // Create a minimal provider for reading accounts
-      const provider = new AnchorProvider(
-        connection,
-        {} as any, // No wallet needed for reading
-        { commitment: "confirmed" }
-      );
+      console.debug("[useGlobalState] CNFT program", programId.toBase58());
 
-      const program = new Program(cnftIdl as Idl, provider);
-
-      // Inject BorshAccountsCoder if missing
-      if (!(program as any)._coder?.accounts) {
-        const { BorshAccountsCoder } = await import("@coral-xyz/anchor");
-        (program as any)._coder = (program as any)._coder || {};
-        (program as any)._coder.accounts = new BorshAccountsCoder(cnftIdl as Idl);
-      }
+      const coder = new BorshAccountsCoder(cnftIdl as Idl);
 
       const [globalStatePda] = PublicKey.findProgramAddressSync(
         [Buffer.from("global_state")],
         programId
       );
+      console.debug("[useGlobalState] GlobalState PDA", globalStatePda.toBase58());
 
       const accountInfo = await connection.getAccountInfo(globalStatePda);
 
@@ -75,11 +63,21 @@ export function useGlobalState() {
         return;
       }
 
+      console.debug("[useGlobalState] GlobalState size", accountInfo.data.length);
+
       // Decode the account data
-      const decoded = (program as any).coder.accounts.decode(
-        "GlobalState",
-        accountInfo.data
-      );
+      let decoded;
+      try {
+        decoded = coder.decode("GlobalState", accountInfo.data);
+      } catch (decodeError) {
+        console.error("[useGlobalState] Failed to decode GlobalState", decodeError);
+        setError(
+          decodeError instanceof Error
+            ? decodeError
+            : new Error("Unable to decode GlobalState")
+        );
+        return;
+      }
 
       setGlobalState({
         authority: decoded.authority.toString(),
