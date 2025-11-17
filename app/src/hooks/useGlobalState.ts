@@ -79,12 +79,44 @@ export function useGlobalState() {
         return;
       }
 
+      const formatPubkeyField = (fieldName: string, value: unknown): string => {
+        try {
+          if (!value) {
+            console.warn(`[useGlobalState] Missing ${fieldName} in decoded account`);
+            return "";
+          }
+
+          if (value instanceof PublicKey) {
+            return value.toBase58();
+          }
+
+          if (typeof value === "string") {
+            return value;
+          }
+
+          const candidate = value as { toBase58?: () => string; toString?: () => string };
+          if (typeof candidate.toBase58 === "function") {
+            return candidate.toBase58();
+          }
+
+          if (typeof candidate.toString === "function") {
+            return candidate.toString();
+          }
+
+          console.warn(`[useGlobalState] Unable to format ${fieldName}, unexpected type`, value);
+          return "";
+        } catch (formatErr) {
+          console.error(`[useGlobalState] Failed to format ${fieldName}`, formatErr);
+          return "";
+        }
+      };
+
       setGlobalState({
-        authority: decoded.authority.toString(),
-        treasuryWallet: decoded.treasuryWallet.toString(),
-        boostVaultWallet: decoded.boostVaultWallet.toString(),
-        buybackWallet: decoded.buybackWallet.toString(),
-        npiVaultWallet: decoded.npiVaultWallet.toString(),
+        authority: formatPubkeyField("authority", decoded.authority),
+        treasuryWallet: formatPubkeyField("treasuryWallet", decoded.treasuryWallet),
+        boostVaultWallet: formatPubkeyField("boostVaultWallet", decoded.boostVaultWallet),
+        buybackWallet: formatPubkeyField("buybackWallet", decoded.buybackWallet),
+        npiVaultWallet: formatPubkeyField("npiVaultWallet", decoded.npiVaultWallet),
         totalCommunityBoost: Number(decoded.totalCommunityBoost),
         activeLocksCount: Number(decoded.activeLocksCount),
         totalValueLocked: Number(decoded.totalValueLocked) / LAMPORTS_PER_BACK,

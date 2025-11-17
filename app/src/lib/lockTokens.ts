@@ -15,6 +15,7 @@ import {
   TOKEN_PROGRAM_ID, 
   getAssociatedTokenAddress,
   ASSOCIATED_TOKEN_PROGRAM_ID,
+  createAssociatedTokenAccountInstruction,
 } from "@solana/spl-token";
 import cnftIdl from "@/idl/swapback_cnft.json";
 import { validateEnv } from "./validateEnv";
@@ -197,6 +198,23 @@ export async function createLockTokensTransaction(
   );
   console.log('✅ [LOCK TX] User Token Account:', userTokenAccount.toString());
 
+  const instructions = [];
+
+  const userAtaInfo = await connection.getAccountInfo(userTokenAccount);
+  if (!userAtaInfo) {
+    console.log('ℹ️ [LOCK TX] User ATA missing - adding createAssociatedTokenAccountInstruction');
+    instructions.push(
+      createAssociatedTokenAccountInstruction(
+        wallet.publicKey,
+        userTokenAccount,
+        wallet.publicKey,
+        BACK_MINT,
+        TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID
+      )
+    );
+  }
+
   // Le vault token account est dérivé automatiquement par Anchor via l'IDL
   // On peut le calculer pour info mais Anchor le fera aussi
   const vaultTokenAccount = await getAssociatedTokenAddress(
@@ -251,7 +269,11 @@ export async function createLockTokensTransaction(
       microLamports: 1, // Petite priorité pour passage plus rapide
     });
 
-    const transaction = new Transaction()
+    const transaction = new Transaction();
+    for (const ix of instructions) {
+      transaction.add(ix);
+    }
+    transaction
       .add(modifyComputeUnits)
       .add(addPriorityFee)
       .add(instruction);
