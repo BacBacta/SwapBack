@@ -190,11 +190,20 @@ export async function createLockTokensTransaction(
     throw new Error('❌ NEXT_PUBLIC_BACK_MINT is not configured. Define it in Vercel or .env');
   }
 
+  const mintAccountInfo = await connection.getAccountInfo(BACK_MINT);
+  if (!mintAccountInfo) {
+    throw new Error('❌ BACK mint account not found on chain');
+  }
+  const backTokenProgramId = mintAccountInfo.owner.equals(TOKEN_2022_PROGRAM_ID)
+    ? TOKEN_2022_PROGRAM_ID
+    : TOKEN_PROGRAM_ID;
+  console.log('🔍 [LOCK TX] BACK mint owned by:', backTokenProgramId.toBase58());
+
   const userTokenAccount = await getAssociatedTokenAddress(
     BACK_MINT,
     wallet.publicKey,
     false,
-    TOKEN_PROGRAM_ID // BACK utilise le programme SPL Token standard
+    backTokenProgramId
   );
   console.log('✅ [LOCK TX] User Token Account:', userTokenAccount.toString());
 
@@ -209,7 +218,7 @@ export async function createLockTokensTransaction(
         userTokenAccount,
         wallet.publicKey,
         BACK_MINT,
-        TOKEN_PROGRAM_ID,
+        backTokenProgramId,
         ASSOCIATED_TOKEN_PROGRAM_ID
       )
     );
@@ -220,8 +229,8 @@ export async function createLockTokensTransaction(
   const vaultTokenAccount = await getAssociatedTokenAddress(
     BACK_MINT,
     vaultAuthority[0],
-    true, // allowOwnerOffCurve = true pour PDA
-    TOKEN_PROGRAM_ID // BACK utilise le programme SPL Token standard
+    true,
+    backTokenProgramId
   );
   console.log('✅ [LOCK TX] Vault Token Account (calculated):', vaultTokenAccount.toString());
 
@@ -229,7 +238,7 @@ export async function createLockTokensTransaction(
     BACK_MINT,
     globalStateAccount.buybackWallet,
     false,
-    TOKEN_PROGRAM_ID
+    backTokenProgramId
   );
   console.log('✅ [LOCK TX] Buyback Wallet ATA:', buybackWalletTokenAccount.toString());
 
@@ -250,7 +259,7 @@ export async function createLockTokensTransaction(
         vaultAuthority: vaultAuthority[0],
         backMint: BACK_MINT,
         user: wallet.publicKey,
-        tokenProgram: TOKEN_PROGRAM_ID, // BACK utilise SPL Token standard
+        tokenProgram: backTokenProgramId,
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       })
@@ -398,19 +407,28 @@ export async function createUnlockTokensTransaction(
   console.log('✅ [UNLOCK TX] User Token Account:', userTokenAccount.toString());
 
   const vaultTokenAccount = await getAssociatedTokenAddress(
+  const mintAccountInfo = await connection.getAccountInfo(BACK_MINT);
+  if (!mintAccountInfo) {
+    throw new Error('❌ BACK mint account not found on chain');
+  }
+  const backTokenProgramId = mintAccountInfo.owner.equals(TOKEN_2022_PROGRAM_ID)
+    ? TOKEN_2022_PROGRAM_ID
+    : TOKEN_PROGRAM_ID;
+  console.log('🔍 [UNLOCK TX] BACK mint owned by:', backTokenProgramId.toBase58());
+
+  const userTokenAccount = await getAssociatedTokenAddress(
     BACK_MINT,
-    vaultAuthority,
-    true, // allowOwnerOffCurve = true pour PDA
-    TOKEN_PROGRAM_ID
+    wallet.publicKey,
+    false,
+    backTokenProgramId
   );
-  console.log('✅ [UNLOCK TX] Vault Token Account:', vaultTokenAccount.toString());
 
   const buybackWalletTokenAccount = await getAssociatedTokenAddress(
     BACK_MINT,
     globalStateAccount.buybackWallet,
     false,
     TOKEN_PROGRAM_ID
-  );
+    backTokenProgramId
   console.log('✅ [UNLOCK TX] Buyback Wallet ATA:', buybackWalletTokenAccount.toString());
 
   // Construire l'instruction
@@ -418,7 +436,7 @@ export async function createUnlockTokensTransaction(
   console.log('📋 [UNLOCK TX] Accounts in order:', {
     '1_userLock': userLock.toString(),
     '2_globalState': globalState.toString(),
-    '3_userTokenAccount': userTokenAccount.toString(),
+    backTokenProgramId
     '4_vaultTokenAccount': vaultTokenAccount.toString(),
     '5_buybackWalletTokenAccount': buybackWalletTokenAccount.toString(),
     '6_vaultAuthority': vaultAuthority.toString(),
@@ -433,7 +451,7 @@ export async function createUnlockTokensTransaction(
       .unlockTokens()
       .accounts({
         userLock,
-        globalState,
+    '9_tokenProgram': backTokenProgramId.toString(),
         userTokenAccount,
         vaultTokenAccount,
         buybackWalletTokenAccount,
@@ -449,7 +467,7 @@ export async function createUnlockTokensTransaction(
     // Create transaction and configure required parameters
     const transaction = new Transaction().add(instruction);
     
-    // Définir le fee payer
+        tokenProgram: backTokenProgramId,
     transaction.feePayer = wallet.publicKey;
     console.log('✅ [UNLOCK TX] Fee payer set:', wallet.publicKey.toString());
     
