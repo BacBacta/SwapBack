@@ -17,8 +17,15 @@ export const metadata: Metadata = {
   description:
     "Optimisez vos swaps sur Solana et gagnez des remises avec SwapBack",
   icons: {
-    icon: "/favicon.svg",
+    icon: [
+      {
+        url: "/icons/icon_swapback.svg",
+        type: "image/svg+xml",
+      },
+    ],
+    apple: "/icons/icon_swapback.svg",
   },
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({

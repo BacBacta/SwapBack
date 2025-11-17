@@ -34,6 +34,10 @@
   --info: #00FFFF;
   --info-hover: #33FFFF;
   
+  /* Logo Gradient Colors */
+  --logo-gradient-start: #00FF00;
+  --logo-gradient-end: #00CC00;
+  
   /* Spacing Scale */
   --space-1: 4px;
   --space-2: 8px;

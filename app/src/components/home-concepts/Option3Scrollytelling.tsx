@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import Brand from "@/components/Brand";
 import { useGlobalState } from "@/hooks/useGlobalState";
 
 // Import wallet with ssr: false
@@ -46,13 +47,11 @@ export default function Option3Scrollytelling() {
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
             {/* Logo */}
-            <button
+            <Brand 
+              size={32}
               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-              className="text-2xl font-bold terminal-text terminal-glow hover:text-[var(--accent)] transition-colors flex items-center gap-3 uppercase tracking-wider cursor-pointer"
-            >
-              <span className="text-3xl">⚡</span>
-              <span>SWAPBACK</span>
-            </button>
+              className="terminal-glow"
+            />
 
             {/* Navigation Links */}
             <div className="flex items-center gap-2">
