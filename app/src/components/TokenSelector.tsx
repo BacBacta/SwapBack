@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import { TrendingUp, Star, Clock, Search, Plus } from "lucide-react";
 import { CustomTokenImport } from "./CustomTokenImport";
 
@@ -121,19 +121,22 @@ export const TokenSelector = ({
   // Build popular tokens list with network-specific tokens
   // Use in component instead of module-level to avoid env access issues
   const getPopularTokens = (): Token[] => {
-    return [
-      ...BASE_POPULAR_TOKENS,
-      // Add $BACK token on devnet only - Uses NEXT_PUBLIC_BACK_MINT from env
-      ...(process.env.NEXT_PUBLIC_SOLANA_NETWORK === 'devnet' ? [{
-        address: process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
+    const tokens: Token[] = [...BASE_POPULAR_TOKENS];
+
+    const backMint = process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux";
+    if (backMint && !tokens.some((token) => token.address === backMint)) {
+      tokens.push({
+        address: backMint,
         symbol: "BACK",
         name: "SwapBack Token",
         decimals: 9,
         logoURI: "https://swapback.xyz/logo.png", // TODO: Add proper logo
         verified: true,
-        trending: true,
-      }] : []),
-    ];
+        trending: process.env.NEXT_PUBLIC_SOLANA_NETWORK === "devnet",
+      });
+    }
+
+    return tokens;
   };
 
   useEffect(() => {
@@ -161,18 +164,18 @@ export const TokenSelector = ({
           "So11111111111111111111111111111111111111112": solBalance / 1e9,
         };
 
-        // Fetch SPL token balances
-        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
-          publicKey,
-          { programId: TOKEN_PROGRAM_ID }
-        );
+        // Fetch SPL token balances (include Token-2022)
+        const programIds = [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID];
 
-        tokenAccounts.value.forEach((accountInfo) => {
-          const parsedInfo = accountInfo.account.data.parsed.info;
-          const mint = parsedInfo.mint;
-          const balance = parsedInfo.tokenAmount.uiAmount || 0;
-          balances[mint] = balance;
-        });
+        for (const programId of programIds) {
+          const tokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, { programId });
+          tokenAccounts.value.forEach((accountInfo) => {
+            const parsedInfo = accountInfo.account.data.parsed.info;
+            const mint = parsedInfo.mint;
+            const balance = parsedInfo.tokenAmount.uiAmount || 0;
+            balances[mint] = balance;
+          });
+        }
 
         setTokenBalances(balances);
       } catch (error) {
