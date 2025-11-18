@@ -2,7 +2,7 @@ import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { useEffect, useState, useCallback } from 'react';
 import { fetchUserCNFT, LockLevel } from '@/lib/cnft';
 
-const LAMPORTS_PER_BACK = 1_000_000; // BACK has 6 decimals
+const LAMPORTS_PER_BACK = 1_000_000_000; // BACK has 9 decimals
 
 export interface CNFTData {
   exists: boolean;
