@@ -144,8 +144,8 @@ export async function createLockTokensTransaction(
     console.log('✅ [LOCK TX] Injected BorshAccountsCoder manually.');
   }
 
-  // Convertir le montant en lamports (6 decimals pour BACK)
-  const amountLamports = new BN(Math.floor(params.amount * 1_000_000));
+  // Convertir le montant en lamports (9 decimals pour BACK)
+  const amountLamports = new BN(Math.floor(params.amount * 1_000_000_000));
   const lockDuration = new BN(Math.floor(params.duration));
   console.log('🔍 [LOCK TX] Amount (lamports):', amountLamports.toString());
   console.log('🔍 [LOCK TX] Duration (seconds):', lockDuration.toString());
