@@ -46,9 +46,10 @@ export default function UnlockInterface({
       timeRemaining > 0 ? timeRemaining : 30 * 24 * 60 * 60;
     const durationDays = estimatedTotalDuration / (24 * 60 * 60);
 
-    const amountScore = Math.min((amount / 1000) * 0.5, 50);
-    const durationScore = Math.min((durationDays / 10) * 1, 50);
-    const totalBoost = Math.min(amountScore + durationScore, 100);
+    // Correct boost formula: (amount / 10000) * 10 max 10%, (days / 5) * 0.2 max 10%
+    const amountScore = Math.min((amount / 10000) * 10, 10);
+    const durationScore = Math.min((durationDays / 5) * 0.2, 10);
+    const totalBoost = Math.min(amountScore + durationScore, 20);
 
     return { amountScore, durationScore, totalBoost };
   }, [lockData]);

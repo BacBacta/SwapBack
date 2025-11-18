@@ -2,7 +2,6 @@
 
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useState, useEffect, useCallback } from "react";
-import { CNFTCard } from "./CNFTCard";
 import { useCNFT } from "../hooks/useCNFT";
 import { useRealtimeStats } from "../hooks/useRealtimeStats";
 import { useGlobalState } from "../hooks/useGlobalState";
@@ -274,23 +273,7 @@ export const Dashboard = () => {
         </div>
       </div>
 
-      {/* cNFT Card */}
-      {cnftData && cnftData.exists && cnftData.isActive && (
-        <CNFTCard
-          level={
-            cnftData.level === "Bronze" ||
-            cnftData.level === "Silver" ||
-            cnftData.level === "Gold"
-              ? cnftData.level
-              : "Bronze"
-          }
-          boost={cnftData.boostBps / 100}
-          lockedAmount={cnftData.lockedAmount}
-          lockDuration={Math.floor(cnftData.lockDuration / 86400)}
-          isActive={cnftData.isActive}
-          unlockDate={new Date(cnftData.unlockTime * 1000)}
-        />
-      )}
+      {/* cNFT Card - REMOVED as per user request */}
 
       {/* Tabs Navigation */}
       <div className="flex gap-1 p-1 bg-gray-900 rounded-xl border border-[var(--primary)]/20">
@@ -514,7 +497,7 @@ export const Dashboard = () => {
                   </div>
                   <div className="flex justify-between items-center p-3 bg-red-900/20 border border-red-500/30 rounded-lg">
                     <span className="text-gray-400">🔥 Penalties Burned:</span>
-                    <span className="text-lg font-bold text-red-400">{globalState.totalPenaltiesCollected.toFixed(2)} BACK</span>
+                    <span className="text-lg font-bold text-red-400">{(globalState.totalPenaltiesCollected).toFixed(2)} BACK</span>
                   </div>
                 </div>
               </div>

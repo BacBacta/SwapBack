@@ -889,24 +889,7 @@ export default function LockInterface({
                 </div>
               </div>
 
-              {/* Buyback Share Estimation */}
-              <div className="p-3 rounded-lg bg-gradient-to-r from-green-500/5 to-transparent border border-green-500/10">
-                <div className="text-sm font-bold text-green-400 mb-2">
-                  🔥 Buyback Allocation
-                </div>
-                <div className="text-xs text-gray-400 mb-2">
-                  Your share of buyback tokens (burned):
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-bold text-green-400">
-                    {calculateBuybackShare(predictedBoost, 10000).toFixed(3)}%
-                  </span>
-                  <span className="text-xs text-gray-500">(estimated*)</span>
-                </div>
-                <div className="text-xs text-gray-500 mt-2">
-                  * Based on current community total boost
-                </div>
-              </div>
+              {/* Buyback Share Estimation - REMOVED */}
             </>
           )}
         </div>

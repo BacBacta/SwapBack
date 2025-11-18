@@ -28,7 +28,7 @@ interface GlobalStateData {
   totalPenaltiesCollected: number;
 }
 
-const LAMPORTS_PER_BACK = 1_000_000; // 6 decimals
+const LAMPORTS_PER_BACK = 1_000_000_000; // 9 decimals (Token-2022)
 const LAMPORTS_PER_BACK_BN = new BN(LAMPORTS_PER_BACK);
 const MAX_SAFE_BN = new BN(Number.MAX_SAFE_INTEGER);
 
