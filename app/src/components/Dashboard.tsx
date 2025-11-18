@@ -17,6 +17,7 @@ import toast from "react-hot-toast";
 import { createClaimNpiTransaction } from "@/lib/claimNpi";
 // Import charts directly instead of lazy loading to avoid chunk errors
 import { VolumeChart, ActivityChart } from "./Charts";
+import OnChainHistoryWidget from "./OnChainHistoryWidget";
 
 export const Dashboard = () => {
   const { connection } = useConnection();
@@ -636,6 +637,9 @@ export const Dashboard = () => {
               </div>
             </div>
           </div>
+
+          {/* On-Chain Transaction History Widget */}
+          <OnChainHistoryWidget limit={10} compact={false} />
         </div>
       )}
     </div>

@@ -16,6 +16,7 @@ export const Navigation = () => {
     { href: "/dca", label: "DCA", badge: "📊" },
     { href: "/buyback", label: "Buyback", badge: "🔥" },
     { href: "/lock", label: "Lock & Earn" },
+    { href: "/history", label: "History", badge: "📜" },
     { href: "/stats", label: "Stats" },
     { href: "/docs", label: "Docs" },
   ];

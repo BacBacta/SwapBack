@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, ParsedTransactionWithMeta, PartiallyDecodedInstruction } from "@solana/web3.js";
 import { getExplorerTxUrl, getSolscanTxUrl, getXrayTxUrl } from "@/utils/explorer";
+import TransactionVolumeChart from "./TransactionVolumeChart";
 
 interface OnChainTransaction {
   signature: string;
@@ -33,6 +34,9 @@ export default function OnChainHistory() {
   const [error, setError] = useState<string | null>(null);
   const [limit, setLimit] = useState(10);
   const [selectedTx, setSelectedTx] = useState<OnChainTransaction | null>(null);
+  const [filter, setFilter] = useState<"all" | "success" | "failed">("all");
+  const [programFilter, setProgramFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const fetchTransactions = useCallback(async () => {
     if (!publicKey || !connected) {
@@ -137,6 +141,32 @@ export default function OnChainHistory() {
     return new Date(timestamp * 1000).toLocaleString();
   };
 
+  const exportToCSV = () => {
+    const headers = ["Signature", "Timestamp", "Slot", "Status", "Fee (SOL)", "Instructions", "Programs"];
+    const rows = filteredTransactions.map(tx => [
+      tx.signature,
+      formatDate(tx.blockTime),
+      tx.slot,
+      tx.success ? "Success" : "Failed",
+      tx.fee.toFixed(6),
+      tx.instructions.length,
+      Array.from(new Set(tx.instructions.map(ix => getProgramName(ix.programId)))).join("; ")
+    ]);
+    
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+    ].join("\n");
+    
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `swapback-history-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const getProgramName = (programId: string): string => {
     const knownPrograms: Record<string, string> = {
       "11111111111111111111111111111111": "System Program",
@@ -149,6 +179,36 @@ export default function OnChainHistory() {
     
     return knownPrograms[programId] || `${programId.slice(0, 4)}...${programId.slice(-4)}`;
   };
+
+  // Filter transactions
+  const filteredTransactions = transactions.filter(tx => {
+    // Status filter
+    if (filter === "success" && !tx.success) return false;
+    if (filter === "failed" && tx.success) return false;
+    
+    // Program filter
+    if (programFilter !== "all") {
+      const hasProgram = tx.instructions.some(ix => ix.programId === programFilter);
+      if (!hasProgram) return false;
+    }
+    
+    // Search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      return (
+        tx.signature.toLowerCase().includes(query) ||
+        tx.slot.toString().includes(query) ||
+        tx.instructions.some(ix => getProgramName(ix.programId).toLowerCase().includes(query))
+      );
+    }
+    
+    return true;
+  });
+
+  // Get unique programs
+  const uniquePrograms = Array.from(
+    new Set(transactions.flatMap(tx => tx.instructions.map(ix => ix.programId)))
+  );
 
   if (!connected) {
     return (
@@ -197,6 +257,79 @@ export default function OnChainHistory() {
         </div>
       </div>
 
+      {/* Volume Chart */}
+      {!isLoading && transactions.length > 0 && (
+        <div className="mb-6 p-6 glass-effect rounded-lg border border-gray-700/50">
+          <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <span>📊</span>
+            <span>Transaction Volume (Last 7 Days)</span>
+          </h3>
+          <TransactionVolumeChart transactions={transactions} />
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="mb-4 space-y-3">
+        {/* Search */}
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search by signature, slot, or program..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full px-4 py-2 pl-10 glass-effect border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-primary"
+          />
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+        </div>
+
+        {/* Filter buttons */}
+        <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2">
+            {(["all", "success", "failed"] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                  filter === f
+                    ? "bg-primary text-black"
+                    : "bg-gray-800 text-gray-400 hover:text-white"
+                }`}
+              >
+                {f === "all" ? "All" : f === "success" ? "✅ Success" : "❌ Failed"}
+              </button>
+            ))}
+          </div>
+
+          <select
+            value={programFilter}
+            onChange={(e) => setProgramFilter(e.target.value)}
+            className="px-3 py-1.5 text-xs glass-effect border border-gray-700 rounded-lg"
+          >
+            <option value="all">All Programs</option>
+            {uniquePrograms.map(prog => (
+              <option key={prog} value={prog}>
+                {getProgramName(prog)}
+              </option>
+            ))}
+          </select>
+
+          <button
+            onClick={exportToCSV}
+            disabled={filteredTransactions.length === 0}
+            className="ml-auto px-3 py-1.5 text-xs bg-green-500/10 border border-green-500/30 rounded-lg text-green-400 hover:bg-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            📥 Export CSV
+          </button>
+        </div>
+
+        {/* Results count */}
+        {searchQuery || filter !== "all" || programFilter !== "all" ? (
+          <div className="text-xs text-gray-400">
+            Showing {filteredTransactions.length} of {transactions.length} transactions
+          </div>
+        ) : null}
+      </div>
+
       {/* Error */}
       {error && (
         <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-300">
@@ -220,9 +353,9 @@ export default function OnChainHistory() {
         </div>
       )}
 
-      {!isLoading && transactions.length > 0 && (
+      {!isLoading && filteredTransactions.length > 0 && (
         <div className="space-y-3">
-          {transactions.map((tx) => (
+          {filteredTransactions.map((tx) => (
             <div
               key={tx.signature}
               className={`p-4 glass-effect border rounded-lg cursor-pointer transition-all ${
@@ -391,19 +524,22 @@ export default function OnChainHistory() {
       )}
 
       {/* Stats Footer */}
-      {transactions.length > 0 && (
+      {filteredTransactions.length > 0 && (
         <div className="mt-6 pt-4 border-t border-gray-700/50">
           <div className="flex items-center justify-between text-sm">
             <div className="text-gray-400">
-              Showing {transactions.length} transaction{transactions.length !== 1 ? 's' : ''}
+              Showing {filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''}
+              {(searchQuery || filter !== "all" || programFilter !== "all") && (
+                <span className="ml-2 text-primary">({transactions.length} total)</span>
+              )}
             </div>
             <div className="flex items-center gap-4">
               <span className="text-green-400">
-                ✅ {transactions.filter(tx => tx.success).length} Success
+                ✅ {filteredTransactions.filter(tx => tx.success).length} Success
               </span>
-              {transactions.filter(tx => !tx.success).length > 0 && (
+              {filteredTransactions.filter(tx => !tx.success).length > 0 && (
                 <span className="text-red-400">
-                  ❌ {transactions.filter(tx => !tx.success).length} Failed
+                  ❌ {filteredTransactions.filter(tx => !tx.success).length} Failed
                 </span>
               )}
             </div>
