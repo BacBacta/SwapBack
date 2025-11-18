@@ -385,8 +385,8 @@ export async function createUnlockTokensTransaction(
   );
   console.log('✅ [UNLOCK TX] Global State:', globalState.toString());
 
-  const globalStateAccount = await program.account.globalState.fetch(globalState);
-  console.log('✅ [UNLOCK TX] Buyback wallet:', globalStateAccount.buybackWallet.toString());
+  // Note: Pas besoin de fetch globalStateAccount car buybackWallet n'est plus utilisé
+  // Les pénalités sont maintenant brûlées directement
 
   const [vaultAuthority] = PublicKey.findProgramAddressSync(
     [Buffer.from("vault_authority")],
@@ -421,10 +421,9 @@ export async function createUnlockTokensTransaction(
   );
   console.log('✅ [UNLOCK TX] Vault Token Account:', vaultTokenAccount.toString());
 
-  // Le buyback wallet stocké dans global_state EST déjà l'ATA
-  // On ne dérive PAS une nouvelle ATA, on utilise directement l'adresse stockée
-  const buybackWalletTokenAccount = globalStateAccount.buybackWallet;
-  console.log('✅ [UNLOCK TX] Buyback Wallet ATA (from global_state):', buybackWalletTokenAccount.toString());
+  // IMPORTANT: buybackWalletTokenAccount n'est plus nécessaire depuis le passage au burn
+  // Les pénalités sont maintenant brûlées directement, pas transférées
+  console.log('ℹ️ [UNLOCK TX] Note: Penalties are now burned, not transferred to buyback wallet');
 
   // Construire l'instruction
   console.log('🔍 [UNLOCK TX] Building instruction...');
@@ -433,11 +432,10 @@ export async function createUnlockTokensTransaction(
     '2_globalState': globalState.toString(),
     '3_userTokenAccount': userTokenAccount.toString(),
     '4_vaultTokenAccount': vaultTokenAccount.toString(),
-    '5_buybackWalletTokenAccount': buybackWalletTokenAccount.toString(),
-    '6_vaultAuthority': vaultAuthority.toString(),
-    '7_backMint': BACK_MINT.toString(),
-    '8_user': wallet.publicKey.toString(),
-    '9_tokenProgram': backTokenProgramId.toString(),
+    '5_vaultAuthority': vaultAuthority.toString(),
+    '6_backMint': BACK_MINT.toString(),
+    '7_user': wallet.publicKey.toString(),
+    '8_tokenProgram': backTokenProgramId.toString(),
   });
   
   try {
@@ -449,7 +447,6 @@ export async function createUnlockTokensTransaction(
         globalState,
         userTokenAccount,
         vaultTokenAccount,
-        buybackWalletTokenAccount,
         vaultAuthority,
         backMint: BACK_MINT,
         user: wallet.publicKey,
