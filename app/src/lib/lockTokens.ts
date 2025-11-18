@@ -421,13 +421,10 @@ export async function createUnlockTokensTransaction(
   );
   console.log('✅ [UNLOCK TX] Vault Token Account:', vaultTokenAccount.toString());
 
-  const buybackWalletTokenAccount = await getAssociatedTokenAddress(
-    BACK_MINT,
-    globalStateAccount.buybackWallet,
-    false,
-    backTokenProgramId
-  );
-  console.log('✅ [UNLOCK TX] Buyback Wallet ATA:', buybackWalletTokenAccount.toString());
+  // Le buyback wallet stocké dans global_state EST déjà l'ATA
+  // On ne dérive PAS une nouvelle ATA, on utilise directement l'adresse stockée
+  const buybackWalletTokenAccount = globalStateAccount.buybackWallet;
+  console.log('✅ [UNLOCK TX] Buyback Wallet ATA (from global_state):', buybackWalletTokenAccount.toString());
 
   // Construire l'instruction
   console.log('🔍 [UNLOCK TX] Building instruction...');
