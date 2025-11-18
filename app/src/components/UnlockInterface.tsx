@@ -141,7 +141,7 @@ export default function UnlockInterface({
         `⚠️ EARLY UNLOCK WARNING\n\n` +
         `You are unlocking before the lock period ends.\n` +
         `A penalty of 2% will be applied:\n\n` +
-        `• Penalty: ${penaltyAmount.toFixed(2)} BACK (sent to buyback vault)\n` +
+        `• Penalty: ${penaltyAmount.toFixed(2)} BACK (burned 🔥)\n` +
         `• You will receive: ${(Number(lockData?.amount || 0) - penaltyAmount).toFixed(2)} BACK\n\n` +
         `Do you want to continue?`
       );

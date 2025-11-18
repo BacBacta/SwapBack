@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token::{transfer_checked as spl_transfer_checked, Token, TransferChecked};
-use anchor_spl::token_2022::{transfer_checked as token2022_transfer_checked, Token2022};
+use anchor_spl::token::{transfer_checked as spl_transfer_checked, burn as spl_burn, Token, TransferChecked, Burn};
+use anchor_spl::token_2022::{transfer_checked as token2022_transfer_checked, burn as token2022_burn, Token2022};
 use anchor_spl::token_interface::{Mint, TokenAccount};
 
 // ⚠️ IMPORTANT: Ce program ID sera généré lors du premier build
@@ -313,32 +313,30 @@ pub mod swapback_cnft {
             let seeds: &[&[&[u8]]] = &[&[b"vault_authority", &[bump]]];
             let signer_seeds = &[seeds[0]];
 
-            let penalty_accounts = TransferChecked {
-                from: ctx.accounts.vault_token_account.to_account_info(),
-                to: ctx
-                    .accounts
-                    .buyback_wallet_token_account
-                    .to_account_info(),
-                authority: ctx.accounts.vault_authority.to_account_info(),
+            // Brûler les tokens de pénalité
+            let burn_accounts = Burn {
                 mint: ctx.accounts.back_mint.to_account_info(),
+                from: ctx.accounts.vault_token_account.to_account_info(),
+                authority: ctx.accounts.vault_authority.to_account_info(),
             };
 
-            transfer_checked_dynamic(
+            burn_checked_dynamic(
                 &ctx.accounts.token_program,
                 &ctx.accounts.token_2022_program,
                 &ctx.accounts.back_mint,
-                penalty_accounts,
+                burn_accounts,
                 penalty_amount,
-                ctx.accounts.back_mint.decimals,
                 Some(signer_seeds),
             )?;
 
-            // Tracker les pénalités collectées
+            // Tracker les pénalités brûlées
             let global_state = &mut ctx.accounts.global_state;
             global_state.total_penalties_collected = global_state
                 .total_penalties_collected
                 .checked_add(penalty_amount)
                 .ok_or(ErrorCode::MathOverflow)?;
+
+            msg!("🔥 {} BACK brûlés (pénalité 2%)", penalty_amount / BACK_DECIMALS);
         }
 
         // Désactiver le lock
@@ -762,12 +760,6 @@ pub struct UnlockTokens<'info> {
     #[account(mut)]
     pub vault_token_account: InterfaceAccount<'info, TokenAccount>,
 
-    #[account(
-        mut,
-        constraint = buyback_wallet_token_account.key() == global_state.buyback_wallet @ ErrorCode::InvalidBuybackWallet
-    )]
-    pub buyback_wallet_token_account: InterfaceAccount<'info, TokenAccount>,
-
     /// CHECK: PDA vault authority
     #[account(
         seeds = [b"vault_authority"],
@@ -1060,6 +1052,52 @@ fn transfer_checked_dynamic<'info>(
         } else {
             let cpi_ctx = CpiContext::new(program_info, accounts);
             spl_transfer_checked(cpi_ctx, amount, decimals)?;
+        }
+
+        return Ok(());
+    }
+
+    Err(error!(ErrorCode::UnsupportedTokenProgram))
+}
+
+/// Brûle des tokens de manière dynamique (Token ou Token-2022)
+fn burn_checked_dynamic<'info>(
+    token_program: &Program<'info, Token>,
+    token_2022_program: &Program<'info, Token2022>,
+    mint: &InterfaceAccount<'info, Mint>,
+    accounts: Burn<'info>,
+    amount: u64,
+    signer_seeds: Option<&[&[&[u8]]]>,
+) -> Result<()> {
+    let owner = mint.to_account_info().owner;
+
+    if owner == &anchor_spl::token_2022::ID {
+        let program_info = token_2022_program.to_account_info();
+        let accounts_2022 = anchor_spl::token_2022::Burn {
+            mint: accounts.mint.clone(),
+            from: accounts.from.clone(),
+            authority: accounts.authority.clone(),
+        };
+
+        if let Some(seeds) = signer_seeds {
+            let cpi_ctx = CpiContext::new_with_signer(program_info, accounts_2022, seeds);
+            token2022_burn(cpi_ctx, amount)?;
+        } else {
+            let cpi_ctx = CpiContext::new(program_info, accounts_2022);
+            token2022_burn(cpi_ctx, amount)?;
+        }
+
+        return Ok(());
+    }
+
+    if owner == &anchor_spl::token::ID {
+        let program_info = token_program.to_account_info();
+        if let Some(seeds) = signer_seeds {
+            let cpi_ctx = CpiContext::new_with_signer(program_info, accounts, seeds);
+            spl_burn(cpi_ctx, amount)?;
+        } else {
+            let cpi_ctx = CpiContext::new(program_info, accounts);
+            spl_burn(cpi_ctx, amount)?;
         }
 
         return Ok(());
