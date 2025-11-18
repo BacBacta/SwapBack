@@ -551,14 +551,14 @@ export default function UnlockInterface({
             return (
               <span className="relative flex items-center justify-center gap-2">
                 <span>⚠️</span>
-                <span>Early Unlock (2% penalty)</span>
+                <span>Early Unlock (2% burned 🔥)</span>
               </span>
             );
           }
           return (
             <span className="relative flex items-center justify-center gap-2">
-              <span>🔓</span>
-              <span>Unlock Now</span>
+              <span>✅</span>
+              <span>Unlock (No Penalty)</span>
             </span>
           );
         })()}
@@ -573,20 +573,27 @@ export default function UnlockInterface({
           <h4 className="text-secondary font-bold">Important Information</h4>
         </div>
         <ul className="text-gray-400 text-sm space-y-2">
-          {!timeRemaining?.canUnlock && lockData?.amount && (
+          {lockData?.amount && (
             <li className="flex flex-col gap-2 p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg">
               <div className="flex items-start gap-2">
-                <span className="text-orange-400 mt-0.5 text-lg">⚠️</span>
-                <span className="text-orange-300 font-bold text-base">
-                  Early Unlock Penalty
+                <span className="text-orange-400 mt-0.5 text-lg">{!timeRemaining?.canUnlock ? '⚠️' : '✅'}</span>
+                <span className={`font-bold text-base ${!timeRemaining?.canUnlock ? 'text-orange-300' : 'text-green-300'}`}>
+                  {!timeRemaining?.canUnlock ? 'Early Unlock Penalty' : 'Lock Period Complete - No Penalty'}
                 </span>
               </div>
               <div className="ml-7 space-y-2">
-                <p className="text-orange-200 text-sm">
-                  Unlocking before the lock period ends will incur a{" "}
-                  <strong className="text-orange-400">2% penalty</strong>.
-                  These tokens are rerouted to the buyback vault to reinforce supply reduction.
-                </p>
+                {!timeRemaining?.canUnlock ? (
+                  <p className="text-orange-200 text-sm">
+                    Unlocking before the lock period ends will incur a{" "}
+                    <strong className="text-orange-400">2% penalty</strong>.
+                    These tokens will be <strong className="text-red-400">BURNED 🔥</strong> permanently, reducing the total supply.
+                  </p>
+                ) : (
+                  <p className="text-green-200 text-sm">
+                    Your lock period is complete! You can unlock your full amount with{" "}
+                    <strong className="text-green-400">NO PENALTY</strong>. All {Number(lockData.amount).toLocaleString()} BACK tokens will be returned.
+                  </p>
+                )}
                 <div className="p-3 bg-black/30 rounded-lg border border-orange-500/20">
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-gray-400 text-xs">Locked Amount:</span>
@@ -595,16 +602,21 @@ export default function UnlockInterface({
                     </span>
                   </div>
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-gray-400 text-xs">Penalty (2%):</span>
-                    <span className="text-red-400 font-bold">
-                      -{(Number(lockData.amount) * 0.02).toFixed(2)} BACK
+                    <span className="text-gray-400 text-xs">
+                      {!timeRemaining?.canUnlock ? 'Penalty (2%):' : 'Penalty:'}
+                    </span>
+                    <span className={!timeRemaining?.canUnlock ? "text-red-400 font-bold" : "text-green-400 font-bold"}>
+                      {!timeRemaining?.canUnlock ? `-${(Number(lockData.amount) * 0.02).toFixed(2)} BACK` : '0 BACK ✅'}
                     </span>
                   </div>
                   <div className="h-px bg-orange-500/30 my-2"></div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-300 text-sm font-medium">You will receive:</span>
                     <span className="text-green-400 font-bold text-lg">
-                      {(Number(lockData.amount) * 0.98).toFixed(2)} BACK
+                      {!timeRemaining?.canUnlock 
+                        ? (Number(lockData.amount) * 0.98).toFixed(2)
+                        : Number(lockData.amount).toFixed(2)
+                      } BACK
                     </span>
                   </div>
                 </div>
