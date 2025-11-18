@@ -35,7 +35,7 @@ export default function UnlockInterface({
       return { amountScore: 0, durationScore: 0, totalBoost: 0 };
     }
 
-    const amount = Number(lockData.amount) / 1_000_000; // 6 decimals
+    const amount = Number(lockData.amount) / 1_000_000_000; // 9 decimals
     const now = Math.floor(Date.now() / 1000);
     const unlockTimestamp = Number(lockData.unlockTime);
 
@@ -134,7 +134,7 @@ export default function UnlockInterface({
     // Avertissement pour unlock anticipé
     if (!timeRemaining?.canUnlock) {
       const penaltyAmount = lockData?.amount 
-        ? (Number(lockData.amount) / 1_000_000) * 0.02  // 6 decimals
+        ? (Number(lockData.amount) / 1_000_000_000) * 0.02  // 9 decimals
         : 0;
       
       const confirmEarlyUnlock = window.confirm(
@@ -142,7 +142,7 @@ export default function UnlockInterface({
         `You are unlocking before the lock period ends.\n` +
         `A penalty of 2% will be applied:\n\n` +
         `• Penalty: ${penaltyAmount.toFixed(2)} BACK (sent to buyback vault)\n` +
-        `• You will receive: ${((Number(lockData?.amount || 0) / 1_000_000) - penaltyAmount).toFixed(2)} BACK\n\n` +
+        `• You will receive: ${((Number(lockData?.amount || 0) / 1_000_000_000) - penaltyAmount).toFixed(2)} BACK\n\n` +
         `Do you want to continue?`
       );
       
@@ -248,7 +248,7 @@ export default function UnlockInterface({
       console.log('✅ [UNLOCK] Transaction confirmed!');
 
       const unlockedAmount = lockData?.amount
-        ? Number(lockData.amount) / 1_000_000 // 6 decimals
+        ? Number(lockData.amount) / 1_000_000_000 // 9 decimals
         : 0;
       const successMessage = `✅ Unlock successful! ${unlockedAmount > 0 ? unlockedAmount + " $BACK" : "Tokens"} recovered. Signature: ${signature.slice(0, 8)}...`;
       setSuccess(successMessage);
@@ -374,7 +374,7 @@ export default function UnlockInterface({
             <span className="text-gray-400 font-medium">Locked Amount</span>
             <span className="text-[var(--primary)] font-bold text-lg">
               {lockData.amount
-                ? (Number(lockData.amount) / 1_000_000).toLocaleString() // 6 decimals
+                ? (Number(lockData.amount) / 1_000_000_000).toLocaleString() // 9 decimals
                 : "0"}{" "}
               <span className="text-primary">$BACK</span>
             </span>
@@ -591,20 +591,20 @@ export default function UnlockInterface({
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-gray-400 text-xs">Locked Amount:</span>
                     <span className="text-white font-medium">
-                      {(Number(lockData.amount) / 1_000_000).toLocaleString()} BACK
+                      {(Number(lockData.amount) / 1_000_000_000).toLocaleString()} BACK
                     </span>
                   </div>
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-gray-400 text-xs">Penalty (2%):</span>
                     <span className="text-red-400 font-bold">
-                      -{((Number(lockData.amount) / 1_000_000) * 0.02).toFixed(2)} BACK
+                      -{((Number(lockData.amount) / 1_000_000_000) * 0.02).toFixed(2)} BACK
                     </span>
                   </div>
                   <div className="h-px bg-orange-500/30 my-2"></div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-300 text-sm font-medium">You will receive:</span>
                     <span className="text-green-400 font-bold text-lg">
-                      {((Number(lockData.amount) / 1_000_000) * 0.98).toFixed(2)} BACK
+                      {((Number(lockData.amount) / 1_000_000_000) * 0.98).toFixed(2)} BACK
                     </span>
                   </div>
                 </div>

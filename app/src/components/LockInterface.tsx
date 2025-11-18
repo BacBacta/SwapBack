@@ -282,7 +282,7 @@ export default function LockInterface({
             offset += 1;
             
             // amount_locked: u64 (8 bytes)
-            const amountLocked = Number(data.readBigUInt64LE(offset)) / 1_000_000; // 6 decimals
+            const amountLocked = Number(data.readBigUInt64LE(offset)) / 1_000_000_000; // 9 decimals
             offset += 8;
             
             // lock_duration: i64 (8 bytes)
