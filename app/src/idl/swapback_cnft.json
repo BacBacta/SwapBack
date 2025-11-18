@@ -672,10 +672,6 @@
           "writable": true
         },
         {
-          "name": "buyback_wallet_token_account",
-          "writable": true
-        },
-        {
           "name": "vault_authority",
           "pda": {
             "seeds": [
@@ -1040,6 +1036,10 @@
           },
           {
             "name": "npi_boost_vault_distributed",
+            "type": "u64"
+          },
+          {
+            "name": "total_penalties_collected",
             "type": "u64"
           }
         ]
