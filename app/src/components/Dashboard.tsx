@@ -512,6 +512,10 @@ export const Dashboard = () => {
                     <span className="text-gray-400">Buyback (15%):</span>
                     <span className="text-lg font-bold text-[var(--accent)]">${globalState.swapBuybackAccrued.toFixed(2)}</span>
                   </div>
+                  <div className="flex justify-between items-center p-3 bg-red-900/20 border border-red-500/30 rounded-lg">
+                    <span className="text-gray-400">🔥 Penalties Sent to Buyback:</span>
+                    <span className="text-lg font-bold text-red-400">{globalState.totalPenaltiesCollected.toFixed(2)} BACK</span>
+                  </div>
                 </div>
               </div>
 

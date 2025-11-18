@@ -25,6 +25,7 @@ interface GlobalStateData {
   npiTreasuryAccrued: number;
   npiBoostVaultAccrued: number;
   npiBoostVaultDistributed: number;
+  totalPenaltiesCollected: number;
 }
 
 const LAMPORTS_PER_BACK = 1_000_000; // 6 decimals
@@ -129,6 +130,7 @@ export function useGlobalState() {
         npiTreasuryAccrued: Number(decoded.npiTreasuryAccrued) / LAMPORTS_PER_BACK,
         npiBoostVaultAccrued: Number(decoded.npiBoostVaultAccrued) / LAMPORTS_PER_BACK,
         npiBoostVaultDistributed: Number(decoded.npiBoostVaultDistributed) / LAMPORTS_PER_BACK,
+        totalPenaltiesCollected: Number(decoded.totalPenaltiesCollected || 0) / LAMPORTS_PER_BACK,
       });
     } catch (err) {
       console.error("Error fetching GlobalState:", err);

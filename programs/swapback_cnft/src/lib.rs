@@ -89,6 +89,7 @@ pub mod swapback_cnft {
         global_state.npi_treasury_accrued = 0;
         global_state.npi_boost_vault_accrued = 0;
         global_state.npi_boost_vault_distributed = 0;
+        global_state.total_penalties_collected = 0;
 
         msg!("✅ GlobalState initialisé");
         Ok(())
@@ -309,8 +310,8 @@ pub mod swapback_cnft {
 
         if penalty_amount > 0 {
             let bump = ctx.bumps.vault_authority;
-            let seeds: &[&[u8]] = &[b"vault_authority", &[bump]];
-            let signer_seeds = &[seeds];
+            let seeds: &[&[&[u8]]] = &[&[b"vault_authority", &[bump]]];
+            let signer_seeds = &[seeds[0]];
 
             let penalty_accounts = TransferChecked {
                 from: ctx.accounts.vault_token_account.to_account_info(),
@@ -331,6 +332,13 @@ pub mod swapback_cnft {
                 ctx.accounts.back_mint.decimals,
                 Some(signer_seeds),
             )?;
+
+            // Tracker les pénalités collectées
+            let global_state = &mut ctx.accounts.global_state;
+            global_state.total_penalties_collected = global_state
+                .total_penalties_collected
+                .checked_add(penalty_amount)
+                .ok_or(ErrorCode::MathOverflow)?;
         }
 
         // Désactiver le lock
@@ -896,6 +904,7 @@ pub struct GlobalState {
     pub npi_treasury_accrued: u64,
     pub npi_boost_vault_accrued: u64,
     pub npi_boost_vault_distributed: u64,
+    pub total_penalties_collected: u64,
 }
 
 #[account]
