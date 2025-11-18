@@ -19,7 +19,7 @@ const fs = require('fs');
 async function main() {
   // Configuration
   const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
-  const CNFT_PROGRAM_ID = new PublicKey('GEkXCcq87yUjQSp5EqcWf7bw9GKrB39A1LWdsE7V3V2E');
+  const CNFT_PROGRAM_ID = new PublicKey(process.env.CNFT_PROGRAM_ID || process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || 'DGDipfpHGVAnWXj7yPEBc3JYFWghQN76tEBzuK2Nojw3');
   const BACK_MINT = new PublicKey('862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux');
   
   // Charger le keypair payer (votre wallet)
@@ -41,12 +41,13 @@ async function main() {
   );
   console.log('🔐 Vault Authority PDA:', vaultAuthority.toString());
   
-  // Calculer l'ATA pour le vault
+  // Calculer l'ATA pour le vault (Token-2022 compatible)
+  const TOKEN_2022_PROGRAM_ID = new PublicKey('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb');
   const vaultTokenAccount = await getAssociatedTokenAddress(
     BACK_MINT,
     vaultAuthority,
     true, // allowOwnerOffCurve = true pour PDA
-    TOKEN_PROGRAM_ID
+    TOKEN_2022_PROGRAM_ID
   );
   console.log('🏦 Vault Token Account:', vaultTokenAccount.toString());
   
@@ -67,7 +68,7 @@ async function main() {
     vaultTokenAccount, // ata
     vaultAuthority, // owner (le PDA)
     BACK_MINT, // mint
-    TOKEN_PROGRAM_ID
+    TOKEN_2022_PROGRAM_ID
   );
   
   // Construire et envoyer la transaction
