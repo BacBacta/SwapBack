@@ -7,7 +7,7 @@ const { Connection, Keypair, PublicKey, Transaction, TransactionInstruction, Sys
 const fs = require("fs");
 const path = require("path");
 
-const CNFT_PROGRAM_ID = process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "GEkXCcq87yUjQSp5EqcWf7bw9GKrB39A1LWdsE7V3V2E";
+const CNFT_PROGRAM_ID = process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "DGDipfpHGVAnWXj7yPEBc3JYFWghQN76tEBzuK2Nojw3";
 const RPC_URL = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
 
 async function main() {

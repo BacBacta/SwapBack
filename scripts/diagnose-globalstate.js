@@ -6,7 +6,7 @@
 
 const { Connection, PublicKey } = require("@solana/web3.js");
 
-const CNFT_PROGRAM_ID = process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "GEkXCcq87yUjQSp5EqcWf7bw9GKrB39A1LWdsE7V3V2E";
+const CNFT_PROGRAM_ID = process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "DGDipfpHGVAnWXj7yPEBc3JYFWghQN76tEBzuK2Nojw3";
 const RPC_URL = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
 
 async function main() {
@@ -53,14 +53,15 @@ async function main() {
   console.log(`🔖 Discriminator: ${discriminator.toString('hex')}`);
 
   // Structure attendue (nouveau format)
-  // 8 bytes: discriminator
-  // 32 bytes: authority
-  // 32 bytes: treasury_wallet
-  // 32 bytes: boost_vault_wallet
-  // 32 bytes: buyback_wallet
-  // 32 bytes: npi_vault_wallet
-  // 9 * 8 bytes: u64 fields (total_community_boost, etc.)
-  const expectedSize = 8 + 32 + 32 + 32 + 32 + 32 + 9 * 8;
+  const DISCRIMINATOR_BYTES = 8;
+  const PUBKEY_BYTES = 32;
+  const U64_BYTES = 8;
+  const GLOBAL_STATE_PUBKEYS = 5; // authority + 4 wallets
+  const GLOBAL_STATE_COUNTERS = 13; // u64 counters and accumulators
+  const expectedSize =
+    DISCRIMINATOR_BYTES +
+    GLOBAL_STATE_PUBKEYS * PUBKEY_BYTES +
+    GLOBAL_STATE_COUNTERS * U64_BYTES;
 
   console.log(`\n📏 Taille du compte:`);
   console.log(`   Actuelle: ${accountInfo.data.length} bytes`);

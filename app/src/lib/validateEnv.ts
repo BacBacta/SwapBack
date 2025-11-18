@@ -16,7 +16,7 @@ function getCnftIdl() {
       cnftIdl = require("@/idl/swapback_cnft.json");
     } catch (error) {
       console.warn("Could not load CNFT IDL:", error);
-      cnftIdl = { address: "36oiDSdezLJVJp7pYN1ii1PuFepXjDD6NeSHrNc9yLaB" };
+      cnftIdl = { address: "DGDipfpHGVAnWXj7yPEBc3JYFWghQN76tEBzuK2Nojw3" };
     }
   }
   return cnftIdl;
@@ -97,7 +97,7 @@ export function validateEnv(): EnvConfig {
   return {
     network: network || 'devnet',
     rpcUrl: rpcUrl || 'https://api.devnet.solana.com',
-    cnftProgramId: cnftProgramId || '36oiDSdezLJVJp7pYN1ii1PuFepXjDD6NeSHrNc9yLaB',
+    cnftProgramId: cnftProgramId || 'DGDipfpHGVAnWXj7yPEBc3JYFWghQN76tEBzuK2Nojw3',
     routerProgramId: routerProgramId || 'H3LLiKAvjPWk9Br14m7bjiWkaJFzeMVB9qvMsFaA14k5',
     backMint: backMint || '862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux',
     npiMint: npiMint || 'So11111111111111111111111111111111111111112',

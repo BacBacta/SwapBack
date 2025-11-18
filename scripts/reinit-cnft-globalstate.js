@@ -11,7 +11,7 @@ const path = require("path");
 // Discriminator pour "initialize_global_state"
 const INITIALIZE_DISCRIMINATOR = Buffer.from([232, 254, 209, 244, 123, 89, 154, 207]);
 
-const CNFT_PROGRAM_ID = process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "GEkXCcq87yUjQSp5EqcWf7bw9GKrB39A1LWdsE7V3V2E";
+const CNFT_PROGRAM_ID = process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "DGDipfpHGVAnWXj7yPEBc3JYFWghQN76tEBzuK2Nojw3";
 const RPC_URL = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
 
 function resolveWallet(envVar, fallbackPubkey) {
@@ -89,7 +89,15 @@ async function main() {
     console.log(`   Owner: ${accountInfo.owner.toString()}`);
     
     // Vérifier si c'est l'ancien format (sans les 4 wallets)
-    const expectedSize = 8 + 32 + 32 + 32 + 32 + 32 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8 + 8; // discriminator + 5 pubkeys + 9 u64
+    const DISCRIMINATOR_BYTES = 8;
+    const PUBKEY_BYTES = 32;
+    const U64_BYTES = 8;
+    const GLOBAL_STATE_PUBKEYS = 5;
+    const GLOBAL_STATE_COUNTERS = 13;
+    const expectedSize =
+      DISCRIMINATOR_BYTES +
+      GLOBAL_STATE_PUBKEYS * PUBKEY_BYTES +
+      GLOBAL_STATE_COUNTERS * U64_BYTES;
     console.log(`   Taille attendue (nouveau format): ${expectedSize} bytes`);
     
     if (accountInfo.data.length < expectedSize) {

@@ -29,7 +29,7 @@ export const SWAPBACK_PROGRAM_IDS = {
   devnet: {
     router: new PublicKey("H3LLiKAvjPWk9Br14m7bjiWkaJFzeMVB9qvMsFaA14k5"),
     buyback: new PublicKey("746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6"),
-    cnft: new PublicKey("GEkXCcq87yUjQSp5EqcWf7bw9GKrB39A1LWdsE7V3V2E"),
+    cnft: new PublicKey("DGDipfpHGVAnWXj7yPEBc3JYFWghQN76tEBzuK2Nojw3"),
   },
   mainnet: {
     router: new PublicKey("11111111111111111111111111111111"), // À déployer

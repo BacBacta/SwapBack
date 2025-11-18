@@ -4,15 +4,15 @@
 
 **Erreur:** `AccountDidNotDeserialize` - Error Number: 3003
 
-**Cause:** Le compte GlobalState on-chain a l'ancienne structure (64 bytes) mais le programme attend la nouvelle structure avec 4 wallets supplémentaires (240 bytes).
+**Cause:** Le compte GlobalState on-chain a l'ancienne structure (64 bytes) mais le programme attend la nouvelle structure avec 4 wallets supplémentaires (272 bytes).
 
 **Structure actuelle (devnet):**
 - 64 bytes (ancien format)
 - Manque: treasury_wallet, boost_vault_wallet, buyback_wallet, npi_vault_wallet
 
 **Structure attendue (code):**
-- 240 bytes (nouveau format)  
-- Inclut: authority + 4 wallets + 9 champs u64
+- 272 bytes (nouveau format)  
+- Inclut: authority + 4 wallets + 13 champs u64
 
 ## ✅ Solution Automatique
 
@@ -87,7 +87,7 @@ Après le redéploiement, vous devriez voir:
 
 ```
 ✅ GlobalState existe
-   Taille: 240 bytes
+   Taille: 272 bytes
    
 ✅ TOUT EST OK!
    Le compte a la bonne taille (nouveau format).

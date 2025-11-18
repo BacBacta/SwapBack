@@ -12,7 +12,7 @@ const crypto = require("crypto");
 
 // Configuration devnet (surchargée via variables d'environnement si définies)
 const NETWORK = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
-const PROGRAM_ID_RAW = process.env.CNFT_PROGRAM_ID || process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "36oiDSdezLJVJp7pYN1ii1PuFepXjDD6NeSHrNc9yLaB";
+const PROGRAM_ID_RAW = process.env.CNFT_PROGRAM_ID || process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "DGDipfpHGVAnWXj7yPEBc3JYFWghQN76tEBzuK2Nojw3";
 const CNFT_PROGRAM_ID = new PublicKey(PROGRAM_ID_RAW);
 
 async function main() {

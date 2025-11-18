@@ -4,9 +4,8 @@ use anchor_spl::token::{transfer_checked as spl_transfer_checked, burn as spl_bu
 use anchor_spl::token_2022::{transfer_checked as token2022_transfer_checked, burn as token2022_burn, Token2022};
 use anchor_spl::token_interface::{Mint, TokenAccount};
 
-// ⚠️ IMPORTANT: Ce program ID sera généré lors du premier build
-// Ne PAS hardcoder l'ancien ID ici - laisser Anchor le générer
-declare_id!("36oiDSdezLJVJp7pYN1ii1PuFepXjDD6NeSHrNc9yLaB");
+// ⚠️ IMPORTANT: Ce program ID doit correspondre au déploiement devnet actif
+declare_id!("DGDipfpHGVAnWXj7yPEBc3JYFWghQN76tEBzuK2Nojw3");
 
 // ============================================================================
 // CONSTANTES ÉCONOMIQUES

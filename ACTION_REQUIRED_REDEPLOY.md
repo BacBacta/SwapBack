@@ -5,7 +5,7 @@
 ```
 ❌ Error: AccountDidNotDeserialize (0xbbb)
    GlobalState: 64 bytes (ancien format)
-   Attendu: 240 bytes (nouveau format avec 4 wallets)
+   Attendu: 272 bytes (nouveau format avec 4 wallets)
 ```
 
 ## 💰 Blocage Immédiat
@@ -152,7 +152,7 @@ node scripts/diagnose-globalstate.js
 Vous devriez voir:
 ```
 ✅ GlobalState existe
-   Taille: 240 bytes
+   Taille: 272 bytes
    
 ✅ TOUT EST OK!
 ```
@@ -216,7 +216,7 @@ spl-token create-account \
 
 - ❌ Solde insuffisant: 0.0357 SOL (besoin de 0.5+ SOL)
 - ❌ Airdrop: Rate limit temporaire
-- ⏸️ GlobalState: Format obsolète (64 bytes au lieu de 240)
+- ⏸️ GlobalState: Format obsolète (64 bytes au lieu de 272)
 
 ### 🎯 Prochaine Action
 
@@ -237,7 +237,7 @@ node scripts/diagnose-globalstate.js
 
 Si problème après redéploiement:
 
-1. Vérifiez que `diagnose-globalstate.js` montre 240 bytes
+1. Vérifiez que `diagnose-globalstate.js` montre 272 bytes
 2. Vérifiez que le Program ID n'a pas changé
 3. Rebuild le frontend: `cd app && npm run build`
 4. Vérifiez les ATAs sont créés pour buyback_wallet
