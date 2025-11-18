@@ -766,6 +766,7 @@ pub struct UnlockTokens<'info> {
     )]
     pub vault_authority: AccountInfo<'info>,
 
+    #[account(mut)]
     pub back_mint: InterfaceAccount<'info, Mint>,
 
     pub user: Signer<'info>,

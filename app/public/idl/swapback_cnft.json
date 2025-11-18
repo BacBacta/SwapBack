@@ -699,7 +699,8 @@
           }
         },
         {
-          "name": "back_mint"
+          "name": "back_mint",
+          "writable": true
         },
         {
           "name": "user",
