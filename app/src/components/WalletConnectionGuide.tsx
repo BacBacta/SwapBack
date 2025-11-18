@@ -1,31 +1,74 @@
 "use client";
 
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useEffect, useState } from "react";
+import { WalletReadyState } from "@solana/wallet-adapter-base";
+import { useEffect, useMemo, useState } from "react";
 
 export const WalletConnectionGuide = () => {
-  const { connected } = useWallet();
+  const { connected, connecting, wallets, wallet, select } = useWallet();
   const [showGuide, setShowGuide] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   useEffect(() => {
     // Montrer le guide si pas connecté et que c'est la première visite
-    const hasSeenGuide = localStorage.getItem('swapback-wallet-guide-seen');
-    if (!connected && !hasSeenGuide) {
-      setShowGuide(true);
+    try {
+      const hasSeenGuide = localStorage.getItem("swapback-wallet-guide-seen");
+      if (!connected && !hasSeenGuide) {
+        setShowGuide(true);
+      }
+    } catch (error) {
+      console.warn("Wallet guide localStorage unavailable", error);
+      if (!connected) {
+        setShowGuide(true);
+      }
     }
   }, [connected]);
 
-  const handlePhantomConnect = async () => {
+  const phantomWallet = useMemo(() => {
+    return wallets.find(({ adapter }) => adapter.name.toLowerCase().includes("phantom"));
+  }, [wallets]);
+
+  const markGuideSeen = () => {
     try {
-      // Utiliser directement l'adaptateur Phantom
-      const phantomWallet = window.solana;
-      if (phantomWallet && phantomWallet.isPhantom) {
-        await phantomWallet.connect();
-      }
-      setShowGuide(false);
-      localStorage.setItem('swapback-wallet-guide-seen', 'true');
+      localStorage.setItem("swapback-wallet-guide-seen", "true");
     } catch (error) {
-      console.error('Phantom connection error:', error);
+      console.warn("Unable to persist wallet guide state", error);
+    }
+  };
+
+  const handlePhantomConnect = async () => {
+    setStatusMessage(null);
+
+    try {
+      if (!phantomWallet) {
+        setStatusMessage("Extension Phantom introuvable");
+        window.open("https://phantom.app/", "_blank", "noopener");
+        return;
+      }
+
+      const isReady =
+        phantomWallet.readyState === WalletReadyState.Installed ||
+        phantomWallet.readyState === WalletReadyState.Loadable;
+
+      if (!isReady) {
+        setStatusMessage("Phantom n'est pas disponible dans ce navigateur");
+        return;
+      }
+
+      if (wallet?.adapter.name !== phantomWallet.adapter.name) {
+        select(phantomWallet.adapter.name);
+      }
+
+      await phantomWallet.adapter.connect();
+      markGuideSeen();
+      setShowGuide(false);
+    } catch (error) {
+      console.error("Phantom adapter connection error:", error);
+      setStatusMessage(
+        error instanceof Error
+          ? error.message
+          : "Échec de la connexion à Phantom"
+      );
     }
   };
 
@@ -60,9 +103,10 @@ export const WalletConnectionGuide = () => {
       <div className="mt-4 flex gap-2">
         <button
           onClick={handlePhantomConnect}
-          className="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded font-bold transition-colors"
+          disabled={connecting}
+          className={`flex-1 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded font-bold transition-colors ${connecting ? "opacity-60 cursor-not-allowed" : ""}`}
         >
-          Connecter Phantom
+          {connecting ? "Connexion..." : "Connecter Phantom"}
         </button>
         <button
           onClick={() => setShowGuide(false)}
@@ -71,6 +115,12 @@ export const WalletConnectionGuide = () => {
           Plus tard
         </button>
       </div>
+
+      {statusMessage && (
+        <div className="mt-3 text-xs text-red-400">
+          {statusMessage}
+        </div>
+      )}
     </div>
   );
 };

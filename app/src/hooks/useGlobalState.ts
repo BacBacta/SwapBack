@@ -3,7 +3,7 @@
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useEffect, useState, useCallback } from "react";
 import { PublicKey } from "@solana/web3.js";
-import { type Idl, BorshAccountsCoder } from "@coral-xyz/anchor";
+import { type Idl, BorshAccountsCoder, BN } from "@coral-xyz/anchor";
 import cnftIdl from "@/idl/swapback_cnft.json";
 import { getCnftProgramId } from "@/config/constants";
 
@@ -29,6 +29,94 @@ interface GlobalStateData {
 }
 
 const LAMPORTS_PER_BACK = 1_000_000; // 6 decimals
+const LAMPORTS_PER_BACK_BN = new BN(LAMPORTS_PER_BACK);
+const MAX_SAFE_BN = new BN(Number.MAX_SAFE_INTEGER);
+
+const toBN = (value: unknown, fieldName: string): BN => {
+  try {
+    if (!value) {
+      return new BN(0);
+    }
+
+    if (BN.isBN(value)) {
+      return value as BN;
+    }
+
+    if (typeof value === "bigint") {
+      return new BN(value.toString());
+    }
+
+    if (typeof value === "number") {
+      return new BN(value);
+    }
+
+    if (typeof value === "string" && value.length > 0) {
+      return new BN(value);
+    }
+
+    const candidate = value as { toString?: () => string };
+    if (typeof candidate?.toString === "function") {
+      const stringValue = candidate.toString();
+      if (stringValue) {
+        return new BN(stringValue);
+      }
+    }
+
+    console.warn(`[useGlobalState] Unable to parse BN for ${fieldName}`, value);
+    return new BN(0);
+  } catch (conversionError) {
+    console.error(`[useGlobalState] Failed to convert ${fieldName} to BN`, conversionError);
+    return new BN(0);
+  }
+};
+
+const toSafeNumber = (bnValue: BN, fieldName: string): number => {
+  if (bnValue.gt(MAX_SAFE_BN)) {
+    console.warn(`[useGlobalState] ${fieldName} exceeds JS number range, clamping`, {
+      value: bnValue.toString(),
+    });
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  return bnValue.toNumber();
+};
+
+const decodeCounterField = (value: unknown, fieldName: string): number => {
+  return toSafeNumber(toBN(value, fieldName), fieldName);
+};
+
+const decodeLamportsField = (value: unknown, fieldName: string): number => {
+  const bnValue = toBN(value, fieldName);
+  const whole = bnValue.div(LAMPORTS_PER_BACK_BN);
+  const remainder = bnValue.mod(LAMPORTS_PER_BACK_BN);
+
+  const safeWhole = toSafeNumber(whole, `${fieldName}.whole`);
+  const fractional = remainder.toNumber() / LAMPORTS_PER_BACK;
+
+  return safeWhole + fractional;
+};
+
+const toSnakeCase = (value: string): string => {
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .toLowerCase();
+};
+
+const getDecodedField = (
+  decoded: Record<string, unknown>,
+  fieldName: string
+): unknown => {
+  if (fieldName in decoded) {
+    return decoded[fieldName];
+  }
+
+  const snakeKey = toSnakeCase(fieldName);
+  if (snakeKey in decoded) {
+    return decoded[snakeKey];
+  }
+
+  return undefined;
+};
 
 export function useGlobalState() {
   const { connection } = useConnection();
@@ -80,6 +168,8 @@ export function useGlobalState() {
         return;
       }
 
+      const decodedRecord = decoded as Record<string, unknown>;
+
       const formatPubkeyField = (fieldName: string, value: unknown): string => {
         try {
           if (!value) {
@@ -113,24 +203,78 @@ export function useGlobalState() {
       };
 
       setGlobalState({
-        authority: formatPubkeyField("authority", decoded.authority),
-        treasuryWallet: formatPubkeyField("treasuryWallet", decoded.treasuryWallet),
-        boostVaultWallet: formatPubkeyField("boostVaultWallet", decoded.boostVaultWallet),
-        buybackWallet: formatPubkeyField("buybackWallet", decoded.buybackWallet),
-        npiVaultWallet: formatPubkeyField("npiVaultWallet", decoded.npiVaultWallet),
-        totalCommunityBoost: Number(decoded.totalCommunityBoost),
-        activeLocksCount: Number(decoded.activeLocksCount),
-        totalValueLocked: Number(decoded.totalValueLocked) / LAMPORTS_PER_BACK,
-        totalSwapVolume: Number(decoded.totalSwapVolume) / LAMPORTS_PER_BACK,
-        totalSwapFeesCollected: Number(decoded.totalSwapFeesCollected) / LAMPORTS_PER_BACK,
-        swapTreasuryAccrued: Number(decoded.swapTreasuryAccrued) / LAMPORTS_PER_BACK,
-        swapBuybackAccrued: Number(decoded.swapBuybackAccrued) / LAMPORTS_PER_BACK,
-        totalNpiVolume: Number(decoded.totalNpiVolume) / LAMPORTS_PER_BACK,
-        npiUserDistributed: Number(decoded.npiUserDistributed) / LAMPORTS_PER_BACK,
-        npiTreasuryAccrued: Number(decoded.npiTreasuryAccrued) / LAMPORTS_PER_BACK,
-        npiBoostVaultAccrued: Number(decoded.npiBoostVaultAccrued) / LAMPORTS_PER_BACK,
-        npiBoostVaultDistributed: Number(decoded.npiBoostVaultDistributed) / LAMPORTS_PER_BACK,
-        totalPenaltiesCollected: Number(decoded.totalPenaltiesCollected || 0) / LAMPORTS_PER_BACK,
+        authority: formatPubkeyField(
+          "authority",
+          getDecodedField(decodedRecord, "authority")
+        ),
+        treasuryWallet: formatPubkeyField(
+          "treasuryWallet",
+          getDecodedField(decodedRecord, "treasuryWallet")
+        ),
+        boostVaultWallet: formatPubkeyField(
+          "boostVaultWallet",
+          getDecodedField(decodedRecord, "boostVaultWallet")
+        ),
+        buybackWallet: formatPubkeyField(
+          "buybackWallet",
+          getDecodedField(decodedRecord, "buybackWallet")
+        ),
+        npiVaultWallet: formatPubkeyField(
+          "npiVaultWallet",
+          getDecodedField(decodedRecord, "npiVaultWallet")
+        ),
+        totalCommunityBoost: decodeCounterField(
+          getDecodedField(decodedRecord, "totalCommunityBoost"),
+          "totalCommunityBoost"
+        ),
+        activeLocksCount: decodeCounterField(
+          getDecodedField(decodedRecord, "activeLocksCount"),
+          "activeLocksCount"
+        ),
+        totalValueLocked: decodeLamportsField(
+          getDecodedField(decodedRecord, "totalValueLocked"),
+          "totalValueLocked"
+        ),
+        totalSwapVolume: decodeLamportsField(
+          getDecodedField(decodedRecord, "totalSwapVolume"),
+          "totalSwapVolume"
+        ),
+        totalSwapFeesCollected: decodeLamportsField(
+          decoded.totalSwapFeesCollected,
+          "totalSwapFeesCollected"
+        ),
+        swapTreasuryAccrued: decodeLamportsField(
+          getDecodedField(decodedRecord, "swapTreasuryAccrued"),
+          "swapTreasuryAccrued"
+        ),
+        swapBuybackAccrued: decodeLamportsField(
+          getDecodedField(decodedRecord, "swapBuybackAccrued"),
+          "swapBuybackAccrued"
+        ),
+        totalNpiVolume: decodeLamportsField(
+          getDecodedField(decodedRecord, "totalNpiVolume"),
+          "totalNpiVolume"
+        ),
+        npiUserDistributed: decodeLamportsField(
+          getDecodedField(decodedRecord, "npiUserDistributed"),
+          "npiUserDistributed"
+        ),
+        npiTreasuryAccrued: decodeLamportsField(
+          getDecodedField(decodedRecord, "npiTreasuryAccrued"),
+          "npiTreasuryAccrued"
+        ),
+        npiBoostVaultAccrued: decodeLamportsField(
+          getDecodedField(decodedRecord, "npiBoostVaultAccrued"),
+          "npiBoostVaultAccrued"
+        ),
+        npiBoostVaultDistributed: decodeLamportsField(
+          getDecodedField(decodedRecord, "npiBoostVaultDistributed"),
+          "npiBoostVaultDistributed"
+        ),
+        totalPenaltiesCollected: decodeLamportsField(
+          getDecodedField(decodedRecord, "totalPenaltiesCollected") ?? 0,
+          "totalPenaltiesCollected"
+        ),
       });
     } catch (err) {
       console.error("Error fetching GlobalState:", err);
