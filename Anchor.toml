@@ -27,7 +27,7 @@ swapback_router = "Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa"
 
 [scripts]
 build = "export TMPDIR=/tmp && export CARGO_TARGET_DIR=/tmp/cargo-target && export RUSTFLAGS='-C target-cpu=generic -C opt-level=1' && anchor build --program-name swapback_router"
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test = "npm exec vitest -- run --reporter=verbose"
 
 [test]
 startup_wait = 10000

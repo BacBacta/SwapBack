@@ -13,7 +13,7 @@ import {
   Transaction,
 } from "@solana/web3.js";
 import { AnchorProvider, Program, BN, Wallet } from "@coral-xyz/anchor";
-import { airdropIfNeeded } from "../utils/solana-helpers";
+import { airdropIfNeeded } from "../utils/solana-helpers.ts";
 
 const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_RPC_URL || "https://api.devnet.solana.com";

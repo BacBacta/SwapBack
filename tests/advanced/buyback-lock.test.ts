@@ -6,7 +6,7 @@
 import { describe, it, expect } from "vitest";
 import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { BN } from "@coral-xyz/anchor";
-import { formatSOL } from "../utils/solana-helpers";
+import { formatSOL } from "../utils/solana-helpers.ts";
 
 const BUYBACK_PROGRAM_ID = new PublicKey("46UWFYdksvkGhTPy9cTSJGa3d5nqzpY766rtJeuxtMgU");
 const BACK_TOKEN_MINT = new PublicKey("862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux");

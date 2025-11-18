@@ -11,7 +11,7 @@ import {
   LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import { BN } from "@coral-xyz/anchor";
-import { airdropIfNeeded, formatSOL } from "../utils/solana-helpers";
+import { airdropIfNeeded, formatSOL } from "../utils/solana-helpers.ts";
 
 const RPC_ENDPOINT = process.env.NEXT_PUBLIC_RPC_URL || "https://api.devnet.solana.com";
 const ROUTER_PROGRAM_ID = new PublicKey("3Z295H9QHByYn9sHm3tH7ASHitwd2Y4AEaXUddfhQKap");

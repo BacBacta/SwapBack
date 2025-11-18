@@ -13,7 +13,7 @@ import {
   getAssociatedTokenAddress,
   createAssociatedTokenAccountInstruction,
 } from "@solana/spl-token";
-import { loadProgram } from "./utils/load-idl";
+import { loadProgram } from "./utils/load-idl.ts";
 import {
   ROUTER_PROGRAM_ID,
   BUYBACK_PROGRAM_ID,

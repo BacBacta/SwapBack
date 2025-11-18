@@ -2,7 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program, AnchorProvider } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { expect } from "chai";
-import { loadProgram } from "./utils/load-idl";
+import { loadProgram } from "./utils/load-idl.ts";
 const ROUTER_PROGRAM_ID = new PublicKey(
   "3Z295H9QHByYn9sHm3tH7ASHitwd2Y4AEaXUddfhQKap"
 );

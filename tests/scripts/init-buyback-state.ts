@@ -3,7 +3,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { AnchorProvider, BN } from "@coral-xyz/anchor";
 import { PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { loadProgram } from "../utils/load-idl";
+import { loadProgram } from "../utils/load-idl.ts";
 import {
   BACK_TOKEN_MINT,
   BUYBACK_PROGRAM_ID,

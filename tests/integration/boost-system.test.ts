@@ -30,7 +30,7 @@ import {
   getAccount,
 } from "@solana/spl-token";
 import { expect } from "chai";
-import { loadProgram } from "../utils/load-idl";
+import { loadProgram } from "../utils/load-idl.ts";
 import {
   CNFT_PROGRAM_ID,
   ROUTER_PROGRAM_ID,

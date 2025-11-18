@@ -10,7 +10,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { BN } from "@coral-xyz/anchor";
 import { createMint, createAccount, mintTo } from "@solana/spl-token";
-import { loadProgram } from "./utils/load-idl";
+import { loadProgram } from "./utils/load-idl.ts";
 
 // ============================================================================
 // ON-CHAIN INTEGRATION TESTS

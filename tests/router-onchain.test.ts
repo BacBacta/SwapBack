@@ -6,7 +6,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program, AnchorProvider } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { expect, beforeAll, describe } from "vitest";
-import { loadProgram } from "./utils/load-idl";
+import { loadProgram } from "./utils/load-idl.ts";
 
 const RUN_ANCHOR_TESTS = process.env.SWAPBACK_RUN_ANCHOR_TESTS === "true";
 
