@@ -446,6 +446,8 @@ export async function createUnlockTokensTransaction(
       .unlockTokens()
       .accounts({
         userLock,
+        globalState,
+        userTokenAccount,
         vaultTokenAccount,
         buybackWalletTokenAccount,
         vaultAuthority,
