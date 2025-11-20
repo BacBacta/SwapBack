@@ -1,5 +1,5 @@
-use anchor_lang::prelude::*;
 use crate::state::DcaPlan;
+use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 pub struct CancelDcaPlan<'info> {
@@ -11,21 +11,25 @@ pub struct CancelDcaPlan<'info> {
         close = user
     )]
     pub dca_plan: Account<'info, DcaPlan>,
-    
+
     #[account(mut)]
     pub user: Signer<'info>,
 }
 
 pub fn handler(ctx: Context<CancelDcaPlan>) -> Result<()> {
     let dca_plan = &ctx.accounts.dca_plan;
-    
+
     msg!("❌ DCA Plan cancelled and closed");
     msg!("Plan ID: {:?}", dca_plan.plan_id);
-    msg!("Swaps executed: {}/{}", dca_plan.executed_swaps, dca_plan.total_swaps);
+    msg!(
+        "Swaps executed: {}/{}",
+        dca_plan.executed_swaps,
+        dca_plan.total_swaps
+    );
     msg!("Total invested: {}", dca_plan.total_invested);
     msg!("Total received: {}", dca_plan.total_received);
-    
+
     // Account will be closed automatically and rent refunded to user
-    
+
     Ok(())
 }

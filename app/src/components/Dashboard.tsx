@@ -9,6 +9,7 @@ import { useUserNpiBalance } from "../hooks/useUserNpiBalance";
 import { SkeletonLoader } from "./Skeletons";
 import { NoActivityState, NoConnectionState } from "./EmptyState";
 import { SwapBackDashboard } from "./SwapBackDashboard";
+import { EnhancedSwapInterface } from "./EnhancedSwapInterface";
 import LockInterface from "./LockInterface";
 import UnlockInterface from "./UnlockInterface";
 import { logError } from "@/lib/errorLogger";
@@ -322,7 +323,7 @@ export const Dashboard = () => {
       {/* Content based on active tab */}
       {activeTab === "dca" && (
         <div className="space-y-6">
-          <SwapBackDashboard />
+          <EnhancedSwapInterface />
         </div>
       )}
 

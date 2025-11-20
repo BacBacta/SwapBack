@@ -37,10 +37,10 @@ export const TESTNET_TOKENS = {
 
 export const TESTNET_PROGRAM_IDS = {
   CNFT: new PublicKey(
-    process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "DGDipfpHGVAnWXj7yPEBc3JYFWghQN76tEBzuK2Nojw3"
+    process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP"
   ),
   ROUTER: new PublicKey(
-    process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "H3LLiKAvjPWk9Br14m7bjiWkaJFzeMVB9qvMsFaA14k5"
+    process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh"
   ),
   BUYBACK: new PublicKey(
     process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || "746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6"

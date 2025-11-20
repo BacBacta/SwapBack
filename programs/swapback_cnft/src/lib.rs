@@ -1,11 +1,15 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token::{transfer_checked as spl_transfer_checked, burn as spl_burn, Token, TransferChecked, Burn};
-use anchor_spl::token_2022::{transfer_checked as token2022_transfer_checked, burn as token2022_burn, Token2022};
+use anchor_spl::token::{
+    burn as spl_burn, transfer_checked as spl_transfer_checked, Burn, Token, TransferChecked,
+};
+use anchor_spl::token_2022::{
+    burn as token2022_burn, transfer_checked as token2022_transfer_checked, Token2022,
+};
 use anchor_spl::token_interface::{Mint, TokenAccount};
 
 // ⚠️ IMPORTANT: Ce program ID doit correspondre au déploiement devnet actif
-declare_id!("DGDipfpHGVAnWXj7yPEBc3JYFWghQN76tEBzuK2Nojw3");
+declare_id!("EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP");
 
 // ============================================================================
 // CONSTANTES ÉCONOMIQUES
@@ -335,7 +339,10 @@ pub mod swapback_cnft {
                 .checked_add(penalty_amount)
                 .ok_or(ErrorCode::MathOverflow)?;
 
-            msg!("🔥 {} BACK brûlés (pénalité 2%)", penalty_amount / BACK_DECIMALS);
+            msg!(
+                "🔥 {} BACK brûlés (pénalité 2%)",
+                penalty_amount / BACK_DECIMALS
+            );
         }
 
         // Désactiver le lock
@@ -543,7 +550,7 @@ pub mod swapback_cnft {
     /// Permet à l'utilisateur de réclamer ses NPI accumulés
     pub fn claim_npi(ctx: Context<ClaimNpi>, amount: u64) -> Result<()> {
         let user_balance = &mut ctx.accounts.user_npi_balance;
-        
+
         require!(
             ctx.accounts.user.key() == user_balance.user,
             ErrorCode::Unauthorized
@@ -556,17 +563,14 @@ pub mod swapback_cnft {
 
         // Vérifier que le vault a assez de tokens
         let vault_balance = ctx.accounts.npi_vault.amount;
-        require!(
-            vault_balance >= amount,
-            ErrorCode::InsufficientVaultBalance
-        );
+        require!(vault_balance >= amount, ErrorCode::InsufficientVaultBalance);
 
         // Déduire du solde pending
         user_balance.pending_npi = user_balance
             .pending_npi
             .checked_sub(amount)
             .ok_or(ErrorCode::MathOverflow)?;
-        
+
         user_balance.total_claimed = user_balance
             .total_claimed
             .checked_add(amount)

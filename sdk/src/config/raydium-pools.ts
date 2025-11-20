@@ -9,6 +9,10 @@
 
 import { PublicKey } from "@solana/web3.js";
 
+export const RAYDIUM_AMM_PROGRAM_ID = new PublicKey(
+  "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
+);
+
 /**
  * Raydium AMM pool configuration for a trading pair
  */
@@ -85,6 +89,18 @@ export const RAYDIUM_POOLS: Record<string, RaydiumPoolConfig> = {
     minLiquidityUsd: 500_000,
   },
 };
+
+/**
+ * Get a Raydium pool configuration by AMM address
+ */
+export function getRaydiumPoolByAmm(ammAddress: PublicKey): RaydiumPoolConfig | null {
+  for (const pool of Object.values(RAYDIUM_POOLS)) {
+    if (pool.ammAddress.equals(ammAddress)) {
+      return pool;
+    }
+  }
+  return null;
+}
 
 /**
  * Get Raydium pool configuration for a token pair

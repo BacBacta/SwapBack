@@ -3,7 +3,7 @@
 
 set -e
 
-PROGRAM_ID="DHfa77Z9yCtVtg9GivhbjF1od25PWfwNBCm7ws5eXpzf"
+PROGRAM_ID="EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP"
 DEVNET_URL="https://api.devnet.solana.com"
 
 echo "🔍 VÉRIFICATION DU STATUT DE DÉPLOIEMENT"

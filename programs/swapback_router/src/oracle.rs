@@ -25,67 +25,78 @@ pub fn read_price(oracle_account: &AccountInfo, clock: &Clock) -> Result<OracleO
     // Switchboard Oracle (ACTIVÉ - Compatible Solana 1.18)
     #[cfg(feature = "switchboard")]
     {
-        // Emprunter les données de l'account
-        let data = oracle_account
-            .try_borrow_data()
-            .map_err(|_| error!(ErrorCode::InvalidOraclePrice))?;
+        // Tentative de lecture comme compte Switchboard
+        // On utilise un scope pour le borrow de data
+        let is_switchboard = {
+            if let Ok(data) = oracle_account.try_borrow_data() {
+                AggregatorAccountData::new_from_bytes(&data).is_ok()
+            } else {
+                false
+            }
+        };
 
-        // Utiliser new_from_bytes pour désérialiser
-        let aggregator = AggregatorAccountData::new_from_bytes(&data)
-            .map_err(|_| error!(ErrorCode::InvalidOraclePrice))?;
+        if is_switchboard {
+            let data = oracle_account
+                .try_borrow_data()
+                .map_err(|_| error!(ErrorCode::InvalidOraclePrice))?;
 
-        let round = &aggregator.latest_confirmed_round;
-        let timestamp = round.round_open_timestamp;
+            let aggregator = AggregatorAccountData::new_from_bytes(&data)
+                .map_err(|_| error!(ErrorCode::InvalidOraclePrice))?;
 
-        // Vérifier staleness
-        if clock.unix_timestamp - timestamp > MAX_STALENESS_SECS {
-            msg!(
-                "⚠️ Switchboard data too old: {} seconds",
-                clock.unix_timestamp - timestamp
-            );
-            return err!(ErrorCode::StaleOracleData);
-        }
+            let round = &aggregator.latest_confirmed_round;
+            let timestamp = round.round_open_timestamp;
 
-        // get_result() retourne Result<SwitchboardDecimal, Error> dans v0.30.4
-        match aggregator.get_result() {
-            Ok(result) => {
-                // Convertir SwitchboardDecimal en f64
-                let value: f64 = result
-                    .try_into()
-                    .map_err(|_| error!(ErrorCode::InvalidOraclePrice))?;
+            // Vérifier staleness
+            if clock.unix_timestamp - timestamp > MAX_STALENESS_SECS {
+                msg!(
+                    "⚠️ Switchboard data too old: {} seconds",
+                    clock.unix_timestamp - timestamp
+                );
+                return err!(ErrorCode::StaleOracleData);
+            }
 
-                if value.is_sign_negative() || value == 0.0 {
-                    msg!("❌ Invalid Switchboard price: {}", value);
+            // get_result() retourne Result<SwitchboardDecimal, Error> dans v0.30.4
+            match aggregator.get_result() {
+                Ok(result) => {
+                    // Convertir SwitchboardDecimal en f64
+                    let value: f64 = result
+                        .try_into()
+                        .map_err(|_| error!(ErrorCode::InvalidOraclePrice))?;
+
+                    if value.is_sign_negative() || value == 0.0 {
+                        msg!("❌ Invalid Switchboard price: {}", value);
+                        return err!(ErrorCode::InvalidOraclePrice);
+                    }
+
+                    // Convertir en format 8 décimales (prix * 10^8)
+                    let price_scaled = (value * 100_000_000_f64) as u64;
+
+                    msg!(
+                        "✅ Switchboard price read: ${} ({} lamports)",
+                        value,
+                        price_scaled
+                    );
+
+                    return Ok(OracleObservation {
+                        price: price_scaled,
+                        confidence: 0, // Switchboard n'expose pas confidence directement
+                        publish_time: timestamp,
+                        slot: clock.slot,
+                        oracle_type: OracleType::Switchboard,
+                    });
+                }
+                Err(e) => {
+                    msg!("❌ Switchboard get_result error: {:?}", e);
                     return err!(ErrorCode::InvalidOraclePrice);
                 }
-
-                // Convertir en format 8 décimales (prix * 10^8)
-                let price_scaled = (value * 100_000_000_f64) as u64;
-
-                msg!(
-                    "✅ Switchboard price read: ${} ({} lamports)",
-                    value,
-                    price_scaled
-                );
-
-                return Ok(OracleObservation {
-                    price: price_scaled,
-                    confidence: 0, // Switchboard n'expose pas confidence directement
-                    publish_time: timestamp,
-                    slot: clock.slot,
-                    oracle_type: OracleType::Switchboard,
-                });
-            }
-            Err(e) => {
-                msg!("❌ Switchboard get_result error: {:?}", e);
-                return err!(ErrorCode::InvalidOraclePrice);
             }
         }
     }
 
     // Fallback: Pyth SDK (DÉSACTIVÉ - Conflit versions)
     // TODO: Réactiver avec version compatible Solana 1.18
-    /*
+    
+    // Pyth SDK Implementation
     let price_data = oracle_account
         .try_borrow_data()
         .map_err(|_| error!(ErrorCode::InvalidOraclePrice))?;
@@ -134,14 +145,9 @@ pub fn read_price(oracle_account: &AccountInfo, clock: &Clock) -> Result<OracleO
             oracle_type: OracleType::Pyth,
         });
     }
-    */
 
-    // Si Switchboard feature non activée, retourner erreur
-    #[cfg(not(feature = "switchboard"))]
-    {
-        msg!("❌ No oracle enabled! Build with --features switchboard");
-        return err!(ErrorCode::InvalidOraclePrice);
-    }
+    msg!("❌ Oracle price not found (Pyth/Switchboard)");
+    return err!(ErrorCode::InvalidOraclePrice);
 }
 
 // Fonctions utilitaires pour Pyth (conservées pour future réactivation)

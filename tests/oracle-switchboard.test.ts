@@ -4,7 +4,7 @@ import { PublicKey } from "@solana/web3.js";
 import { expect } from "chai";
 import { loadProgram } from "./utils/load-idl.ts";
 const ROUTER_PROGRAM_ID = new PublicKey(
-  "3Z295H9QHByYn9sHm3tH7ASHitwd2Y4AEaXUddfhQKap"
+  "9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh"
 );
 
 type SwapbackRouter = any;

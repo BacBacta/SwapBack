@@ -30,8 +30,8 @@ solana-program = { workspace = true }
 # use anchor_lang::solana_program au lieu de use solana_program
 switchboard-solana = { version = "0.30.4", optional = true }
 
-# Pyth SDK - DÉSACTIVÉ pour éviter conflit de versions Solana
-# pyth-sdk-solana = "0.10.6"
+# Pyth SDK
+pyth-sdk-solana = "=0.10.1"
 
 # getrandom avec custom feature pour notre stub BPF
 getrandom = { version = "0.2", default-features = false, features = ["custom"] }

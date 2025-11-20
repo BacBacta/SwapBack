@@ -7,6 +7,32 @@ import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import { RouteCandidate } from "@/../../sdk/src/types/smart-router";
 
+type JupiterRoutePlanStep = {
+  swapInfo?: {
+    ammKey?: string;
+    label?: string;
+    inputMint?: string;
+    outputMint?: string;
+    inAmount?: string;
+    outAmount?: string;
+    feeAmount?: string;
+    feeMint?: string;
+  };
+  [key: string]: unknown;
+};
+
+type JupiterCpiMeta = {
+  pubkey: string;
+  isSigner: boolean;
+  isWritable: boolean;
+};
+
+export type JupiterCpiState = {
+  expectedInputAmount: string;
+  swapInstruction: string;
+  accounts: JupiterCpiMeta[];
+} | null;
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -33,6 +59,9 @@ export interface SwapState {
 export interface RouteState {
   routes: RouteCandidate[];
   selectedRoute: RouteCandidate | null;
+  selectedRoutePlan: JupiterRoutePlanStep[] | null;
+  jupiterCpi: JupiterCpiState;
+  jupiterCpi: JupiterCpiState;
   isLoading: boolean;
   error: string | null;
 }
@@ -65,7 +94,7 @@ export interface SwapStore {
 
   // Route State
   routes: RouteState;
-  fetchRoutes: () => Promise<void>;
+  fetchRoutes: (options?: { userPublicKey?: string | null }) => Promise<void>;
   selectRoute: (route: RouteCandidate) => void;
   clearRoutes: () => void;
 
@@ -110,6 +139,8 @@ const initialSwapState: SwapState = {
 const initialRouteState: RouteState = {
   routes: [],
   selectedRoute: null,
+  selectedRoutePlan: null,
+  jupiterCpi: null,
   isLoading: false,
   error: null,
 };
@@ -181,7 +212,7 @@ export const useSwapStore = create<SwapStore>()(
         // Route State
         routes: initialRouteState,
 
-        fetchRoutes: async () => {
+        fetchRoutes: async (options) => {
           const { swap } = get();
           
           if (!swap.inputToken || !swap.outputToken || !swap.inputAmount) {
@@ -189,7 +220,12 @@ export const useSwapStore = create<SwapStore>()(
           }
 
           set((state) => ({
-            routes: { ...state.routes, isLoading: true, error: null },
+            routes: {
+              ...state.routes,
+              isLoading: true,
+              error: null,
+              jupiterCpi: null,
+            },
           }));
 
           try {
@@ -208,6 +244,7 @@ export const useSwapStore = create<SwapStore>()(
                 outputMint: swap.outputToken.mint,
                 amount: amountInSmallestUnit,
                 slippageBps: Math.floor(swap.slippageTolerance * 10000),
+                userPublicKey: options?.userPublicKey ?? null,
               }),
             });
 
@@ -224,7 +261,8 @@ export const useSwapStore = create<SwapStore>()(
             }
 
             const quote = data.quote;
-            
+            const routePlan: JupiterRoutePlanStep[] = quote?.routePlan ?? [];
+
             if (quote && quote.outAmount) {
               // Parse price impact (peut être string ou number)
               const priceImpact = typeof quote.priceImpactPct === 'string' 
@@ -244,7 +282,7 @@ export const useSwapStore = create<SwapStore>()(
                 effectiveRate: parseFloat(quote.outAmount) / parseFloat(quote.inAmount),
                 riskScore: priceImpact ? Math.min(100, priceImpact * 10) : 10,
                 mevRisk: priceImpact > 2 ? "high" : priceImpact > 0.5 ? "medium" : "low",
-                instructions: [],
+                instructions: routePlan,
                 estimatedComputeUnits: 200000,
               };
 
@@ -261,6 +299,8 @@ export const useSwapStore = create<SwapStore>()(
                   ...state.routes,
                   routes: [route],
                   selectedRoute: route,
+                  selectedRoutePlan: routePlan,
+                  jupiterCpi: data.jupiterCpi ?? null,
                   isLoading: false,
                 },
               }));
@@ -274,6 +314,8 @@ export const useSwapStore = create<SwapStore>()(
                 ...state.routes,
                 isLoading: false,
                 error: error instanceof Error ? error.message : "Unknown error",
+                selectedRoutePlan: null,
+                jupiterCpi: null,
               },
             }));
           }
@@ -281,12 +323,24 @@ export const useSwapStore = create<SwapStore>()(
 
         selectRoute: (route) =>
           set((state) => ({
-            routes: { ...state.routes, selectedRoute: route },
+            routes: {
+              ...state.routes,
+              selectedRoute: route,
+              selectedRoutePlan: Array.isArray(route.instructions)
+                ? (route.instructions as JupiterRoutePlanStep[])
+                : state.routes.selectedRoutePlan,
+            },
           })),
 
         clearRoutes: () =>
           set((state) => ({
-            routes: { ...state.routes, routes: [], selectedRoute: null },
+            routes: {
+              ...state.routes,
+              routes: [],
+              selectedRoute: null,
+              selectedRoutePlan: null,
+              jupiterCpi: null,
+            },
           })),
 
         // Transaction State

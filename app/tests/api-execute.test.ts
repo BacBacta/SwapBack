@@ -92,6 +92,7 @@ describe("API Route: /api/execute", () => {
         json: async () => {
           throw new Error("Invalid JSON");
         },
+        headers: new Headers(),
       } as unknown as NextRequest;
 
       const response = await POST(request);

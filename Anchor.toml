@@ -16,8 +16,8 @@ swapback_cnft = "CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH"
 swapback_router = "Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa"
 
 [programs.devnet]
-swapback_cnft = "DGDipfpHGVAnWXj7yPEBc3JYFWghQN76tEBzuK2Nojw3"
-swapback_router = "H3LLiKAvjPWk9Br14m7bjiWkaJFzeMVB9qvMsFaA14k5"
+swapback_cnft = "EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP"
+swapback_router = "9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh"
 swapback_buyback = "746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6"
 
 [programs.mainnet]
@@ -26,7 +26,7 @@ swapback_cnft = "CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH"
 swapback_router = "Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa"
 
 [scripts]
-build = "export TMPDIR=/tmp && export CARGO_TARGET_DIR=/tmp/cargo-target && export RUSTFLAGS='-C target-cpu=generic -C opt-level=1' && anchor build --program-name swapback_router"
+build = "export TMPDIR=/tmp && export CARGO_TARGET_DIR=/tmp/cargo-target && export RUSTFLAGS='-C target-cpu=generic -C opt-level=1' && anchor build --program-name swapback_router -- --features switchboard"
 test = "npm exec vitest -- run --reporter=verbose"
 
 [test]
@@ -43,3 +43,6 @@ address = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 
 [[test.validator.clone]]
 address = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
+
+[[test.validator.clone]]
+address = "J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix"

@@ -14,11 +14,15 @@ import { NextRequest } from "next/server";
 // ============================================================================
 
 // Mock Solana Connection
-vi.mock("@solana/web3.js", () => ({
-  Connection: vi.fn().mockImplementation(() => ({
-    getSlot: vi.fn().mockResolvedValue(12345678),
-  })),
-}));
+vi.mock("@solana/web3.js", async () => {
+  const actual = await vi.importActual("@solana/web3.js");
+  return {
+    ...actual,
+    Connection: vi.fn().mockImplementation(() => ({
+      getSlot: vi.fn().mockResolvedValue(12345678),
+    })),
+  };
+});
 
 // ============================================================================
 // HELPER FUNCTIONS

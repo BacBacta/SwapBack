@@ -15,7 +15,7 @@ pub enum SwapbackError {
     IntervalTooLong,
     #[msg("Expiry must be in the future")]
     InvalidExpiry,
-    
+
     // DCA Execution Errors
     #[msg("DCA plan is not active")]
     PlanNotActive,
@@ -29,7 +29,7 @@ pub enum SwapbackError {
     InsufficientBalance,
     #[msg("Slippage tolerance exceeded")]
     SlippageExceeded,
-    
+
     // DCA Management Errors
     #[msg("DCA plan is already paused")]
     AlreadyPaused,

@@ -14,7 +14,7 @@ const borsh = require("borsh");
 // Configuration
 const RPC_URL = "https://api.devnet.solana.com";
 const ROUTER_PROGRAM = new PublicKey(
-  "H3LLiKAvjPWk9Br14m7bjiWkaJFzeMVB9qvMsFaA14k5"
+  "9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh"
 );
 const BUYBACK_PROGRAM = new PublicKey(
   "746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6"
@@ -22,16 +22,24 @@ const BUYBACK_PROGRAM = new PublicKey(
 const BACK_MINT = new PublicKey("862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux");
 const USDC_MOCK = new PublicKey("BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR");
 
-// Discriminators Anchor (sha256 des 8 premiers bytes de "global:initialize")
+// Discriminators Anchor (sha256 des 8 premiers bytes)
+// initialize: global:initialize -> [175, 175, 109, 31, 13, 152, 155, 237]
 const ROUTER_INIT_DISCRIMINATOR = Buffer.from([
   175, 175, 109, 31, 13, 152, 155, 237,
-]); // initialize
+]); 
+
+// initialize: global:initialize -> [175, 175, 109, 31, 13, 152, 155, 237]
 const BUYBACK_INIT_DISCRIMINATOR = Buffer.from([
   175, 175, 109, 31, 13, 152, 155, 237,
-]); // initialize
+]); 
+
+// initialize_config: global:initialize_config -> [208, 127, 21, 1, 194, 190, 196, 70]
 const GLOBAL_INIT_DISCRIMINATOR = Buffer.from([
-  120, 80, 74, 19, 150, 7, 70, 233,
-]); // initialize_global
+  208, 127, 21, 1, 194, 190, 196, 70,
+]); 
+
+const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+const SYSVAR_RENT_PUBKEY = new PublicKey("SysvarRent111111111111111111111111111111111");
 
 async function loadKeypair() {
   const keypairPath = path.join(__dirname, "devnet-keypair.json");
@@ -63,14 +71,20 @@ async function main() {
   );
 
   const [globalStatePda, globalBump] = PublicKey.findProgramAddressSync(
-    [Buffer.from("global_state")],
+    [Buffer.from("router_config")],
     ROUTER_PROGRAM
+  );
+
+  const [usdcVaultPda, usdcVaultBump] = PublicKey.findProgramAddressSync(
+    [Buffer.from("usdc_vault")],
+    BUYBACK_PROGRAM
   );
 
   console.log("📍 PDAs calculés:");
   console.log("  RouterState: ", routerStatePda.toString());
   console.log("  BuybackState:", buybackStatePda.toString());
-  console.log("  GlobalState: ", globalStatePda.toString());
+  console.log("  USDC Vault:  ", usdcVaultPda.toString());
+  console.log("  RouterConfig:", globalStatePda.toString());
   console.log("");
 
   const results = {
@@ -94,8 +108,7 @@ async function main() {
       // Encoder les données (simplified - peut nécessiter borsh)
       const data = Buffer.concat([
         ROUTER_INIT_DISCRIMINATOR,
-        payer.publicKey.toBuffer(), // fee_recipient
-        Buffer.from([platformFeeBps, 0]), // u16 platform_fee_bps
+        // Pas d'arguments pour initialize() dans le nouveau code, juste le contexte
       ]);
 
       const ix = new TransactionInstruction({
@@ -133,22 +146,25 @@ async function main() {
       console.log("✅ BuybackState déjà initialisé\n");
       results.buybackState = buybackStatePda.toString();
     } else {
+      // Arguments: min_buyback_amount (u64)
+      const minBuybackAmount = Buffer.alloc(8);
+      minBuybackAmount.writeBigUInt64LE(BigInt(1000000)); // 1 USDC
+
       const data = Buffer.concat([
         BUYBACK_INIT_DISCRIMINATOR,
-        payer.publicKey.toBuffer(), // authority
-        BACK_MINT.toBuffer(), // back_mint
-        USDC_MOCK.toBuffer(), // usdc_mint
+        minBuybackAmount,
       ]);
 
       const ix = new TransactionInstruction({
         keys: [
-          { pubkey: buybackStatePda, isSigner: false, isWritable: true },
-          { pubkey: payer.publicKey, isSigner: true, isWritable: true },
-          {
-            pubkey: SystemProgram.programId,
-            isSigner: false,
-            isWritable: false,
-          },
+          { pubkey: buybackStatePda, isSigner: false, isWritable: true }, // buyback_state
+          { pubkey: BACK_MINT, isSigner: false, isWritable: false },      // back_mint
+          { pubkey: usdcVaultPda, isSigner: false, isWritable: true },    // usdc_vault
+          { pubkey: USDC_MOCK, isSigner: false, isWritable: false },      // usdc_mint
+          { pubkey: payer.publicKey, isSigner: true, isWritable: true },  // authority
+          { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
+          { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }, // rent
         ],
         programId: BUYBACK_PROGRAM,
         data,
@@ -167,29 +183,25 @@ async function main() {
     console.log("⚠️  Continuons...\n");
   }
 
-  // 3. Initialiser GlobalState
-  console.log("📍 Initialisation GlobalState...");
+  // 3. Initialiser GlobalState (RouterConfig)
+  console.log("📍 Initialisation RouterConfig (GlobalState)...");
   try {
     const accountInfo = await connection.getAccountInfo(globalStatePda);
     if (accountInfo) {
-      console.log("✅ GlobalState déjà initialisé\n");
+      console.log("✅ RouterConfig déjà initialisé\n");
       results.globalState = globalStatePda.toString();
     } else {
+      // initialize_config n'a pas d'arguments dans le contexte, tout est hardcodé ou par défaut
       const data = Buffer.concat([
         GLOBAL_INIT_DISCRIMINATOR,
-        Buffer.from([0]), // pause_swaps: false
-        Buffer.from([100, 0]), // max_slippage_bps: 100 (1%)
       ]);
 
       const ix = new TransactionInstruction({
         keys: [
-          { pubkey: globalStatePda, isSigner: false, isWritable: true },
-          { pubkey: payer.publicKey, isSigner: true, isWritable: true },
-          {
-            pubkey: SystemProgram.programId,
-            isSigner: false,
-            isWritable: false,
-          },
+          { pubkey: globalStatePda, isSigner: false, isWritable: true }, // config
+          { pubkey: routerStatePda, isSigner: false, isWritable: true }, // state
+          { pubkey: payer.publicKey, isSigner: true, isWritable: true }, // authority
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
         ],
         programId: ROUTER_PROGRAM,
         data,

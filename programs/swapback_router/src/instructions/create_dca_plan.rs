@@ -1,6 +1,6 @@
-use anchor_lang::prelude::*;
-use crate::state::{DcaPlan, RouterState};
 use crate::error::SwapbackError;
+use crate::state::{DcaPlan, RouterState};
+use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 #[instruction(plan_id: [u8; 32])]
@@ -13,16 +13,16 @@ pub struct CreateDcaPlan<'info> {
         bump
     )]
     pub dca_plan: Account<'info, DcaPlan>,
-    
+
     #[account(
         seeds = [b"router_state"],
         bump = state.bump
     )]
     pub state: Account<'info, RouterState>,
-    
+
     #[account(mut)]
     pub user: Signer<'info>,
-    
+
     pub system_program: Program<'info, System>,
 }
 
@@ -30,22 +30,22 @@ pub struct CreateDcaPlan<'info> {
 pub struct CreateDcaPlanArgs {
     /// Input token mint
     pub token_in: Pubkey,
-    
+
     /// Output token mint
     pub token_out: Pubkey,
-    
+
     /// Amount per swap (in lamports/smallest unit)
     pub amount_per_swap: u64,
-    
+
     /// Total number of swaps
     pub total_swaps: u32,
-    
+
     /// Interval between swaps (in seconds)
     pub interval_seconds: i64,
-    
+
     /// Minimum output per swap (slippage protection)
     pub min_out_per_swap: u64,
-    
+
     /// Optional expiry timestamp (0 = no expiry)
     pub expires_at: i64,
 }
@@ -57,14 +57,20 @@ pub fn handler(
 ) -> Result<()> {
     let dca_plan = &mut ctx.accounts.dca_plan;
     let clock = Clock::get()?;
-    
+
     // Validation
     require!(args.amount_per_swap > 0, SwapbackError::InvalidAmount);
     require!(args.total_swaps > 0, SwapbackError::InvalidSwapCount);
     require!(args.total_swaps <= 10000, SwapbackError::TooManySwaps);
-    require!(args.interval_seconds >= 3600, SwapbackError::IntervalTooShort); // Min 1 hour
-    require!(args.interval_seconds <= 31536000, SwapbackError::IntervalTooLong); // Max 1 year
-    
+    require!(
+        args.interval_seconds >= 3600,
+        SwapbackError::IntervalTooShort
+    ); // Min 1 hour
+    require!(
+        args.interval_seconds <= 31536000,
+        SwapbackError::IntervalTooLong
+    ); // Max 1 year
+
     // If expiry is set, must be in the future
     if args.expires_at > 0 {
         require!(
@@ -72,7 +78,7 @@ pub fn handler(
             SwapbackError::InvalidExpiry
         );
     }
-    
+
     // Initialize DCA plan
     dca_plan.plan_id = plan_id;
     dca_plan.user = ctx.accounts.user.key();
@@ -90,7 +96,7 @@ pub fn handler(
     dca_plan.total_invested = 0;
     dca_plan.total_received = 0;
     dca_plan.bump = ctx.bumps.dca_plan;
-    
+
     msg!("✅ DCA Plan created successfully!");
     msg!("Plan ID: {:?}", plan_id);
     msg!("Token pair: {} → {}", args.token_in, args.token_out);
@@ -98,6 +104,6 @@ pub fn handler(
     msg!("Total swaps: {}", args.total_swaps);
     msg!("Interval: {} seconds", args.interval_seconds);
     msg!("Next execution: {}", dca_plan.next_execution);
-    
+
     Ok(())
 }

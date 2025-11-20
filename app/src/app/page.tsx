@@ -1,5 +1,5 @@
-import Option3Scrollytelling from "@/components/home-concepts/Option3Scrollytelling";
+import { redirect } from 'next/navigation';
 
 export default function Home() {
-  return <Option3Scrollytelling />;
+  redirect('/dashboard');
 }

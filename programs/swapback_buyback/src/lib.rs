@@ -100,25 +100,21 @@ pub mod swapback_buyback {
         let price_update = &mut ctx.accounts.price_update;
         let maximum_age: u64 = 60; // Prix valide pendant 60 secondes
         let feed_id: [u8; 32] = get_feed_id_from_hex(
-            "0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43" // $BACK/USD feed (à configurer)
+            "0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43", // $BACK/USD feed (à configurer)
         )?;
 
         // Obtenir le prix depuis Pyth avec vérification d'âge
-        let price = price_update.get_price_no_older_than(
-            &Clock::get()?,
-            maximum_age,
-            &feed_id,
-        )?;
+        let price = price_update.get_price_no_older_than(&Clock::get()?, maximum_age, &feed_id)?;
 
         // Calculer combien de $BACK peut être acheté avec actual_usdc
         // Formula: back_amount = (usdc_amount / usdc_price) * back_price
         // Simplifié si BACK/USD direct: back_amount = usdc_amount / (price.price)
-        
+
         // USDC a 6 decimals, BACK a 9 decimals
         // price.exponent contient l'exposant du prix (ex: -8 pour $0.00000001)
         let price_i64 = price.price;
         let exponent = price.exponent;
-        
+
         require!(price_i64 > 0, ErrorCode::InvalidPrice);
 
         // Calcul sécurisé avec gestion des décimales
@@ -144,23 +140,28 @@ pub mod swapback_buyback {
             .ok_or(ErrorCode::MathOverflow)? as u64;
 
         // Vérification du slippage (protection utilisateur)
-        require!(
-            back_bought >= min_back_amount,
-            ErrorCode::SlippageExceeded
-        );
+        require!(back_bought >= min_back_amount, ErrorCode::SlippageExceeded);
 
         // ✅ TRANSFERT USDC vers une pool externe (Raydium, Orca, etc.)
         // Pour le MVP: on garde les USDC dans le vault
         // En production: implémenter CPI vers DEX pour swap réel
-        
+
         // ✅ TRANSFERT BACK depuis pool vers back_vault
         // NOTE: Nécessite que le back_vault soit pré-rempli ou connecté à une pool
         // Pour le MVP: on assume que les tokens sont déjà dans back_vault
         // En production: CPI vers pool DEX pour récupérer les BACK
 
-        msg!("Prix BACK/USD depuis Pyth: {} (expo: {})", price_i64, exponent);
-        msg!("Swap calculé: {} USDC ({} lamports) -> {} BACK", 
-             actual_usdc / 1_000_000, actual_usdc, back_bought);
+        msg!(
+            "Prix BACK/USD depuis Pyth: {} (expo: {})",
+            price_i64,
+            exponent
+        );
+        msg!(
+            "Swap calculé: {} USDC ({} lamports) -> {} BACK",
+            actual_usdc / 1_000_000,
+            actual_usdc,
+            back_bought
+        );
 
         // Mise à jour des statistiques
         buyback_state.total_usdc_spent = buyback_state
@@ -190,10 +191,7 @@ pub mod swapback_buyback {
     /// Distribue une portion des tokens buyback à un utilisateur proportionnellement à son boost
     /// Ratio: 50% distribution, 50% burn
     /// Formula: user_share = (user_boost / total_community_boost) * (buyback_tokens * 50%)
-    pub fn distribute_buyback(
-        ctx: Context<DistributeBuyback>,
-        max_tokens: u64,
-    ) -> Result<()> {
+    pub fn distribute_buyback(ctx: Context<DistributeBuyback>, max_tokens: u64) -> Result<()> {
         require!(max_tokens > 0, ErrorCode::InvalidAmount);
 
         let global_state = &ctx.accounts.global_state;
@@ -621,7 +619,7 @@ mod tests {
             .unwrap()
             .checked_div(10_000)
             .unwrap() as u64;
-        
+
         assert_eq!(distributable, 50_000, "50% should be distributable");
     }
 
@@ -638,7 +636,10 @@ mod tests {
             .checked_div(total_boost as u128)
             .unwrap() as u64;
 
-        assert_eq!(user_share, 50_000, "Single user should get 100% of distributable");
+        assert_eq!(
+            user_share, 50_000,
+            "Single user should get 100% of distributable"
+        );
     }
 
     #[test]
@@ -697,7 +698,7 @@ mod tests {
             .unwrap()
             .checked_div(10_000)
             .unwrap() as u64;
-        
+
         assert_eq!(burn_amount, 50_000, "50% should be burned");
     }
 
@@ -709,13 +710,14 @@ mod tests {
         // 10 utilisateurs avec des boosts variés
 
         let total_buyback = 1_000_000u64;
-        let distributable = (total_buyback as u128 * DISTRIBUTION_RATIO_BPS as u128 / 10_000) as u64;
-        
+        let distributable =
+            (total_buyback as u128 * DISTRIBUTION_RATIO_BPS as u128 / 10_000) as u64;
+
         assert_eq!(distributable, 500_000);
 
         // Simuler différents boosts (total: 50,000 BP)
         let total_boost = 50_000u64;
-        
+
         // Whale avec 20,000 BP (40%)
         let whale_share = (distributable as u128 * 20_000 / total_boost as u128) as u64;
         assert_eq!(whale_share, 200_000, "Whale gets 40% of distribution");

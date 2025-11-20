@@ -1,5 +1,5 @@
 {
-  "address": "H3LLiKAvjPWk9Br14m7bjiWkaJFzeMVB9qvMsFaA14k5",
+  "address": "9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh",
   "metadata": {
     "name": "swapback_router",
     "version": "0.1.0",
@@ -123,6 +123,10 @@
                   108,
                   116
                 ]
+              },
+              {
+                "kind": "account",
+                "path": "state"
               }
             ]
           }
@@ -433,6 +437,286 @@
       "args": []
     },
     {
+      "name": "initialize_config",
+      "discriminator": [
+        208,
+        127,
+        21,
+        1,
+        194,
+        190,
+        196,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  116,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  116,
+                  101,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_oracle_cache",
+      "discriminator": [
+        115,
+        82,
+        59,
+        247,
+        61,
+        81,
+        232,
+        131
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "oracle_cache",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  97,
+                  99,
+                  108,
+                  101,
+                  95,
+                  99,
+                  97,
+                  99,
+                  104,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "oracle"
+              }
+            ]
+          }
+        },
+        {
+          "name": "oracle"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_rebate_vault",
+      "discriminator": [
+        229,
+        225,
+        212,
+        22,
+        49,
+        72,
+        54,
+        244
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  116,
+                  101,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "rebate_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  98,
+                  97,
+                  116,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "state"
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_venue_score",
+      "discriminator": [
+        198,
+        190,
+        33,
+        113,
+        162,
+        1,
+        121,
+        119
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "state",
+          "writable": true
+        },
+        {
+          "name": "venue_score",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  110,
+                  117,
+                  101,
+                  95,
+                  115,
+                  99,
+                  111,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "state"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "pause_dca_plan",
       "docs": [
         "Pause a DCA plan"
@@ -620,6 +904,97 @@
           "optional": true
         },
         {
+          "name": "rebate_vault",
+          "docs": [
+            "Rebate vault PDA holding USDC"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  98,
+                  97,
+                  116,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "state"
+              }
+            ]
+          }
+        },
+        {
+          "name": "oracle_cache",
+          "writable": true,
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  97,
+                  99,
+                  108,
+                  101,
+                  95,
+                  99,
+                  97,
+                  99,
+                  104,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "oracle"
+              }
+            ]
+          }
+        },
+        {
+          "name": "venue_score",
+          "writable": true,
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  110,
+                  117,
+                  101,
+                  95,
+                  115,
+                  99,
+                  111,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "state"
+              }
+            ]
+          }
+        },
+        {
           "name": "token_program",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
@@ -638,6 +1013,123 @@
           }
         }
       ]
+    },
+    {
+      "name": "update_config",
+      "discriminator": [
+        29,
+        158,
+        252,
+        191,
+        10,
+        83,
+        219,
+        99
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  116,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  116,
+                  101,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "rebate_bps",
+          "type": {
+            "option": "u16"
+          }
+        },
+        {
+          "name": "treasury_bps",
+          "type": {
+            "option": "u16"
+          }
+        },
+        {
+          "name": "boost_vault_bps",
+          "type": {
+            "option": "u16"
+          }
+        },
+        {
+          "name": "treasury_from_fees_bps",
+          "type": {
+            "option": "u16"
+          }
+        },
+        {
+          "name": "buyburn_from_fees_bps",
+          "type": {
+            "option": "u16"
+          }
+        },
+        {
+          "name": "dynamic_slippage_enabled",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "npi_benchmarking_enabled",
+          "type": {
+            "option": "bool"
+          }
+        }
+      ]
     }
   ],
   "accounts": [
@@ -652,6 +1144,32 @@
         241,
         52,
         84
+      ]
+    },
+    {
+      "name": "OracleCache",
+      "discriminator": [
+        214,
+        35,
+        152,
+        232,
+        168,
+        223,
+        73,
+        212
+      ]
+    },
+    {
+      "name": "RouterConfig",
+      "discriminator": [
+        147,
+        20,
+        81,
+        135,
+        46,
+        251,
+        46,
+        139
       ]
     },
     {
@@ -705,6 +1223,19 @@
         112,
         99
       ]
+    },
+    {
+      "name": "VenueScore",
+      "discriminator": [
+        206,
+        113,
+        107,
+        208,
+        163,
+        238,
+        81,
+        248
+      ]
     }
   ],
   "events": [
@@ -722,16 +1253,29 @@
       ]
     },
     {
-      "name": "BuybackDeposit",
+      "name": "BuyburnDeposit",
       "discriminator": [
-        106,
-        22,
-        95,
-        53,
-        81,
-        147,
-        98,
-        59
+        151,
+        114,
+        209,
+        141,
+        130,
+        121,
+        96,
+        253
+      ]
+    },
+    {
+      "name": "ConfigUpdated",
+      "discriminator": [
+        40,
+        241,
+        230,
+        122,
+        11,
+        19,
+        198,
+        194
       ]
     },
     {
@@ -745,6 +1289,32 @@
         103,
         5,
         186
+      ]
+    },
+    {
+      "name": "FeesAllocated",
+      "discriminator": [
+        53,
+        240,
+        32,
+        213,
+        108,
+        203,
+        110,
+        47
+      ]
+    },
+    {
+      "name": "NPIDistributed",
+      "discriminator": [
+        186,
+        133,
+        250,
+        175,
+        215,
+        7,
+        102,
+        81
       ]
     },
     {
@@ -916,7 +1486,7 @@
       }
     },
     {
-      "name": "BuybackDeposit",
+      "name": "BuyburnDeposit",
       "type": {
         "kind": "struct",
         "fields": [
@@ -927,6 +1497,42 @@
           {
             "name": "source",
             "type": "string"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "rebate_bps",
+            "type": "u16"
+          },
+          {
+            "name": "treasury_bps",
+            "type": "u16"
+          },
+          {
+            "name": "boost_vault_bps",
+            "type": "u16"
+          },
+          {
+            "name": "treasury_from_fees_bps",
+            "type": "u16"
+          },
+          {
+            "name": "buyburn_from_fees_bps",
+            "type": "u16"
           },
           {
             "name": "timestamp",
@@ -1224,6 +1830,56 @@
       }
     },
     {
+      "name": "FeesAllocated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "swap_amount",
+            "type": "u64"
+          },
+          {
+            "name": "platform_fee",
+            "type": "u64"
+          },
+          {
+            "name": "to_treasury",
+            "type": "u64"
+          },
+          {
+            "name": "to_buyburn",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "JupiterRouteParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "swap_instruction",
+            "docs": [
+              "Full Jupiter instruction data (including discriminator)"
+            ],
+            "type": "bytes"
+          },
+          {
+            "name": "expected_input_amount",
+            "docs": [
+              "Amount Jupiter is expected to pull from user_source_token_account"
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "LockLevel",
       "type": {
         "kind": "enum",
@@ -1242,6 +1898,75 @@
           },
           {
             "name": "Diamond"
+          }
+        ]
+      }
+    },
+    {
+      "name": "NPIDistributed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_npi",
+            "type": "u64"
+          },
+          {
+            "name": "to_rebate",
+            "type": "u64"
+          },
+          {
+            "name": "to_treasury",
+            "type": "u64"
+          },
+          {
+            "name": "to_boost_vault",
+            "type": "u64"
+          },
+          {
+            "name": "boost_paid",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OracleCache",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token_pair",
+            "type": {
+              "array": [
+                "pubkey",
+                2
+              ]
+            }
+          },
+          {
+            "name": "cached_price",
+            "type": "u64"
+          },
+          {
+            "name": "cached_at",
+            "type": "i64"
+          },
+          {
+            "name": "cache_duration",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }
@@ -1365,6 +2090,59 @@
       }
     },
     {
+      "name": "RouterConfig",
+      "docs": [
+        "RouterConfig stores governance-controlled parameters that can be updated without redeploying the program"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_authority",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "rebate_bps",
+            "type": "u16"
+          },
+          {
+            "name": "treasury_bps",
+            "type": "u16"
+          },
+          {
+            "name": "boost_vault_bps",
+            "type": "u16"
+          },
+          {
+            "name": "treasury_from_fees_bps",
+            "type": "u16"
+          },
+          {
+            "name": "buyburn_from_fees_bps",
+            "type": "u16"
+          },
+          {
+            "name": "dynamic_slippage_enabled",
+            "type": "bool"
+          },
+          {
+            "name": "npi_benchmarking_enabled",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "RouterState",
       "docs": [
         "Router State Account - Global configuration and statistics"
@@ -1387,18 +2165,60 @@
             "type": "u16"
           },
           {
-            "name": "buyback_percentage",
+            "name": "treasury_percentage",
             "docs": [
-              "Percentage of NPI allocated to buyback (basis points, 10000 = 100%)"
+              "Percentage of NPI allocated to treasury (basis points, 10000 = 100%)"
             ],
             "type": "u16"
           },
           {
-            "name": "protocol_percentage",
+            "name": "boost_vault_percentage",
             "docs": [
-              "Percentage of NPI allocated to protocol treasury (basis points, 10000 = 100%)"
+              "Percentage of NPI allocated to boost vault (basis points, 10000 = 100%)"
             ],
             "type": "u16"
+          },
+          {
+            "name": "treasury_from_fees_bps",
+            "docs": [
+              "Percentage of platform fees allocated to treasury (basis points, 10000 = 100%)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "buyburn_from_fees_bps",
+            "docs": [
+              "Percentage of platform fees allocated to buy & burn (basis points, 10000 = 100%)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "treasury_wallet",
+            "docs": [
+              "Treasury wallet collecting platform fees and NPI share"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "boost_vault_wallet",
+            "docs": [
+              "Boost vault wallet accumulating lock rewards"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "buyback_wallet",
+            "docs": [
+              "Buy & burn wallet receiving platform fee allocation"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "npi_vault_wallet",
+            "docs": [
+              "Vault used to custody NPI reserves if needed"
+            ],
+            "type": "pubkey"
           },
           {
             "name": "total_volume",
@@ -1422,16 +2242,37 @@
             "type": "u64"
           },
           {
-            "name": "total_buyback_from_npi",
+            "name": "total_treasury_from_npi",
             "docs": [
-              "Total buyback from NPI"
+              "Total treasury share sourced from NPI"
             ],
             "type": "u64"
           },
           {
-            "name": "total_protocol_revenue",
+            "name": "total_boost_vault",
             "docs": [
-              "Total protocol revenue (fees + NPI)"
+              "Total boost vault allocation accumulated"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "dynamic_slippage_enabled",
+            "docs": [
+              "Enable dynamic slippage calculation based on volatility"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "total_treasury_from_fees",
+            "docs": [
+              "Total treasury share sourced from platform fees"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_buyburn",
+            "docs": [
+              "Total buy & burn allocation sourced from platform fees"
             ],
             "type": "u64"
           },
@@ -1487,6 +2328,16 @@
           {
             "name": "oracle_account",
             "type": "pubkey"
+          },
+          {
+            "name": "jupiter_route",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "JupiterRouteParams"
+                }
+              }
+            }
           }
         ]
       }
@@ -1517,7 +2368,7 @@
             "type": "u64"
           },
           {
-            "name": "buyback_deposit",
+            "name": "buyburn_deposit",
             "type": "u64"
           },
           {
@@ -1724,6 +2575,78 @@
           {
             "name": "fallback_used",
             "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VenueScore",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "venue",
+            "type": "pubkey"
+          },
+          {
+            "name": "venue_type",
+            "type": {
+              "defined": {
+                "name": "VenueType"
+              }
+            }
+          },
+          {
+            "name": "total_swaps",
+            "type": "u64"
+          },
+          {
+            "name": "total_volume",
+            "type": "u64"
+          },
+          {
+            "name": "total_npi_generated",
+            "type": "i64"
+          },
+          {
+            "name": "avg_latency_ms",
+            "type": "u32"
+          },
+          {
+            "name": "avg_slippage_bps",
+            "type": "u16"
+          },
+          {
+            "name": "quality_score",
+            "type": "u16"
+          },
+          {
+            "name": "last_updated",
+            "type": "i64"
+          },
+          {
+            "name": "window_start",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VenueType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Raydium"
+          },
+          {
+            "name": "Orca"
+          },
+          {
+            "name": "Jupiter"
+          },
+          {
+            "name": "Unknown"
           }
         ]
       }

@@ -9,7 +9,12 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 import { NextRequest, NextResponse } from "next/server";
-import { Connection } from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddressSync,
+} from "@solana/spl-token";
 import { getTokenByMint } from "@/constants/tokens";
 import { DEFAULT_SOLANA_RPC_URL } from "@/config/constants";
 
@@ -65,6 +70,28 @@ type JupiterQuoteResponse = {
   otherAmountThreshold?: string;
   swapMode?: string;
   [key: string]: unknown;
+};
+
+type JupiterAccountMeta = {
+  pubkey: string;
+  isSigner: boolean;
+  isWritable: boolean;
+};
+
+type JupiterSwapInstructionResponse = {
+  swapInstruction?: {
+    programId: string;
+    accounts: JupiterAccountMeta[];
+    data: string;
+  };
+  setupInstructions?: unknown[];
+  cleanupInstruction?: unknown;
+};
+
+type JupiterCpiPayload = {
+  expectedInputAmount: string;
+  swapInstruction: string;
+  accounts: JupiterAccountMeta[];
 };
 
 const validateTokenSupport = async (
@@ -164,6 +191,10 @@ const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
   DEFAULT_SOLANA_RPC_URL;
 
+const JUPITER_PROGRAM_ID = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4";
+const ZERO_PUBKEY = "11111111111111111111111111111111";
+const JUPITER_ACCOUNT_SLOTS = 48;
+
 /**
  * Mock Mode (pour dev/test sans réseau)
  * Default: false
@@ -178,6 +209,7 @@ export async function POST(request: NextRequest) {
       outputMint,
       amount,
       slippageBps = 50, // 0.5% default
+      userPublicKey,
     } = await request.json();
 
     // Validate inputs
@@ -277,6 +309,7 @@ export async function POST(request: NextRequest) {
           success: true,
           quote: mockQuote,
           routeInfo: mockRouteInfo,
+          jupiterCpi: null,
           timestamp: Date.now(),
         },
         withNoStore()
@@ -348,11 +381,19 @@ export async function POST(request: NextRequest) {
     // Parse and enhance the quote with route information
     const routeInfo = parseRouteInfo(quote);
 
+    const jupiterCpi = await buildJupiterCpiPayload({
+      quote,
+      inputMint,
+      outputMint,
+      userPublicKey,
+    });
+
     return NextResponse.json(
       {
         success: true,
         quote,
         routeInfo,
+        jupiterCpi,
         timestamp: Date.now(),
       },
       withNoStore()
@@ -406,6 +447,123 @@ function parseRouteInfo(quote: JupiterQuoteResponse) {
     otherAmountThreshold: quote.otherAmountThreshold,
     swapMode: quote.swapMode ?? "ExactIn",
   };
+}
+
+async function buildJupiterCpiPayload(params: {
+  quote: JupiterQuoteResponse;
+  inputMint: string;
+  outputMint: string;
+  userPublicKey?: string;
+}): Promise<JupiterCpiPayload | null> {
+  const { quote, inputMint, outputMint, userPublicKey } = params;
+
+  if (!userPublicKey) {
+    console.warn("⚠️ Jupiter CPI payload skipped: missing userPublicKey");
+    return null;
+  }
+
+  try {
+    const userPk = new PublicKey(userPublicKey);
+    const inputMintPk = new PublicKey(inputMint);
+    const outputMintPk = new PublicKey(outputMint);
+
+    const userSourceAta = getAssociatedTokenAddressSync(
+      inputMintPk,
+      userPk,
+      false,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+
+    const userDestinationAta = getAssociatedTokenAddressSync(
+      outputMintPk,
+      userPk,
+      false,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+
+    const swapInstructionResponse = await fetch(
+      getJupiterUrl("/swap-instructions"),
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          quoteResponse: quote,
+          userPublicKey: userPk.toBase58(),
+          wrapAndUnwrapSol: true,
+          destinationTokenAccount: userDestinationAta.toBase58(),
+          userSourceTokenAccount: userSourceAta.toBase58(),
+          userDestinationTokenAccount: userDestinationAta.toBase58(),
+          useSharedAccounts: true,
+          dynamicComputeUnitLimit: true,
+        }),
+        next: { revalidate: 0 },
+      }
+    );
+
+    if (!swapInstructionResponse.ok) {
+      const errorBody = await swapInstructionResponse.text();
+      console.warn("⚠️ Jupiter swap-instructions failed", {
+        status: swapInstructionResponse.status,
+        error: errorBody,
+      });
+      return null;
+    }
+
+    const instructionPayload =
+      (await swapInstructionResponse.json()) as JupiterSwapInstructionResponse;
+
+    const instruction = instructionPayload.swapInstruction;
+    if (!instruction?.accounts?.length || !instruction.data) {
+      console.warn("⚠️ Jupiter swap-instructions missing data");
+      return null;
+    }
+
+    const accounts = normalizeJupiterAccounts(instruction.accounts);
+
+    return {
+      expectedInputAmount: quote.inAmount ?? "0",
+      swapInstruction: instruction.data,
+      accounts,
+    };
+  } catch (error) {
+    console.error("❌ Failed to build Jupiter CPI payload", error);
+    return null;
+  }
+}
+
+function normalizeJupiterAccounts(accounts: JupiterAccountMeta[]): JupiterAccountMeta[] {
+  const normalized: JupiterAccountMeta[] = [
+    {
+      pubkey: JUPITER_PROGRAM_ID,
+      isSigner: false,
+      isWritable: false,
+    },
+    ...accounts.map((meta) => ({
+      pubkey: meta.pubkey,
+      isSigner: Boolean(meta.isSigner),
+      isWritable: Boolean(meta.isWritable),
+    })),
+  ];
+
+  if (normalized.length > JUPITER_ACCOUNT_SLOTS) {
+    throw new Error(
+      `Jupiter CPI accounts exceed supported slots (${normalized.length} > ${JUPITER_ACCOUNT_SLOTS})`
+    );
+  }
+
+  while (normalized.length < JUPITER_ACCOUNT_SLOTS) {
+    normalized.push({
+      pubkey: ZERO_PUBKEY,
+      isSigner: false,
+      isWritable: false,
+    });
+  }
+
+  return normalized;
 }
 
 /**

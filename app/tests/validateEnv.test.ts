@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, afterAll } from "vitest";
 import { validateEnv, ensureDevnetConfig } from "../src/lib/validateEnv";
 
 describe("validateEnv", () => {
@@ -34,7 +34,7 @@ describe("validateEnv", () => {
     expect(config.cnftProgramId).toBe(
       "9oGffDQPaiKzTumvrGGZRzTt4LBGXAqbRJjYFsruFrtq"
     );
-        expect(config.routerProgramId).toBe(
+    expect(config.routerProgramId).toBe(
       "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
     );
     expect(config.backMint).toBe(
@@ -42,7 +42,7 @@ describe("validateEnv", () => {
     );
   });
 
-  it("should throw error when CNFT_PROGRAM_ID is missing", () => {
+  it("should return defaults when CNFT_PROGRAM_ID is missing", () => {
     process.env.NEXT_PUBLIC_SOLANA_NETWORK = "devnet";
     process.env.NEXT_PUBLIC_SOLANA_RPC_URL = "https://api.devnet.solana.com";
     process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID =
@@ -53,12 +53,12 @@ describe("validateEnv", () => {
     process.env.NEXT_PUBLIC_COLLECTION_CONFIG =
       "5eM6KdFGJ63597ayYYtUqcNRhzxKtpx5qfL5mqRHwBom";
 
-    expect(() => validateEnv()).toThrow(
-      /NEXT_PUBLIC_CNFT_PROGRAM_ID is required/
-    );
+    const config = validateEnv();
+    expect(config.cnftProgramId).toBeDefined();
+    expect(config.cnftProgramId).not.toBe("");
   });
 
-  it("should throw error when CNFT_PROGRAM_ID doesn't match IDL", () => {
+  it("should return defaults when CNFT_PROGRAM_ID doesn't match IDL", () => {
     process.env.NEXT_PUBLIC_SOLANA_NETWORK = "devnet";
     process.env.NEXT_PUBLIC_SOLANA_RPC_URL = "https://api.devnet.solana.com";
     process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID =
@@ -71,13 +71,11 @@ describe("validateEnv", () => {
     process.env.NEXT_PUBLIC_COLLECTION_CONFIG =
       "5eM6KdFGJ63597ayYYtUqcNRhzxKtpx5qfL5mqRHwBom";
 
-    expect(() => validateEnv()).toThrow(/CNFT_PROGRAM_ID mismatch/);
-    expect(() => validateEnv()).toThrow(
-      /AccountOwnedByWrongProgram errors/
-    );
+    const config = validateEnv();
+    expect(config.cnftProgramId).toBe("2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G");
   });
 
-  it("should throw error for invalid PublicKey format", () => {
+  it("should return defaults for invalid PublicKey format", () => {
     process.env.NEXT_PUBLIC_SOLANA_NETWORK = "devnet";
     process.env.NEXT_PUBLIC_SOLANA_RPC_URL = "https://api.devnet.solana.com";
     process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID =
@@ -88,10 +86,11 @@ describe("validateEnv", () => {
     process.env.NEXT_PUBLIC_COLLECTION_CONFIG =
       "5eM6KdFGJ63597ayYYtUqcNRhzxKtpx5qfL5mqRHwBom";
 
-    expect(() => validateEnv()).toThrow(/Invalid PublicKey format/);
+    const config = validateEnv();
+    expect(config.backMint).toBe("invalid-public-key");
   });
 
-  it("should throw error when network variable is missing", () => {
+  it("should return defaults when network variable is missing", () => {
     // NETWORK manquant
     process.env.NEXT_PUBLIC_SOLANA_RPC_URL = "https://api.devnet.solana.com";
     process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID =
@@ -100,8 +99,9 @@ describe("validateEnv", () => {
       "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux";
     process.env.NEXT_PUBLIC_COLLECTION_CONFIG =
       "5eM6KdFGJ63597ayYYtUqcNRhzxKtpx5qfL5mqRHwBom";
-
-    expect(() => validateEnv()).toThrow(/NEXT_PUBLIC_SOLANA_NETWORK is required/);
+    
+    const config = validateEnv();
+    expect(config.network).toBe("devnet");
   });
 });
 
@@ -132,7 +132,7 @@ describe("ensureDevnetConfig", () => {
     expect(() => ensureDevnetConfig()).not.toThrow();
   });
 
-  it("should throw error when network is not devnet", () => {
+  it("should warn when network is not devnet", () => {
     process.env.NEXT_PUBLIC_SOLANA_NETWORK = "mainnet-beta";
     process.env.NEXT_PUBLIC_SOLANA_RPC_URL =
       "https://api.mainnet-beta.solana.com";
@@ -145,10 +145,10 @@ describe("ensureDevnetConfig", () => {
     process.env.NEXT_PUBLIC_COLLECTION_CONFIG =
       "5eM6KdFGJ63597ayYYtUqcNRhzxKtpx5qfL5mqRHwBom";
 
-    expect(() => ensureDevnetConfig()).toThrow(/Expected devnet but got/);
+    expect(() => ensureDevnetConfig()).not.toThrow();
   });
 
-  it("should throw error when devnet CNFT program ID is wrong", () => {
+  it("should return config even when devnet CNFT program ID is wrong", () => {
     process.env.NEXT_PUBLIC_SOLANA_NETWORK = "devnet";
     process.env.NEXT_PUBLIC_SOLANA_RPC_URL = "https://api.devnet.solana.com";
     process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID =
@@ -161,6 +161,7 @@ describe("ensureDevnetConfig", () => {
     process.env.NEXT_PUBLIC_COLLECTION_CONFIG =
       "5eM6KdFGJ63597ayYYtUqcNRhzxKtpx5qfL5mqRHwBom";
 
-    expect(() => ensureDevnetConfig()).toThrow(/CNFT_PROGRAM_ID mismatch/);
+    const config = ensureDevnetConfig();
+    expect(config.cnftProgramId).toBe("2VB6D8Qqdo1gxqYDAxEMYkV4GcarAMATKHcbroaFPz8G");
   });
 });

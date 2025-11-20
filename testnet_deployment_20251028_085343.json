@@ -14,9 +14,9 @@
     "usdc_mock": "BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR"
   },
   "states": {
-    "router_state": "Bc1tQmMQYRHcEyKV2bJQutcVw6cEVBqTAfNviKHbrRLQ",
-    "buyback_state": "",
-    "global_state": "",
+    "router_state": "4AJsLDYDtFG1MGSvQ39HsaPHKkecMoQejKonxi8mWKAY",
+    "buyback_state": "E3jZwEJ47FrWpBckGUkS9bQ5Au9zDLJN55wBNx8aECz9",
+    "global_state": "J2zjpRVETKoXXYy3y3y7u3KRJMoCa2xMgKs4qbzddT6G",
     "collection_config": "4zhpvzBMqvGoM7j9RAaAF5ZizwDUAtgYr5Pnzn8uRh5s"
   },
   "merkle_tree": "93Tzc7btocwzDSbscW9EfL9dBzWLx85FHE6zeWrwHbNT",

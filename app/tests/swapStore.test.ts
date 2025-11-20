@@ -238,7 +238,10 @@ describe("SwapStore", () => {
 
       (global.fetch as unknown as Mock).mockResolvedValueOnce({
         ok: true,
-        json: async () => mockQuoteResponse,
+        json: async () => ({
+          success: true,
+          quote: mockQuoteResponse
+        }),
       });
 
       // Fetch routes

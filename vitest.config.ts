@@ -15,10 +15,12 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./sdk/src"),
       "@/lib": path.resolve(__dirname, "./app/src/lib"),
       "@/hooks": path.resolve(__dirname, "./app/src/hooks"),
       "@/components": path.resolve(__dirname, "./app/src/components"),
+      "@/config": path.resolve(__dirname, "./app/src/config"),
+      "@/idl": path.resolve(__dirname, "./app/src/idl"),
+      "@": path.resolve(__dirname, "./sdk/src"),
     },
   },
 });

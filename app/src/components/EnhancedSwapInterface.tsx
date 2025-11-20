@@ -3,14 +3,35 @@
  * Modern, clean design with complete functionality
  */
 
+        }
+
+        if (resolution.accounts.dexProgramId === RAYDIUM_PROGRAM_ID_STR) {
+          return buildRaydiumAccountMetas(
+            resolution.accounts as RaydiumDexAccounts,
+            derived,
+            userAccounts,
+            resolution.descriptor
+          );
 "use client";
 
 import { useState, useEffect } from "react";
+import { BN } from "@coral-xyz/anchor";
+import { AccountMeta, PublicKey } from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useSwapStore } from "@/store/swapStore";
 import { useSwapWebSocket } from "@/hooks/useSwapWebSocket";
+import {
+  useSwapRouter,
+  DerivedSwapAccounts,
+} from "@/hooks/useSwapRouter";
+import type { JupiterRouteParams } from "@/hooks/useSwapRouter";
+import { ORCA_WHIRLPOOL_PROGRAM_ID } from "@/sdk/config/orca-pools";
+import { RAYDIUM_AMM_PROGRAM_ID } from "@/sdk/config/raydium-pools";
+import { getExplorerUrl } from "@/config/constants";
 import { ClientOnlyConnectionStatus } from "./ClientOnlyConnectionStatus";
 import { TokenSelector } from "./TokenSelector";
+import { DistributionBreakdown } from "./DistributionBreakdown";
 // import { debounce } from "lodash"; // Désactivé - Pas d'auto-fetch
 
 interface RouteStep {
@@ -22,8 +43,184 @@ interface RouteStep {
   fee: string;
 }
 
+type JupiterRoutePlanStep = {
+  swapInfo?: {
+    ammKey?: string;
+    label?: string;
+    inputMint?: string;
+    outputMint?: string;
+    inAmount?: string;
+    outAmount?: string;
+    feeAmount?: string;
+    feeMint?: string;
+  };
+  [key: string]: unknown;
+};
+
+type OrcaDexAccounts = {
+  variant: "ORCA_WHIRLPOOL";
+  dexProgramId: string;
+  whirlpool: string;
+  tokenMintA: string;
+  tokenMintB: string;
+  tokenVaultA: string;
+  tokenVaultB: string;
+  tickArrays: string[];
+  oracle: string;
+  direction: "aToB" | "bToA";
+  tickSpacing: number;
+};
+
+type RaydiumDexAccounts = {
+  variant: "RAYDIUM_AMM";
+  dexProgramId: string;
+  direction: "aToB" | "bToA";
+  tokenMintA: string;
+  tokenMintB: string;
+  ammId: string;
+  ammAuthority: string;
+  ammOpenOrders: string;
+  ammTargetOrders: string;
+  poolCoinTokenAccount: string;
+  poolPcTokenAccount: string;
+  poolWithdrawQueue?: string;
+  poolTempLpTokenAccount?: string;
+  serumProgramId: string;
+  serumMarket: string;
+  serumBids: string;
+  serumAsks: string;
+  serumEventQueue: string;
+  serumCoinVault: string;
+  serumPcVault: string;
+  serumVaultSigner: string;
+};
+
+type RouterDexAccounts = OrcaDexAccounts | RaydiumDexAccounts;
+
+type DexStepDescriptor = {
+  index: number;
+  ammKey: string;
+  label: string;
+  inputMint: string;
+  outputMint: string;
+  dexProgramId: string;
+};
+
+type DexAccountResolution = {
+  descriptor: DexStepDescriptor;
+  accounts: RouterDexAccounts;
+};
+
+const ORCA_PROGRAM_ID_STR = ORCA_WHIRLPOOL_PROGRAM_ID.toBase58();
+const RAYDIUM_PROGRAM_ID_STR = RAYDIUM_AMM_PROGRAM_ID.toBase58();
+
+type DexLabelMetadata = {
+  keyword: string;
+  friendlyName: string;
+  supported: boolean;
+  programId?: string;
+};
+
+const DEX_LABEL_METADATA: DexLabelMetadata[] = [
+  {
+    keyword: "orca",
+    friendlyName: "Orca Whirlpool",
+    supported: true,
+    programId: ORCA_PROGRAM_ID_STR,
+  },
+  {
+    keyword: "raydium",
+    friendlyName: "Raydium",
+    supported: true,
+    programId: RAYDIUM_PROGRAM_ID_STR,
+  },
+  { keyword: "meteora", friendlyName: "Meteora DLMM", supported: false },
+  { keyword: "phoenix", friendlyName: "Phoenix", supported: false },
+  { keyword: "lifinity", friendlyName: "Lifinity", supported: false },
+];
+
+const matchDexLabel = (label: string): DexLabelMetadata | null => {
+  const normalized = label.toLowerCase();
+  return (
+    DEX_LABEL_METADATA.find((metadata) => normalized.includes(metadata.keyword)) ??
+    null
+  );
+};
+
+const partitionPlanDexSteps = (
+  plan: JupiterRoutePlanStep[]
+): {
+  supported: DexStepDescriptor[];
+  unsupported: string[];
+} => {
+  const supported: DexStepDescriptor[] = [];
+  const unsupported: string[] = [];
+
+  plan.forEach((step, index) => {
+    const swapInfo = step.swapInfo;
+    if (!swapInfo?.ammKey || !swapInfo.inputMint || !swapInfo.outputMint) {
+      return;
+    }
+
+    const label = swapInfo.label ?? `Venue ${index + 1}`;
+    const metadata = matchDexLabel(label);
+
+    if (!metadata) {
+      return;
+    }
+
+    if (metadata.supported && metadata.programId) {
+      supported.push({
+        index,
+        ammKey: swapInfo.ammKey,
+        label,
+        inputMint: swapInfo.inputMint,
+        outputMint: swapInfo.outputMint,
+        dexProgramId: metadata.programId,
+      });
+      return;
+    }
+
+    unsupported.push(metadata.friendlyName || label);
+  });
+
+  return { supported, unsupported };
+};
+
+const BPS_SCALE = 10_000;
+
+function toLamports(amount: string, decimals: number) {
+  const parsed = Number(amount);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return new BN(0);
+  }
+  const scale = Math.pow(10, decimals);
+  return new BN(Math.floor(parsed * scale).toString());
+}
+
+function decodeBase64ToUint8Array(data: string): Uint8Array {
+  if (typeof atob === "function") {
+    const binary = atob(data);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+
+  const nodeBuffer = (globalThis as {
+    Buffer?: { from(input: string, encoding: string): Uint8Array };
+  }).Buffer;
+  if (nodeBuffer) {
+    return Uint8Array.from(nodeBuffer.from(data, "base64"));
+  }
+
+  throw new Error("Base64 decoding is not supported in this environment");
+}
+
 export function EnhancedSwapInterface() {
-  const { connected } = useWallet();
+  const { connected, publicKey } = useWallet();
+  const { swapWithRouter } = useSwapRouter();
 
   // Store
   const {
@@ -54,6 +251,9 @@ export function EnhancedSwapInterface() {
   const [priceImpact, setPriceImpact] = useState(0);
   const [showTooltip, setShowTooltip] = useState<string | null>(null);
   const [routeError, setRouteError] = useState<string | null>(null);
+  const [swapError, setSwapError] = useState<string | null>(null);
+  const [isSwapping, setIsSwapping] = useState(false);
+  const [swapSignature, setSwapSignature] = useState<string | null>(null);
 
   // ⚠️ AUTO-FETCH DÉSACTIVÉ pour éviter les boucles infinies
   // User must click "Search Route" manually
@@ -127,18 +327,411 @@ export function EnhancedSwapInterface() {
 
   const routerConfidenceScore = selectedRouter === "swapback" ? 98 : 95;
 
+  const getActiveRoutePlan = (): JupiterRoutePlanStep[] | null => {
+    if (routes.selectedRoutePlan && routes.selectedRoutePlan.length > 0) {
+      return routes.selectedRoutePlan;
+    }
+
+    const candidateInstructions = routes.selectedRoute?.instructions;
+    if (Array.isArray(candidateInstructions) && candidateInstructions.length > 0) {
+      return candidateInstructions as JupiterRoutePlanStep[];
+    }
+
+    return null;
+  };
+
+  const fetchDexAccountsForPlan = async (
+    plan: JupiterRoutePlanStep[]
+  ): Promise<DexAccountResolution[]> => {
+    const { supported: descriptors, unsupported } = partitionPlanDexSteps(plan);
+
+    if (unsupported.length) {
+      const uniqueUnsupported = Array.from(new Set(unsupported));
+      throw new Error(
+        `La route sélectionnée contient actuellement ${uniqueUnsupported.join(
+          ", "
+        )}, qui n'est pas encore supportée on-chain. Choisissez une route 100% Orca ou ajustez vos splits.`
+      );
+    }
+
+    if (!descriptors.length) {
+      throw new Error(
+        }
+
+        if (resolution.accounts.dexProgramId === RAYDIUM_PROGRAM_ID_STR) {
+          return buildRaydiumAccountMetas(
+            resolution.accounts as RaydiumDexAccounts,
+            derived,
+            userAccounts,
+            resolution.descriptor
+          );
+        "Aucune venue compatible n'a été trouvée dans le plan actuel. Relancez une recherche ou choisissez une autre route."
+      );
+    }
+
+    const resolutions = await Promise.all(
+      descriptors.map(async (descriptor) => {
+        if (descriptor.dexProgramId === ORCA_PROGRAM_ID_STR) {
+          const accounts = await fetchOrcaDexAccounts(descriptor);
+          return { descriptor, accounts } as DexAccountResolution;
+        }
+
+        if (descriptor.dexProgramId === RAYDIUM_PROGRAM_ID_STR) {
+          const accounts = await fetchRaydiumDexAccounts(descriptor);
+          return { descriptor, accounts } as DexAccountResolution;
+        }
+
+        throw new Error(`Venue non supportée: ${descriptor.label}`);
+      })
+    );
+
+    return resolutions;
+  };
+        }
+
+        if (resolution.accounts.dexProgramId === RAYDIUM_PROGRAM_ID_STR) {
+          return buildRaydiumAccountMetas(
+            resolution.accounts as RaydiumDexAccounts,
+            derived,
+            userAccounts,
+            resolution.descriptor
+          );
+
+  const fetchOrcaDexAccounts = async (
+    descriptor: DexStepDescriptor
+  ): Promise<OrcaDexAccounts> => {
+    const response = await fetch("/api/router/accounts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ammKey: descriptor.ammKey,
+        tokenInMint: descriptor.inputMint,
+        tokenOutMint: descriptor.outputMint,
+        dexProgramId: descriptor.dexProgramId,
+      }),
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(
+        payload?.error ||
+          `Échec de la résolution des comptes Orca pour ${descriptor.label}.`
+      );
+    }
+
+    const payload = (await response.json()) as OrcaDexAccounts;
+    return {
+      ...payload,
+      dexProgramId: ORCA_PROGRAM_ID_STR,
+    };
+  };
+
+  const fetchRaydiumDexAccounts = async (
+    descriptor: DexStepDescriptor
+  ): Promise<RaydiumDexAccounts> => {
+    const response = await fetch("/api/router/accounts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ammKey: descriptor.ammKey,
+        tokenInMint: descriptor.inputMint,
+        tokenOutMint: descriptor.outputMint,
+        dexProgramId: descriptor.dexProgramId,
+      }),
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(
+        payload?.error ||
+          `Échec de la résolution des comptes Raydium pour ${descriptor.label}.`
+      );
+    }
+
+    const payload = (await response.json()) as RaydiumDexAccounts;
+    return {
+      ...payload,
+      dexProgramId: RAYDIUM_PROGRAM_ID_STR,
+    };
+  };
+
+  const buildOrcaAccountMetas = (
+    dexAccounts: OrcaDexAccounts,
+    derived: DerivedSwapAccounts,
+    userAccounts: Record<string, PublicKey>
+  ): AccountMeta[] => {
+    const ownerA = userAccounts[dexAccounts.tokenMintA];
+    const ownerB = userAccounts[dexAccounts.tokenMintB];
+
+    if (!ownerA || !ownerB) {
+      throw new Error(
+        "Comptes utilisateurs introuvables pour le couple de tokens sélectionné."
+      );
+    }
+
+    const tickArrayMetas = dexAccounts.tickArrays.map<AccountMeta>((key) => ({
+      pubkey: new PublicKey(key),
+      isWritable: true,
+      isSigner: false,
+    }));
+
+    while (tickArrayMetas.length < 3) {
+      tickArrayMetas.push({
+        pubkey: tickArrayMetas[0]?.pubkey ?? new PublicKey(dexAccounts.whirlpool),
+        isWritable: true,
+        isSigner: false,
+      });
+    }
+
+    return [
+      { pubkey: TOKEN_PROGRAM_ID, isWritable: false, isSigner: false },
+      { pubkey: derived.walletPublicKey, isWritable: false, isSigner: true },
+      { pubkey: new PublicKey(dexAccounts.whirlpool), isWritable: true, isSigner: false },
+      { pubkey: ownerA, isWritable: true, isSigner: false },
+      { pubkey: new PublicKey(dexAccounts.tokenVaultA), isWritable: true, isSigner: false },
+      { pubkey: ownerB, isWritable: true, isSigner: false },
+      { pubkey: new PublicKey(dexAccounts.tokenVaultB), isWritable: true, isSigner: false },
+      tickArrayMetas[0],
+      tickArrayMetas[1],
+      tickArrayMetas[2],
+      { pubkey: new PublicKey(dexAccounts.oracle), isWritable: false, isSigner: false },
+    ];
+  };
+
+  const buildRaydiumAccountMetas = (
+    dexAccounts: RaydiumDexAccounts,
+    derived: DerivedSwapAccounts,
+    userAccounts: Record<string, PublicKey>,
+    descriptor: DexStepDescriptor
+  ): AccountMeta[] => {
+    const sourceMint =
+      dexAccounts.direction === "aToB"
+        ? dexAccounts.tokenMintA
+        : dexAccounts.tokenMintB;
+    const destinationMint =
+      dexAccounts.direction === "aToB"
+        ? dexAccounts.tokenMintB
+        : dexAccounts.tokenMintA;
+
+    const userSource = userAccounts[sourceMint];
+    const userDestination = userAccounts[destinationMint];
+
+    if (!userSource || !userDestination) {
+      throw new Error(
+        `Comptes utilisateurs introuvables pour ${descriptor.label}. Assurez-vous que les tokens nécessaires sont disponibles.`
+      );
+    }
+
+    return [
+      { pubkey: TOKEN_PROGRAM_ID, isWritable: false, isSigner: false },
+      { pubkey: derived.walletPublicKey, isWritable: false, isSigner: true },
+      { pubkey: new PublicKey(dexAccounts.ammId), isWritable: true, isSigner: false },
+      { pubkey: new PublicKey(dexAccounts.ammAuthority), isWritable: false, isSigner: false },
+      { pubkey: new PublicKey(dexAccounts.ammOpenOrders), isWritable: true, isSigner: false },
+      { pubkey: new PublicKey(dexAccounts.ammTargetOrders), isWritable: true, isSigner: false },
+      { pubkey: new PublicKey(dexAccounts.poolCoinTokenAccount), isWritable: true, isSigner: false },
+      { pubkey: new PublicKey(dexAccounts.poolPcTokenAccount), isWritable: true, isSigner: false },
+      { pubkey: new PublicKey(dexAccounts.serumProgramId), isWritable: false, isSigner: false },
+      { pubkey: new PublicKey(dexAccounts.serumMarket), isWritable: true, isSigner: false },
+      { pubkey: new PublicKey(dexAccounts.serumBids), isWritable: true, isSigner: false },
+      { pubkey: new PublicKey(dexAccounts.serumAsks), isWritable: true, isSigner: false },
+      { pubkey: new PublicKey(dexAccounts.serumEventQueue), isWritable: true, isSigner: false },
+      { pubkey: new PublicKey(dexAccounts.serumCoinVault), isWritable: true, isSigner: false },
+      { pubkey: new PublicKey(dexAccounts.serumPcVault), isWritable: true, isSigner: false },
+      { pubkey: new PublicKey(dexAccounts.serumVaultSigner), isWritable: false, isSigner: false },
+      { pubkey: userSource, isWritable: true, isSigner: false },
+      { pubkey: userDestination, isWritable: true, isSigner: false },
+    ];
+  };
+
+  const createRemainingAccountsBuilder = async () => {
+    if (!swap.inputToken || !swap.outputToken) {
+      throw new Error("Sélectionnez deux tokens avant d'exécuter un swap.");
+    }
+
+    const plan = getActiveRoutePlan();
+    if (!plan || plan.length === 0) {
+      throw new Error(
+        "Plan de route introuvable. Relancez une recherche avant d'exécuter le swap."
+      );
+    }
+
+    const dexResolutions = await fetchDexAccountsForPlan(plan);
+
+    return ({ derived }: { derived: DerivedSwapAccounts }): AccountMeta[] => {
+      const userAccounts: Record<string, PublicKey> = {
+        [swap.inputToken!.mint]: derived.userTokenAccountA,
+        [swap.outputToken!.mint]: derived.userTokenAccountB,
+      };
+
+      return dexResolutions.flatMap((resolution) => {
+        if (resolution.accounts.variant === "ORCA_WHIRLPOOL") {
+          return buildOrcaAccountMetas(
+            resolution.accounts,
+            derived,
+            userAccounts
+          );
+        }
+
+        if (resolution.accounts.variant === "RAYDIUM_AMM") {
+          return buildRaydiumAccountMetas(
+            resolution.accounts,
+            derived,
+            userAccounts,
+            resolution.descriptor
+          );
+        }
+
+        throw new Error(
+          `Venue non supportée dans le plan (program ${resolution.accounts.dexProgramId ?? "inconnu"}).`
+        );
+      });
+    };
+  };
+
   const handleSearchRoute = async () => {
     const amount = parseFloat(swap.inputAmount);
 
     if (swap.inputToken && swap.outputToken && amount > 0) {
       setRouteError(null);
+      setSwapError(null);
+      setSwapSignature(null);
       try {
-        await fetchRoutes();
+        await fetchRoutes({ userPublicKey: publicKey?.toBase58() ?? null });
         setHasSearchedRoute(true);
       } catch (error) {
         setRouteError("No route found. Try adjusting the amount or selecting different tokens.");
         setHasSearchedRoute(false);
       }
+    } else {
+      setRouteError("Enter a valid amount and select tokens to search a route.");
+      setHasSearchedRoute(false);
+    }
+  };
+
+  const handleExecuteSwap = async () => {
+    const activeRoutePlan = getActiveRoutePlan();
+
+    if (selectedRouter !== "swapback") {
+      setSwapError("L'exécution on-chain est disponible uniquement via le router SwapBack.");
+      return;
+    }
+    if (!swap.inputToken || !swap.outputToken || !routes.selectedRoute) {
+      setSwapError("Route invalide. Relancez une recherche avant de swapper.");
+      return;
+    }
+    if (!activeRoutePlan || activeRoutePlan.length === 0) {
+      setSwapError("Plan de route introuvable. Relancez une recherche avant de swapper.");
+      return;
+    }
+    if (!swapWithRouter) {
+      setSwapError("Client router non initialisé. Veuillez recharger la page.");
+      return;
+    }
+
+    const amountInLamports = toLamports(
+      swap.inputAmount,
+      swap.inputToken.decimals ?? 6
+    );
+
+    if (amountInLamports.lte(new BN(0))) {
+      setSwapError("Montant d'entrée invalide pour le swap.");
+      return;
+    }
+
+    const expectedOutLamports = toLamports(
+      swap.outputAmount,
+      swap.outputToken.decimals ?? 6
+    );
+    const slippageBps = Math.min(
+      BPS_SCALE - 1,
+      Math.max(1, Math.floor((swap.slippageTolerance || 0.01) * BPS_SCALE))
+    );
+
+    let minOutLamports = expectedOutLamports.gt(new BN(0))
+      ? expectedOutLamports
+          .mul(new BN(BPS_SCALE - slippageBps))
+          .div(new BN(BPS_SCALE))
+      : new BN(1);
+    if (minOutLamports.lte(new BN(0))) {
+      minOutLamports = new BN(1);
+    }
+
+    let remainingAccountsBuilder: ((params: {
+      derived: DerivedSwapAccounts;
+    }) => AccountMeta[]) | null = null;
+    let staticRemainingAccounts: AccountMeta[] | null = null;
+    let jupiterRoutePayload: JupiterRouteParams | null = null;
+
+    if (routes.jupiterCpi) {
+      try {
+        staticRemainingAccounts = routes.jupiterCpi.accounts.map((meta) => ({
+          pubkey: new PublicKey(meta.pubkey),
+          isWritable: meta.isWritable,
+          isSigner: meta.isSigner,
+        }));
+
+        if (!staticRemainingAccounts.length) {
+          throw new Error("Liste de comptes Jupiter vide.");
+        }
+
+        jupiterRoutePayload = {
+          expectedInputAmount: new BN(routes.jupiterCpi.expectedInputAmount),
+          swapInstruction: decodeBase64ToUint8Array(
+            routes.jupiterCpi.swapInstruction
+          ),
+        };
+      } catch (error) {
+        setSwapError(
+          error instanceof Error
+            ? error.message
+            : "Impossible de préparer l'instruction Jupiter."
+        );
+        return;
+      }
+    } else {
+      try {
+        remainingAccountsBuilder = await createRemainingAccountsBuilder();
+      } catch (error) {
+        setSwapError(
+          error instanceof Error
+            ? error.message
+            : "Impossible de préparer les comptes DEX."
+        );
+        return;
+      }
+    }
+
+    setSwapError(null);
+    setSwapSignature(null);
+    setIsSwapping(true);
+
+    try {
+      const signature = await swapWithRouter({
+        tokenIn: new PublicKey(swap.inputToken.mint),
+        tokenOut: new PublicKey(swap.outputToken.mint),
+        amountIn: amountInLamports,
+        minOut: minOutLamports,
+        slippageBps,
+        remainingAccounts: staticRemainingAccounts ?? undefined,
+        buildRemainingAccounts:
+          staticRemainingAccounts === null
+            ? async ({ derived }) => {
+                return remainingAccountsBuilder
+                  ? remainingAccountsBuilder({ derived })
+                  : [];
+              }
+            : undefined,
+        jupiterRoute: jupiterRoutePayload,
+      });
+
+      if (signature) {
+        setSwapSignature(signature);
+      }
+    } catch (error) {
+      setSwapError(error instanceof Error ? error.message : "Swap échoué");
+    } finally {
+      setIsSwapping(false);
     }
   };
 
@@ -204,6 +797,47 @@ export function EnhancedSwapInterface() {
         })) as RouteStep[],
       }
     : null;
+
+  const explorerUrl = swapSignature ? getExplorerUrl("tx", swapSignature) : null;
+
+  const usdPerOutputToken =
+    outputAmount > 0 && inputAmount > 0 ? inputAmount / outputAmount : 0;
+
+  const npiUsd =
+    mockRouteInfo && mockRouteInfo.npi > 0
+      ? usdPerOutputToken > 0
+        ? mockRouteInfo.npi * usdPerOutputToken
+        : mockRouteInfo.npi
+      : 0;
+
+  const platformFeeUsd =
+    mockRouteInfo && mockRouteInfo.fees > 0
+      ? usdPerOutputToken > 0
+        ? mockRouteInfo.fees * usdPerOutputToken
+        : mockRouteInfo.fees
+      : 0;
+
+  const canExecuteSwap =
+    selectedRouter === "swapback" &&
+    hasSearchedRoute &&
+    Boolean(routes.selectedRoute) &&
+    !routes.isLoading;
+
+  const primaryButtonDisabled =
+    !connected ||
+    !swap.inputToken ||
+    !swap.outputToken ||
+    inputAmount <= 0 ||
+    routes.isLoading ||
+    isSwapping;
+
+  const primaryButtonClass = !connected || !swap.inputToken || !swap.outputToken || inputAmount <= 0
+    ? "bg-gray-800 text-gray-600 cursor-not-allowed"
+    : routes.isLoading || isSwapping
+      ? "bg-[var(--primary)]/50 text-black cursor-wait"
+      : canExecuteSwap
+        ? "bg-green-600 text-white hover:bg-green-700"
+        : "bg-[var(--primary)] text-black hover:bg-[var(--primary)]/90";
 
   return (
     <div className="max-w-lg mx-auto">
@@ -460,6 +1094,28 @@ export function EnhancedSwapInterface() {
         {/* Route Info - Show after search */}
         {hasSearchedRoute && routes.selectedRoute && !routes.isLoading && (
           <div className="mb-6 space-y-3">
+            {swapSignature && (
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 flex flex-col gap-2" role="status" aria-live="polite">
+                <div className="text-green-400 font-semibold">Swap submitted successfully</div>
+                {explorerUrl && (
+                  <a
+                    href={explorerUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm text-[var(--primary)] hover:underline"
+                  >
+                    View on Solana Explorer ↗
+                  </a>
+                )}
+              </div>
+            )}
+
+            {swapError && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4" role="alert" aria-live="assertive">
+                <div className="text-sm text-red-300">{swapError}</div>
+              </div>
+            )}
+
             {/* Price Info */}
             <div className="bg-gray-900 rounded-lg p-3">
               <div className="flex justify-between text-sm mb-2">
@@ -553,6 +1209,13 @@ export function EnhancedSwapInterface() {
               </div>
             )}
 
+            {selectedRouter === "swapback" && mockRouteInfo && (npiUsd > 0 || platformFeeUsd > 0) && (
+              <DistributionBreakdown
+                npiAmount={npiUsd}
+                platformFee={platformFeeUsd}
+              />
+            )}
+
             {/* Route Visualization */}
             {routes.selectedRoute.venues &&
               routes.selectedRoute.venues.length > 0 && (
@@ -579,27 +1242,16 @@ export function EnhancedSwapInterface() {
 
         {/* Swap Button */}
         <button
-          onClick={handleSearchRoute}
-          disabled={
-            !connected ||
-            !swap.inputToken ||
-            !swap.outputToken ||
-            inputAmount <= 0 ||
-            routes.isLoading
+          onClick={canExecuteSwap ? handleExecuteSwap : handleSearchRoute}
+          disabled={primaryButtonDisabled}
+          className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${primaryButtonClass}`}
+          aria-label={
+            !connected
+              ? "Connect wallet to swap"
+              : canExecuteSwap
+                ? "Execute swap"
+                : "Search for best route"
           }
-          className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
-            !connected ||
-            !swap.inputToken ||
-            !swap.outputToken ||
-            inputAmount <= 0
-              ? "bg-gray-800 text-gray-600 cursor-not-allowed"
-              : routes.isLoading
-                ? "bg-[var(--primary)]/50 text-black cursor-wait"
-                : hasSearchedRoute && routes.selectedRoute
-                  ? "bg-green-600 text-white hover:bg-green-700"
-                  : "bg-[var(--primary)] text-black hover:bg-[var(--primary)]/90"
-          }`}
-          aria-label={!connected ? "Connect wallet to swap" : hasSearchedRoute ? "Execute swap" : "Search for best route"}
         >
           {!connected
             ? "Connect Wallet"
@@ -609,8 +1261,10 @@ export function EnhancedSwapInterface() {
                 ? "Enter Amount"
                 : routes.isLoading
                   ? "🔍 Searching..."
-                  : hasSearchedRoute && routes.selectedRoute
-                    ? "✅ Execute Swap"
+                  : canExecuteSwap
+                    ? isSwapping
+                      ? "⚡ Executing Swap..."
+                      : "✅ Execute Swap"
                     : "🔍 Search Route"}
         </button>
 

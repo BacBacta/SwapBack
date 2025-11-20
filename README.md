@@ -69,6 +69,11 @@ $BACK (SwapBack) est un routeur d'exécution pour Solana qui maximise le prix ne
 - 💰 **Supply initial** : 1 milliard de tokens
 - 📈 **Déflationniste** : Supply diminue avec chaque transaction
 
+### Oracles
+
+- 🔮 **Switchboard** : Oracle principal pour les prix SOL/USD (Feature flag: `switchboard`)
+- 🔮 **Pyth** : Oracle de secours (Fallback)
+
 ## 🏗️ Architecture
 
 ### Structure du Projet

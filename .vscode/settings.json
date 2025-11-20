@@ -61,19 +61,29 @@
   "git.autorefresh": false,
   "git.autofetch": false,
   
-  // Rust - Configuration PATH et environnement
+  // Rust - Configuration PATH et environnement (Utiliser installations globales)
   "rust-analyzer.server.extraEnv": {
-    "RUSTUP_HOME": "/home/codespace/.rustup",
-    "CARGO_HOME": "/home/codespace/.cargo",
-    "PATH": "/home/codespace/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    "RUSTUP_HOME": "/usr/local/rustup",
+    "CARGO_HOME": "/usr/local/cargo",
+    "PATH": "/home/codespace/.local/share/solana/install/active_release/bin:/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin"
   },
   "rust-analyzer.cargo.extraEnv": {
-    "RUSTUP_HOME": "/home/codespace/.rustup",
-    "CARGO_HOME": "/home/codespace/.cargo"
+    "RUSTUP_HOME": "/usr/local/rustup",
+    "CARGO_HOME": "/usr/local/cargo"
   },
+  "rust-analyzer.checkOnSave.enable": false,
+  "[rust]": {
+    "editor.formatOnSave": false,
+    "editor.defaultFormatter": "rust-lang.rust-analyzer"
+  },
+  "rust-analyzer.diagnostics.disabled": [
+    "unresolved-import",
+    "unresolved-macro-call",
+    "mismatched-arg-count"
+  ],
   "terminal.integrated.env.linux": {
-    "RUSTUP_HOME": "/home/codespace/.rustup",
-    "CARGO_HOME": "/home/codespace/.cargo",
-    "PATH": "/home/codespace/.cargo/bin:${env:PATH}"
+    "RUSTUP_HOME": "/usr/local/rustup",
+    "CARGO_HOME": "/usr/local/cargo",
+    "PATH": "/home/codespace/.local/share/solana/install/active_release/bin:/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin"
   }
 }

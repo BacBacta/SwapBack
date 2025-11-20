@@ -19,7 +19,7 @@ let _routerProgramId: PublicKey | null = null;
 export function getRouterProgramId(): PublicKey {
   if (!_routerProgramId) {
     _routerProgramId = new PublicKey(
-      process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || 'H3LLiKAvjPWk9Br14m7bjiWkaJFzeMVB9qvMsFaA14k5'
+      process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || '9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh'
     );
   }
   return _routerProgramId;
@@ -44,7 +44,7 @@ let _cnftProgramId: PublicKey | null = null;
 export function getCnftProgramId(): PublicKey {
   if (!_cnftProgramId) {
     _cnftProgramId = new PublicKey(
-      process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || 'DGDipfpHGVAnWXj7yPEBc3JYFWghQN76tEBzuK2Nojw3'
+      process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || 'EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP'
     );
   }
   return _cnftProgramId;

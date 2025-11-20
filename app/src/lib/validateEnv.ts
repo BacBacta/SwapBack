@@ -16,7 +16,7 @@ function getCnftIdl() {
       cnftIdl = require("@/idl/swapback_cnft.json");
     } catch (error) {
       console.warn("Could not load CNFT IDL:", error);
-      cnftIdl = { address: "DGDipfpHGVAnWXj7yPEBc3JYFWghQN76tEBzuK2Nojw3" };
+      cnftIdl = { address: "EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP" };
     }
   }
   return cnftIdl;
@@ -28,7 +28,7 @@ function getRouterIdl() {
       routerIdl = require("@/idl/swapback_router.json");
     } catch (error) {
       console.warn("Could not load Router IDL:", error);
-      routerIdl = { address: "H3LLiKAvjPWk9Br14m7bjiWkaJFzeMVB9qvMsFaA14k5" };
+      routerIdl = { address: "9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh" };
     }
   }
   return routerIdl;
@@ -98,7 +98,7 @@ export function validateEnv(): EnvConfig {
     network: network || 'devnet',
     rpcUrl: rpcUrl || 'https://api.devnet.solana.com',
     cnftProgramId: cnftProgramId || 'DGDipfpHGVAnWXj7yPEBc3JYFWghQN76tEBzuK2Nojw3',
-    routerProgramId: routerProgramId || 'H3LLiKAvjPWk9Br14m7bjiWkaJFzeMVB9qvMsFaA14k5',
+    routerProgramId: routerProgramId || '9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh',
     backMint: backMint || '862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux',
     npiMint: npiMint || 'So11111111111111111111111111111111111111112',
     collectionConfig: collectionConfig || '5Lz4eHdqAgVsXu3Antp3TVqncuoCdUj2WEnc6PQuVzMT',
