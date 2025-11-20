@@ -4,18 +4,30 @@ import { BorshCoder, Idl } from "@coral-xyz/anchor";
 import { PDAUtil, SwapUtils } from "@orca-so/whirlpools-sdk";
 import { Market } from "@project-serum/serum";
 import { DEFAULT_SOLANA_RPC_URL } from "@/config/constants";
-import { ORCA_WHIRLPOOL_PROGRAM_ID } from "@/sdk/config/orca-pools";
-import {
-  RAYDIUM_AMM_PROGRAM_ID,
-  getRaydiumPoolByAmm,
-  RaydiumPoolConfig,
-} from "@/sdk/config/raydium-pools";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL || DEFAULT_SOLANA_RPC_URL;
+
+// Lazy imports to avoid build-time execution
+let orcaConfig: typeof import("@/sdk/config/orca-pools") | null = null;
+let raydiumConfig: typeof import("@/sdk/config/raydium-pools") | null = null;
+
+async function getOrcaConfig() {
+  if (!orcaConfig) {
+    orcaConfig = await import("@/sdk/config/orca-pools");
+  }
+  return orcaConfig;
+}
+
+async function getRaydiumConfig() {
+  if (!raydiumConfig) {
+    raydiumConfig = await import("@/sdk/config/raydium-pools");
+  }
+  return raydiumConfig;
+}
 
 // Lazy initialization to avoid build-time execution
 let whirlpoolCoder: BorshCoder | null = null;
@@ -76,7 +88,7 @@ async function decodeWhirlpool(data: Buffer): Promise<WhirlpoolAccountData | nul
 export async function POST(request: NextRequest) {
   try {
     const connection = new Connection(RPC_ENDPOINT, "confirmed");
-    
+
     const body = (await request.json()) as AccountsRequest;
     const tokenInMint = body.tokenInMint?.trim();
     const tokenOutMint = body.tokenOutMint?.trim();
@@ -102,14 +114,16 @@ export async function POST(request: NextRequest) {
     }
 
     const ammPubkey = new PublicKey(ammAddress);
-    const raydiumPoolConfig = getRaydiumPoolByAmm(ammPubkey);
+    const raydiumCfg = await getRaydiumConfig();
+    const raydiumPoolConfig = raydiumCfg.getRaydiumPoolByAmm(ammPubkey);
 
     if (
       raydiumPoolConfig &&
-      (!requestedDexProgram || requestedDexProgram.equals(RAYDIUM_AMM_PROGRAM_ID))
+      (!requestedDexProgram || requestedDexProgram.equals(raydiumCfg.RAYDIUM_AMM_PROGRAM_ID))
     ) {
       try {
         const raydiumPayload = await deriveRaydiumAccounts({
+          connection,
           tokenInMint,
           tokenOutMint,
           poolConfig: raydiumPoolConfig,
@@ -161,16 +175,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const orcaCfg = await getOrcaConfig();
     const tickArrayKeys = SwapUtils.getTickArrayPublicKeys(
       whirlpool.tickCurrentIndex,
       whirlpool.tickSpacing,
       direction === "aToB",
-      ORCA_WHIRLPOOL_PROGRAM_ID,
+      orcaCfg.ORCA_WHIRLPOOL_PROGRAM_ID,
       whirlpoolPubkey
     ).map((pk) => pk.toBase58());
 
     const oraclePda = PDAUtil.getOracle(
-      ORCA_WHIRLPOOL_PROGRAM_ID,
+      orcaCfg.ORCA_WHIRLPOOL_PROGRAM_ID,
       whirlpoolPubkey
     ).publicKey;
 
@@ -185,7 +200,7 @@ export async function POST(request: NextRequest) {
       tickArrays: tickArrayKeys,
       oracle: oraclePda.toBase58(),
       tickSpacing: whirlpool.tickSpacing,
-      dexProgramId: ORCA_WHIRLPOOL_PROGRAM_ID.toBase58(),
+      dexProgramId: orcaCfg.ORCA_WHIRLPOOL_PROGRAM_ID.toBase58(),
     });
   } catch (error) {
     console.error("router/accounts error", error);
@@ -207,11 +222,12 @@ export async function GET() {
 }
 
 async function deriveRaydiumAccounts(params: {
+  connection: Connection;
   tokenInMint: string;
   tokenOutMint: string;
-  poolConfig: RaydiumPoolConfig;
+  poolConfig: any;
 }) {
-  const { tokenInMint, tokenOutMint, poolConfig } = params;
+  const { connection, tokenInMint, tokenOutMint, poolConfig } = params;
   const mintA = poolConfig.tokenMintA.toBase58();
   const mintB = poolConfig.tokenMintB.toBase58();
 
@@ -250,12 +266,14 @@ async function deriveRaydiumAccounts(params: {
     poolConfig.serumProgramId
   );
 
+  const raydiumCfg = await getRaydiumConfig();
+  
   return {
     variant: "RAYDIUM_AMM" as const,
     direction,
     tokenMintA: mintA,
     tokenMintB: mintB,
-    dexProgramId: RAYDIUM_AMM_PROGRAM_ID.toBase58(),
+    dexProgramId: raydiumCfg.RAYDIUM_AMM_PROGRAM_ID.toBase58(),
     ammId: poolConfig.ammAddress.toBase58(),
     ammAuthority: poolConfig.ammAuthority.toBase58(),
     ammOpenOrders: poolConfig.ammOpenOrders.toBase58(),
