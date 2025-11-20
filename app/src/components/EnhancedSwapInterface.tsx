@@ -3,15 +3,6 @@
  * Modern, clean design with complete functionality
  */
 
-        }
-
-        if (resolution.accounts.dexProgramId === RAYDIUM_PROGRAM_ID_STR) {
-          return buildRaydiumAccountMetas(
-            resolution.accounts as RaydiumDexAccounts,
-            derived,
-            userAccounts,
-            resolution.descriptor
-          );
 "use client";
 
 import { useState, useEffect } from "react";
