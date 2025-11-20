@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Connection, PublicKey } from "@solana/web3.js";
-import { BorshCoder, Idl } from "@coral-xyz/anchor";
-import { PDAUtil, SwapUtils } from "@orca-so/whirlpools-sdk";
+import { PDAUtil, SwapUtils, ParsableWhirlpool } from "@orca-so/whirlpools-sdk";
 import { Market } from "@project-serum/serum";
 import { DEFAULT_SOLANA_RPC_URL } from "@/config/constants";
 
@@ -26,16 +25,6 @@ async function getRaydiumConfig() {
   return raydiumConfig;
 }
 
-// Lazy initialization to avoid build-time execution
-let whirlpoolCoder: BorshCoder | null = null;
-async function getWhirlpoolCoder(): Promise<BorshCoder> {
-  if (!whirlpoolCoder) {
-    const whirlpoolIdl = await import("@orca-so/whirlpools-sdk/dist/artifacts/whirlpool.json");
-    whirlpoolCoder = new BorshCoder(whirlpoolIdl.default as unknown as Idl);
-  }
-  return whirlpoolCoder;
-}
-
 type AccountsRequest = {
   tokenInMint: string;
   tokenOutMint: string;
@@ -53,28 +42,29 @@ type WhirlpoolAccountData = {
   tickCurrentIndex: number;
 };
 
-async function decodeWhirlpool(data: Buffer): Promise<WhirlpoolAccountData | null> {
+async function decodeWhirlpool(
+  connection: Connection,
+  address: PublicKey
+): Promise<WhirlpoolAccountData | null> {
   try {
-    const coder = await getWhirlpoolCoder();
-    const decoded = coder.accounts.decode("Whirlpool", data) as {
-      tokenMintA: PublicKey;
-      tokenMintB: PublicKey;
-      tokenVaultA: PublicKey;
-      tokenVaultB: PublicKey;
-      tickSpacing: number;
-      tickCurrentIndex: number | { toNumber(): number };
-    };
+    const accountInfo = await connection.getAccountInfo(address);
+    if (!accountInfo) {
+      return null;
+    }
+
+    // Use ParsableWhirlpool from the SDK instead of BorshCoder
+    const whirlpoolData = ParsableWhirlpool.parse(address, accountInfo);
+    if (!whirlpoolData) {
+      return null;
+    }
 
     return {
-      tokenMintA: decoded.tokenMintA,
-      tokenMintB: decoded.tokenMintB,
-      tokenVaultA: decoded.tokenVaultA,
-      tokenVaultB: decoded.tokenVaultB,
-      tickSpacing: decoded.tickSpacing,
-      tickCurrentIndex:
-        typeof decoded.tickCurrentIndex === "number"
-          ? decoded.tickCurrentIndex
-          : decoded.tickCurrentIndex.toNumber(),
+      tokenMintA: whirlpoolData.tokenMintA,
+      tokenMintB: whirlpoolData.tokenMintB,
+      tokenVaultA: whirlpoolData.tokenVaultA,
+      tokenVaultB: whirlpoolData.tokenVaultB,
+      tickSpacing: whirlpoolData.tickSpacing,
+      tickCurrentIndex: whirlpoolData.tickCurrentIndex,
     };
   } catch (error) {
     console.warn("Failed to decode whirlpool account", error);
@@ -136,16 +126,8 @@ export async function handlePOST(request: NextRequest) {
     }
 
     const whirlpoolPubkey = ammPubkey;
-    const accountInfo = await connection.getAccountInfo(whirlpoolPubkey);
 
-    if (!accountInfo) {
-      return NextResponse.json(
-        { error: "Whirlpool account not found" },
-        { status: 404 }
-      );
-    }
-
-    const whirlpool = await decodeWhirlpool(accountInfo.data);
+    const whirlpool = await decodeWhirlpool(connection, whirlpoolPubkey);
     if (!whirlpool) {
       return NextResponse.json(
         { error: "Account is not a valid Whirlpool pool" },
