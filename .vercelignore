@@ -1,7 +1,7 @@
 # Ignore root level files and folders
 /programs
 /tests
-/sdk
+# Note: Keep /sdk for build-time copying to app/src/sdk
 /oracle
 /target
 *.md

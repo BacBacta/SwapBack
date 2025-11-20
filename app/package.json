@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npm run copy-idl && next build",
-    "build:clean": "rm -rf .next && npm run copy-idl && next build",
+    "build": "npm run copy-deps && next build",
+    "build:clean": "rm -rf .next && npm run copy-deps && next build",
     "copy-idl": "mkdir -p src/idl && (cp -f ../target/idl/*.json src/idl/ 2>/dev/null || cp -f public/idl/*.json src/idl/ 2>/dev/null || true)",
+    "copy-sdk": "mkdir -p src/sdk && cp -r ../sdk/src/* src/sdk/ 2>/dev/null || true",
+    "copy-deps": "npm run copy-idl && npm run copy-sdk",
     "start": "next start",
     "lint": "next lint",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
