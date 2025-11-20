@@ -18,7 +18,7 @@ import {
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import routerIdl from "@/idl/swapback_router.json";
-import { PROGRAM_IDS } from "@/config/programIds";
+import { PROGRAM_IDS } from "@/constants/programIds";
 import { getOracleForPair } from "@/config/oracles";
 import { USDC_MINT } from "@/config/constants";
 import toast from "react-hot-toast";

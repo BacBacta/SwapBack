@@ -6,7 +6,7 @@ import { AnchorProvider, Idl, Program, Wallet } from "@coral-xyz/anchor";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
 import routerIdl from "@/idl/swapback_router.json";
-import { PROGRAM_IDS } from "@/config/programIds";
+import { PROGRAM_IDS } from "@/constants/programIds";
 
 const ROUTER_PROGRAM_ID = PROGRAM_IDS.routerProgram;
 
