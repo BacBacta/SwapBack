@@ -3,7 +3,6 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { BorshCoder, Idl } from "@coral-xyz/anchor";
 import { PDAUtil, SwapUtils } from "@orca-so/whirlpools-sdk";
 import { Market } from "@project-serum/serum";
-import whirlpoolIdl from "@orca-so/whirlpools-sdk/dist/artifacts/whirlpool.json";
 import { DEFAULT_SOLANA_RPC_URL } from "@/config/constants";
 import { ORCA_WHIRLPOOL_PROGRAM_ID } from "@/sdk/config/orca-pools";
 import {
@@ -14,16 +13,16 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// export const revalidate = 0; // Removed to prevent static generation attempts
 
 const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL || DEFAULT_SOLANA_RPC_URL;
 
 // Lazy initialization to avoid build-time execution
 let whirlpoolCoder: BorshCoder | null = null;
-function getWhirlpoolCoder(): BorshCoder {
+async function getWhirlpoolCoder(): Promise<BorshCoder> {
   if (!whirlpoolCoder) {
-    whirlpoolCoder = new BorshCoder(whirlpoolIdl as unknown as Idl);
+    const whirlpoolIdl = await import("@orca-so/whirlpools-sdk/dist/artifacts/whirlpool.json");
+    whirlpoolCoder = new BorshCoder(whirlpoolIdl.default as unknown as Idl);
   }
   return whirlpoolCoder;
 }
@@ -45,9 +44,9 @@ type WhirlpoolAccountData = {
   tickCurrentIndex: number;
 };
 
-function decodeWhirlpool(data: Buffer): WhirlpoolAccountData | null {
+async function decodeWhirlpool(data: Buffer): Promise<WhirlpoolAccountData | null> {
   try {
-    const coder = getWhirlpoolCoder();
+    const coder = await getWhirlpoolCoder();
     const decoded = coder.accounts.decode("Whirlpool", data) as {
       tokenMintA: PublicKey;
       tokenMintB: PublicKey;
@@ -140,7 +139,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const whirlpool = decodeWhirlpool(accountInfo.data);
+    const whirlpool = await decodeWhirlpool(accountInfo.data);
     if (!whirlpool) {
       return NextResponse.json(
         { error: "Account is not a valid Whirlpool pool" },
