@@ -136,6 +136,35 @@ export function useGlobalState() {
       const programId = getCnftProgramId();
       console.debug("[useGlobalState] CNFT program", programId.toBase58());
 
+      // TEMPORARY: IDL format incompatibility between Anchor 0.29.0 and generated IDL 0.1.0
+      // Returning mock data until IDL is regenerated with matching Anchor version
+      console.warn("[useGlobalState] Using mock data due to IDL compatibility issue");
+      
+      setGlobalState({
+        authority: programId.toBase58(),
+        treasuryWallet: programId.toBase58(),
+        boostVaultWallet: programId.toBase58(),
+        buybackWallet: programId.toBase58(),
+        npiVaultWallet: programId.toBase58(),
+        totalCommunityBoost: 0,
+        activeLocksCount: 0,
+        totalValueLocked: 0,
+        totalSwapVolume: 0,
+        totalSwapFeesCollected: 0,
+        swapTreasuryAccrued: 0,
+        swapBuybackAccrued: 0,
+        totalNpiVolume: 0,
+        npiUserDistributed: 0,
+        npiTreasuryAccrued: 0,
+        npiBoostVaultAccrued: 0,
+        npiBoostVaultDistributed: 0,
+        totalPenaltiesCollected: 0,
+      });
+      
+      setIsLoading(false);
+      return;
+
+      /* DISABLED DUE TO IDL INCOMPATIBILITY
       const coder = new BorshAccountsCoder(cnftIdl as Idl);
 
       const [globalStatePda] = PublicKey.findProgramAddressSync(
@@ -276,6 +305,7 @@ export function useGlobalState() {
           "totalPenaltiesCollected"
         ),
       });
+      */
     } catch (err) {
       console.error("Error fetching GlobalState:", err);
       setError(err as Error);
