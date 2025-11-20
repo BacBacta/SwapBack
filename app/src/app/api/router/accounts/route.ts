@@ -19,8 +19,14 @@ export const dynamic = "force-dynamic";
 const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL || DEFAULT_SOLANA_RPC_URL;
 
-const connection = new Connection(RPC_ENDPOINT, "confirmed");
-const whirlpoolCoder = new BorshCoder(whirlpoolIdl as unknown as Idl);
+// Lazy initialization to avoid build-time execution
+let whirlpoolCoder: BorshCoder | null = null;
+function getWhirlpoolCoder(): BorshCoder {
+  if (!whirlpoolCoder) {
+    whirlpoolCoder = new BorshCoder(whirlpoolIdl as unknown as Idl);
+  }
+  return whirlpoolCoder;
+}
 
 type AccountsRequest = {
   tokenInMint: string;
@@ -41,7 +47,8 @@ type WhirlpoolAccountData = {
 
 function decodeWhirlpool(data: Buffer): WhirlpoolAccountData | null {
   try {
-    const decoded = whirlpoolCoder.accounts.decode("Whirlpool", data) as {
+    const coder = getWhirlpoolCoder();
+    const decoded = coder.accounts.decode("Whirlpool", data) as {
       tokenMintA: PublicKey;
       tokenMintB: PublicKey;
       tokenVaultA: PublicKey;
@@ -69,6 +76,8 @@ function decodeWhirlpool(data: Buffer): WhirlpoolAccountData | null {
 
 export async function POST(request: NextRequest) {
   try {
+    const connection = new Connection(RPC_ENDPOINT, "confirmed");
+    
     const body = (await request.json()) as AccountsRequest;
     const tokenInMint = body.tokenInMint?.trim();
     const tokenOutMint = body.tokenOutMint?.trim();
