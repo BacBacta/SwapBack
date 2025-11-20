@@ -20,7 +20,7 @@ const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL || DEFAULT_SOLANA_RPC_URL;
 
 const connection = new Connection(RPC_ENDPOINT, "confirmed");
-const whirlpoolCoder = new BorshCoder(whirlpoolIdl as Idl);
+const whirlpoolCoder = new BorshCoder(whirlpoolIdl as unknown as Idl);
 
 type AccountsRequest = {
   tokenInMint: string;

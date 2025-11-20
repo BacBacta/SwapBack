@@ -165,7 +165,7 @@ export async function createLockTokensTransaction(
   console.log('✅ [LOCK TX] Global State:', globalState.toString());
 
   // Lire le global state pour récupérer les wallets cibles en chaîne
-  const globalStateAccount = await program.account.globalState.fetch(globalState);
+  const globalStateAccount = await (program.account as any).globalState.fetch(globalState);
   console.log('✅ [LOCK TX] Buyback wallet:', globalStateAccount.buybackWallet.toString());
 
   const [userLock] = PublicKey.findProgramAddressSync(

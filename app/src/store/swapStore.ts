@@ -61,7 +61,6 @@ export interface RouteState {
   selectedRoute: RouteCandidate | null;
   selectedRoutePlan: JupiterRoutePlanStep[] | null;
   jupiterCpi: JupiterCpiState;
-  jupiterCpi: JupiterCpiState;
   isLoading: boolean;
   error: string | null;
 }

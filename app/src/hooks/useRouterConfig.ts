@@ -35,7 +35,7 @@ function getProgram(connection: ReturnType<typeof useConnection>["connection"]) 
     new Wallet(dummyKeypair),
     { commitment: "confirmed" }
   );
-  return new Program(routerIdl as Idl, ROUTER_PROGRAM_ID, provider);
+  return new Program(routerIdl as Idl, provider);
 }
 
 export function useRouterConfig() {
@@ -55,7 +55,7 @@ export function useRouterConfig() {
       );
 
       try {
-        const account = await program.account.routerConfig.fetch(configPda);
+        const account = await (program.account as any).routerConfig.fetch(configPda);
         return {
           rebateBps: Number(account.rebateBps ?? DEFAULT_CONFIG.rebateBps),
           treasuryBps: Number(account.treasuryBps ?? DEFAULT_CONFIG.treasuryBps),

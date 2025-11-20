@@ -31,5 +31,34 @@ export function getSwitchboardFeed(): PublicKey {
   return _switchboardFeed;
 }
 
+let _buybackProgramId: PublicKey | null = null;
+export function getBuybackProgramId(): PublicKey {
+  if (!_buybackProgramId) {
+    _buybackProgramId = new PublicKey(
+      process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || "746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6"
+    );
+  }
+  return _buybackProgramId;
+}
+
+let _cnftProgramId: PublicKey | null = null;
+export function getCnftProgramId(): PublicKey {
+  if (!_cnftProgramId) {
+    _cnftProgramId = new PublicKey(
+      process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP"
+    );
+  }
+  return _cnftProgramId;
+}
+
+// Export for backward compatibility with existing code
+export const PROGRAM_IDS = {
+  get routerProgram() { return getRouterProgramId(); },
+  get backTokenMint() { return getBackTokenMint(); },
+  get switchboardFeed() { return getSwitchboardFeed(); },
+  get buybackProgram() { return getBuybackProgramId(); },
+  get cnftProgram() { return getCnftProgramId(); },
+};
+
 // DO NOT export module-level constants - they cause "Application error: client-side exception"
 // Use lazy loading functions instead: getRouterProgramId(), getBackTokenMint(), getSwitchboardFeed()

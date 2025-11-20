@@ -7,6 +7,7 @@
 
 import { Connection, PublicKey, SystemProgram } from '@solana/web3.js';
 import { AnchorProvider, Program, BN, Idl } from '@coral-xyz/anchor';
+import { bnToNumberWithFallback, lamportsToUiSafe } from '@/lib/bnUtils';
 import { 
   getAssociatedTokenAddress, 
   TOKEN_PROGRAM_ID,

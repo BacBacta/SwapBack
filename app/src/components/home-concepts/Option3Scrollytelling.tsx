@@ -139,7 +139,7 @@ export default function Option3Scrollytelling() {
 
       {/* SECTION 2: THE PROBLEM */}
       <div 
-        ref={el => sectionsRef.current[0] = el}
+        ref={el => { sectionsRef.current[0] = el; }}
         className={`min-h-screen flex items-center justify-center border-t-2 border-[var(--primary)]/30 transition-all duration-1000 ${
           visibleSections.includes(0) ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'
         }`}
@@ -213,7 +213,7 @@ export default function Option3Scrollytelling() {
 
       {/* SECTION 3: THE SOLUTION */}
       <div 
-        ref={el => sectionsRef.current[1] = el}
+        ref={el => { sectionsRef.current[1] = el; }}
         className={`min-h-screen flex items-center justify-center border-t-2 border-[var(--primary)]/30 transition-all duration-1000 ${
           visibleSections.includes(1) ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'
         }`}
@@ -310,7 +310,7 @@ export default function Option3Scrollytelling() {
 
       {/* SECTION 4: THE REWARDS */}
       <div 
-        ref={el => sectionsRef.current[2] = el}
+        ref={el => { sectionsRef.current[2] = el; }}
         className={`min-h-screen flex items-center justify-center border-t-2 border-[var(--primary)]/30 transition-all duration-1000 ${
           visibleSections.includes(2) ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'
         }`}
@@ -409,7 +409,7 @@ export default function Option3Scrollytelling() {
 
       {/* SECTION 5: LIVE DASHBOARD PREVIEW */}
       <div 
-        ref={el => sectionsRef.current[3] = el}
+        ref={el => { sectionsRef.current[3] = el; }}
         className={`min-h-screen flex items-center justify-center border-t-2 border-[var(--primary)]/30 transition-all duration-1000 ${
           visibleSections.includes(3) ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'
         }`}

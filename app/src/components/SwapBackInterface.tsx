@@ -100,7 +100,7 @@ export const SwapBackInterface = () => {
   useEffect(() => {
     const fetchPrice = async () => {
       try {
-        const accountInfo = await connection.getAccountInfo(SWITCHBOARD_FEED);
+        const accountInfo = await connection.getAccountInfo(getSwitchboardFeed());
         if (accountInfo && accountInfo.data.length >= 220) {
           // Parse simplifié du feed Switchboard (offset 214 pour le result)
           const view = new DataView(accountInfo.data.buffer);
@@ -160,13 +160,13 @@ export const SwapBackInterface = () => {
           publicKey.toBuffer(),
           planId.toArrayLike(Buffer, "le", 8),
         ],
-        ROUTER_PROGRAM_ID
+        getRouterProgramId()
       );
 
       // 4. Dériver le PDA du Router State
       const [statePda] = PublicKey.findProgramAddressSync(
         [Buffer.from("router_state")],
-        ROUTER_PROGRAM_ID
+        getRouterProgramId()
       );
 
       // 5. Convertir les montants

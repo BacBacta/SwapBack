@@ -11,7 +11,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { DcaPlan } from "@/types/dca";
+import { DcaPlan } from "@/lib/dca";
+import { DcaPlanUI, useExecuteDcaSwap, usePauseDcaPlan, useResumeDcaPlan, useCancelDcaPlan } from "@/hooks/useDCA";
 import { toast } from "react-hot-toast";
 import { bnToNumberWithFallback } from "@/lib/bnUtils";
 import { lamportsToUi } from "@/lib/dca";

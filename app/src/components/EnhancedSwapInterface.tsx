@@ -556,7 +556,7 @@ export function EnhancedSwapInterface() {
         }
 
         throw new Error(
-          `Venue non supportée dans le plan (program ${resolution.accounts.dexProgramId ?? "inconnu"}).`
+          `Venue non supportée dans le plan (program ${(resolution.accounts as any).dexProgramId ?? "inconnu"}).`
         );
       });
     };

@@ -63,6 +63,7 @@ export function validateEnv(): EnvConfig {
       cnftProgramId: process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || '',
       routerProgramId: process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || '',
       backMint: process.env.NEXT_PUBLIC_BACK_MINT || '',
+      npiMint: process.env.NEXT_PUBLIC_NPI_MINT || '',
       collectionConfig: process.env.NEXT_PUBLIC_COLLECTION_CONFIG || '',
     };
   }

@@ -60,7 +60,7 @@ export async function createClaimNpiTransaction(
     TOKEN_PROGRAM_ID
   );
 
-  const globalStateAccount = await program.account.globalState.fetch(globalState);
+  const globalStateAccount = await (program.account as any).globalState.fetch(globalState);
   const npiVault = new PublicKey(globalStateAccount.npiVaultWallet);
 
   const amountLamports = new BN(Math.floor(amount * LAMPORTS_PER_NPI));

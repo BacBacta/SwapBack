@@ -29,7 +29,7 @@ interface BenchmarkResult {
 }
 
 // Configuration
-const RPC_URL = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com"\;
+const RPC_URL = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
 const connection = new Connection(RPC_URL);
 
 const BENCHMARK_PAIRS: [string, string][] = [

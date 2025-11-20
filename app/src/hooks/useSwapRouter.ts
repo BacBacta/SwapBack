@@ -30,7 +30,7 @@ function buildReadOnlyProgram(connection: Connection) {
   const provider = new AnchorProvider(connection, new Wallet(dummy), {
     commitment: "confirmed",
   });
-  return new Program(routerIdl as Idl, ROUTER_PROGRAM_ID, provider);
+  return new Program(routerIdl as Idl, provider);
 }
 
 export interface SwapRequest {
@@ -74,7 +74,7 @@ export function useSwapRouter() {
       const provider = new AnchorProvider(connection, wallet, {
         commitment: "confirmed",
       });
-      return new Program(routerIdl as Idl, ROUTER_PROGRAM_ID, provider);
+      return new Program(routerIdl as Idl, provider);
     }
     return buildReadOnlyProgram(connection);
   }, [connection, wallet]);
@@ -159,7 +159,11 @@ export function useSwapRouter() {
       let builder = program.methods
         .swapToc(args)
         .accounts(accounts)
-        .remainingAccounts(remainingAccounts);
+        .remainingAccounts(remainingAccounts.map(acc => ({
+          pubkey: acc.pubkey,
+          isSigner: acc.isSigner ?? false,
+          isWritable: acc.isWritable ?? false
+        })));
 
       const preInstructions = [
         ...derived.preInstructions,
@@ -224,7 +228,7 @@ async function deriveSwapAccounts(params: {
     ROUTER_PROGRAM_ID
   );
 
-  const routerStateAccount = await program.account.routerState.fetchNullable(
+  const routerStateAccount = await (program.account as any).routerState.fetchNullable(
     routerState
   );
   if (!routerStateAccount) {
