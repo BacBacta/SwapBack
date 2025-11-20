@@ -39,27 +39,32 @@ type WhirlpoolAccountData = {
   tickCurrentIndex: number;
 };
 
-function decodeWhirlpool(data: Buffer): WhirlpoolAccountData {
-  const decoded = whirlpoolCoder.accounts.decode("Whirlpool", data) as {
-    tokenMintA: PublicKey;
-    tokenMintB: PublicKey;
-    tokenVaultA: PublicKey;
-    tokenVaultB: PublicKey;
-    tickSpacing: number;
-    tickCurrentIndex: number | { toNumber(): number };
-  };
+function decodeWhirlpool(data: Buffer): WhirlpoolAccountData | null {
+  try {
+    const decoded = whirlpoolCoder.accounts.decode("Whirlpool", data) as {
+      tokenMintA: PublicKey;
+      tokenMintB: PublicKey;
+      tokenVaultA: PublicKey;
+      tokenVaultB: PublicKey;
+      tickSpacing: number;
+      tickCurrentIndex: number | { toNumber(): number };
+    };
 
-  return {
-    tokenMintA: decoded.tokenMintA,
-    tokenMintB: decoded.tokenMintB,
-    tokenVaultA: decoded.tokenVaultA,
-    tokenVaultB: decoded.tokenVaultB,
-    tickSpacing: decoded.tickSpacing,
-    tickCurrentIndex:
-      typeof decoded.tickCurrentIndex === "number"
-        ? decoded.tickCurrentIndex
-        : decoded.tickCurrentIndex.toNumber(),
-  };
+    return {
+      tokenMintA: decoded.tokenMintA,
+      tokenMintB: decoded.tokenMintB,
+      tokenVaultA: decoded.tokenVaultA,
+      tokenVaultB: decoded.tokenVaultB,
+      tickSpacing: decoded.tickSpacing,
+      tickCurrentIndex:
+        typeof decoded.tickCurrentIndex === "number"
+          ? decoded.tickCurrentIndex
+          : decoded.tickCurrentIndex.toNumber(),
+    };
+  } catch (error) {
+    console.warn("Failed to decode whirlpool account", error);
+    return null;
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -127,6 +132,12 @@ export async function POST(request: NextRequest) {
     }
 
     const whirlpool = decodeWhirlpool(accountInfo.data);
+    if (!whirlpool) {
+      return NextResponse.json(
+        { error: "Account is not a valid Whirlpool pool" },
+        { status: 400 }
+      );
+    }
     const mintA = whirlpool.tokenMintA.toBase58();
     const mintB = whirlpool.tokenMintB.toBase58();
 
