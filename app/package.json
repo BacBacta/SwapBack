@@ -23,6 +23,7 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.30.1",
     "@metaplex-foundation/mpl-bubblegum": "^5.0.2",
+    "@orca-so/whirlpools-sdk": "^0.16.0",
     "@project-serum/serum": "^0.13.65",
     "@pythnetwork/hermes-client": "^2.0.0",
     "@pythnetwork/pyth-solana-receiver": "^0.12.0",
