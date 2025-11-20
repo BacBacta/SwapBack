@@ -2,8 +2,8 @@
 
 import { useMemo } from "react";
 import { useConnection } from "@solana/wallet-adapter-react";
-import { AnchorProvider, Idl, Program, Wallet } from "@coral-xyz/anchor";
-import { Keypair, PublicKey } from "@solana/web3.js";
+import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
+import { Keypair, PublicKey, Transaction, VersionedTransaction } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
 import routerIdl from "@/idl/swapback_router.json";
 import { PROGRAM_IDS } from "@/constants/programIds";
@@ -27,12 +27,25 @@ export interface RouterConfigView {
   updatedAt?: number;
 }
 
+function createReadonlyWallet(keypair: Keypair) {
+  return {
+    publicKey: keypair.publicKey,
+    async signTransaction<T extends Transaction | VersionedTransaction>(tx: T) {
+      return tx;
+    },
+    async signAllTransactions<T extends Transaction | VersionedTransaction>(txs: T[]) {
+      return txs;
+    },
+  };
+}
+
 function getProgram(connection: ReturnType<typeof useConnection>["connection"]) {
   if (!connection) return null;
   const dummyKeypair = Keypair.generate();
+  const readonlyWallet = createReadonlyWallet(dummyKeypair);
   const provider = new AnchorProvider(
     connection,
-    new Wallet(dummyKeypair),
+    readonlyWallet,
     { commitment: "confirmed" }
   );
   return new Program(routerIdl as Idl, provider);

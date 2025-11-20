@@ -2,13 +2,15 @@
 
 import { useMemo } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { AnchorProvider, BN, Idl, Program, Wallet } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, Idl, Program } from "@coral-xyz/anchor";
 import {
   AccountMeta,
   Connection,
   Keypair,
   PublicKey,
   SystemProgram,
+  Transaction,
+  VersionedTransaction,
   TransactionInstruction,
 } from "@solana/web3.js";
 import {
@@ -25,9 +27,21 @@ import toast from "react-hot-toast";
 
 const ROUTER_PROGRAM_ID = PROGRAM_IDS.routerProgram;
 
+function createReadonlyWallet(keypair: Keypair) {
+  return {
+    publicKey: keypair.publicKey,
+    async signTransaction<T extends Transaction | VersionedTransaction>(tx: T) {
+      return tx;
+    },
+    async signAllTransactions<T extends Transaction | VersionedTransaction>(txs: T[]) {
+      return txs;
+    },
+  };
+}
+
 function buildReadOnlyProgram(connection: Connection) {
   const dummy = Keypair.generate();
-  const provider = new AnchorProvider(connection, new Wallet(dummy), {
+  const provider = new AnchorProvider(connection, createReadonlyWallet(dummy), {
     commitment: "confirmed",
   });
   return new Program(routerIdl as Idl, provider);
