@@ -191,6 +191,13 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function GET() {
+  return NextResponse.json({
+    status: "ok",
+    message: "Use POST with token mints and pool address to derive router accounts."
+  });
+}
+
 async function deriveRaydiumAccounts(params: {
   tokenInMint: string;
   tokenOutMint: string;
