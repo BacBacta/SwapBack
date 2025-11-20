@@ -347,15 +347,6 @@ export function EnhancedSwapInterface() {
 
     if (!descriptors.length) {
       throw new Error(
-        }
-
-        if (resolution.accounts.dexProgramId === RAYDIUM_PROGRAM_ID_STR) {
-          return buildRaydiumAccountMetas(
-            resolution.accounts as RaydiumDexAccounts,
-            derived,
-            userAccounts,
-            resolution.descriptor
-          );
         "Aucune venue compatible n'a été trouvée dans le plan actuel. Relancez une recherche ou choisissez une autre route."
       );
     }
@@ -378,15 +369,6 @@ export function EnhancedSwapInterface() {
 
     return resolutions;
   };
-        }
-
-        if (resolution.accounts.dexProgramId === RAYDIUM_PROGRAM_ID_STR) {
-          return buildRaydiumAccountMetas(
-            resolution.accounts as RaydiumDexAccounts,
-            derived,
-            userAccounts,
-            resolution.descriptor
-          );
 
   const fetchOrcaDexAccounts = async (
     descriptor: DexStepDescriptor
