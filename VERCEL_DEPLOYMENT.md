@@ -13,7 +13,8 @@ Export encountered errors on following paths:
 2. ✅ Suppression de `/preview/*` (pages demo obsolètes)
 3. ✅ Suppression des anciennes pages (page-old.tsx, page-simple.tsx)
 4. ✅ Suppression de `/api/router/accounts` (dépendances natives incompatibles)
-5. ✅ Build propre sans erreurs d'export ou webpack
+5. ✅ Lazy loading de `EnhancedSwapInterface` (évite bundling webpack)
+6. ✅ Build propre sans erreurs d'export ou webpack
 
 ## 📋 Variables d'Environnement Vercel
 
