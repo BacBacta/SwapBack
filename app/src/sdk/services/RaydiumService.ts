@@ -5,11 +5,6 @@ import {
   VenueName,
   VenueType,
 } from "../types/smart-router";
-import {
-  AdapterHealthConfig,
-  AdapterHealthSnapshot,
-  AdapterHealthTracker,
-} from "./AdapterHealthTracker";
 
 const DEFAULT_CACHE_MS = Number(
   process.env.NEXT_PUBLIC_RAYDIUM_VAULT_CACHE_MS ?? 5000
@@ -18,7 +13,6 @@ const DEFAULT_CACHE_MS = Number(
 export type RaydiumServiceOptions = {
   enabled?: boolean;
   cacheTtlMs?: number;
-  health?: AdapterHealthConfig;
 };
 
 type CachedBalance = {
@@ -32,13 +26,11 @@ export class RaydiumService {
   private readonly enabled: boolean;
   private readonly cacheTtlMs: number;
   private readonly balanceCache = new Map<string, CachedBalance>();
-  private readonly healthTracker: AdapterHealthTracker;
 
   constructor(connection: Connection | null, options: RaydiumServiceOptions = {}) {
     this.connection = connection ?? null;
     this.enabled = options.enabled ?? true;
     this.cacheTtlMs = options.cacheTtlMs ?? DEFAULT_CACHE_MS;
-    this.healthTracker = new AdapterHealthTracker(options.health);
   }
 
   async fetchLiquidity(
@@ -46,25 +38,20 @@ export class RaydiumService {
     outputMint: string,
     inputAmount: number
   ): Promise<LiquiditySource | null> {
-    if (
-      !this.enabled ||
-      !this.connection ||
-      inputAmount <= 0 ||
-      !this.healthTracker.canAttempt()
-    ) {
+    if (!this.enabled || !this.connection || inputAmount <= 0) {
       return null;
     }
 
-    const inputPk = new PublicKey(inputMint);
-    const outputPk = new PublicKey(outputMint);
-    const pool = getRaydiumPool(inputPk, outputPk);
+    const pool = getRaydiumPool(
+      new PublicKey(inputMint),
+      new PublicKey(outputMint)
+    );
 
     if (!pool) {
       return null;
     }
 
     try {
-      const startedAt = Date.now();
       const [coinVault, pcVault] = await Promise.all([
         this.getCachedBalance(pool.poolCoinTokenAccount),
         this.getCachedBalance(pool.poolPcTokenAccount),
@@ -104,8 +91,6 @@ export class RaydiumService {
       };
       const depth =
         Math.min(coinVault.amount * spotPriceRaw, pcVault.amount) * 2;
-      this.healthTracker.markSuccess(Date.now() - startedAt);
-      const health = this.healthTracker.getHealth();
 
       return {
         venue: VenueName.RAYDIUM,
@@ -126,8 +111,6 @@ export class RaydiumService {
             feeBps: pool.feeBps,
             cacheAgeMs: this.getCacheAge(pool.poolCoinTokenAccount.toBase58()),
           },
-          latencyMs: health.lastLatencyMs,
-          health: health.status,
         },
       };
     } catch (error) {
@@ -136,23 +119,8 @@ export class RaydiumService {
         outputMint,
         error,
       });
-      this.healthTracker.markFailure(error);
       return null;
     }
-  }
-
-  supportsPair(inputMint: string, outputMint: string): boolean {
-    if (!inputMint || !outputMint) {
-      return false;
-    }
-    return (
-      getRaydiumPool(new PublicKey(inputMint), new PublicKey(outputMint)) !==
-      null
-    );
-  }
-
-  getHealth(): AdapterHealthSnapshot {
-    return this.healthTracker.getHealth();
   }
 
   private async getCachedBalance(address: PublicKey): Promise<CachedBalance> {

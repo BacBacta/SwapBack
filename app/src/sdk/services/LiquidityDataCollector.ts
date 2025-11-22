@@ -19,7 +19,6 @@ import { LifinityService } from "./LifinityService";
 import { ClobTradeDirection } from "./ClobMath";
 import { OrcaService } from "./OrcaService";
 import { RaydiumService } from "./RaydiumService";
-import { AdapterHealthSnapshot } from "./AdapterHealthTracker";
 import { StructuredLogger } from "../utils/StructuredLogger";
 
 // ============================================================================
@@ -151,16 +150,6 @@ const PRICE_SORT_EPSILON = 1e-9;
 type ClobHealthState = {
   consecutiveFailures: number;
   lastFailure: number;
-};
-
-type AmmAdapter = {
-  fetchLiquidity(
-    inputMint: string,
-    outputMint: string,
-    inputAmount: number
-  ): Promise<LiquiditySource | null>;
-  supportsPair?: (inputMint: string, outputMint: string) => boolean;
-  getHealth?: () => AdapterHealthSnapshot;
 };
 
 // ============================================================================
@@ -307,48 +296,6 @@ export class LiquidityDataCollector {
     }
   }
 
-  private getAmmAdapter(venue: VenueName): AmmAdapter | null {
-    switch (venue) {
-      case VenueName.ORCA:
-        return this.orcaService;
-      case VenueName.RAYDIUM:
-        return this.raydiumService;
-      case VenueName.METEORA:
-        return this.meteoraService;
-      case VenueName.LIFINITY:
-        return this.lifinityService;
-      default:
-        return null;
-    }
-  }
-
-  private shouldSkipAmmAdapter(
-    venue: VenueName,
-    adapter: AmmAdapter | null,
-    inputMint: string,
-    outputMint: string
-  ): boolean {
-    if (!adapter) {
-      console.warn("[liquidity][amm] adapter_missing", { venue });
-      return true;
-    }
-
-    if (adapter.supportsPair && !adapter.supportsPair(inputMint, outputMint)) {
-      return true;
-    }
-
-    const health = adapter.getHealth ? adapter.getHealth() : undefined;
-    if (health?.status === "offline") {
-      console.warn("[liquidity][amm] skip_offline", {
-        venue,
-        consecutiveFailures: health.consecutiveFailures,
-      });
-      return true;
-    }
-
-    return false;
-  }
-
   /**
    * Fetch CLOB (Phoenix, OpenBook) liquidity
    * Check top-of-book for immediate execution
@@ -420,7 +367,7 @@ export class LiquidityDataCollector {
     }
 
     const top = this.resolveTopOfBook(source);
-    const snapshot: OrderbookSnapshot | undefined = source.orderbook;
+    const snapshot = source.orderbook;
     const metadata = { ...(source.metadata ?? {}) } as Record<string, unknown>;
     const minCoverage = this.getVenueConfig(venue).minTopOfBookCoverage ?? 0;
     const latencyMs =
@@ -512,7 +459,7 @@ export class LiquidityDataCollector {
       return source.topOfBook;
     }
 
-    const snapshot = source.orderbook;
+    const snapshot: OrderbookSnapshot | undefined = source.orderbook;
     if (!snapshot) {
       return undefined;
     }
@@ -552,24 +499,36 @@ export class LiquidityDataCollector {
   ): Promise<LiquiditySource | null> {
     const config = VENUE_CONFIGS[venue];
 
-    const adapter = this.getAmmAdapter(venue);
-    if (
-      this.shouldSkipAmmAdapter(venue, adapter, inputMint, outputMint) ||
-      !adapter
-    ) {
-      return null;
+    // Orca Whirlpools integration
+    if (venue === VenueName.ORCA) {
+      return this.orcaService.fetchLiquidity(inputMint, outputMint, inputAmount);
     }
 
-    const result = await adapter.fetchLiquidity(
-      inputMint,
-      outputMint,
-      inputAmount
-    );
-    if (result) {
-      return result;
+    if (venue === VenueName.RAYDIUM) {
+      return this.raydiumService.fetchLiquidity(
+        inputMint,
+        outputMint,
+        inputAmount
+      );
     }
 
-    // All major AMM venues are now supported via dedicated adapters
+    if (venue === VenueName.METEORA) {
+      return this.meteoraService.fetchLiquidity(
+        inputMint,
+        outputMint,
+        inputAmount
+      );
+    }
+
+    if (venue === VenueName.LIFINITY) {
+      return this.lifinityService.fetchLiquidity(
+        inputMint,
+        outputMint,
+        inputAmount
+      );
+    }
+
+    // All major AMM venues are now supported via dedicated services
     // If we reach here, the venue is not yet implemented
     console.warn(
       `[liquidity][amm] Venue ${venue} not yet implemented - no mock fallback`

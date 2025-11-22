@@ -41,7 +41,7 @@ export interface VenueConfig {
   takerFeeBps?: number;
   priorityFeeLamports?: number;
   latencyTargetMs?: number;
-  featureFlag?: string; // NEXT_PUBLIC_ENABLE_<flag>
+  featureFlag?: string;
   minTopOfBookCoverage?: number; // Fraction (0-1) of requested size that best level must satisfy
 }
 

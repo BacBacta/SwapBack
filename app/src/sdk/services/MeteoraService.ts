@@ -2,11 +2,19 @@ import BN from "bn.js";
 import { Connection, PublicKey } from "@solana/web3.js";
 import DLMM from "@meteora-ag/dlmm";
 import { LiquiditySource, VenueName, VenueType } from "../types/smart-router";
-import {
-  AdapterHealthConfig,
-  AdapterHealthSnapshot,
-  AdapterHealthTracker,
-} from "./AdapterHealthTracker";
+
+const DEFAULT_REGISTRY_URL =
+  process.env.NEXT_PUBLIC_METEORA_POOL_REGISTRY_URL ??
+  "https://dlmm-api.meteora.ag/pair/all";
+const METEORA_ENABLED =
+  (process.env.NEXT_PUBLIC_ENABLE_METEORA ?? "true").toLowerCase() !==
+  "false";
+const DEFAULT_SLIPPAGE_BPS = Number(
+  process.env.NEXT_PUBLIC_METEORA_SLIPPAGE_BPS ?? 50
+);
+const DEFAULT_REGISTRY_TTL_MS = Number(
+  process.env.NEXT_PUBLIC_METEORA_POOL_CACHE_MS ?? 5 * 60 * 1000
+);
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 type DlmmInstance = InstanceType<typeof DLMM>;
@@ -34,21 +42,7 @@ type MeteoraServiceOptions = {
   registryTtlMs?: number;
   fetcher?: FetchLike;
   dlmmFactory?: DlmmFactory;
-  health?: AdapterHealthConfig;
 };
-
-const DEFAULT_REGISTRY_URL =
-  process.env.NEXT_PUBLIC_METEORA_POOL_REGISTRY_URL ??
-  "https://dlmm-api.meteora.ag/pair/all";
-const METEORA_ENABLED =
-  (process.env.NEXT_PUBLIC_ENABLE_METEORA ?? "true").toLowerCase() !==
-  "false";
-const DEFAULT_SLIPPAGE_BPS = Number(
-  process.env.NEXT_PUBLIC_METEORA_SLIPPAGE_BPS ?? 50
-);
-const DEFAULT_REGISTRY_TTL_MS = Number(
-  process.env.NEXT_PUBLIC_METEORA_POOL_CACHE_MS ?? 5 * 60 * 1000
-);
 
 export class MeteoraService {
   private readonly connection: Connection | null;
@@ -58,11 +52,9 @@ export class MeteoraService {
   private readonly registryTtlMs: number;
   private readonly fetcher: FetchLike;
   private readonly dlmmFactory: DlmmFactory;
-  private readonly healthTracker: AdapterHealthTracker;
 
   private registryPromise?: Promise<MeteoraPoolEntry[]>;
   private registryFetchedAt = 0;
-  private registryCache: MeteoraPoolEntry[] | null = null;
   private dlmmCache = new Map<string, Promise<DlmmInstance>>();
   private readonly zero = new BN(0);
 
@@ -96,7 +88,6 @@ export class MeteoraService {
         }
         return DLMM.create(connectionCtx, new PublicKey(address));
       });
-    this.healthTracker = new AdapterHealthTracker(options.health);
   }
 
   async fetchLiquidity(
@@ -104,18 +95,15 @@ export class MeteoraService {
     outputMint: string,
     inputAmount: number
   ): Promise<LiquiditySource | null> {
-    if (
-      !this.enabled ||
-      !this.connection ||
-      inputAmount <= 0 ||
-      !this.healthTracker.canAttempt()
-    ) {
+    if (!this.enabled || !this.connection) {
+      return null;
+    }
+
+    if (inputAmount <= 0) {
       return null;
     }
 
     const pools = await this.findCandidatePools(inputMint, outputMint);
-    const startedAt = Date.now();
-
     for (const pool of pools) {
       try {
         const source = await this.quotePool(
@@ -125,28 +113,14 @@ export class MeteoraService {
           inputAmount
         );
         if (source) {
-          this.healthTracker.markSuccess(Date.now() - startedAt);
-          const health = this.healthTracker.getHealth();
-          return {
-            ...source,
-            metadata: {
-              ...(source.metadata ?? {}),
-              health: health.status,
-              latencyMs: health.lastLatencyMs,
-            },
-          };
+          return source;
         }
       } catch (error) {
         console.warn("[meteora] pool_quote_failed", {
           pool: pool.address,
           error,
         });
-        this.healthTracker.markFailure(error);
       }
-    }
-
-    if (pools.length) {
-      this.healthTracker.markFailure("no_pool_produced_quote");
     }
 
     return null;
@@ -244,7 +218,6 @@ export class MeteoraService {
     outputMint: string
   ): Promise<MeteoraPoolEntry[]> {
     const registry = await this.loadRegistry();
-    this.registryCache = registry;
     return registry
       .filter((pool) => this.resolveDirection(pool, inputMint, outputMint))
       .sort((a, b) => this.toNumber(b.liquidity) - this.toNumber(a.liquidity));
@@ -260,15 +233,10 @@ export class MeteoraService {
     }
 
     this.registryFetchedAt = now;
-    this.registryPromise = this.downloadRegistry()
-      .then((registry) => {
-        this.registryCache = registry;
-        return registry;
-      })
-      .catch((error) => {
-        this.registryPromise = undefined;
-        throw error;
-      });
+    this.registryPromise = this.downloadRegistry().catch((error) => {
+      this.registryPromise = undefined;
+      throw error;
+    });
 
     return this.registryPromise;
   }
@@ -427,19 +395,5 @@ export class MeteoraService {
     }
 
     return 0;
-  }
-
-  supportsPair(inputMint: string, outputMint: string): boolean {
-    if (!this.registryCache || this.registryCache.length === 0) {
-      return true;
-    }
-
-    return this.registryCache.some(
-      (pool) => this.resolveDirection(pool, inputMint, outputMint) !== null
-    );
-  }
-
-  getHealth(): AdapterHealthSnapshot {
-    return this.healthTracker.getHealth();
   }
 }

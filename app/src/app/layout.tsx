@@ -6,6 +6,7 @@ import { QueryProvider } from "@/components/QueryProvider";
 import { Toaster } from "react-hot-toast";
 import { GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 import { DebugLogPanel } from "@/components/DebugLogPanel";
+import { Navbar } from "@/components/Navbar";
 // import { WalletConnectionGuide } from "@/components/WalletConnectionGuide";
 // import { NetworkStatusIndicator } from "@/components/NetworkStatusIndicator";
 // import { NetworkInfoModal } from "@/components/NetworkInfoModal";
@@ -43,7 +44,10 @@ export default function RootLayout({
         <GlobalErrorBoundary>
           <QueryProvider>
             <ClientWalletProvider>
-              {children}
+              <Navbar />
+              <main id="main-content">
+                {children}
+              </main>
               {/* <WalletConnectionGuide /> */}
               {/* <NetworkStatusIndicator /> */}
               {/* <NetworkInfoModal /> */}

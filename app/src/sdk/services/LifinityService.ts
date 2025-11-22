@@ -1,15 +1,7 @@
 import { AccountInfo, Connection, PublicKey } from "@solana/web3.js";
 import { AccountLayout, u64 } from "@solana/spl-token";
-import {
-  getAmountOut as lifinityGetAmountOut,
-  getPoolList,
-} from "@lifinity/sdk";
+import { getAmountOut as lifinityGetAmountOut, getPoolList } from "@lifinity/sdk";
 import { LiquiditySource, VenueName, VenueType } from "../types/smart-router";
-import {
-  AdapterHealthConfig,
-  AdapterHealthSnapshot,
-  AdapterHealthTracker,
-} from "./AdapterHealthTracker";
 
 const LIFINITY_ENABLED =
   (process.env.NEXT_PUBLIC_ENABLE_LIFINITY ?? "true").toLowerCase() !==
@@ -60,7 +52,6 @@ type LifinityServiceOptions = {
   poolListProvider?: typeof getPoolList;
   accountInfoFetcher?: AccountInfoFetcher;
   balanceResolver?: BalanceResolver;
-  health?: AdapterHealthConfig;
 };
 
 export class LifinityService {
@@ -74,7 +65,6 @@ export class LifinityService {
   private readonly balanceResolver: BalanceResolver | null;
 
   private balanceCache = new Map<string, { value: number; fetchedAt: number }>();
-  private readonly healthTracker: AdapterHealthTracker;
 
   constructor(connection: Connection | null, options: LifinityServiceOptions = {}) {
     this.connection = connection ?? null;
@@ -87,7 +77,6 @@ export class LifinityService {
       options.accountInfoFetcher ??
       ((conn, addresses) => conn.getMultipleAccountsInfo(addresses));
     this.balanceResolver = options.balanceResolver ?? null;
-    this.healthTracker = new AdapterHealthTracker(options.health);
   }
 
   async fetchLiquidity(
@@ -95,43 +84,23 @@ export class LifinityService {
     outputMint: string,
     inputAmount: number
   ): Promise<LiquiditySource | null> {
-    if (
-      !this.enabled ||
-      !this.connection ||
-      inputAmount <= 0 ||
-      !this.healthTracker.canAttempt()
-    ) {
+    if (!this.enabled || !this.connection || inputAmount <= 0) {
       return null;
     }
 
     const pools = this.findPools(inputMint, outputMint);
-    const startedAt = Date.now();
     for (const pool of pools) {
       try {
         const source = await this.quotePool(pool, inputMint, outputMint, inputAmount);
         if (source) {
-          this.healthTracker.markSuccess(Date.now() - startedAt);
-          const health = this.healthTracker.getHealth();
-          return {
-            ...source,
-            metadata: {
-              ...(source.metadata ?? {}),
-              health: health.status,
-              latencyMs: health.lastLatencyMs,
-            },
-          };
+          return source;
         }
       } catch (error) {
         console.warn("[lifinity] pool_quote_failed", {
           pool: pool.amm,
           error,
         });
-        this.healthTracker.markFailure(error);
       }
-    }
-
-    if (pools.length) {
-      this.healthTracker.markFailure("no_pool_produced_quote");
     }
 
     return null;
@@ -356,16 +325,5 @@ export class LifinityService {
       return 0;
     }
     return value! / 100;
-  }
-
-  supportsPair(inputMint: string, outputMint: string): boolean {
-    const poolMap = this.poolListProvider();
-    return Object.values(poolMap).some((pool) =>
-      this.matchesPool(pool, inputMint, outputMint)
-    );
-  }
-
-  getHealth(): AdapterHealthSnapshot {
-    return this.healthTracker.getHealth();
   }
 }

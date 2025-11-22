@@ -25,11 +25,6 @@ import {
   VenueName,
   VenueType,
 } from "../types/smart-router";
-import {
-  AdapterHealthConfig,
-  AdapterHealthSnapshot,
-  AdapterHealthTracker,
-} from "./AdapterHealthTracker";
 
 const DEFAULT_ORCA_SLIPPAGE_BPS = Number(
   process.env.NEXT_PUBLIC_ORCA_SLIPPAGE_BPS ?? 50
@@ -56,7 +51,6 @@ export type OrcaServiceOptions = {
   slippageBps?: number;
   programId?: PublicKey;
   wallet?: Wallet;
-  health?: AdapterHealthConfig;
 };
 
 export class OrcaService {
@@ -68,7 +62,6 @@ export class OrcaService {
   private readonly poolCache = new Map<string, Promise<Whirlpool>>();
   private client?: WhirlpoolClient;
   private fetcher?: WhirlpoolAccountFetcherInterface;
-  private readonly healthTracker: AdapterHealthTracker;
 
   constructor(connection: Connection | null, options: OrcaServiceOptions = {}) {
     this.connection = connection ?? null;
@@ -76,7 +69,6 @@ export class OrcaService {
     this.slippageBps = options.slippageBps ?? DEFAULT_ORCA_SLIPPAGE_BPS;
     this.programId = options.programId ?? ORCA_WHIRLPOOL_PROGRAM_ID;
     this.wallet = options.wallet ?? new ReadonlyWallet();
-    this.healthTracker = new AdapterHealthTracker(options.health);
 
     if (this.connection && this.enabled) {
       const provider = new AnchorProvider(
@@ -103,18 +95,12 @@ export class OrcaService {
       !this.connection ||
       !this.client ||
       !this.fetcher ||
-      inputAmount <= 0 ||
-      !this.healthTracker.canAttempt()
+      inputAmount <= 0
     ) {
       return null;
     }
 
     try {
-      if (!this.supportsPair(inputMint, outputMint)) {
-        return null;
-      }
-
-      const startedAt = Date.now();
       const poolAddress = getOrcaWhirlpool(
         new PublicKey(inputMint),
         new PublicKey(outputMint)
@@ -211,9 +197,7 @@ export class OrcaService {
         outputInfo.decimals
       );
       const depth = Math.min(reserveInput, reserveOutput) * 2;
-      this.healthTracker.markSuccess(Date.now() - startedAt);
 
-      const health = this.healthTracker.getHealth();
       return {
         venue: VenueName.ORCA,
         venueType: VenueType.AMM,
@@ -236,8 +220,6 @@ export class OrcaService {
             inputDecimals: inputInfo.decimals,
             outputDecimals: outputInfo.decimals,
           },
-          latencyMs: health.lastLatencyMs,
-          health: health.status,
         },
       };
     } catch (error) {
@@ -246,22 +228,8 @@ export class OrcaService {
         outputMint,
         error,
       });
-      this.healthTracker.markFailure(error);
       return null;
     }
-  }
-
-  supportsPair(inputMint: string, outputMint: string): boolean {
-    if (!inputMint || !outputMint) {
-      return false;
-    }
-    const inputPk = new PublicKey(inputMint);
-    const outputPk = new PublicKey(outputMint);
-    return getOrcaWhirlpool(inputPk, outputPk) !== null;
-  }
-
-  getHealth(): AdapterHealthSnapshot {
-    return this.healthTracker.getHealth();
   }
 
   private async getPool(address: string): Promise<Whirlpool> {

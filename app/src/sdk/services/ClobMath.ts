@@ -123,7 +123,6 @@ export function simulateClobFill(
     };
   }
 
-  // direction === 'sellQuote'
   let remainingQuote = params.inputAmount;
   let grossBase = 0;
 

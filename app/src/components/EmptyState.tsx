@@ -1,5 +1,7 @@
 "use client";
 
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+
 interface EmptyStateProps {
   icon?: string;
   title: string;
@@ -8,6 +10,7 @@ interface EmptyStateProps {
     label: string;
     onClick: () => void;
   };
+  showWalletButton?: boolean;
 }
 
 export const EmptyState = ({
@@ -15,6 +18,7 @@ export const EmptyState = ({
   title,
   description,
   action,
+  showWalletButton = false,
 }: EmptyStateProps) => {
   return (
     <div className="swap-card text-center py-16">
@@ -31,7 +35,11 @@ export const EmptyState = ({
         {description}
       </p>
 
-      {action && (
+      {showWalletButton ? (
+        <div className="flex justify-center">
+          <WalletMultiButton className="!bg-[var(--primary)] !text-[#19162F] hover:!bg-gray-100 !rounded-lg !font-medium !px-6 !py-3 !text-base !transition-all !shadow-md" />
+        </div>
+      ) : action ? (
         <button
           onClick={action.onClick}
           className="btn-primary px-8 py-3 terminal-text"
@@ -39,7 +47,7 @@ export const EmptyState = ({
           <span className="terminal-prefix">&gt;</span> [
           {action.label.toUpperCase().replace(/ /g, "_")}]
         </button>
-      )}
+      ) : null}
 
       {/* Decorative elements */}
       <div className="mt-8 flex justify-center gap-2">
@@ -71,6 +79,7 @@ export const NoConnectionState = () => {
       icon="👛"
       title="Wallet Not Connected"
       description="> Connect your wallet to view your personalized dashboard and trading statistics"
+      showWalletButton={true}
     />
   );
 };

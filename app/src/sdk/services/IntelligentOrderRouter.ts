@@ -106,7 +106,6 @@ const DEFAULT_OPTIONS: IntelligentRouterOptions = {
 };
 
 const DEFAULT_TWAP_TRIGGER_RATIO = (() => {
-
   const raw = Number(
     process.env.NEXT_PUBLIC_ROUTER_TWAP_TRIGGER_RATIO ?? 0.3
   );
@@ -698,10 +697,8 @@ export class IntelligentOrderRouter {
   }
 
   /**
-   * Simulate venue execution using the most accurate model available.
-   * For CLOBs we replay against the in-memory orderbook so routing decisions
-   * reflect real depth instead of a single top-of-book price. AMMs keep using
-   * xy=k math while RFQ venues fall back to their quoted effective price.
+   * Simulate venue execution with consistent pricing semantics so both app
+   * and SDK share identical routing heuristics.
    */
   private simulateSourceOutput(
     source: LiquiditySource,

@@ -14,10 +14,10 @@ export const ClientWalletProvider: FC<{ children: ReactNode }> = ({ children }) 
     setMounted(true);
   }, []);
 
-  // Pendant le SSR et l'hydration initiale, on attend d'être côté client
-  // avant de rendre les children pour éviter d'appeler useWallet sans provider
+  // Pendant le SSR, on rend quand même les children pour éviter un écran blanc
+  // Le WalletProvider gérera l'hydration proprement
   if (!mounted) {
-    return null;
+    return <div suppressHydrationWarning>{children}</div>;
   }
 
   // Une fois monté côté client, on peut utiliser le WalletProvider complet

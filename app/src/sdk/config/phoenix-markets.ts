@@ -38,7 +38,7 @@ const DEFAULT_PHOENIX_MARKETS: PhoenixMarketConfig[] = [
     quoteDecimals: 6,
     lotSize: 0.01,
     tickSize: 0.0001,
-    makerFeeBps: -1, // Phoenix rebates makers
+    makerFeeBps: -1,
     takerFeeBps: 5,
   },
   {
@@ -57,6 +57,10 @@ const DEFAULT_PHOENIX_MARKETS: PhoenixMarketConfig[] = [
 
 let phoenixMarketMap: PhoenixMarketMap | null = null;
 
+function pairKey(baseMint: string, quoteMint: string): string {
+  return `${baseMint}:${quoteMint}`;
+}
+
 function loadPhoenixMarkets(): PhoenixMarketMap {
   if (phoenixMarketMap) {
     return phoenixMarketMap;
@@ -64,8 +68,7 @@ function loadPhoenixMarkets(): PhoenixMarketMap {
 
   const map: PhoenixMarketMap = {};
   for (const config of DEFAULT_PHOENIX_MARKETS) {
-    const key = pairKey(config.baseMint.toBase58(), config.quoteMint.toBase58());
-    map[key] = config;
+    map[pairKey(config.baseMint.toBase58(), config.quoteMint.toBase58())] = config;
   }
 
   const override = process.env.NEXT_PUBLIC_PHOENIX_MARKETS_JSON;
@@ -111,10 +114,6 @@ function loadPhoenixMarkets(): PhoenixMarketMap {
   return map;
 }
 
-function pairKey(baseMint: string, quoteMint: string): string {
-  return `${baseMint}:${quoteMint}`;
-}
-
 export function isPhoenixEnabled(): boolean {
   const flag = process.env.NEXT_PUBLIC_ENABLE_PHOENIX;
   if (!flag) return true;
@@ -129,14 +128,6 @@ export const PHOENIX_MARKETS: Record<string, PublicKey> = Object.fromEntries(
   DEFAULT_PHOENIX_MARKETS.map((cfg) => [cfg.symbol, cfg.marketAddress])
 );
 
-/**
- * Token pair to Phoenix market mapping
- */
-export type PhoenixMarketPair = keyof typeof PHOENIX_MARKETS;
-
-/**
- * Get Phoenix market address for a token pair
- */
 export function getPhoenixMarketConfig(
   inputMint: string,
   outputMint: string
@@ -158,26 +149,15 @@ export function getPhoenixMarket(inputMint: string, outputMint: string): PublicK
   return match ? match.config.marketAddress : null;
 }
 
-/**
- * Check if a token pair has a Phoenix market
- */
 export function hasPhoenixMarket(inputMint: string, outputMint: string): boolean {
   return getPhoenixMarket(inputMint, outputMint) !== null;
 }
 
-/**
- * Phoenix program ID on Solana Mainnet
- */
 export const PHOENIX_PROGRAM_ID = new PublicKey('PhoeNiXZ8ByJGLkxNfZRnkUfjvmuYqLR89jjFHGqdXY');
 
-/**
- * Phoenix configuration
- */
 export const PHOENIX_CONFIG = {
   programId: PHOENIX_PROGRAM_ID,
   cluster: 'mainnet-beta' as const,
-  // Phoenix has very tight spreads, minimal slippage on CLOB
-  defaultSlippageBps: 10, // 0.1%
-  // Orderbook refresh rate
-  refreshIntervalMs: 1000, // 1 second
+  defaultSlippageBps: 10,
+  refreshIntervalMs: 1000,
 };
