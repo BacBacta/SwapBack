@@ -140,6 +140,20 @@ export class RouteOptimizationEngine {
     // Step 5: Sort by expected output, honoring CLOB bias if requested
     this.rankCandidates(candidates, config);
 
+    // Step 5.1: Enrich candidates with routing strategy metadata
+    for (const candidate of candidates) {
+      candidate.strategy = this.buildStrategyMetadata(
+        candidate,
+        inputAmount,
+        config
+      );
+    }
+
+    // Step 5.2: Generate fallback plans if enabled
+    if (config.enableFallback && candidates.length > 1) {
+      this.enrichWithFallbackPlans(candidates);
+    }
+
     const diagnostics = this.buildRoutingDiagnostics(
       inputMint,
       outputMint,
@@ -654,6 +668,113 @@ export class RouteOptimizationEngine {
         venueOrder: dexList.map((d) => d.venue),
       };
     }
+  }
+
+  /**
+   * Build routing strategy metadata for a candidate
+   */
+  private buildStrategyMetadata(
+    candidate: RouteCandidate,
+    inputAmount: number,
+    config: OptimizationConfig
+  ): RoutingStrategyMetadata {
+    const profile = candidate.splits.length > 1 ? "split" : "direct";
+    const usesClob = this.routeUsesClob(candidate);
+
+    // Determine if TWAP is recommended
+    const twapRecommended = this.shouldRecommendTWAP(inputAmount, candidate);
+    const twap = twapRecommended
+      ? this.generateTWAPHints(inputAmount, candidate, config)
+      : undefined;
+
+    return {
+      profile,
+      fallbackCount: 0, // Will be updated by enrichWithFallbackPlans
+      twap,
+    };
+  }
+
+  /**
+   * Determine if TWAP execution is recommended
+   */
+  private shouldRecommendTWAP(
+    inputAmount: number,
+    candidate: RouteCandidate
+  ): boolean {
+    // Recommend TWAP for large orders that would cause significant slippage
+    const HIGH_SLIPPAGE_THRESHOLD = 0.005; // 0.5%
+    const LARGE_TRADE_THRESHOLD = 100000; // $100k USD equivalent
+
+    const hasHighSlippage = candidate.splits.some(
+      (split) => split.liquiditySource.slippagePercent > HIGH_SLIPPAGE_THRESHOLD
+    );
+
+    const isLargeTrade = inputAmount > LARGE_TRADE_THRESHOLD;
+
+    return hasHighSlippage && isLargeTrade;
+  }
+
+  /**
+   * Generate TWAP execution hints
+   */
+  private generateTWAPHints(
+    inputAmount: number,
+    candidate: RouteCandidate,
+    config: OptimizationConfig
+  ): RoutingStrategyMetadata["twap"] {
+    // Calculate optimal number of slices based on amount and slippage
+    const maxSlippage = Math.max(
+      ...candidate.splits.map((s) => s.liquiditySource.slippagePercent)
+    );
+
+    // More slippage = more slices needed
+    let slices = 3; // Default
+    if (maxSlippage > 0.01) slices = 5;
+    if (maxSlippage > 0.02) slices = 8;
+    if (maxSlippage > 0.05) slices = 12;
+
+    // Calculate interval between slices (in milliseconds)
+    // Use exponential backoff for better price discovery
+    const baseInterval = 2000; // 2 seconds
+    const intervalMs = baseInterval * Math.pow(1.5, Math.log10(maxSlippage * 100));
+
+    return {
+      recommended: true,
+      slices,
+      intervalMs: Math.round(intervalMs),
+      rationale: `High slippage detected (${(maxSlippage * 100).toFixed(2)}%). Splitting into ${slices} chunks reduces price impact.`,
+    };
+  }
+
+  /**
+   * Enrich top candidates with fallback plans
+   */
+  private enrichWithFallbackPlans(candidates: RouteCandidate[]): void {
+    if (candidates.length < 2) return;
+
+    // Primary route gets next 2 candidates as fallbacks
+    const primary = candidates[0];
+    const fallbacks = candidates.slice(1, 3);
+
+    if (primary.strategy) {
+      primary.strategy.fallbackCount = fallbacks.length;
+    }
+
+    // Store fallback route IDs in metadata
+    primary.metadata = {
+      ...primary.metadata,
+      fallbackRouteIds: fallbacks.map((f) => f.id),
+    };
+
+    this.logger.info("fallback_plans_generated", {
+      primaryRoute: primary.id,
+      fallbackCount: fallbacks.length,
+      fallbacks: fallbacks.map((f) => ({
+        id: f.id,
+        venues: f.venues,
+        expectedOutput: f.expectedOutput,
+      })),
+    });
   }
 
   private buildRoutingDiagnostics(
