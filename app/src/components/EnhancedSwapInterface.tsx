@@ -373,51 +373,22 @@ export function EnhancedSwapInterface() {
   const fetchOrcaDexAccounts = async (
     descriptor: DexStepDescriptor
   ): Promise<OrcaDexAccounts> => {
-    const response = await fetch("/api/router/accounts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ammKey: descriptor.ammKey,
-        tokenInMint: descriptor.inputMint,
-        tokenOutMint: descriptor.outputMint,
-        dexProgramId: descriptor.dexProgramId,
-      }),
-    });
-
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      throw new Error(
-        payload?.error ||
-          `Échec de la résolution des comptes Orca pour ${descriptor.label}.`
-      );
-    }
-
-    const payload = (await response.json()) as OrcaDexAccounts;
-    return {
-      ...payload,
-      dexProgramId: ORCA_PROGRAM_ID_STR,
-    };
+    // TODO: Implement client-side account resolution
+    // For now, throw an error to indicate this feature is not available
+    throw new Error(
+      `La résolution des comptes Orca pour ${descriptor.label} nécessite un backend. Veuillez utiliser Jupiter API ou une route alternative.`
+    );
   };
 
   const fetchRaydiumDexAccounts = async (
     descriptor: DexStepDescriptor
   ): Promise<RaydiumDexAccounts> => {
-    const response = await fetch("/api/router/accounts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ammKey: descriptor.ammKey,
-        tokenInMint: descriptor.inputMint,
-        tokenOutMint: descriptor.outputMint,
-        dexProgramId: descriptor.dexProgramId,
-      }),
-    });
-
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      throw new Error(
-        payload?.error ||
-          `Échec de la résolution des comptes Raydium pour ${descriptor.label}.`
+    // TODO: Implement client-side account resolution
+    // For now, throw an error to indicate this feature is not available
+    throw new Error(
+      `La résolution des comptes Raydium pour ${descriptor.label} nécessite un backend. Veuillez utiliser Jupiter API ou une route alternative.`
+    );
+  };
       );
     }
 
