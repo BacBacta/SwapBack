@@ -23,6 +23,15 @@ vi.mock("@ellipsis-labs/phoenix-sdk", () => ({
   })),
 }));
 
+// Mock Meteora DLMM SDK to avoid loading native deps during tests
+vi.mock("@meteora-ag/dlmm", () => ({
+  default: class MockDlmm {
+    static async create() {
+      throw new Error("not implemented in tests");
+    }
+  },
+}));
+
 // Mock axios for Jupiter API
 vi.mock("axios", () => ({
   default: {
@@ -32,30 +41,141 @@ vi.mock("axios", () => ({
 }));
 
 // ============================================================================
-// MOCK DATA
+// DETERMINISTIC MOCK HELPERS
 // ============================================================================
 
-const createMockLiquiditySource = (
+const DEFAULT_INPUT_MINT = "So11111111111111111111111111111111111111112";
+const DEFAULT_OUTPUT_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+const deterministicVenueConfigs: Partial<
+  Record<VenueName, Partial<LiquiditySource>>
+> = {
+  [VenueName.PHOENIX]: {
+    venueType: VenueType.CLOB,
+    depth: 600000,
+    effectivePrice: 19.8,
+    topOfBook: { bidPrice: 49.9, askPrice: 50, bidSize: 10, askSize: 9 },
+    metadata: { direction: "sellBase", takerFeeBps: 5 },
+  },
+  [VenueName.OPENBOOK]: {
+    venueType: VenueType.CLOB,
+    depth: 500000,
+    effectivePrice: 20.05,
+    topOfBook: { bidPrice: 49.5, askPrice: 49.9, bidSize: 8, askSize: 7 },
+    metadata: { direction: "sellBase", takerFeeBps: 5 },
+  },
+  [VenueName.ORCA]: {
+    venueType: VenueType.AMM,
+    depth: 400000,
+    effectivePrice: 20.1,
+    reserves: { input: 1_000_000, output: 500_000 },
+  },
+  [VenueName.RAYDIUM]: {
+    venueType: VenueType.AMM,
+    depth: 350000,
+    effectivePrice: 20.2,
+    reserves: { input: 1_000_000, output: 500_000 },
+  },
+  [VenueName.METEORA]: {
+    venueType: VenueType.AMM,
+    depth: 200000,
+    effectivePrice: 20.4,
+    reserves: { input: 1_000_000, output: 500_000 },
+  },
+  [VenueName.LIFINITY]: {
+    venueType: VenueType.AMM,
+    depth: 180000,
+    effectivePrice: 20.45,
+    reserves: { input: 1_000_000, output: 500_000 },
+  },
+  [VenueName.JUPITER]: {
+    venueType: VenueType.RFQ,
+    depth: 250000,
+    effectivePrice: 20.5,
+  },
+  [VenueName.METIS]: {
+    venueType: VenueType.RFQ,
+    depth: 150000,
+    effectivePrice: 20.6,
+  },
+};
+
+const buildMockSource = (
   venue: VenueName,
-  type: VenueType,
-  price: number,
-  depth: number,
-  priority: number
-): LiquiditySource => ({
-  venue,
-  type,
-  depth,
-  effectivePrice: price,
-  expectedOutput: depth * price,
-  feeRate: 0.003,
-  priceImpact: 0.01,
-  route: { hops: 1, venues: [venue] },
-  executionTime: 500,
-  confidence: 0.95,
-  timestamp: Date.now(),
-  priority,
-  slippage: 0.005,
-});
+  inputMint: string,
+  outputMint: string,
+  overrides: Partial<LiquiditySource> = {}
+): LiquiditySource => {
+  const inferredType =
+    overrides.venueType ??
+    deterministicVenueConfigs[venue]?.venueType ??
+    (venue === VenueName.JUPITER || venue === VenueName.METIS
+      ? VenueType.RFQ
+      : venue === VenueName.PHOENIX || venue === VenueName.OPENBOOK
+        ? VenueType.CLOB
+        : VenueType.AMM);
+
+  return {
+    venue,
+    venueType: inferredType,
+    tokenPair: [inputMint, outputMint],
+    depth:
+      overrides.depth ?? deterministicVenueConfigs[venue]?.depth ?? 250000,
+    effectivePrice:
+      overrides.effectivePrice ??
+      deterministicVenueConfigs[venue]?.effectivePrice ??
+      20,
+    feeAmount:
+      overrides.feeAmount ??
+      deterministicVenueConfigs[venue]?.feeAmount ??
+      0.05,
+    slippagePercent:
+      overrides.slippagePercent ??
+      deterministicVenueConfigs[venue]?.slippagePercent ??
+      0.001,
+    route: overrides.route ?? [inputMint, outputMint],
+    timestamp: Date.now(),
+    reserves:
+      overrides.reserves ?? deterministicVenueConfigs[venue]?.reserves,
+    topOfBook:
+      overrides.topOfBook ?? deterministicVenueConfigs[venue]?.topOfBook,
+    orderbook:
+      overrides.orderbook ?? deterministicVenueConfigs[venue]?.orderbook,
+    metadata:
+      overrides.metadata ??
+      deterministicVenueConfigs[venue]?.metadata ??
+      (inferredType === VenueType.CLOB
+        ? { direction: "sellBase", takerFeeBps: 5 }
+        : undefined),
+  };
+};
+
+const defaultFetchImplementation = async (
+  venue: VenueName,
+  inputMint: string,
+  outputMint: string
+): Promise<LiquiditySource | null> => {
+  const template = deterministicVenueConfigs[venue];
+  if (!template) {
+    return null;
+  }
+  return buildMockSource(venue, inputMint, outputMint, template);
+};
+
+const attachDeterministicFetch = (
+  instance: LiquidityDataCollector,
+  impl: typeof defaultFetchImplementation = defaultFetchImplementation
+) =>
+  vi
+    .spyOn(instance as any, "fetchVenueLiquidity")
+    .mockImplementation(
+      async (
+        venue: VenueName,
+        inputMint: string,
+        outputMint: string,
+        _inputAmount: number
+      ) => impl(venue, inputMint, outputMint)
+    );
 
 // ============================================================================
 // TEST SUITE
@@ -64,6 +184,7 @@ const createMockLiquiditySource = (
 describe("LiquidityDataCollector", () => {
   let collector: LiquidityDataCollector;
   let mockConnection: any;
+  let fetchVenueMock: ReturnType<typeof attachDeterministicFetch>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -74,6 +195,7 @@ describe("LiquidityDataCollector", () => {
     };
 
     collector = new LiquidityDataCollector(mockConnection as Connection, 10000);
+    fetchVenueMock = attachDeterministicFetch(collector);
   });
 
   // ============================================================================
@@ -82,40 +204,9 @@ describe("LiquidityDataCollector", () => {
 
   describe("Aggregated Liquidity Fetching", () => {
     it("should aggregate liquidity from multiple venues", async () => {
-      const inputMint = "So11111111111111111111111111111111111111112"; // SOL
-      const outputMint = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"; // USDC
+      const inputMint = DEFAULT_INPUT_MINT;
+      const outputMint = DEFAULT_OUTPUT_MINT;
       const inputAmount = 100;
-
-      // Mock Jupiter response (RFQ)
-      const axios = await import("axios");
-      (axios.default.get as any).mockResolvedValue({
-        data: {
-          data: [
-            {
-              inAmount: "100000000000", // 100 SOL
-              outAmount: "10000000000", // 10000 USDC (price = 100)
-              priceImpactPct: 0.5,
-              marketInfos: [{ label: "Jupiter", lpFee: { pct: 0 } }],
-            },
-          ],
-        },
-      });
-
-      // Mock Orca pool account (AMM)
-      const orcaPoolBuffer = Buffer.alloc(512);
-      // Simplified Orca whirlpool data - real implementation would parse correctly
-      orcaPoolBuffer.writeBigUInt64LE(BigInt(1000000000000), 0); // liquidity
-      orcaPoolBuffer.writeBigInt64LE(BigInt(50000000), 64); // token A amount
-      orcaPoolBuffer.writeBigInt64LE(BigInt(5000000000), 128); // token B amount
-
-      const mockOrcaAccount: Partial<AccountInfo<Buffer>> = {
-        data: orcaPoolBuffer,
-        owner: new PublicKey("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"),
-        lamports: 1000000,
-        executable: false,
-      };
-
-      mockConnection.getAccountInfo.mockResolvedValue(mockOrcaAccount);
 
       const result = await collector.fetchAggregatedLiquidity(
         inputMint,
@@ -282,6 +373,7 @@ describe("LiquidityDataCollector", () => {
         mockConnection as Connection,
         shortCacheMs
       );
+      attachDeterministicFetch(collectorShortCache);
 
       const inputMint = "So11111111111111111111111111111111111111112";
       const outputMint = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -391,25 +483,18 @@ describe("LiquidityDataCollector", () => {
 
   describe("Error Handling", () => {
     it("should handle venue fetch failures gracefully", async () => {
-      const inputMint = "So11111111111111111111111111111111111111112";
-      const outputMint = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+      const inputMint = DEFAULT_INPUT_MINT;
+      const outputMint = DEFAULT_OUTPUT_MINT;
       const inputAmount = 100;
 
-      // Mock Jupiter failure
-      const axios = await import("axios");
-      (axios.default.get as any).mockRejectedValue(
-        new Error("Jupiter API down")
+      fetchVenueMock.mockImplementation(
+        async (venue: VenueName, mintIn: string, mintOut: string) => {
+          if (venue === VenueName.JUPITER) {
+            return null; // Simulate RFQ outage
+          }
+          return defaultFetchImplementation(venue, mintIn, mintOut);
+        }
       );
-
-      // Mock Orca success
-      const mockOrcaAccount: Partial<AccountInfo<Buffer>> = {
-        data: Buffer.alloc(512),
-        owner: new PublicKey("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"),
-        lamports: 1000000,
-        executable: false,
-      };
-
-      mockConnection.getAccountInfo.mockResolvedValue(mockOrcaAccount);
 
       // Should still return data from Orca (no throw)
       const result = await collector.fetchAggregatedLiquidity(
@@ -423,16 +508,32 @@ describe("LiquidityDataCollector", () => {
     });
 
     it("should return fallback AMM data when implemented venues fail", async () => {
-      const inputMint = "So11111111111111111111111111111111111111112";
-      const outputMint = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+      const inputMint = DEFAULT_INPUT_MINT;
+      const outputMint = DEFAULT_OUTPUT_MINT;
       const inputAmount = 100;
 
-      // Mock Jupiter failure (RFQ)
-      const axios = await import("axios");
-      (axios.default.get as any).mockRejectedValue(new Error("API down"));
+      fetchVenueMock.mockImplementation(
+        async (venue: VenueName, mintIn: string, mintOut: string) => {
+          if (venue === VenueName.JUPITER || venue === VenueName.ORCA) {
+            return null; // Force primary venues to fail
+          }
 
-      // Mock Orca failure (only implemented AMM)
-      mockConnection.getAccountInfo.mockResolvedValue(null);
+          if (
+            venue === VenueName.RAYDIUM ||
+            venue === VenueName.METEORA ||
+            venue === VenueName.LIFINITY
+          ) {
+            return buildMockSource(venue, mintIn, mintOut, {
+              venueType: VenueType.AMM,
+              reserves: { input: 1_000_000, output: 500_000 },
+              depth: 300000,
+              effectivePrice: 20.3,
+            });
+          }
+
+          return defaultFetchImplementation(venue, mintIn, mintOut);
+        }
+      );
 
       const result = await collector.fetchAggregatedLiquidity(
         inputMint,
@@ -456,6 +557,58 @@ describe("LiquidityDataCollector", () => {
           expect(source.reserves.output).toBe(500000);
         }
       });
+    });
+  });
+
+  // ============================================================================
+  // TEST 3: REAL AMM SERVICE INTEGRATION (METEORA + LIFINITY)
+  // ============================================================================
+
+  describe("AMM service integration", () => {
+    beforeEach(() => {
+      fetchVenueMock.mockRestore();
+    });
+
+    it("delegates Meteora and Lifinity venues to their services", async () => {
+      const inputMint = DEFAULT_INPUT_MINT;
+      const outputMint = DEFAULT_OUTPUT_MINT;
+      const inputAmount = 5;
+
+      const meteoraQuote = buildMockSource(VenueName.METEORA, inputMint, outputMint, {
+        effectivePrice: 20.12,
+        depth: 12345,
+      });
+      const lifinityQuote = buildMockSource(
+        VenueName.LIFINITY,
+        inputMint,
+        outputMint,
+        {
+          effectivePrice: 20.18,
+          depth: 9876,
+        }
+      );
+
+      const meteoraSpy = vi
+        .spyOn((collector as any).meteoraService, "fetchLiquidity")
+        .mockResolvedValue(meteoraQuote);
+      const lifinitySpy = vi
+        .spyOn((collector as any).lifinityService, "fetchLiquidity")
+        .mockResolvedValue(lifinityQuote);
+
+      const result = await collector.fetchAggregatedLiquidity(
+        inputMint,
+        outputMint,
+        inputAmount,
+        [VenueName.METEORA, VenueName.LIFINITY]
+      );
+
+      expect(meteoraSpy).toHaveBeenCalledWith(inputMint, outputMint, inputAmount);
+      expect(lifinitySpy).toHaveBeenCalledWith(inputMint, outputMint, inputAmount);
+      expect(result.sources).toHaveLength(2);
+      expect(result.totalDepth).toBeCloseTo(meteoraQuote.depth + lifinityQuote.depth);
+      expect(result.sources.map((s) => s.venue)).toEqual(
+        expect.arrayContaining([VenueName.METEORA, VenueName.LIFINITY])
+      );
     });
   });
 });

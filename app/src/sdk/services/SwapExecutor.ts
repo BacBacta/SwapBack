@@ -48,6 +48,7 @@ import {
   VenueName,
   VenueType,
   OraclePriceData,
+  OracleVerificationDetail,
 } from "../types/smart-router";
 import { JitoBundleService, MEVProtectionAnalyzer } from "./JitoBundleService";
 
@@ -171,6 +172,8 @@ interface ExecutionContext {
   globalMinOutput?: number;
   inputOracle?: OraclePriceData;
   outputOracle?: OraclePriceData;
+  inputOracleDetail?: OracleVerificationDetail;
+  outputOracleDetail?: OracleVerificationDetail;
   tradeValueUSD?: number;
   bundleId?: string;
   mevStrategy?: "jito" | "quicknode" | "direct";
@@ -458,6 +461,9 @@ export class SwapExecutor {
       }
 
       seen.add(next.id);
+      if (next.baseRoute && next.strategy) {
+        next.baseRoute.strategy = next.strategy;
+      }
       candidates.push(next);
 
       if (next.fallbackPlans?.length) {
@@ -558,6 +564,8 @@ export class SwapExecutor {
     attemptCtx.oraclePrice = oracleCheck.rate;
     attemptCtx.inputOracle = oracleCheck.inputPrice;
     attemptCtx.outputOracle = oracleCheck.outputPrice;
+    attemptCtx.inputOracleDetail = oracleCheck.inputDetail;
+    attemptCtx.outputOracleDetail = oracleCheck.outputDetail;
 
     await this.prepareOutputAccountContext(
       params,
@@ -619,6 +627,8 @@ export class SwapExecutor {
       globalMinOutput: undefined,
       inputOracle: baseCtx.inputOracle,
       outputOracle: baseCtx.outputOracle,
+      inputOracleDetail: baseCtx.inputOracleDetail,
+      outputOracleDetail: baseCtx.outputOracleDetail,
       tradeValueUSD: undefined,
       bundleId: undefined,
       mevStrategy: undefined,
@@ -663,6 +673,8 @@ export class SwapExecutor {
     target.oraclePrice = result.oraclePrice;
     target.inputOracle = result.inputOracle;
     target.outputOracle = result.outputOracle;
+    target.inputOracleDetail = result.inputOracleDetail;
+    target.outputOracleDetail = result.outputOracleDetail;
 
     if (result.chunkSignatures?.length) {
       target.chunkSignatures = result.chunkSignatures;
@@ -674,56 +686,72 @@ export class SwapExecutor {
     plan: AtomicSwapPlan
   ): TwapConfig {
     const preferences = params.routePreferences;
-    const enabled = preferences?.enableTwapMode ?? false;
+    const strategy = plan.strategy;
+    const twapHint = strategy?.twap;
+    const explicitDisable = preferences?.enableTwapMode === false;
+    const userOptIn = preferences?.enableTwapMode === true;
+    const autoEligible = Boolean(twapHint?.recommended) && !explicitDisable;
+    const enabled = userOptIn || autoEligible;
     const threshold = Math.min(
       0.9,
-      Math.max(preferences?.twapThresholdRatio ?? 0.2, 0.05)
+      Math.max(
+        preferences?.twapThresholdRatio ?? twapHint?.triggerRatio ?? 0.2,
+        0.05
+      )
     );
+    const hintedSlices = twapHint?.slices;
     const maxSlices = Math.min(
-      Math.max(preferences?.twapMaxSlices ?? 3, 2),
+      Math.max(preferences?.twapMaxSlices ?? hintedSlices ?? 3, 2),
       10
     );
-    const intervalMs = Math.max(0, preferences?.twapIntervalMs ?? 2_000);
+    const intervalMs = Math.max(
+      0,
+      preferences?.twapIntervalMs ?? twapHint?.intervalMs ?? 2_000
+    );
+    const liquidityFootprint = this.computePlanLiquidityFootprint(plan);
+    const footprintRatio =
+      twapHint?.footprintRatio ??
+      (liquidityFootprint > 0
+        ? plan.totalInput / liquidityFootprint
+        : undefined);
+    const stalenessReason =
+      twapHint?.reason === "liquidity_snapshot_stale"
+        ? plan.maxStalenessMs
+        : undefined;
+
+    const disabledConfig: TwapConfig = {
+      enabled: false,
+      slices: 1,
+      intervalMs: 0,
+      thresholdRatio: threshold,
+      liquidityDepth: liquidityFootprint > 0 ? liquidityFootprint : undefined,
+      footprintRatio,
+      liquidityStalenessMs: stalenessReason,
+    };
 
     if (!enabled) {
-      return {
-        enabled: false,
-        slices: 1,
-        intervalMs: 0,
-        thresholdRatio: threshold,
-      };
+      return disabledConfig;
     }
 
-    const liquidityFootprint = this.computePlanLiquidityFootprint(plan);
-    if (liquidityFootprint <= 0) {
-      return {
-        enabled: false,
-        slices: 1,
-        intervalMs: 0,
-        thresholdRatio: threshold,
-      };
+    let slices: number;
+    if (hintedSlices && autoEligible && !userOptIn) {
+      slices = hintedSlices;
+    } else if (footprintRatio && footprintRatio > 0) {
+      slices = Math.ceil(footprintRatio / threshold);
+    } else {
+      slices = 2;
     }
 
-    const footprintRatio = plan.totalInput / liquidityFootprint;
-    if (footprintRatio < threshold) {
-      return {
-        enabled: false,
-        slices: 1,
-        intervalMs: 0,
-        thresholdRatio: threshold,
-      };
-    }
-
-    const slices = Math.min(
-      maxSlices,
-      Math.max(2, Math.ceil(footprintRatio / threshold))
-    );
+    slices = Math.min(maxSlices, Math.max(2, slices));
 
     return {
       enabled: true,
       slices,
       intervalMs,
       thresholdRatio: threshold,
+      liquidityDepth: liquidityFootprint > 0 ? liquidityFootprint : undefined,
+      footprintRatio,
+      liquidityStalenessMs: stalenessReason,
     };
   }
 
@@ -1215,6 +1243,8 @@ export class SwapExecutor {
     rate: number;
     inputPrice: OraclePriceData;
     outputPrice: OraclePriceData;
+    inputDetail: OracleVerificationDetail;
+    outputDetail: OracleVerificationDetail;
   }> {
     const slippageTolerance = Math.max(params.maxSlippageBps / 10_000, 0.0001);
 
@@ -1222,6 +1252,15 @@ export class SwapExecutor {
       this.oracleService.getTokenPrice(params.inputMint),
       this.oracleService.getTokenPrice(params.outputMint),
     ]);
+
+    const inputDetail = this.ensureOracleDetail(
+      params.inputMint,
+      inputPriceData
+    );
+    const outputDetail = this.ensureOracleDetail(
+      params.outputMint,
+      outputPriceData
+    );
 
     const maxOracleAgeMs = Math.min(plan.quoteValidityMs, 15_000);
 
@@ -1303,6 +1342,33 @@ export class SwapExecutor {
       rate: oracleRate,
       inputPrice: inputPriceData,
       outputPrice: outputPriceData,
+      inputDetail,
+      outputDetail,
+    };
+  }
+
+  private ensureOracleDetail(
+    mint: string,
+    price: OraclePriceData
+  ): OracleVerificationDetail {
+    const cached = this.oracleService.getVerificationDetail(mint);
+    if (cached) {
+      return cached;
+    }
+
+    const sources: OracleVerificationDetail["sources"] = {};
+    if (price.provider === "pyth") {
+      sources.pyth = price;
+    } else {
+      sources.switchboard = price;
+    }
+
+    return {
+      providerUsed: price.provider,
+      price: price.price,
+      confidence: price.confidence,
+      fallbackUsed: false,
+      sources,
     };
   }
 
@@ -1845,6 +1911,8 @@ export class SwapExecutor {
     console.log("🔀 Routes used:", metrics.routeCount);
     console.log("🏦 Venue breakdown:", metrics.venueBreakdown);
     console.log("🚦 MEV strategy:", ctx.mevStrategy ?? "direct");
+    this.logOracleDetail("Input", ctx.inputOracleDetail);
+    this.logOracleDetail("Output", ctx.outputOracleDetail);
     if (ctx.mevTipLamports) {
       console.log(
         "🎁 Tip (lamports):",
@@ -1872,6 +1940,10 @@ export class SwapExecutor {
       totalFees: metrics.totalFees,
       venues: metrics.venueBreakdown,
       oraclePrice: metrics.oraclePrice,
+      oracleMetadata: this.buildOracleMetadataPayload(
+        ctx.inputOracleDetail,
+        ctx.outputOracleDetail
+      ),
       diffs: ctx.planDiffs,
       refreshReason: ctx.planRefreshReason,
       refreshIterations: ctx.planRefreshIterations,
@@ -1908,6 +1980,10 @@ export class SwapExecutor {
       error,
       routesAttempted: ctx.routes.length,
       elapsedMs: Date.now() - ctx.startTime,
+      oracleMetadata: this.buildOracleMetadataPayload(
+        ctx.inputOracleDetail,
+        ctx.outputOracleDetail
+      ),
       diffs: ctx.planDiffs,
       refreshReason: ctx.planRefreshReason,
       bundleStrategy: ctx.mevStrategy,
@@ -1916,6 +1992,37 @@ export class SwapExecutor {
       priorityFeeMicroLamports: ctx.priorityFeeMicroLamports,
       tradeValueUSD: ctx.tradeValueUSD,
     });
+  }
+
+  private logOracleDetail(
+    label: string,
+    detail?: OracleVerificationDetail
+  ): void {
+    if (!detail) {
+      return;
+    }
+
+    const confidencePct = detail.price
+      ? ((Math.abs(detail.confidence) / Math.max(Math.abs(detail.price), 1e-9)) * 100).toFixed(4)
+      : "n/a";
+    const divergencePct =
+      typeof detail.divergencePercent === "number"
+        ? `${(detail.divergencePercent * 100).toFixed(4)}%`
+        : "n/a";
+
+    console.log(
+      `📡 ${label} Oracle → provider=${detail.providerUsed}, confidence=${confidencePct}%, divergence=${divergencePct}, fallback=${detail.fallbackUsed ? "yes" : "no"}`
+    );
+  }
+
+  private buildOracleMetadataPayload(
+    input?: OracleVerificationDetail,
+    output?: OracleVerificationDetail
+  ): Record<string, unknown> | undefined {
+    if (!input && !output) {
+      return undefined;
+    }
+    return { input, output };
   }
 
   /**

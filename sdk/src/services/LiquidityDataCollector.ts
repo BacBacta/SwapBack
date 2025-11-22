@@ -10,13 +10,48 @@ import {
   LiquiditySource,
   AggregatedLiquidity,
   VenueConfig,
+  OrderbookSnapshot,
 } from "../types/smart-router";
-import { getOrcaWhirlpool } from "../config/orca-pools";
-import { getRaydiumPool } from "../config/raydium-pools";
+import { PhoenixService } from "./PhoenixService";
+import { OpenBookService } from "./OpenBookService";
+import { MeteoraService } from "./MeteoraService";
+import { LifinityService } from "./LifinityService";
+import { ClobTradeDirection } from "./ClobMath";
+import { OrcaService } from "./OrcaService";
+import { RaydiumService } from "./RaydiumService";
+import { StructuredLogger } from "../utils/StructuredLogger";
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
+
+const clamp01 = (value: number): number => Math.min(Math.max(value, 0), 1);
+
+const parseCoverageEnv = (
+  raw: string | undefined,
+  fallback: number
+): number => {
+  const parsed = raw !== undefined ? Number(raw) : NaN;
+  if (Number.isFinite(parsed)) {
+    return clamp01(parsed);
+  }
+  return clamp01(fallback);
+};
+
+const DEFAULT_CLOB_TOP_OF_BOOK_COVERAGE = parseCoverageEnv(
+  process.env.NEXT_PUBLIC_CLOB_MIN_TOP_OF_BOOK_COVERAGE,
+  0.65
+);
+
+const PHOENIX_TOP_OF_BOOK_COVERAGE = parseCoverageEnv(
+  process.env.NEXT_PUBLIC_PHOENIX_MIN_TOP_OF_BOOK_COVERAGE,
+  DEFAULT_CLOB_TOP_OF_BOOK_COVERAGE
+);
+
+const OPENBOOK_TOP_OF_BOOK_COVERAGE = parseCoverageEnv(
+  process.env.NEXT_PUBLIC_OPENBOOK_MIN_TOP_OF_BOOK_COVERAGE,
+  DEFAULT_CLOB_TOP_OF_BOOK_COVERAGE
+);
 
 const VENUE_CONFIGS: Record<VenueName, VenueConfig> = {
   // CLOBs - Highest priority (best execution)
@@ -28,6 +63,7 @@ const VENUE_CONFIGS: Record<VenueName, VenueConfig> = {
     feeRate: 0.0005, // 0.05% taker fee
     minTradeSize: 10,
     maxSlippage: 0.001,
+    minTopOfBookCoverage: PHOENIX_TOP_OF_BOOK_COVERAGE,
   },
   [VenueName.OPENBOOK]: {
     name: VenueName.OPENBOOK,
@@ -37,6 +73,7 @@ const VENUE_CONFIGS: Record<VenueName, VenueConfig> = {
     feeRate: 0.0004,
     minTradeSize: 10,
     maxSlippage: 0.001,
+    minTopOfBookCoverage: OPENBOOK_TOP_OF_BOOK_COVERAGE,
   },
 
   // AMMs - Medium priority
@@ -61,7 +98,9 @@ const VENUE_CONFIGS: Record<VenueName, VenueConfig> = {
   [VenueName.METEORA]: {
     name: VenueName.METEORA,
     type: VenueType.AMM,
-    enabled: true,
+    enabled:
+      (process.env.NEXT_PUBLIC_ENABLE_METEORA ?? "true").toLowerCase() !==
+      "false",
     priority: 70,
     feeRate: 0.002,
     minTradeSize: 1,
@@ -70,7 +109,9 @@ const VENUE_CONFIGS: Record<VenueName, VenueConfig> = {
   [VenueName.LIFINITY]: {
     name: VenueName.LIFINITY,
     type: VenueType.AMM,
-    enabled: true,
+    enabled:
+      (process.env.NEXT_PUBLIC_ENABLE_LIFINITY ?? "true").toLowerCase() !==
+      "false",
     priority: 65,
     feeRate: 0.001, // Variable fee
     minTradeSize: 1,
@@ -98,6 +139,19 @@ const VENUE_CONFIGS: Record<VenueName, VenueConfig> = {
   },
 };
 
+const CLOB_FAILURE_THRESHOLD = Number(
+  process.env.NEXT_PUBLIC_CLOB_FAILURE_THRESHOLD ?? 3
+);
+const CLOB_FAILURE_COOLDOWN_MS = Number(
+  process.env.NEXT_PUBLIC_CLOB_FAILURE_COOLDOWN_MS ?? 30000
+);
+const PRICE_SORT_EPSILON = 1e-9;
+
+type ClobHealthState = {
+  consecutiveFailures: number;
+  lastFailure: number;
+};
+
 // ============================================================================
 // LIQUIDITY DATA COLLECTOR
 // ============================================================================
@@ -106,11 +160,27 @@ export class LiquidityDataCollector {
   private connection: Connection;
   private cache: Map<string, AggregatedLiquidity>;
   private cacheExpiryMs: number;
+  private phoenixService: PhoenixService;
+  private openBookService: OpenBookService;
+  private meteoraService: MeteoraService;
+  private lifinityService: LifinityService;
+  private orcaService: OrcaService;
+  private raydiumService: RaydiumService;
+  private clobHealth: Partial<Record<VenueName, ClobHealthState>>;
+  private logger: StructuredLogger;
 
   constructor(connection: Connection, cacheExpiryMs = 10000) {
     this.connection = connection;
     this.cache = new Map();
     this.cacheExpiryMs = cacheExpiryMs;
+    this.phoenixService = new PhoenixService(connection);
+    this.openBookService = new OpenBookService(connection);
+    this.meteoraService = new MeteoraService(connection);
+    this.lifinityService = new LifinityService(connection);
+    this.orcaService = new OrcaService(connection);
+    this.raydiumService = new RaydiumService(connection);
+    this.clobHealth = {};
+    this.logger = new StructuredLogger("liquidity");
   }
 
   /**
@@ -145,13 +215,18 @@ export class LiquidityDataCollector {
         this.fetchVenueLiquidity(venue, inputMint, outputMint, inputAmount)
       );
 
-    const sources = (await Promise.allSettled(venuePromises))
+    const normalizedSources = (await Promise.allSettled(venuePromises))
       .filter(
         (result): result is PromiseFulfilledResult<LiquiditySource> =>
           result.status === "fulfilled" && result.value !== null
       )
-      .map((result) => result.value)
-      .sort((a, b) => a.effectivePrice - b.effectivePrice); // Sort by best price
+      .map((result) =>
+        this.normalizeClobSource(result.value, inputMint, outputMint)
+      );
+
+    const sources = normalizedSources.sort((a, b) =>
+      this.compareLiquiditySources(a, b)
+    );
 
     // Calculate total depth
     const totalDepth = sources.reduce((sum, s) => sum + s.depth, 0);
@@ -229,73 +304,187 @@ export class LiquidityDataCollector {
     venue: VenueName,
     inputMint: string,
     outputMint: string,
-    _inputAmount: number
+    inputAmount: number
   ): Promise<LiquiditySource | null> {
-    // Phoenix integration
-    if (venue === VenueName.PHOENIX) {
-      try {
-        return await this.fetchPhoenixOrderbook(
-          new PublicKey(inputMint),
-          new PublicKey(outputMint)
-        );
-      } catch (error) {
-        console.error("Phoenix orderbook fetch error:", error);
-        return null;
-      }
+    if (!this.isClobHealthy(venue)) {
+      console.warn("[liquidity][clob] skip_unhealthy", { venue });
+      return null;
     }
 
-    // OpenBook and other CLOBs not yet implemented
-    // TODO: Implement OpenBook integration
+    if (venue === VenueName.PHOENIX) {
+      const result = await this.withClobHealth(venue, () =>
+        this.phoenixService.fetchLiquidity(inputMint, outputMint, inputAmount)
+      );
+      return this.postProcessClobSource(venue, result, inputAmount);
+    }
+
+    if (venue === VenueName.OPENBOOK) {
+      const result = await this.withClobHealth(venue, () =>
+        this.openBookService.fetchLiquidity(inputMint, outputMint, inputAmount)
+      );
+      return this.postProcessClobSource(venue, result, inputAmount);
+    }
+
     console.warn(`CLOB venue ${venue} not yet implemented`);
     return null;
   }
 
-  /**
-   * Fetch real-time orderbook from Phoenix CLOB
-   */
-  private async fetchPhoenixOrderbook(
-    _inputMint: PublicKey,
-    _outputMint: PublicKey
-  ): Promise<LiquiditySource | null> {
-    try {
-      // TODO: Fix Phoenix integration types
-      console.warn("Phoenix orderbook fetch temporarily disabled");
-      return null;
-
-      /* TEMPORARILY DISABLED
-      const marketAddress = getPhoenixMarket(inputMint.toBase58(), outputMint.toBase58());
-      if (!marketAddress) {
-        return null;
-      }
-
-      // Check if Client.create exists (handles Vitest import issues)
-      if (typeof PhoenixClient.create !== 'function') {
-        console.warn("Phoenix Client.create not available - skipping Phoenix liquidity");
-        return null;
-      }
-
-      const phoenixClient = await PhoenixClient.create(
-        this.connection,
-        false  // Don't skip initial fetch
-      );
-      
-      // Add market to the client
-      await phoenixClient.addMarket(marketAddress);
-
-      const ladder = phoenixClient.getUiLadder(marketAddress);
-
-      return {
-        venue: VenueName.PHOENIX,
-        venueType: VenueType.CLOB,
-        price: ladder.bids[0]?.price || 0,
-        liquidity: 0, // TODO: Calculate from ladder
-        timestamp: Date.now(),
-      };
-      */
-    } catch (error) {
-      console.error("Phoenix orderbook fetch error:", error);
+  private postProcessClobSource(
+    venue: VenueName,
+    source: LiquiditySource | null,
+    inputAmount: number
+  ): LiquiditySource | null {
+    if (!source) {
       return null;
     }
+
+    this.emitClobMetrics(venue, source);
+
+    const coverage = this.evaluateTopOfBookCoverage(
+      venue,
+      source,
+      inputAmount
+    );
+
+    if (!coverage.passes) {
+      this.logger.warn("clob_skip_insufficient_top_of_book", {
+        venue,
+        inputAmount,
+        direction: coverage.direction,
+        coverageShare: coverage.coverageShare,
+        requiredCoverage: coverage.minCoverage,
+        topOfBook: coverage.top ?? null,
+      });
+      return null;
+    }
+
+    return source;
+  }
+
+  private emitClobMetrics(venue: VenueName, source: LiquiditySource): void {
+    if (source.venueType !== VenueType.CLOB) {
+      return;
+    }
+
+    const top = this.resolveTopOfBook(source);
+    const snapshot = source.orderbook;
+    const metadata = { ...(source.metadata ?? {}) } as Record<string, unknown>;
+    const minCoverage = this.getVenueConfig(venue).minTopOfBookCoverage ?? 0;
+    const latencyMs =
+      typeof snapshot?.latencyMs === "number"
+        ? snapshot.latencyMs
+        : typeof metadata.latencyMs === "number"
+          ? (metadata.latencyMs as number)
+          : undefined;
+
+    this.logger.info("clob_metrics", {
+      venue,
+      direction: this.extractClobDirection(source),
+      depthUsd: snapshot?.depthUsd ?? source.depth,
+      spreadBps: snapshot?.spreadBps ?? null,
+      latencyMs: latencyMs ?? null,
+      bestBid: top?.bidPrice ?? null,
+      bidSize: top?.bidSize ?? null,
+      bestAsk: top?.askPrice ?? null,
+      askSize: top?.askSize ?? null,
+      dataFreshnessMs: source.dataFreshnessMs ?? null,
+      exhausted: Boolean(metadata.exhausted),
+      minCoverage,
+    });
+  }
+
+  private evaluateTopOfBookCoverage(
+    venue: VenueName,
+    source: LiquiditySource,
+    inputAmount: number
+  ): {
+    passes: boolean;
+    coverageShare: number;
+    minCoverage: number;
+    direction: ClobTradeDirection;
+    top?: LiquiditySource["topOfBook"];
+  } {
+    const minCoverage = this.getVenueConfig(venue).minTopOfBookCoverage ?? 0;
+    const direction = this.extractClobDirection(source);
+    const top = this.resolveTopOfBook(source);
+
+    if (inputAmount <= 0 || minCoverage <= 0) {
+      return { passes: true, coverageShare: 1, minCoverage, direction, top };
+    }
+
+    if (!top) {
+      return { passes: false, coverageShare: 0, minCoverage, direction };
+    }
+
+    const coverageShare = this.getTopOfBookCoverageShare(
+      top,
+      direction,
+      inputAmount
+    );
+
+    return {
+      passes: coverageShare >= minCoverage,
+      coverageShare,
+      minCoverage,
+      direction,
+      top,
+    };
+  }
+
+  private getTopOfBookCoverageShare(
+    top: NonNullable<LiquiditySource["topOfBook"]>,
+    direction: ClobTradeDirection,
+    inputAmount: number
+  ): number {
+    if (inputAmount <= 0) {
+      return 1;
+    }
+
+    if (direction === "sellBase") {
+      return top.bidSize / inputAmount;
+    }
+
+    if (top.askPrice <= 0) {
+      return 0;
+    }
+
+    const quoteCapacity = top.askSize * top.askPrice;
+    return quoteCapacity / inputAmount;
+  }
+
+  private resolveTopOfBook(
+    source: LiquiditySource
+  ): LiquiditySource["topOfBook"] | undefined {
+    if (source.topOfBook) {
+      return source.topOfBook;
+    }
+
+    const snapshot: OrderbookSnapshot | undefined = source.orderbook;
+    if (!snapshot) {
+      return undefined;
+    }
+
+    const bestBid = snapshot.bids[0];
+    const bestAsk = snapshot.asks[0];
+
+    if (!bestBid && !bestAsk) {
+      return undefined;
+    }
+
+    return {
+      bidPrice: bestBid?.price ?? 0,
+      bidSize: bestBid?.size ?? 0,
+      askPrice: bestAsk?.price ?? 0,
+      askSize: bestAsk?.size ?? 0,
+    };
+  }
+
+  private extractClobDirection(source: LiquiditySource): ClobTradeDirection {
+    const metadata = { ...(source.metadata ?? {}) } as Record<string, unknown>;
+    return (
+      (metadata.direction as ClobTradeDirection | undefined) ??
+      this.deriveClobDirection(metadata)
+    );
   }
 
   /**
@@ -312,26 +501,31 @@ export class LiquidityDataCollector {
 
     // Orca Whirlpools integration
     if (venue === VenueName.ORCA) {
-      try {
-        return await this.fetchOrcaWhirlpool(
-          inputMint,
-          outputMint,
-          inputAmount
-        );
-      } catch (error) {
-        console.error("Orca whirlpool fetch error:", error);
-        return null;
-      }
+      return this.orcaService.fetchLiquidity(inputMint, outputMint, inputAmount);
     }
 
-    // Raydium AMM integration
     if (venue === VenueName.RAYDIUM) {
-      try {
-        return await this.fetchRaydiumAmm(inputMint, outputMint, inputAmount);
-      } catch (error) {
-        console.error("Raydium AMM fetch error:", error);
-        return null;
-      }
+      return this.raydiumService.fetchLiquidity(
+        inputMint,
+        outputMint,
+        inputAmount
+      );
+    }
+
+    if (venue === VenueName.METEORA) {
+      return this.meteoraService.fetchLiquidity(
+        inputMint,
+        outputMint,
+        inputAmount
+      );
+    }
+
+    if (venue === VenueName.LIFINITY) {
+      return this.lifinityService.fetchLiquidity(
+        inputMint,
+        outputMint,
+        inputAmount
+      );
     }
 
     // Fallback mock data for other AMMs
@@ -344,291 +538,24 @@ export class LiquidityDataCollector {
     const outputAmount =
       (reserves.output * inputWithFee) / (reserves.input + inputWithFee);
 
-    const spotPrice = reserves.output / reserves.input;
-    const effectivePrice = inputAmount / outputAmount;
-    const slippagePercent = (effectivePrice - spotPrice) / spotPrice;
-
-    const feeAmount = inputAmount * config.feeRate;
-    const depth = Math.min(reserves.input, reserves.output) * 2;
+    const effectivePrice = outputAmount / inputAmount;
+    const slippagePercent = 0.01; // Placeholder until venue-specific logic exists
 
     return {
       venue,
       venueType: VenueType.AMM,
       tokenPair: [inputMint, outputMint],
-      depth,
+      depth: Math.min(reserves.input, reserves.output) * 2,
       reserves,
       effectivePrice,
-      feeAmount,
+      feeAmount: inputAmount - inputWithFee,
       slippagePercent,
       route: [inputMint, outputMint],
       timestamp: Date.now(),
+      metadata: {
+        placeholder: true,
+      },
     };
-  }
-
-  /**
-   * Fetch liquidity from Orca Whirlpools
-   * Uses concentrated liquidity (tick-based pricing similar to Uniswap V3)
-   */
-  private async fetchOrcaWhirlpool(
-    inputMint: string,
-    outputMint: string,
-    inputAmount: number
-  ): Promise<LiquiditySource | null> {
-    try {
-      // Get Orca whirlpool for this pair
-      const whirlpoolAddress = getOrcaWhirlpool(
-        new PublicKey(inputMint),
-        new PublicKey(outputMint)
-      );
-
-      if (!whirlpoolAddress) {
-        console.warn(`No Orca whirlpool for ${inputMint}/${outputMint}`);
-        return null;
-      }
-
-      // Fetch whirlpool account data
-      const whirlpoolAccount =
-        await this.connection.getAccountInfo(whirlpoolAddress);
-
-      if (!whirlpoolAccount) {
-        console.warn(
-          `Orca whirlpool account not found: ${whirlpoolAddress.toBase58()}`
-        );
-        return null;
-      }
-
-      // Parse whirlpool data (concentrated liquidity model)
-      // Note: Orca Whirlpools use tick-based pricing, similar to Uniswap V3
-      // Full SDK integration would require WhirlpoolContext and Wallet
-      // For real-time quotes, we parse the account data directly
-
-      const data = whirlpoolAccount.data;
-
-      // Whirlpool account layout (simplified - actual layout is more complex):
-      // - liquidity: u128 at offset 65 (16 bytes)
-      // - sqrtPrice: u128 at offset 81 (16 bytes)
-      // - tickCurrentIndex: i32 at offset 97 (4 bytes)
-      // - feeRate: u16 at offset 101 (2 bytes)
-
-      // Read current tick price (concentrated liquidity)
-      const sqrtPriceBuf = data.slice(81, 97); // Read 16 bytes for u128
-      const sqrtPriceX64 = sqrtPriceBuf.readBigUInt64LE(0); // Lower 64 bits
-
-      // Convert sqrt price to regular price
-      // price = (sqrtPrice / 2^64)^2
-      const sqrtPrice = Number(sqrtPriceX64) / Math.pow(2, 64);
-      const currentPrice = Math.pow(sqrtPrice, 2);
-
-      // Read liquidity
-      const liquidityBuf = data.slice(65, 81);
-      const liquidity = Number(liquidityBuf.readBigUInt64LE(0));
-
-      // Read fee rate (basis points)
-      const rawFeeRate = data.readUInt16LE(101);
-      const feeRate = Math.min(rawFeeRate / 10000, 0.01); // Convert bps to decimal, cap at 1%
-
-      console.log(
-        `Orca Whirlpool: rawFeeRate=${rawFeeRate}, feeRate=${feeRate}`
-      );
-
-      // Calculate output amount with concentrated liquidity formula
-      // For small trades, we can approximate with constant product
-      const inputWithFee = inputAmount * (1 - feeRate);
-      const outputAmount = inputWithFee * currentPrice;
-
-      // Calculate price impact
-      const effectivePrice = outputAmount / inputAmount;
-      const slippagePercent =
-        Math.abs(effectivePrice - currentPrice) / currentPrice;
-
-      // Estimate depth (TVL in the pool) - use a more reasonable estimate for concentrated liquidity
-      const depth = Math.min((liquidity * currentPrice * 2) / 1e12, 100000000); // Cap at 100M tokens, scale down
-
-      const feeAmount = inputAmount * feeRate;
-
-      return {
-        venue: VenueName.ORCA,
-        venueType: VenueType.AMM,
-        tokenPair: [inputMint, outputMint],
-        depth,
-        reserves: {
-          input: liquidity,
-          output: liquidity * currentPrice,
-        },
-        effectivePrice,
-        feeAmount,
-        slippagePercent,
-        route: [inputMint, outputMint],
-        timestamp: Date.now(),
-        metadata: {
-          orca: {
-            whirlpoolAddress: whirlpoolAddress.toBase58(),
-            sqrtPrice: sqrtPrice,
-            currentPrice,
-            liquidity,
-            feeRate,
-          },
-        },
-      };
-    } catch (error) {
-      console.error("Orca whirlpool fetch error:", error);
-      return null;
-    }
-  }
-
-  /**
-   * Fetch liquidity from Raydium AMM
-   * Uses constant product AMM (xy=k) similar to Uniswap V2
-   */
-  private async fetchRaydiumAmm(
-    inputMint: string,
-    outputMint: string,
-    inputAmount: number
-  ): Promise<LiquiditySource | null> {
-    try {
-      // Get Raydium pool for this pair
-      const poolConfig = getRaydiumPool(
-        new PublicKey(inputMint),
-        new PublicKey(outputMint)
-      );
-
-      if (!poolConfig) {
-        console.warn(`No Raydium pool for ${inputMint}/${outputMint}`);
-        return null;
-      }
-
-      // Fetch AMM account data
-      const ammAccount = await this.connection.getAccountInfo(
-        poolConfig.ammAddress
-      );
-
-      if (!ammAccount) {
-        console.warn(
-          `Raydium AMM account not found: ${poolConfig.ammAddress.toBase58()}`
-        );
-        return null;
-      }
-
-      // Parse Raydium AMM account data
-      // Raydium AMM account layout (simplified):
-      // - status: u64 at offset 0
-      // - nonce: u64 at offset 8
-      // - orderNum: u64 at offset 16
-      // - depth: u64 at offset 24
-      // - coinDecimals: u64 at offset 32
-      // - pcDecimals: u64 at offset 40
-      // - state: u64 at offset 48
-      // - resetFlag: u64 at offset 56
-      // - minSize: u64 at offset 64
-      // - volMaxCutRatio: u64 at offset 72
-      // - amountWaveRatio: u64 at offset 80
-      // - coinLotSize: u64 at offset 88
-      // - pcLotSize: u64 at offset 96
-      // - minPriceMultiplier: u64 at offset 104
-      // - maxPriceMultiplier: u64 at offset 112
-      // - systemDecimalValue: u64 at offset 120
-      // - minSeparateNumerator: u64 at offset 128
-      // - minSeparateDenominator: u64 at offset 136
-      // - tradeFeeNumerator: u64 at offset 144
-      // - tradeFeeDenominator: u64 at offset 152
-      // - pnlNumerator: u64 at offset 160
-      // - pnlDenominator: u64 at offset 168
-      // - swapFeeNumerator: u64 at offset 176
-      // - swapFeeDenominator: u64 at offset 184
-      // - needTakePnlCoin: u64 at offset 192
-      // - needTakePnlPc: u64 at offset 200
-      // - totalPnlPc: u64 at offset 208
-      // - totalPnlCoin: u64 at offset 216
-      // - poolCoinTokenAccount: Pubkey at offset 224 (32 bytes)
-      // - poolPcTokenAccount: Pubkey at offset 256 (32 bytes)
-      // - coinMintAddress: Pubkey at offset 288 (32 bytes)
-      // - pcMintAddress: Pubkey at offset 320 (32 bytes)
-      // - lpMintAddress: Pubkey at offset 352 (32 bytes)
-      // - ammOpenOrders: Pubkey at offset 384 (32 bytes)
-      // - serumMarket: Pubkey at offset 416 (32 bytes)
-      // - serumProgramId: Pubkey at offset 448 (32 bytes)
-      // - ammTargetOrders: Pubkey at offset 480 (32 bytes)
-      // - ammQuantities: Pubkey at offset 512 (32 bytes)
-      // - poolWithdrawQueue: Pubkey at offset 544 (32 bytes)
-      // - poolTempLpTokenAccount: Pubkey at offset 576 (32 bytes)
-      // - ammOwner: Pubkey at offset 608 (32 bytes)
-      // - poolLpTokenAccount: Pubkey at offset 640 (32 bytes)
-
-      // Read coin vault balance (token A)
-      const coinVaultAccount = await this.connection.getTokenAccountBalance(
-        poolConfig.poolCoinTokenAccount
-      );
-      const pcVaultAccount = await this.connection.getTokenAccountBalance(
-        poolConfig.poolPcTokenAccount
-      );
-
-      if (!coinVaultAccount.value || !pcVaultAccount.value) {
-        console.warn("Failed to fetch Raydium vault balances");
-        return null;
-      }
-
-      const coinBalance = Number(coinVaultAccount.value.amount);
-      const pcBalance = Number(pcVaultAccount.value.amount);
-      const coinDecimals = coinVaultAccount.value.decimals;
-      const pcDecimals = pcVaultAccount.value.decimals;
-
-      // Convert to common decimal representation
-      const coinAmount = coinBalance / Math.pow(10, coinDecimals);
-      const pcAmount = pcBalance / Math.pow(10, pcDecimals);
-
-      // Calculate spot price: pcAmount / coinAmount
-      const spotPrice = pcAmount / coinAmount;
-
-      // Determine if input is coin (tokenA) or pc (tokenB)
-      const isInputCoin = poolConfig.tokenMintA.toBase58() === inputMint;
-      const inputReserve = isInputCoin ? coinAmount : pcAmount;
-      const outputReserve = isInputCoin ? pcAmount : coinAmount;
-
-      // Calculate output amount using constant product formula
-      const feeRate = poolConfig.feeBps / 10000; // Convert bps to decimal
-      const inputWithFee = inputAmount * (1 - feeRate);
-      const outputAmount =
-        (outputReserve * inputWithFee) / (inputReserve + inputWithFee);
-
-      // Calculate effective price and slippage
-      const effectivePrice = outputAmount / inputAmount; // Price in output units per input unit
-      const slippagePercent = Math.abs(effectivePrice - spotPrice) / spotPrice;
-
-      console.log(
-        `Raydium AMM: inputAmount=${inputAmount}, outputAmount=${outputAmount}, effectivePrice=${effectivePrice}, spotPrice=${spotPrice}`
-      );
-
-      const feeAmount = inputAmount * feeRate;
-      const depth = Math.min(coinAmount, pcAmount) * spotPrice * 2; // TVL estimate
-
-      return {
-        venue: VenueName.RAYDIUM,
-        venueType: VenueType.AMM,
-        tokenPair: [inputMint, outputMint],
-        depth,
-        reserves: {
-          input: inputReserve,
-          output: outputReserve,
-        },
-        effectivePrice,
-        feeAmount,
-        slippagePercent,
-        route: [inputMint, outputMint],
-        timestamp: Date.now(),
-        metadata: {
-          ammAddress: poolConfig.ammAddress.toBase58(),
-          spotPrice,
-          feeRate,
-          coinBalance,
-          pcBalance,
-          coinDecimals,
-          pcDecimals,
-        },
-      };
-    } catch (error) {
-      console.error("Raydium AMM fetch error:", error);
-      return null;
-    }
   }
 
   /**
@@ -766,6 +693,65 @@ export class LiquidityDataCollector {
     this.cache.clear();
   }
 
+  private async withClobHealth(
+    venue: VenueName,
+    fn: () => Promise<LiquiditySource | null>
+  ): Promise<LiquiditySource | null> {
+    try {
+      const result = await fn();
+      this.markClobOutcome(venue, !!result);
+      return result;
+    } catch (error) {
+      this.markClobOutcome(venue, false, error);
+      throw error;
+    }
+  }
+
+  private isClobHealthy(venue: VenueName): boolean {
+    if (VENUE_CONFIGS[venue].type !== VenueType.CLOB) {
+      return true;
+    }
+
+    const state = this.clobHealth[venue];
+    if (!state || state.consecutiveFailures < CLOB_FAILURE_THRESHOLD) {
+      return true;
+    }
+
+    return Date.now() - state.lastFailure >= CLOB_FAILURE_COOLDOWN_MS;
+  }
+
+  private markClobOutcome(
+    venue: VenueName,
+    success: boolean,
+    error?: unknown
+  ): void {
+    if (VENUE_CONFIGS[venue].type !== VenueType.CLOB) {
+      return;
+    }
+
+    if (success) {
+      this.clobHealth[venue] = { consecutiveFailures: 0, lastFailure: 0 };
+      return;
+    }
+
+    const prev = this.clobHealth[venue] || {
+      consecutiveFailures: 0,
+      lastFailure: 0,
+    };
+
+    const consecutiveFailures = prev.consecutiveFailures + 1;
+    this.clobHealth[venue] = {
+      consecutiveFailures,
+      lastFailure: Date.now(),
+    };
+
+    console.warn("[liquidity][clob] venue_failure", {
+      venue,
+      consecutiveFailures,
+      error: error instanceof Error ? error.message : error,
+    });
+  }
+
   /**
    * Get venue configuration
    */
@@ -780,6 +766,71 @@ export class LiquidityDataCollector {
     return Object.values(VenueName)
       .filter((venue) => VENUE_CONFIGS[venue].enabled)
       .sort((a, b) => VENUE_CONFIGS[b].priority - VENUE_CONFIGS[a].priority);
+  }
+
+  private normalizeClobSource(
+    source: LiquiditySource,
+    inputMint: string,
+    outputMint: string
+  ): LiquiditySource {
+    if (!source || source.venueType !== VenueType.CLOB) {
+      return source;
+    }
+
+    const config = this.getVenueConfig(source.venue);
+    const metadata = { ...(source.metadata ?? {}) } as Record<string, unknown>;
+    const takerFeeBps =
+      typeof metadata.takerFeeBps === "number"
+        ? (metadata.takerFeeBps as number)
+        : config.takerFeeBps ?? Math.round(config.feeRate * 10_000);
+
+    const direction =
+      (metadata.direction as ClobTradeDirection | undefined) ??
+      this.deriveClobDirection(metadata);
+
+    if (source.orderbook?.latencyMs !== undefined) {
+      metadata.latencyMs = source.orderbook.latencyMs;
+    } else if (metadata.latencyMs === undefined) {
+      metadata.latencyMs = source.dataFreshnessMs ?? 0;
+    }
+
+    metadata.takerFeeBps = takerFeeBps;
+    metadata.direction = direction;
+    metadata.inputMint = metadata.inputMint ?? inputMint;
+    metadata.outputMint = metadata.outputMint ?? outputMint;
+
+    return {
+      ...source,
+      metadata,
+    };
+  }
+
+  private deriveClobDirection(
+    metadata: Record<string, unknown>
+  ): ClobTradeDirection {
+    if (metadata && typeof metadata.inverted === "boolean") {
+      return metadata.inverted ? "sellQuote" : "sellBase";
+    }
+    return "sellBase";
+  }
+
+  private compareLiquiditySources(
+    a: LiquiditySource,
+    b: LiquiditySource
+  ): number {
+    const priceDiff = a.effectivePrice - b.effectivePrice;
+    if (Math.abs(priceDiff) > PRICE_SORT_EPSILON) {
+      return priceDiff;
+    }
+
+    const priorityDiff =
+      this.getVenueConfig(b.venue).priority -
+      this.getVenueConfig(a.venue).priority;
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
+
+    return a.timestamp - b.timestamp;
   }
 }
 

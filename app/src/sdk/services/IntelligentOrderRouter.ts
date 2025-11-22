@@ -3,18 +3,23 @@ import {
   calculatePriceImpact,
   estimateAMMOutput,
 } from "./LiquidityDataCollector";
+import { simulateClobFill, ClobTradeDirection } from "./ClobMath";
 import { RouteOptimizationEngine } from "./RouteOptimizationEngine";
 import {
   AtomicSwapLeg,
   AtomicSwapPlan,
   LiquiditySource,
   OptimizationConfig,
+  OrderbookSnapshot,
   RouteCandidate,
   VenueName,
   VenueQuoteSample,
   VenueSimulationResult,
   VenueType,
+  RoutingStrategyMetadata,
+  TwapRecommendation,
 } from "../types/smart-router";
+import { StructuredLogger } from "../utils/StructuredLogger";
 
 export interface PlanDiff {
   venue: VenueName;
@@ -100,10 +105,22 @@ const DEFAULT_OPTIONS: IntelligentRouterOptions = {
   },
 };
 
+const DEFAULT_TWAP_TRIGGER_RATIO = (() => {
+
+  const raw = Number(
+    process.env.NEXT_PUBLIC_ROUTER_TWAP_TRIGGER_RATIO ?? 0.3
+  );
+  if (!Number.isFinite(raw)) {
+    return 0.3;
+  }
+  return Math.min(Math.max(raw, 0.05), 0.9);
+})();
+
 export class IntelligentOrderRouter {
   private readonly liquidityCollector: LiquidityDataCollector;
   private readonly optimizer: RouteOptimizationEngine;
   private readonly options: IntelligentRouterOptions;
+  private readonly logger: StructuredLogger;
 
   constructor(
     liquidityCollector: LiquidityDataCollector,
@@ -112,6 +129,7 @@ export class IntelligentOrderRouter {
   ) {
     this.liquidityCollector = liquidityCollector;
     this.optimizer = optimizer;
+    this.logger = new StructuredLogger("intelligent-router");
     this.options = {
       ...DEFAULT_OPTIONS,
       ...options,
@@ -144,12 +162,12 @@ export class IntelligentOrderRouter {
       ...(params.rebalance ?? {}),
     };
 
-    const optimizationConfig: Partial<OptimizationConfig> = {
+    const optimizationConfig: OptimizationConfig = {
       ...this.options.optimizationDefaults,
       ...(params.optimization ?? {}),
       slippageTolerance:
         (params.maxSlippageBps ?? this.options.maxSlippageBps) / 10_000,
-    };
+    } as OptimizationConfig;
 
     const aggregated = await this.liquidityCollector.fetchAggregatedLiquidity(
       params.inputMint,
@@ -221,10 +239,58 @@ export class IntelligentOrderRouter {
       throw new Error("Failed to build primary swap plan");
     }
 
-    primaryPlan.fallbackPlans = fallbackPlans.map((plan) => ({
-      ...plan,
-      fallbackPlans: [],
-    }));
+    const twapHint = this.deriveTwapHint(
+      params.inputAmount,
+      aggregated.totalDepth,
+      aggregated.staleness
+    );
+
+    const normalizedFallbacks = fallbackPlans.map((plan) =>
+      this.normalizeFallbackPlan(plan, {
+        totalDepth: aggregated.totalDepth,
+        totalInput: params.inputAmount,
+        optimization: optimizationConfig,
+        twapHint,
+      })
+    );
+
+    primaryPlan.strategy = this.buildRoutingStrategyMetadata(primaryPlan, {
+      fallbackCount: this.countFallbackPlans(normalizedFallbacks),
+      totalDepth: aggregated.totalDepth,
+      totalInput: params.inputAmount,
+      optimization: optimizationConfig,
+      twapHint,
+    });
+    this.enrichPlanStrategy(primaryPlan);
+    primaryPlan.fallbackPlans = normalizedFallbacks;
+
+    this.logger.info("routing_strategy_selected", {
+      planId: primaryPlan.id,
+      inputMint: params.inputMint,
+      outputMint: params.outputMint,
+      inputAmount: params.inputAmount,
+      profile: primaryPlan.strategy.profile,
+      splitVenues: primaryPlan.strategy.splitVenues,
+      fallbackCount: primaryPlan.strategy.fallbackCount,
+      twapRecommended: primaryPlan.strategy.twap?.recommended ?? false,
+      twapSlices: primaryPlan.strategy.twap?.slices,
+    });
+
+    this.logger.info("plan_built", {
+      planId: primaryPlan.id,
+      inputMint: params.inputMint,
+      outputMint: params.outputMint,
+      totalInput: params.inputAmount,
+      expectedOutput: primaryPlan.expectedOutput,
+      fallbackCount: primaryPlan.fallbackPlans.length,
+      strategy: primaryPlan.strategy,
+      legs: primaryPlan.legs.map((leg) => ({
+        venue: leg.venue,
+        inputAmount: leg.inputAmount,
+        expectedOutput: leg.expectedOutput,
+        minOutput: leg.minOutput,
+      })),
+    });
 
     return primaryPlan;
   }
@@ -279,6 +345,156 @@ export class IntelligentOrderRouter {
     };
   }
 
+  private deriveTwapHint(
+    totalInput: number,
+    totalDepth: number,
+    stalenessMs: number
+  ): TwapRecommendation {
+    const footprintRatio = totalDepth > 0 ? totalInput / totalDepth : 0;
+    const recommended = footprintRatio >= DEFAULT_TWAP_TRIGGER_RATIO;
+    const slices = recommended
+      ? Math.min(
+          10,
+          Math.max(
+            2,
+            Math.ceil(footprintRatio / DEFAULT_TWAP_TRIGGER_RATIO)
+          )
+        )
+      : undefined;
+
+    return {
+      recommended,
+      triggerRatio: DEFAULT_TWAP_TRIGGER_RATIO,
+      footprintRatio,
+      slices,
+      intervalMs: recommended ? this.options.rebalance.pollIntervalMs : undefined,
+      reason: recommended
+        ? "liquidity_footprint_exceeds_threshold"
+        : stalenessMs > this.options.rebalance.maxStalenessMs
+          ? "liquidity_snapshot_stale"
+          : undefined,
+    };
+  }
+
+  private buildRoutingStrategyMetadata(
+    plan: AtomicSwapPlan,
+    context: {
+      fallbackCount: number;
+      totalDepth: number;
+      totalInput: number;
+      optimization: OptimizationConfig;
+      twapHint?: TwapRecommendation;
+    }
+  ): RoutingStrategyMetadata {
+    const splitVenues = Array.from(new Set(plan.legs.map((leg) => leg.venue)));
+    const splitsEnabled =
+      Boolean(context.optimization.enableSplitRoutes ?? true) &&
+      splitVenues.length > 1;
+    const fallbackEnabled =
+      Boolean(context.optimization.enableFallback ?? true) &&
+      context.fallbackCount > 0;
+    const twap = context.twapHint
+      ? { ...context.twapHint }
+      : {
+          recommended: false,
+          triggerRatio: DEFAULT_TWAP_TRIGGER_RATIO,
+          footprintRatio:
+            context.totalDepth > 0
+              ? context.totalInput / context.totalDepth
+              : 0,
+        };
+
+    const profile = twap.recommended
+      ? "twap-assisted"
+      : splitsEnabled
+        ? "split"
+        : "single-venue";
+
+    const notes: string[] = [];
+    if (context.optimization.enableSplitRoutes === false) {
+      notes.push("splits_disabled_by_config");
+    }
+    if (context.optimization.enableFallback === false) {
+      notes.push("fallback_disabled_by_config");
+    }
+    if (twap.recommended) {
+      notes.push("twap_recommended");
+    }
+
+    return {
+      profile,
+      splitsEnabled,
+      splitVenues,
+      fallbackEnabled,
+      fallbackCount: fallbackEnabled ? context.fallbackCount : 0,
+      twap,
+      notes: notes.length ? notes : undefined,
+    };
+  }
+
+  private enrichPlanStrategy(plan: AtomicSwapPlan): void {
+    if (!plan.strategy) {
+      return;
+    }
+
+    plan.strategy.splitVenues = Array.from(
+      new Set(plan.legs.map((leg) => leg.venue))
+    );
+
+    if (plan.baseRoute) {
+      plan.baseRoute.strategy = plan.strategy;
+    }
+
+    if (plan.fallbackPlans?.length) {
+      plan.fallbackPlans.forEach((fallback) => {
+        if (fallback.baseRoute) {
+          fallback.baseRoute.strategy = fallback.strategy ?? plan.strategy;
+        }
+      });
+    }
+  }
+
+  private normalizeFallbackPlan(
+    plan: AtomicSwapPlan,
+    context: {
+      totalDepth: number;
+      totalInput: number;
+      optimization: OptimizationConfig;
+      twapHint?: TwapRecommendation;
+    }
+  ): AtomicSwapPlan {
+    const normalizedFallbacks = (plan.fallbackPlans ?? []).map((child) =>
+      this.normalizeFallbackPlan(child, context)
+    );
+
+    const clonedPlan: AtomicSwapPlan = {
+      ...plan,
+      fallbackPlans: normalizedFallbacks,
+    };
+
+    clonedPlan.strategy = this.buildRoutingStrategyMetadata(clonedPlan, {
+      fallbackCount: this.countFallbackPlans(normalizedFallbacks),
+      totalDepth: context.totalDepth,
+      totalInput: context.totalInput,
+      optimization: context.optimization,
+      twapHint: context.twapHint,
+    });
+
+    this.enrichPlanStrategy(clonedPlan);
+    return clonedPlan;
+  }
+
+  private countFallbackPlans(fallbacks?: AtomicSwapPlan[]): number {
+    if (!fallbacks?.length) {
+      return 0;
+    }
+
+    return fallbacks.reduce((sum, child) => {
+      const nested = this.countFallbackPlans(child.fallbackPlans);
+      return sum + 1 + nested;
+    }, 0);
+  }
+
   /**
    * Evaluate the current plan against latest liquidity and rebuild if needed.
    */
@@ -289,6 +505,11 @@ export class IntelligentOrderRouter {
     const evaluation = await this.evaluatePlan(plan);
 
     if (!evaluation.shouldRebalance) {
+      this.logger.debug("plan_monitor_steady", {
+        planId: plan.id,
+        reason: evaluation.reason ?? "up_to_date",
+        diffs: evaluation.diffs,
+      });
       return {
         updated: false,
         plan,
@@ -306,6 +527,13 @@ export class IntelligentOrderRouter {
       sampleStrategy: overrides?.sampleStrategy,
       optimization: overrides?.optimization,
       rebalance: overrides?.rebalance,
+    });
+
+    this.logger.warn("plan_rebuilt", {
+      oldPlanId: plan.id,
+      newPlanId: updatedPlan.id,
+      reason: evaluation.reason ?? "unspecified",
+      diffs: evaluation.diffs,
     });
 
     return {
@@ -469,6 +697,12 @@ export class IntelligentOrderRouter {
     };
   }
 
+  /**
+   * Simulate venue execution using the most accurate model available.
+   * For CLOBs we replay against the in-memory orderbook so routing decisions
+   * reflect real depth instead of a single top-of-book price. AMMs keep using
+   * xy=k math while RFQ venues fall back to their quoted effective price.
+   */
   private simulateSourceOutput(
     source: LiquiditySource,
     inputAmount: number
@@ -490,51 +724,160 @@ export class IntelligentOrderRouter {
     let slippagePercent: number;
     let feeAmount = inputAmount * config.feeRate;
     let postTradeLiquidity: number | undefined;
+    let bumpOutputFn: ((amount: number) => number) | undefined;
+    let clobFillApplied = false;
 
-    if (source.venueType === VenueType.CLOB && source.topOfBook) {
-      const askPrice = source.topOfBook.askPrice;
-      outputAmount = inputAmount / (askPrice * (1 + config.feeRate));
-      effectivePrice = inputAmount / outputAmount;
-      slippagePercent =
-        inputAmount > source.topOfBook.askSize
-          ? source.slippagePercent * (inputAmount / source.topOfBook.askSize)
-          : source.slippagePercent;
-      postTradeLiquidity = Math.max(source.depth - inputAmount, 0);
-      feeAmount = outputAmount * config.feeRate;
-    } else if (source.venueType === VenueType.AMM && source.reserves) {
-      outputAmount = estimateAMMOutput(
-        inputAmount,
-        source.reserves.input,
-        source.reserves.output,
-        config.feeRate
-      );
-      effectivePrice =
-        inputAmount / Math.max(outputAmount, this.options.epsilonAmount);
-      slippagePercent = calculatePriceImpact(
-        inputAmount,
-        source.reserves.input,
-        source.reserves.output,
-        config.feeRate
-      );
-      postTradeLiquidity = Math.max(source.reserves.output - outputAmount, 0);
-    } else {
-      outputAmount = inputAmount / source.effectivePrice;
-      effectivePrice = source.effectivePrice;
-      slippagePercent = source.slippagePercent;
-      postTradeLiquidity = source.depth - inputAmount;
+    const clobMeta = (source.metadata ?? {}) as {
+      direction?: ClobTradeDirection;
+      takerFeeBps?: number;
+      inverted?: boolean;
+    };
+    const direction: ClobTradeDirection = clobMeta.direction
+      ? clobMeta.direction
+      : clobMeta.inverted
+        ? "sellQuote"
+        : "sellBase";
+    const takerFeeBps =
+      clobMeta.takerFeeBps ??
+      config.takerFeeBps ??
+      Math.round(config.feeRate * 10_000);
+    const takerFeeRate = takerFeeBps / 10_000;
+
+    if (source.venueType === VenueType.CLOB && source.orderbook) {
+      const fillMeta = (source.metadata ?? {}) as {
+        direction?: ClobTradeDirection;
+        takerFeeBps?: number;
+      };
+      const directionOverride = fillMeta.direction ?? direction;
+      const effectiveTakerFeeBps = fillMeta.takerFeeBps ?? takerFeeBps;
+      const computeFill = (amount: number) =>
+        simulateClobFill({
+          direction: directionOverride,
+          inputAmount: amount,
+          takerFeeBps: effectiveTakerFeeBps,
+          bids: source.orderbook!.bids,
+          asks: source.orderbook!.asks,
+        });
+      const fill = computeFill(inputAmount);
+
+      if (fill) {
+        outputAmount = fill.outputAmount;
+        effectivePrice = fill.effectivePrice;
+        slippagePercent = fill.slippagePercent;
+        feeAmount = fill.feeAmount;
+        postTradeLiquidity = Math.max(
+          source.depth - fill.notionalQuote,
+          0
+        );
+        bumpOutputFn = (amount: number) =>
+          computeFill(amount)?.outputAmount ?? fill.outputAmount;
+        clobFillApplied = true;
+      } else {
+        this.logger.warn("clob_fill_simulation_failed", {
+          venue: source.venue,
+          direction: directionOverride,
+          inputAmount,
+          takerFeeBps: effectiveTakerFeeBps,
+          bidLevels: source.orderbook?.bids.length ?? 0,
+          askLevels: source.orderbook?.asks.length ?? 0,
+        });
+      }
+    }
+
+    const fallbackTopOfBook =
+      source.topOfBook ?? this.deriveTopOfBook(source.orderbook);
+
+    if (!clobFillApplied) {
+      if (
+        source.venueType === VenueType.CLOB &&
+        fallbackTopOfBook
+      ) {
+        const top = fallbackTopOfBook;
+        const applySellQuoteFallback = () => {
+          if (top.askPrice <= 0) {
+            return false;
+          }
+          const netQuote = inputAmount * (1 - takerFeeRate);
+          outputAmount = netQuote / top.askPrice;
+          feeAmount = inputAmount * takerFeeRate;
+          effectivePrice =
+            (inputAmount + feeAmount) /
+            Math.max(outputAmount, this.options.epsilonAmount);
+          slippagePercent = source.slippagePercent;
+          postTradeLiquidity = Math.max(source.depth - inputAmount, 0);
+          bumpOutputFn = (amount: number) =>
+            (amount * (1 - takerFeeRate)) / top.askPrice;
+          return true;
+        };
+
+        const applySellBaseFallback = () => {
+          if (top.bidPrice <= 0) {
+            return false;
+          }
+          const grossQuote = inputAmount * top.bidPrice;
+          feeAmount = grossQuote * takerFeeRate;
+          outputAmount = grossQuote - feeAmount;
+          effectivePrice =
+            inputAmount /
+            Math.max(outputAmount, this.options.epsilonAmount);
+          slippagePercent = source.slippagePercent;
+          postTradeLiquidity = Math.max(source.depth - grossQuote, 0);
+          bumpOutputFn = (amount: number) => {
+            const gross = amount * top.bidPrice;
+            const fee = gross * takerFeeRate;
+            return gross - fee;
+          };
+          return true;
+        };
+
+        const appliedFallback =
+          direction === "sellQuote"
+            ? applySellQuoteFallback()
+            : applySellBaseFallback();
+
+        clobFillApplied = appliedFallback;
+      } else if (source.venueType === VenueType.AMM && source.reserves) {
+        outputAmount = estimateAMMOutput(
+          inputAmount,
+          source.reserves.input,
+          source.reserves.output,
+          config.feeRate
+        );
+        effectivePrice =
+          inputAmount / Math.max(outputAmount, this.options.epsilonAmount);
+        slippagePercent = calculatePriceImpact(
+          inputAmount,
+          source.reserves.input,
+          source.reserves.output,
+          config.feeRate
+        );
+        postTradeLiquidity = Math.max(
+          source.reserves.output - outputAmount,
+          0
+        );
+        bumpOutputFn = (amount: number) =>
+          estimateAMMOutput(
+            amount,
+            source.reserves!.input,
+            source.reserves!.output,
+            config.feeRate
+          );
+      } else {
+        outputAmount = inputAmount / source.effectivePrice;
+        effectivePrice = source.effectivePrice;
+        slippagePercent = source.slippagePercent;
+        postTradeLiquidity = source.depth - inputAmount;
+        bumpOutputFn = (amount: number) =>
+          amount /
+          Math.max(source.effectivePrice, this.options.epsilonAmount);
+      }
     }
 
     const delta = Math.max(inputAmount * 0.01, this.options.epsilonAmount);
-    const bumpedOutput =
-      source.venueType === VenueType.AMM && source.reserves
-        ? estimateAMMOutput(
-            inputAmount + delta,
-            source.reserves.input,
-            source.reserves.output,
-            config.feeRate
-          )
-        : (inputAmount + delta) /
-          Math.max(source.effectivePrice, this.options.epsilonAmount);
+    const bumpedOutput = bumpOutputFn
+      ? bumpOutputFn(inputAmount + delta)
+      : (inputAmount + delta) /
+        Math.max(source.effectivePrice, this.options.epsilonAmount);
     const marginalOutput = Math.max(
       bumpedOutput - outputAmount,
       this.options.epsilonAmount
@@ -595,6 +938,32 @@ export class IntelligentOrderRouter {
     }
 
     return legs;
+  }
+
+  private deriveTopOfBook(
+    snapshot?: OrderbookSnapshot
+  ): LiquiditySource["topOfBook"] | undefined {
+    if (!snapshot) {
+      return undefined;
+    }
+
+    const bestBid = snapshot.bids.find(
+      (level) => level.price > this.options.epsilonAmount && level.size > 0
+    );
+    const bestAsk = snapshot.asks.find(
+      (level) => level.price > this.options.epsilonAmount && level.size > 0
+    );
+
+    if (!bestBid && !bestAsk) {
+      return undefined;
+    }
+
+    return {
+      bidPrice: bestBid?.price ?? 0,
+      bidSize: bestBid?.size ?? 0,
+      askPrice: bestAsk?.price ?? 0,
+      askSize: bestAsk?.size ?? 0,
+    };
   }
 
   private buildSampleSizes(

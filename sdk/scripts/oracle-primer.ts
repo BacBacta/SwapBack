@@ -15,7 +15,10 @@ import {
   OraclePriceService,
   formatOraclePrice,
 } from "../src/services/OraclePriceService";
-import type { OraclePriceData } from "../src/types/smart-router";
+import type {
+  OraclePriceData,
+  OracleVerificationDetail,
+} from "../src/types/smart-router";
 
 const DEFAULT_MINTS = [
   "So11111111111111111111111111111111111111112", // SOL
@@ -72,10 +75,29 @@ async function main(): Promise<void> {
       );
       console.log("   Age:", formatAge(price.publishTime));
       console.log("   Confidence:", formatConfidence(price));
+
+      const detail = oracleService.getVerificationDetail(mint);
+      if (detail) {
+        logVerificationDetail(detail);
+      }
     } catch (error) {
       console.error(`   ❌ Failed to fetch oracle price for ${mint}`, error);
     }
   }
+}
+
+function logVerificationDetail(detail: OracleVerificationDetail): void {
+  const divergence =
+    typeof detail.divergencePercent === "number"
+      ? `${(detail.divergencePercent * 100).toFixed(4)}%`
+      : "n/a";
+  const confidencePct =
+    detail.price !== 0
+      ? `${((Math.abs(detail.confidence) / Math.abs(detail.price)) * 100).toFixed(4)}%`
+      : "n/a";
+  console.log(
+    `   Oracle Meta → provider=${detail.providerUsed}, fallback=${detail.fallbackUsed ? "yes" : "no"}, confidence=${confidencePct}, divergence=${divergence}`
+  );
 }
 
 main()

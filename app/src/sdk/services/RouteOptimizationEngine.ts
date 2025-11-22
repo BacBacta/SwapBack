@@ -10,9 +10,15 @@ import {
   LiquiditySource,
   VenueName,
   VenueType,
+  RoutingStrategyMetadata,
 } from "../types/smart-router";
 import { LiquidityDataCollector } from "./LiquidityDataCollector";
 import { OraclePriceService } from "./OraclePriceService";
+import { StructuredLogger } from "../utils/StructuredLogger";
+import { simulateClobFill, ClobTradeDirection } from "./ClobMath";
+
+const PRICE_SORT_EPSILON = 1e-9;
+const ROUTE_SORT_EPSILON = 1e-9;
 
 // ============================================================================
 // OPTIMIZATION ENGINE
@@ -22,6 +28,7 @@ export class RouteOptimizationEngine {
   private readonly liquidityCollector: LiquidityDataCollector;
   private readonly oracleService: OraclePriceService;
   private readonly defaultConfig: OptimizationConfig;
+  private readonly logger: StructuredLogger;
 
   constructor(
     liquidityCollector: LiquidityDataCollector,
@@ -29,6 +36,7 @@ export class RouteOptimizationEngine {
   ) {
     this.liquidityCollector = liquidityCollector;
     this.oracleService = oracleService;
+    this.logger = new StructuredLogger("route-engine");
 
     this.defaultConfig = {
       slippageTolerance: 0.01, // 1%
@@ -84,6 +92,14 @@ export class RouteOptimizationEngine {
       (s) => s.slippagePercent <= config.slippageTolerance
     );
 
+    // Drop venues flagged offline by their adapters
+    sources = sources.filter((source) => this.isSourceHealthy(source));
+
+    sources =
+      config.prioritizeCLOB && sources.length > 1
+        ? this.applyClobPreference(sources)
+        : sources;
+
     if (sources.length === 0) {
       throw new Error(
         "No viable liquidity sources found within slippage tolerance"
@@ -124,8 +140,17 @@ export class RouteOptimizationEngine {
       this.assessRisk(candidate);
     }
 
-    // Step 5: Sort by expected output (descending)
-    candidates.sort((a, b) => b.expectedOutput - a.expectedOutput);
+    // Step 5: Sort by expected output, honoring CLOB bias if requested
+    this.rankCandidates(candidates, config);
+
+    const diagnostics = this.buildRoutingDiagnostics(
+      inputMint,
+      outputMint,
+      inputAmount,
+      candidates,
+      config
+    );
+    this.logger.info("routes_ranked", diagnostics);
 
     // Step 6: Return top N
     return candidates.slice(0, config.maxRoutes || 3);
@@ -276,6 +301,77 @@ export class RouteOptimizationEngine {
     return splits;
   }
 
+  private rankCandidates(
+    candidates: RouteCandidate[],
+    config: OptimizationConfig
+  ): void {
+    candidates.sort((a, b) => {
+      const diff = b.expectedOutput - a.expectedOutput;
+      if (Math.abs(diff) > ROUTE_SORT_EPSILON) {
+        return diff;
+      }
+
+      if (config.prioritizeCLOB) {
+        const aUsesClob = this.routeUsesClob(a);
+        const bUsesClob = this.routeUsesClob(b);
+        if (aUsesClob !== bUsesClob) {
+          return aUsesClob ? -1 : 1;
+        }
+      }
+
+      return 0;
+    });
+  }
+
+  private routeUsesClob(candidate: RouteCandidate): boolean {
+    return candidate.splits.some(
+      (split) => split.liquiditySource.venueType === VenueType.CLOB
+    );
+  }
+
+  private applyClobPreference(
+    sources: LiquiditySource[]
+  ): LiquiditySource[] {
+    return [...sources].sort((a, b) => {
+      const priceDiff = a.effectivePrice - b.effectivePrice;
+      if (Math.abs(priceDiff) > PRICE_SORT_EPSILON) {
+        return priceDiff;
+      }
+
+      if (a.venueType !== b.venueType) {
+        return a.venueType === VenueType.CLOB ? -1 : 1;
+      }
+
+      const priorityDiff =
+        this.liquidityCollector.getVenueConfig(b.venue).priority -
+        this.liquidityCollector.getVenueConfig(a.venue).priority;
+      if (priorityDiff !== 0) {
+        return priorityDiff;
+      }
+
+      return a.timestamp - b.timestamp;
+    });
+  }
+
+  private getTakerFeeBps(venue: VenueName): number {
+    const config = this.liquidityCollector.getVenueConfig(venue);
+    return config.takerFeeBps ?? Math.round(config.feeRate * 10_000);
+  }
+
+  private resolveClobDirection(
+    metadata?: Record<string, unknown>
+  ): ClobTradeDirection {
+    if (metadata && typeof metadata.direction === "string") {
+      return metadata.direction as ClobTradeDirection;
+    }
+
+    if (metadata && typeof metadata.inverted === "boolean") {
+      return metadata.inverted ? "sellQuote" : "sellBase";
+    }
+
+    return "sellBase";
+  }
+
   /**
    * Calculate expected output from a liquidity source
    */
@@ -283,6 +379,30 @@ export class RouteOptimizationEngine {
     source: LiquiditySource,
     inputAmount: number
   ): number {
+    if (source.venueType === VenueType.CLOB && source.orderbook) {
+      const metadata = source.metadata as Record<string, unknown> | undefined;
+      const direction = this.resolveClobDirection(metadata);
+      const takerFeeBps =
+        (metadata?.takerFeeBps as number | undefined) ??
+        this.getTakerFeeBps(source.venue);
+
+      const fill = simulateClobFill({
+        direction,
+        inputAmount,
+        takerFeeBps,
+        bids: source.orderbook.bids,
+        asks: source.orderbook.asks,
+      });
+
+      if (fill) {
+        return fill.outputAmount;
+      }
+    }
+
+    if (source.effectivePrice > 0) {
+      return inputAmount / source.effectivePrice;
+    }
+
     if (source.venueType === VenueType.CLOB && source.topOfBook) {
       // For CLOB, use ask price directly
       const config = this.liquidityCollector.getVenueConfig(source.venue);
@@ -299,8 +419,8 @@ export class RouteOptimizationEngine {
       );
     }
 
-    // For RFQ, use effective price
-    return inputAmount / source.effectivePrice;
+    // No pricing info available
+    return 0;
   }
 
   /**
@@ -388,6 +508,14 @@ export class RouteOptimizationEngine {
     };
 
     return baseUnits[venueType] * numOperations;
+  }
+
+  private isSourceHealthy(source: LiquiditySource): boolean {
+    const metadata = source.metadata as { health?: string } | undefined;
+    if (!metadata || !metadata.health) {
+      return true;
+    }
+    return metadata.health !== "offline";
   }
 
   /**
@@ -539,7 +667,71 @@ export class RouteOptimizationEngine {
       };
     }
   }
+
+  private buildRoutingDiagnostics(
+    inputMint: string,
+    outputMint: string,
+    inputAmount: number,
+    candidates: RouteCandidate[],
+    config: OptimizationConfig
+  ): RoutingDiagnostics {
+    const topRoutes = candidates.slice(0, 3);
+    const clobRouteCount = candidates.filter((candidate) =>
+      this.routeUsesClob(candidate)
+    ).length;
+    const clobRoutesInTop3 = topRoutes.filter((candidate) =>
+      this.routeUsesClob(candidate)
+    ).length;
+
+    return {
+      inputMint,
+      outputMint,
+      inputAmount,
+      slippageTolerance: config.slippageTolerance,
+      candidateCount: candidates.length,
+      clobPreferenceApplied: config.prioritizeCLOB,
+      clobRouteCount,
+      clobRoutesInTop3,
+      topRoutes: topRoutes.map((candidate) => ({
+        id: candidate.id,
+        venues: candidate.venues,
+        expectedOutput: candidate.expectedOutput,
+        totalCost: candidate.totalCost,
+        effectiveRate: candidate.effectiveRate,
+        mevRisk: candidate.mevRisk,
+        usesClob: this.routeUsesClob(candidate),
+        strategyProfile: candidate.strategy?.profile,
+        fallbackCount: candidate.strategy?.fallbackCount,
+        twapRecommended: candidate.strategy?.twap?.recommended ?? false,
+        twapSlices: candidate.strategy?.twap?.slices,
+      })),
+    };
+  }
 }
+
+export type RoutingDiagnostics = {
+  inputMint: string;
+  outputMint: string;
+  inputAmount: number;
+  slippageTolerance: number;
+  candidateCount: number;
+  clobPreferenceApplied: boolean;
+  clobRouteCount: number;
+  clobRoutesInTop3: number;
+  topRoutes: Array<{
+    id: string;
+    venues: VenueName[];
+    expectedOutput: number;
+    totalCost: number;
+    effectiveRate: number;
+    mevRisk: string;
+    usesClob: boolean;
+    strategyProfile?: RoutingStrategyMetadata["profile"];
+    fallbackCount?: number;
+    twapRecommended?: boolean;
+    twapSlices?: number;
+  }>;
+};
 
 /**
  * Validate route candidate before execution

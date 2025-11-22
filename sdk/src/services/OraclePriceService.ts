@@ -7,6 +7,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { parsePriceData } from "@pythnetwork/client";
 import {
   OraclePriceData,
+  OracleVerificationDetail,
   PriceVerification,
   RouteCandidate,
 } from "../types/smart-router";
@@ -23,6 +24,25 @@ import {
   SWITCHBOARD_MAX_VARIANCE_THRESHOLD,
 } from "../config/switchboard-feeds";
 
+const DEFAULT_MAX_ORACLE_DIVERGENCE_PERCENT = Number(
+  process.env.NEXT_PUBLIC_ORACLE_MAX_DIVERGENCE_PERCENT ?? 0.01
+);
+
+type OraclePriceServiceOptions = {
+  maxOracleDivergencePercent?: number;
+};
+
+type OracleConsensusResult = {
+  best: OraclePriceData;
+  providerUsed: OraclePriceData["provider"];
+  fallbackUsed: boolean;
+  divergencePercent?: number;
+  sources: {
+    pyth?: OraclePriceData;
+    switchboard?: OraclePriceData;
+  };
+};
+
 // ============================================================================
 // ORACLE PRICE SERVICE
 // ============================================================================
@@ -30,7 +50,9 @@ import {
 export class OraclePriceService {
   private connection: Connection;
   private priceCache: Map<string, OraclePriceData>;
+  private verificationDetailCache: Map<string, OracleVerificationDetail>;
   private cacheExpiryMs: number;
+  private readonly maxOracleDivergencePercent: number;
 
   // Price feed addresses (examples - replace with actual addresses)
   private readonly PRICE_FEEDS = {
@@ -40,10 +62,18 @@ export class OraclePriceService {
     "USDT/USD": new PublicKey("3vxLXJqLqF3JG5TCbYycbKWRBbCJQLxQmBGCkyqEEefL"),
   };
 
-  constructor(connection: Connection, cacheExpiryMs = 5000) {
+  constructor(
+    connection: Connection,
+    cacheExpiryMs = 5000,
+    options: OraclePriceServiceOptions = {}
+  ) {
     this.connection = connection;
     this.priceCache = new Map();
+    this.verificationDetailCache = new Map();
     this.cacheExpiryMs = cacheExpiryMs;
+    this.maxOracleDivergencePercent =
+      options.maxOracleDivergencePercent ??
+      DEFAULT_MAX_ORACLE_DIVERGENCE_PERCENT;
   }
 
   /**
@@ -75,6 +105,16 @@ export class OraclePriceService {
       // Determine if acceptable
       const isAcceptable = deviation <= maxDeviationPercent;
 
+      const inputMetadata = this.verificationDetailCache.get(inputMint);
+      const outputMetadata = this.verificationDetailCache.get(outputMint);
+      const metadata =
+        inputMetadata || outputMetadata
+          ? {
+              input: inputMetadata,
+              output: outputMetadata,
+            }
+          : undefined;
+
       // Generate warning if needed
       let warning: string | undefined;
       if (!isAcceptable) {
@@ -89,6 +129,7 @@ export class OraclePriceService {
         deviation,
         isAcceptable,
         warning,
+        metadata,
       };
     } catch (error) {
       console.error("Oracle price verification failed:", error);
@@ -118,29 +159,24 @@ export class OraclePriceService {
       }
     }
 
-    // Try Pyth first
-    try {
-      const pythPrice = await this.fetchPythPrice(mint);
-      if (pythPrice) {
-        this.priceCache.set(mint, pythPrice);
-        return pythPrice;
-      }
-    } catch (error) {
-      console.warn("Pyth price fetch failed:", error);
+    const consensus = await this.getDualOracleConsensus(mint);
+    this.priceCache.set(mint, consensus.best);
+    this.verificationDetailCache.set(
+      mint,
+      this.buildVerificationDetail(consensus)
+    );
+
+    if (
+      consensus.divergencePercent !== undefined &&
+      consensus.divergencePercent > this.maxOracleDivergencePercent
+    ) {
+      console.warn("[oracle] dual_divergence", {
+        mint,
+        divergence: consensus.divergencePercent,
+      });
     }
 
-    // Fallback to Switchboard
-    try {
-      const switchboardPrice = await this.fetchSwitchboardPrice(mint);
-      if (switchboardPrice) {
-        this.priceCache.set(mint, switchboardPrice);
-        return switchboardPrice;
-      }
-    } catch (error) {
-      console.warn("Switchboard price fetch failed:", error);
-    }
-
-    throw new Error(`No oracle price available for ${mint}`);
+    return consensus.best;
   }
 
   /**
@@ -428,6 +464,80 @@ export class OraclePriceService {
    */
   clearCache(): void {
     this.priceCache.clear();
+    this.verificationDetailCache.clear();
+  }
+
+  public getVerificationDetail(
+    mint: string
+  ): OracleVerificationDetail | undefined {
+    return this.verificationDetailCache.get(mint);
+  }
+
+  private async getDualOracleConsensus(
+    mint: string
+  ): Promise<OracleConsensusResult> {
+    const [pythPrice, switchboardPrice] = await Promise.all([
+      this.fetchPythPrice(mint),
+      this.fetchSwitchboardPrice(mint),
+    ]);
+
+    if (!pythPrice && !switchboardPrice) {
+      throw new Error(`No oracle price available for ${mint}`);
+    }
+
+    const available = [pythPrice, switchboardPrice].filter(
+      (price): price is OraclePriceData => !!price
+    );
+
+    const sorted = available.sort(
+      (a, b) => this.getConfidenceRatio(a) - this.getConfidenceRatio(b)
+    );
+    const best = sorted[0];
+
+    const divergencePercent =
+      pythPrice && switchboardPrice
+        ? Math.abs(pythPrice.price - switchboardPrice.price) /
+          Math.max(
+            1e-9,
+            (Math.abs(pythPrice.price) + Math.abs(switchboardPrice.price)) / 2
+          )
+        : undefined;
+
+    return {
+      best,
+      providerUsed: best.provider,
+      fallbackUsed: Boolean(pythPrice) && best.provider !== "pyth",
+      divergencePercent,
+      sources: {
+        pyth: pythPrice ?? undefined,
+        switchboard: switchboardPrice ?? undefined,
+      },
+    };
+  }
+
+  private getConfidenceRatio(price: OraclePriceData): number {
+    const absPrice = Math.abs(price.price);
+    if (!Number.isFinite(absPrice) || absPrice === 0) {
+      return Number.POSITIVE_INFINITY;
+    }
+
+    const absConfidence = Math.abs(price.confidence);
+    return Number.isFinite(absConfidence)
+      ? absConfidence / absPrice
+      : Number.POSITIVE_INFINITY;
+  }
+
+  private buildVerificationDetail(
+    consensus: OracleConsensusResult
+  ): OracleVerificationDetail {
+    return {
+      providerUsed: consensus.providerUsed,
+      price: consensus.best.price,
+      confidence: consensus.best.confidence,
+      divergencePercent: consensus.divergencePercent,
+      fallbackUsed: consensus.fallbackUsed,
+      sources: consensus.sources,
+    };
   }
 
   /**

@@ -1,4 +1,6 @@
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection } from '@solana/web3.js';
+import { OraclePriceService } from '../../sdk/src/services/OraclePriceService';
+import type { PriceVerification } from '../../sdk/src/types/smart-router';
 
 interface CompetitorQuote {
   dex: string;
@@ -26,11 +28,17 @@ interface BenchmarkResult {
   rebate: number;
   netGain: number;
   timestamp: number;
+  oracle?: {
+    expectedOut: number;
+    deviationBps?: number;
+    metadata?: PriceVerification["metadata"];
+  };
 }
 
 // Configuration
 const RPC_URL = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
 const connection = new Connection(RPC_URL);
+const oracleService = new OraclePriceService(connection);
 
 const BENCHMARK_PAIRS: [string, string][] = [
   ['So11111111111111111111111111111111111111112', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'], // SOL-USDC
@@ -42,6 +50,21 @@ const BENCHMARK_AMOUNTS = [
   10_000_000_000,     // 10 SOL
   100_000_000_000,    // 100 SOL
 ];
+
+const TOKEN_DECIMALS: Record<string, number> = {
+  'So11111111111111111111111111111111111111112': 9, // SOL
+  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 6, // USDC
+  'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': 6, // USDT
+};
+
+function getTokenDecimals(mint: string): number {
+  const decimals = TOKEN_DECIMALS[mint];
+  if (decimals === undefined) {
+    console.warn(`⚠️ Unknown decimals for mint ${mint}, defaulting to 9`);
+    return 9;
+  }
+  return decimals;
+}
 
 async function fetchJupiterQuote(
   inputMint: string,
@@ -162,6 +185,27 @@ async function runBenchmark(
       console.log(`  SwapBack: ${swapbackQuote.outAmount}`);
       console.log(`  NPI: ${npi} (${npiPercent.toFixed(4)}%)`);
       console.log(`  Rebate: ${swapbackQuote.rebate}`);
+
+      const oracleInsight = await collectOracleInsight(
+        tokenA,
+        tokenB,
+        amount,
+        swapbackQuote.outAmount
+      );
+
+      if (oracleInsight?.metadata) {
+        const inputFallback = oracleInsight.metadata.input?.fallbackUsed
+          ? "(fallback)"
+          : "";
+        const outputFallback = oracleInsight.metadata.output?.fallbackUsed
+          ? "(fallback)"
+          : "";
+        console.log(
+          `  Oracle: Δ=${oracleInsight.deviationBps?.toFixed(2) ?? 'n/a'} bps | ` +
+            `input=${oracleInsight.metadata.input?.providerUsed ?? 'n/a'}${inputFallback} ` +
+            `output=${oracleInsight.metadata.output?.providerUsed ?? 'n/a'}${outputFallback}`
+        );
+      }
       
       results.push({
         pair: `${tokenA}-${tokenB}`,
@@ -172,12 +216,53 @@ async function runBenchmark(
         npiPercent,
         rebate: swapbackQuote.rebate,
         netGain: swapbackQuote.rebate,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        oracle: oracleInsight
       });
     }
   }
   
   return results;
+}
+
+async function collectOracleInsight(
+  inputMint: string,
+  outputMint: string,
+  inputAmount: number,
+  swapbackOutAmount: number
+) {
+  try {
+    const [inputPrice, outputPrice] = await Promise.all([
+      oracleService.getTokenPrice(inputMint),
+      oracleService.getTokenPrice(outputMint),
+    ]);
+
+    const inputDecimals = getTokenDecimals(inputMint);
+    const outputDecimals = getTokenDecimals(outputMint);
+    const humanInput = inputAmount / Math.pow(10, inputDecimals);
+    const inputValueUSD = humanInput * inputPrice.price;
+    const expectedOutputTokens = inputValueUSD / outputPrice.price;
+    const expectedOutputUnits = expectedOutputTokens * Math.pow(10, outputDecimals);
+    const deviationBps = expectedOutputUnits
+      ? ((swapbackOutAmount - expectedOutputUnits) / expectedOutputUnits) * 10_000
+      : undefined;
+
+    const metadataInput = oracleService.getVerificationDetail(inputMint);
+    const metadataOutput = oracleService.getVerificationDetail(outputMint);
+    const metadata =
+      metadataInput || metadataOutput
+        ? { input: metadataInput, output: metadataOutput }
+        : undefined;
+
+    return {
+      expectedOut: expectedOutputUnits,
+      deviationBps,
+      metadata,
+    };
+  } catch (error) {
+    console.warn("⚠️ Oracle metadata unavailable", error);
+    return undefined;
+  }
 }
 
 async function main() {
@@ -191,7 +276,14 @@ async function main() {
             swapback: r.swapbackOut,
             npi: r.npi,
             'npi%': r.npiPercent.toFixed(4) + '%',
-            rebate: r.rebate
+            rebate: r.rebate,
+            oracle_dev_bps: r.oracle?.deviationBps
+              ? r.oracle.deviationBps.toFixed(2)
+              : 'n/a',
+            oracle_fallback: r.oracle?.metadata &&
+              (r.oracle.metadata.input?.fallbackUsed || r.oracle.metadata.output?.fallbackUsed)
+              ? 'yes'
+              : 'no'
         })));
     } catch (e) {
         console.error(e);

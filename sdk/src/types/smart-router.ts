@@ -37,6 +37,23 @@ export interface VenueConfig {
   feeRate: number; // Base fee (e.g., 0.003 = 0.3%)
   minTradeSize: number; // Minimum trade size in USD
   maxSlippage: number; // Maximum allowed slippage
+  makerFeeBps?: number;
+  takerFeeBps?: number;
+  priorityFeeLamports?: number;
+  latencyTargetMs?: number;
+  featureFlag?: string;
+  minTopOfBookCoverage?: number; // Fraction (0-1) of requested size that best level must satisfy
+}
+
+export interface OrderbookSnapshot {
+  bids: Array<{ price: number; size: number }>;
+  asks: Array<{ price: number; size: number }>;
+  bestBid: number;
+  bestAsk: number;
+  spreadBps: number;
+  depthUsd: number;
+  lastUpdated: number;
+  latencyMs: number;
 }
 
 // ============================================================================
@@ -57,6 +74,7 @@ export interface LiquiditySource {
     bidSize: number;
     askSize: number;
   };
+  orderbook?: OrderbookSnapshot; // Detailed orderbook snapshot for analytics
 
   // AMM-specific
   reserves?: {
@@ -68,6 +86,10 @@ export interface LiquiditySource {
   effectivePrice: number; // Including fees and slippage
   feeAmount: number; // Absolute fee in output token
   slippagePercent: number; // Expected slippage %
+  venueFeeBps?: number;
+  priorityFeeLamports?: number;
+  mevProtectionCost?: number;
+  dataFreshnessMs?: number;
 
   // Execution details
   route: string[]; // Token path (may be multi-hop)
@@ -104,6 +126,7 @@ export interface RouteCandidate {
   // Execution
   instructions: unknown[]; // Solana instructions to execute
   estimatedComputeUnits: number;
+  strategy?: RoutingStrategyMetadata;
 }
 
 export interface RouteSplit {
@@ -150,6 +173,25 @@ export interface AtomicSwapLeg {
   liquiditySource: LiquiditySource;
 }
 
+export interface TwapRecommendation {
+  recommended: boolean;
+  triggerRatio?: number;
+  slices?: number;
+  intervalMs?: number;
+  reason?: string;
+  footprintRatio?: number;
+}
+
+export interface RoutingStrategyMetadata {
+  profile: "single-venue" | "split" | "twap-assisted";
+  splitsEnabled: boolean;
+  splitVenues: VenueName[];
+  fallbackEnabled: boolean;
+  fallbackCount: number;
+  twap?: TwapRecommendation;
+  notes?: string[];
+}
+
 export interface AtomicSwapPlan {
   id: string;
   inputMint: string;
@@ -176,6 +218,7 @@ export interface AtomicSwapPlan {
       timestamp: number;
     }
   >;
+  strategy: RoutingStrategyMetadata;
 }
 
 // ============================================================================
@@ -225,12 +268,28 @@ export interface OraclePriceData {
   exponent: number; // Price exponent
 }
 
+export interface OracleVerificationDetail {
+  providerUsed: "pyth" | "switchboard";
+  price: number;
+  confidence: number;
+  divergencePercent?: number;
+  fallbackUsed: boolean;
+  sources: {
+    pyth?: OraclePriceData;
+    switchboard?: OraclePriceData;
+  };
+}
+
 export interface PriceVerification {
   oraclePrice: number;
   routePrice: number;
   deviation: number; // % deviation from oracle
   isAcceptable: boolean; // Within acceptable range
   warning?: string; // Warning message if risky
+  metadata?: {
+    input?: OracleVerificationDetail;
+    output?: OracleVerificationDetail;
+  };
 }
 
 // ============================================================================

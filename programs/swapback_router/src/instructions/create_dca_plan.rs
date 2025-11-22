@@ -1,5 +1,6 @@
 use crate::error::SwapbackError;
 use crate::state::{DcaPlan, RouterState};
+use crate::MAX_SINGLE_SWAP_LAMPORTS;
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
@@ -58,26 +59,7 @@ pub fn handler(
     let dca_plan = &mut ctx.accounts.dca_plan;
     let clock = Clock::get()?;
 
-    // Validation
-    require!(args.amount_per_swap > 0, SwapbackError::InvalidAmount);
-    require!(args.total_swaps > 0, SwapbackError::InvalidSwapCount);
-    require!(args.total_swaps <= 10000, SwapbackError::TooManySwaps);
-    require!(
-        args.interval_seconds >= 3600,
-        SwapbackError::IntervalTooShort
-    ); // Min 1 hour
-    require!(
-        args.interval_seconds <= 31536000,
-        SwapbackError::IntervalTooLong
-    ); // Max 1 year
-
-    // If expiry is set, must be in the future
-    if args.expires_at > 0 {
-        require!(
-            args.expires_at > clock.unix_timestamp,
-            SwapbackError::InvalidExpiry
-        );
-    }
+    validate_plan_args(&args, clock.unix_timestamp)?;
 
     // Initialize DCA plan
     dca_plan.plan_id = plan_id;
@@ -104,6 +86,26 @@ pub fn handler(
     msg!("Total swaps: {}", args.total_swaps);
     msg!("Interval: {} seconds", args.interval_seconds);
     msg!("Next execution: {}", dca_plan.next_execution);
+
+    Ok(())
+}
+
+pub fn validate_plan_args(args: &CreateDcaPlanArgs, current_ts: i64) -> Result<()> {
+    require!(args.amount_per_swap > 0, SwapbackError::InvalidAmount);
+    require!(args.amount_per_swap <= MAX_SINGLE_SWAP_LAMPORTS, SwapbackError::AmountExceedsLimit);
+    require!(args.total_swaps > 0, SwapbackError::InvalidSwapCount);
+    require!(args.total_swaps <= 10000, SwapbackError::TooManySwaps);
+    require!(args.token_in != args.token_out, SwapbackError::IdenticalMints);
+    require!(args.interval_seconds >= 3600, SwapbackError::IntervalTooShort);
+    require!(args.interval_seconds <= 31536000, SwapbackError::IntervalTooLong);
+    require!(args.min_out_per_swap > 0, SwapbackError::InvalidMinOutput);
+
+    if args.expires_at > 0 {
+        require!(
+            args.expires_at > current_ts,
+            SwapbackError::InvalidExpiry
+        );
+    }
 
     Ok(())
 }

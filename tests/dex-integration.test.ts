@@ -5,16 +5,122 @@
  * Tests both liquidity fetching and actual swap execution
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Connection, Keypair } from "@solana/web3.js";
 import { LiquidityDataCollector } from "../sdk/src/services/LiquidityDataCollector";
-import { VenueName } from "../sdk/src/types/smart-router";
+import {
+  VenueName,
+  VenueType,
+  LiquiditySource,
+} from "../sdk/src/types/smart-router";
+
+const USE_REAL_NETWORK = process.env.SWAPBACK_REAL_DEX === "true";
+const TEST_MODE_LABEL = USE_REAL_NETWORK ? "Real" : "Stubbed";
+
+const stubbedVenueConfigs: Partial<
+  Record<VenueName, Partial<LiquiditySource>>
+> = {
+  [VenueName.PHOENIX]: {
+    venueType: VenueType.CLOB,
+    depth: 650000,
+    effectivePrice: 19.75,
+    topOfBook: { bidPrice: 49.8, askPrice: 49.9, bidSize: 12, askSize: 10 },
+  },
+  [VenueName.ORCA]: {
+    venueType: VenueType.AMM,
+    depth: 420000,
+    effectivePrice: 20.1,
+    reserves: { input: 1_200_000, output: 600_000 },
+  },
+  [VenueName.RAYDIUM]: {
+    venueType: VenueType.AMM,
+    depth: 415000,
+    effectivePrice: 20.2,
+    reserves: { input: 1_100_000, output: 550_000 },
+  },
+  [VenueName.JUPITER]: {
+    venueType: VenueType.RFQ,
+    depth: 250000,
+    effectivePrice: 20.4,
+  },
+  [VenueName.METEORA]: {
+    venueType: VenueType.AMM,
+    depth: 200000,
+    effectivePrice: 20.35,
+    reserves: { input: 1_000_000, output: 500_000 },
+  },
+  [VenueName.LIFINITY]: {
+    venueType: VenueType.AMM,
+    depth: 180000,
+    effectivePrice: 20.45,
+    reserves: { input: 1_000_000, output: 500_000 },
+  },
+  [VenueName.METIS]: {
+    venueType: VenueType.RFQ,
+    depth: 150000,
+    effectivePrice: 20.55,
+  },
+};
+
+const buildStubSource = (
+  venue: VenueName,
+  inputMint: string,
+  outputMint: string,
+  overrides: Partial<LiquiditySource> = {}
+): LiquiditySource => {
+  const base = {
+    venue,
+    venueType:
+      overrides.venueType ??
+      stubbedVenueConfigs[venue]?.venueType ??
+      VenueType.AMM,
+    tokenPair: [inputMint, outputMint],
+    depth: overrides.depth ?? stubbedVenueConfigs[venue]?.depth ?? 250000,
+    effectivePrice:
+      overrides.effectivePrice ??
+      stubbedVenueConfigs[venue]?.effectivePrice ??
+      20,
+    feeAmount:
+      overrides.feeAmount ??
+      stubbedVenueConfigs[venue]?.feeAmount ??
+      0.05,
+    slippagePercent:
+      overrides.slippagePercent ??
+      stubbedVenueConfigs[venue]?.slippagePercent ??
+      0.002,
+    route: overrides.route ?? [inputMint, outputMint],
+    timestamp: Date.now(),
+    reserves:
+      overrides.reserves ?? stubbedVenueConfigs[venue]?.reserves,
+    topOfBook:
+      overrides.topOfBook ?? stubbedVenueConfigs[venue]?.topOfBook,
+    metadata:
+      overrides.metadata ??
+      (stubbedVenueConfigs[venue]?.venueType === VenueType.CLOB
+        ? { direction: "sellBase", takerFeeBps: 5 }
+        : undefined),
+  } satisfies LiquiditySource;
+
+  return base;
+};
+
+const stubFetchVenue = async (
+  venue: VenueName,
+  inputMint: string,
+  outputMint: string
+): Promise<LiquiditySource | null> => {
+  const template = stubbedVenueConfigs[venue];
+  if (!template) {
+    return null;
+  }
+  return buildStubSource(venue, inputMint, outputMint, template);
+};
 
 // ============================================================================
 // REAL DEX INTEGRATION TESTS
 // ============================================================================
 
-describe("DEX Integration Tests", () => {
+describe(`DEX Integration Tests (${TEST_MODE_LABEL} Mode)`, () => {
   let connection: Connection;
   let liquidityCollector: LiquidityDataCollector;
 
@@ -29,6 +135,17 @@ describe("DEX Integration Tests", () => {
       "confirmed"
     );
     liquidityCollector = new LiquidityDataCollector(connection);
+
+    if (!USE_REAL_NETWORK) {
+      vi.spyOn(liquidityCollector as any, "fetchVenueLiquidity").mockImplementation(
+        async (
+          venue: VenueName,
+          inputMint: string,
+          outputMint: string,
+          _inputAmount: number
+        ) => stubFetchVenue(venue, inputMint, outputMint)
+      );
+    }
   });
 
   describe("Real DEX Liquidity Fetching", () => {

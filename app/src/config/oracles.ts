@@ -1,30 +1,66 @@
 /**
- * Mapping des oracles Pyth/Switchboard utilisés par le router.
+ * Mapping des oracles Switchboard (primaire) + Pyth (fallback) utilisés par le router.
  */
 
 import { PublicKey } from "@solana/web3.js";
 
-const PYTH_FEEDS: Record<string, string> = {
-  // Devnet feeds
-  "So11111111111111111111111111111111111111112/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v":
-    "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG", // SOL/USDC
-  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/So11111111111111111111111111111111111111112":
-    "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG",
-  "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v":
-    "Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD", // USDT/USDC
-  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB":
-    "Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD",
+export interface OracleFeedConfig {
+  primary: PublicKey;
+  fallback?: PublicKey;
+}
+
+type OraclePair = `${string}/${string}`;
+
+const ORACLE_FEED_CONFIGS: Record<OraclePair, { primary: string; fallback?: string }> = {
+  // SOL ⇄ USDC
+  "So11111111111111111111111111111111111111112/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": {
+    primary: "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR", // Switchboard SOL/USD (devnet)
+    fallback: "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG", // Pyth SOL/USD
+  },
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/So11111111111111111111111111111111111111112": {
+    primary: "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR",
+    fallback: "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG",
+  },
+
+  // USDT ⇄ USDC
+  "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": {
+    primary: "5mp8kbkTYwWWCsKSte8rURjTuyinsqBpJ3xQKf8mF7cc", // Switchboard USDT/USD
+    fallback: "Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD", // Pyth USDT/USD
+  },
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB": {
+    primary: "5mp8kbkTYwWWCsKSte8rURjTuyinsqBpJ3xQKf8mF7cc",
+    fallback: "Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD",
+  },
 };
 
-export function getOracleForPair(inputMint: string, outputMint: string): PublicKey {
-  const key = `${inputMint}/${outputMint}`;
-  const feed = PYTH_FEEDS[key];
-  if (!feed) {
+const ORACLE_CACHE = new Map<OraclePair, OracleFeedConfig>();
+
+export function getOracleFeedsForPair(inputMint: string, outputMint: string): OracleFeedConfig {
+  const key = `${inputMint}/${outputMint}` as OraclePair;
+
+  if (ORACLE_CACHE.has(key)) {
+    return ORACLE_CACHE.get(key)!;
+  }
+
+  const config = ORACLE_FEED_CONFIGS[key];
+  if (!config) {
     throw new Error(`Aucun oracle configuré pour ${key}`);
   }
-  return new PublicKey(feed);
+
+  const resolved: OracleFeedConfig = {
+    primary: new PublicKey(config.primary),
+    fallback: config.fallback ? new PublicKey(config.fallback) : undefined,
+  };
+
+  ORACLE_CACHE.set(key, resolved);
+  return resolved;
+}
+
+// Retro-compatibilité (retourne l'oracle primaire uniquement)
+export function getOracleForPair(inputMint: string, outputMint: string): PublicKey {
+  return getOracleFeedsForPair(inputMint, outputMint).primary;
 }
 
 export function listSupportedOraclePairs(): string[] {
-  return Object.keys(PYTH_FEEDS);
+  return Object.keys(ORACLE_FEED_CONFIGS);
 }

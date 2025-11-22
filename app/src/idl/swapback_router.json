@@ -799,7 +799,11 @@
           "signer": true
         },
         {
-          "name": "oracle"
+          "name": "primary_oracle"
+        },
+        {
+          "name": "fallback_oracle",
+          "optional": true
         },
         {
           "name": "user_token_account_a",
@@ -960,7 +964,7 @@
               },
               {
                 "kind": "account",
-                "path": "oracle"
+                "path": "primary_oracle"
               }
             ]
           }
@@ -1429,41 +1433,56 @@
     },
     {
       "code": 6006,
+      "name": "IdenticalMints",
+      "msg": "Input and output mints must differ"
+    },
+    {
+      "code": 6007,
+      "name": "AmountExceedsLimit",
+      "msg": "Per-swap amount exceeds router limits"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidMinOutput",
+      "msg": "Minimum output must be greater than 0"
+    },
+    {
+      "code": 6009,
       "name": "PlanNotActive",
       "msg": "DCA plan is not active"
     },
     {
-      "code": 6007,
+      "code": 6010,
       "name": "PlanCompleted",
       "msg": "DCA plan is already completed"
     },
     {
-      "code": 6008,
+      "code": 6011,
       "name": "PlanExpired",
       "msg": "DCA plan has expired"
     },
     {
-      "code": 6009,
+      "code": 6012,
       "name": "NotReadyForExecution",
       "msg": "Not ready for execution yet"
     },
     {
-      "code": 6010,
+      "code": 6013,
       "name": "InsufficientBalance",
       "msg": "Insufficient user balance"
     },
     {
-      "code": 6011,
+      "code": 6014,
       "name": "SlippageExceeded",
       "msg": "Slippage tolerance exceeded"
     },
     {
-      "code": 6012,
+      "code": 6015,
       "name": "AlreadyPaused",
       "msg": "DCA plan is already paused"
     },
     {
-      "code": 6013,
+      "code": 6016,
       "name": "AlreadyActive",
       "msg": "DCA plan is already active"
     }
@@ -2326,8 +2345,14 @@
             "type": "bool"
           },
           {
-            "name": "oracle_account",
+            "name": "primary_oracle_account",
             "type": "pubkey"
+          },
+          {
+            "name": "fallback_oracle_account",
+            "type": {
+              "option": "pubkey"
+            }
           },
           {
             "name": "jupiter_route",

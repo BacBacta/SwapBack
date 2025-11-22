@@ -21,7 +21,7 @@ import {
 } from "@solana/spl-token";
 import routerIdl from "@/idl/swapback_router.json";
 import { PROGRAM_IDS } from "@/constants/programIds";
-import { getOracleForPair } from "@/config/oracles";
+import { getOracleFeedsForPair, type OracleFeedConfig } from "@/config/oracles";
 import { USDC_MINT } from "@/config/constants";
 import toast from "react-hot-toast";
 
@@ -57,7 +57,7 @@ export interface SwapRequest {
   useDynamicPlan?: boolean;
   useBundle?: boolean;
   planAccount?: PublicKey | null;
-  oracle?: PublicKey;
+  oracleFeeds?: OracleFeedConfig;
   remainingAccounts?: Array<{
     pubkey: PublicKey;
     isWritable?: boolean;
@@ -112,9 +112,9 @@ export function useSwapRouter() {
         walletPublicKey: wallet.publicKey,
       });
 
-      const oracle =
-        request.oracle ||
-        getOracleForPair(
+      const oracleFeeds =
+        request.oracleFeeds ||
+        getOracleFeedsForPair(
           request.tokenIn.toBase58(),
           request.tokenOut.toBase58()
         );
@@ -138,14 +138,16 @@ export function useSwapRouter() {
         useDynamicPlan: request.useDynamicPlan ?? false,
         planAccount: request.planAccount ?? null,
         useBundle: request.useBundle ?? false,
-        oracleAccount: oracle,
+        primaryOracleAccount: oracleFeeds.primary,
+        fallbackOracleAccount: oracleFeeds.fallback ?? null,
         jupiterRoute: normalizedJupiterRoute,
       } as const;
 
       const accounts = {
         state: derived.routerState,
         user: wallet.publicKey,
-        oracle,
+        primaryOracle: oracleFeeds.primary,
+        fallbackOracle: oracleFeeds.fallback ?? null,
         userTokenAccountA: derived.userTokenAccountA,
         userTokenAccountB: derived.userTokenAccountB,
         vaultTokenAccountA: derived.vaultTokenAccountA,

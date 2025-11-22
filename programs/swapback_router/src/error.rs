@@ -15,6 +15,12 @@ pub enum SwapbackError {
     IntervalTooLong,
     #[msg("Expiry must be in the future")]
     InvalidExpiry,
+    #[msg("Input and output mints must differ")]
+    IdenticalMints,
+    #[msg("Per-swap amount exceeds router limits")]
+    AmountExceedsLimit,
+    #[msg("Minimum output must be greater than 0")]
+    InvalidMinOutput,
 
     // DCA Execution Errors
     #[msg("DCA plan is not active")]

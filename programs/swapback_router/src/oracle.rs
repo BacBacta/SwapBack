@@ -5,12 +5,14 @@ use crate::{ErrorCode, OracleType, MAX_STALENESS_SECS};
 #[cfg(feature = "switchboard")]
 use switchboard_solana::AggregatorAccountData;
 
+#[derive(Clone, Copy)]
 pub struct OracleObservation {
     pub price: u64,
     pub confidence: u64,
     pub publish_time: i64,
     pub slot: u64,
     pub oracle_type: OracleType,
+    pub feed: Pubkey,
 }
 
 // Confidence maximale autorisée (2% = 200 bps) - Pyth seulement
@@ -83,6 +85,7 @@ pub fn read_price(oracle_account: &AccountInfo, clock: &Clock) -> Result<OracleO
                         publish_time: timestamp,
                         slot: clock.slot,
                         oracle_type: OracleType::Switchboard,
+                        feed: oracle_account.key(),
                     });
                 }
                 Err(e) => {
@@ -143,6 +146,7 @@ pub fn read_price(oracle_account: &AccountInfo, clock: &Clock) -> Result<OracleO
             publish_time: price.publish_time,
             slot: clock.slot,
             oracle_type: OracleType::Pyth,
+            feed: oracle_account.key(),
         });
     }
 

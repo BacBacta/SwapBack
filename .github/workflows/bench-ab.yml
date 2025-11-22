@@ -1,0 +1,65 @@
+name: Swap Router Benchmarks
+
+on:
+  schedule:
+    # Nightly run at 02:30 UTC
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bench-ab:
+    name: Benchmark Swap Router vs Jupiter
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 📊 Run benchmark harness
+        id: bench
+        env:
+          RPC_URL: https://api.mainnet-beta.solana.com
+          BENCH_OUTPUT_DIR: benchmarks/nightly
+          SAVE_RESULTS: 'true'
+        run: |
+          npm run bench:ab -- \
+            --iterations=4 \
+            --pairs=SOL/USDC,USDC/USDT,SOL/BONK \
+            --output=benchmarks/nightly \
+            --floor=5
+
+      - name: 📝 Publish benchmark summary
+        if: always()
+        run: |
+          SUMMARY_FILE="benchmarks/nightly/latest-summary.json"
+          if [ -f "$SUMMARY_FILE" ]; then
+            echo "## 📊 Benchmark Summary" >> $GITHUB_STEP_SUMMARY
+            cat "$SUMMARY_FILE" | jq '{metadata, stats}' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ⚠️ Benchmark Summary" >> $GITHUB_STEP_SUMMARY
+            echo "No summary file generated" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 📤 Upload benchmark artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swap-router-benchmarks
+          path: benchmarks/nightly
+          retention-days: 14

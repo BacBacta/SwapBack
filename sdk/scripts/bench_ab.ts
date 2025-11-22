@@ -13,12 +13,17 @@
  *   SAVE_RESULTS - Save results to CSV/JSON (default: true)
  */
 
+import { execSync } from "node:child_process";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { IntelligentOrderRouter } from "../src/services/IntelligentOrderRouter";
 import { JupiterService } from "../src/services/JupiterService";
 import { LiquidityDataCollector } from "../src/services/LiquidityDataCollector";
 import { RouteOptimizationEngine } from "../src/services/RouteOptimizationEngine";
 import { OraclePriceService } from "../src/services/OraclePriceService";
+import {
+  PriceVerification,
+  RouteCandidate,
+} from "../src/types/smart-router";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -30,6 +35,40 @@ const TOKENS = {
   BONK: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
   mSOL: "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
 };
+
+interface TestCase {
+  label: string;
+  from: string;
+  to: string;
+  amounts: number[];
+}
+
+const DEFAULT_TEST_CASES: TestCase[] = [
+  {
+    label: "SOL/USDC",
+    from: TOKENS.SOL,
+    to: TOKENS.USDC,
+    amounts: [1e6, 1e7, 1e8, 1e9],
+  },
+  {
+    label: "USDC/USDT",
+    from: TOKENS.USDC,
+    to: TOKENS.USDT,
+    amounts: [1e4, 1e5, 1e6, 1e7],
+  },
+  {
+    label: "SOL/BONK",
+    from: TOKENS.SOL,
+    to: TOKENS.BONK,
+    amounts: [1e7, 1e8, 1e9],
+  },
+  {
+    label: "mSOL/SOL",
+    from: TOKENS.mSOL,
+    to: TOKENS.SOL,
+    amounts: [1e6, 1e7, 1e8],
+  },
+];
 
 interface BenchmarkResult {
   pair: string;
@@ -44,6 +83,10 @@ interface BenchmarkResult {
     duration: number;
     success: boolean;
     error?: string;
+    oracleAcceptable?: boolean;
+    oracleDeviationBps?: number;
+    oracleWarning?: string;
+    oracleMetadata?: PriceVerification["metadata"];
   };
   jupiter: {
     priceIn: number;
@@ -67,12 +110,39 @@ interface BenchmarkStats {
   totalSavings: number;
   avgDuration: number;
   successRate: number;
+  pairSummaries: Record<string, PairSummary>;
+}
+
+interface PairSummary {
+  tests: number;
+  avgImprovement: number;
+  medianImprovement: number;
+  p95Improvement: number;
+  avgSavings: number;
+  successRate: number;
+}
+
+interface BenchmarkRunOptions {
+  iterations: number;
+  outputDir: string;
+  saveResults: boolean;
+  improvementFloorBps?: number;
+  pairFilter?: string[];
+}
+
+interface BenchmarkRunMetadata {
+  startedAt: string;
+  rpcEndpoint: string;
+  iterations: number;
+  pairs: string[];
+  gitCommit?: string;
 }
 
 class SwapBackBenchmark {
   private readonly connection: Connection;
   private readonly router: IntelligentOrderRouter;
   private readonly jupiter: JupiterService;
+  private readonly oracle: OraclePriceService;
   private readonly results: BenchmarkResult[] = [];
 
   constructor(rpcUrl?: string) {
@@ -85,30 +155,36 @@ class SwapBackBenchmark {
     );
     this.router = new IntelligentOrderRouter(liquidityCollector, optimizer);
     this.jupiter = new JupiterService(this.connection);
+    this.oracle = oracleService;
   }
 
-  async runBenchmark(iterations: number = 5): Promise<void> {
-    console.log("🚀 Starting SwapBack vs Competitors Benchmark");
-    console.log(`📊 Running ${iterations} iterations per test case`);
-    console.log(`🔗 RPC: ${this.connection.rpcEndpoint}`);
-    console.log("");
+  async runBenchmark(partialOptions: Partial<BenchmarkRunOptions> = {}): Promise<BenchmarkStats> {
+    const config: BenchmarkRunOptions = {
+      iterations: partialOptions.iterations ?? 5,
+      outputDir: partialOptions.outputDir ?? path.join(process.cwd(), "benchmarks"),
+      saveResults: partialOptions.saveResults ?? true,
+      improvementFloorBps: partialOptions.improvementFloorBps,
+      pairFilter: partialOptions.pairFilter,
+    };
 
-    // Test pairs and amounts
-    const testCases = [
-      { from: TOKENS.SOL, to: TOKENS.USDC, amounts: [1e6, 1e7, 1e8, 1e9] }, // 0.001 to 1 SOL
-      { from: TOKENS.USDC, to: TOKENS.USDT, amounts: [1e4, 1e5, 1e6, 1e7] }, // 0.01 to 10 USDC
-      { from: TOKENS.SOL, to: TOKENS.BONK, amounts: [1e7, 1e8, 1e9] }, // 0.01 to 1 SOL
-      { from: TOKENS.mSOL, to: TOKENS.SOL, amounts: [1e6, 1e7, 1e8] }, // 0.001 to 0.1 mSOL
-    ];
+    const testCases = this.resolveTestCases(config.pairFilter);
+    this.results.length = 0;
+    const metadata = this.buildMetadata(config, testCases);
+
+    console.log("🚀 Starting SwapBack vs Competitors Benchmark");
+    console.log(`📊 Iterations per case: ${config.iterations}`);
+    console.log(`🔗 RPC: ${this.connection.rpcEndpoint}`);
+    console.log(`🎯 Pairs: ${testCases.map((tc) => tc.label).join(", ")}`);
+    console.log("");
 
     for (const testCase of testCases) {
       for (const amount of testCase.amounts) {
         console.log(
-          `\n📈 Testing ${this.getTokenSymbol(testCase.from)} → ${this.getTokenSymbol(testCase.to)} (${this.formatAmount(amount, testCase.from)})`
+          `\n📈 Testing ${testCase.label} (${this.formatAmount(amount, testCase.from)})`
         );
 
-        for (let i = 0; i < iterations; i++) {
-          console.log(`  Iteration ${i + 1}/${iterations}...`);
+        for (let i = 0; i < config.iterations; i++) {
+          console.log(`  Iteration ${i + 1}/${config.iterations}...`);
           const result = await this.runComparison(
             testCase.from,
             testCase.to,
@@ -131,7 +207,17 @@ class SwapBackBenchmark {
       }
     }
 
-    this.generateReport();
+    const successfulResults = this.results.filter(
+      (r) => r.swapback.success && r.jupiter.success
+    );
+    const stats = this.calculateStats(successfulResults);
+    this.generateReport(stats, metadata);
+
+    if (config.saveResults && successfulResults.length) {
+      this.saveResultsToFile(successfulResults, stats, metadata, config);
+    }
+
+    return stats;
   }
 
   private async runComparison(
@@ -152,6 +238,10 @@ class SwapBackBenchmark {
         fees: 0,
         duration: 0,
         success: false,
+        oracleAcceptable: undefined,
+        oracleDeviationBps: undefined,
+        oracleWarning: undefined,
+        oracleMetadata: undefined,
       },
       jupiter: {
         priceIn: 0,
@@ -175,6 +265,16 @@ class SwapBackBenchmark {
       });
       const swapbackDuration = Date.now() - swapbackStart;
 
+      let oracleVerification: PriceVerification | undefined;
+      if (plan.baseRoute) {
+        oracleVerification = await this.safeOracleVerification(
+          plan.baseRoute,
+          inputMint,
+          outputMint,
+          amount
+        );
+      }
+
       result.swapback = {
         priceIn: amount,
         priceOut: plan.expectedOutput,
@@ -182,7 +282,32 @@ class SwapBackBenchmark {
         fees: 0, // Fees calculation to be implemented
         duration: swapbackDuration,
         success: true,
+        oracleAcceptable: oracleVerification?.isAcceptable,
+        oracleDeviationBps: oracleVerification
+          ? oracleVerification.deviation * 10_000
+          : undefined,
+        oracleWarning: oracleVerification?.warning,
+        oracleMetadata: oracleVerification?.metadata,
       };
+
+      if (oracleVerification?.metadata) {
+        const inputProvider =
+          oracleVerification.metadata.input?.providerUsed ?? "n/a";
+        const outputProvider =
+          oracleVerification.metadata.output?.providerUsed ?? "n/a";
+        const divergence =
+          oracleVerification.metadata.output?.divergencePercent;
+        console.log(
+          `    📡 Oracle: input=${inputProvider}, output=${outputProvider}, divergence=${
+            divergence ? (divergence * 100).toFixed(3) : "n/a"
+          }%`
+        );
+        if (oracleVerification.warning) {
+          console.log(
+            `    ⚠️  Oracle warning: ${oracleVerification.warning}`
+          );
+        }
+      }
     } catch (error) {
       result.swapback.error =
         error instanceof Error ? error.message : String(error);
@@ -225,25 +350,25 @@ class SwapBackBenchmark {
     return result;
   }
 
-  private generateReport(): void {
+  private generateReport(stats: BenchmarkStats, metadata: BenchmarkRunMetadata): void {
     console.log("\n" + "=".repeat(80));
     console.log("📊 BENCHMARK REPORT");
     console.log("=".repeat(80));
+    console.log(`Started: ${metadata.startedAt}`);
+    console.log(`RPC: ${metadata.rpcEndpoint}`);
+    if (metadata.gitCommit) {
+      console.log(`Git commit: ${metadata.gitCommit}`);
+    }
 
-    const successfulResults = this.results.filter(
-      (r) => r.swapback.success && r.jupiter.success
-    );
+    console.log(`Total test cases: ${this.results.length}`);
+    console.log(`Successful comparisons: ${stats.successfulTests}`);
+    console.log(`Success rate: ${stats.successRate.toFixed(2)}%`);
 
-    if (successfulResults.length === 0) {
+    if (stats.successfulTests === 0) {
       console.log("❌ No successful comparisons completed");
       return;
     }
 
-    const stats = this.calculateStats(successfulResults);
-
-    console.log(`Total test cases: ${this.results.length}`);
-    console.log(`Successful comparisons: ${successfulResults.length}`);
-    console.log(`Success rate: ${stats.successRate.toFixed(2)}%`);
     console.log(
       `Average price improvement: ${stats.avgImprovement.toFixed(2)} bps`
     );
@@ -256,60 +381,166 @@ class SwapBackBenchmark {
     console.log(`Total estimated savings: $${stats.totalSavings.toFixed(2)}`);
     console.log(`Average response time: ${stats.avgDuration.toFixed(0)}ms`);
 
-    // Save results if requested
-    if (process.env.SAVE_RESULTS !== "false") {
-      this.saveResultsToFile(successfulResults, stats);
+    if (Object.keys(stats.pairSummaries).length) {
+      console.log("\nPer-pair breakdown:");
+      for (const [pair, summary] of Object.entries(stats.pairSummaries)) {
+        console.log(
+          ` - ${pair}: avg ${summary.avgImprovement.toFixed(2)} bps ` +
+            `(median ${summary.medianImprovement.toFixed(2)} bps, success ${summary.successRate.toFixed(1)}%, tests ${summary.tests})`
+        );
+      }
     }
   }
 
   private calculateStats(results: BenchmarkResult[]): BenchmarkStats {
-    const improvements = results
+    if (results.length === 0) {
+      return {
+        totalTests: this.results.length,
+        successfulTests: 0,
+        avgImprovement: 0,
+        medianImprovement: 0,
+        p95Improvement: 0,
+        totalSavings: 0,
+        avgDuration: 0,
+        successRate: 0,
+        pairSummaries: {},
+      };
+    }
+
+    const improvements = [...results]
       .map((r) => r.priceImprovement)
       .sort((a, b) => a - b);
     const durations = results.map((r) =>
       Math.max(r.swapback.duration, r.jupiter.duration)
     );
 
+    const totalPerPair = this.results.reduce<Record<string, number>>(
+      (acc, result) => {
+        acc[result.pair] = (acc[result.pair] ?? 0) + 1;
+        return acc;
+      },
+      {}
+    );
+
+    const groupedByPair = results.reduce<Record<string, BenchmarkResult[]>>(
+      (acc, result) => {
+        acc[result.pair] = acc[result.pair] || [];
+        acc[result.pair].push(result);
+        return acc;
+      },
+      {}
+    );
+
+    const pairSummaries: Record<string, PairSummary> = {};
+    for (const [pair, pairResults] of Object.entries(groupedByPair)) {
+      const pairImprovements = [...pairResults]
+        .map((r) => r.priceImprovement)
+        .sort((a, b) => a - b);
+      const totalTestsForPair = totalPerPair[pair] ?? pairResults.length;
+      const avgImprovement =
+        pairImprovements.reduce((sum, val) => sum + val, 0) /
+        pairImprovements.length;
+      const medianImprovement =
+        pairImprovements[Math.floor(pairImprovements.length / 2)];
+      const p95Improvement = pairImprovements[
+        Math.min(
+          pairImprovements.length - 1,
+          Math.floor(pairImprovements.length * 0.95)
+        )
+      ];
+      const avgSavings =
+        pairResults.reduce((sum, r) => sum + r.savings, 0) /
+        pairResults.length;
+      const successRate = (pairResults.length / totalTestsForPair) * 100;
+
+      pairSummaries[pair] = {
+        tests: pairResults.length,
+        avgImprovement,
+        medianImprovement,
+        p95Improvement,
+        avgSavings,
+        successRate,
+      };
+    }
+
     return {
       totalTests: this.results.length,
       successfulTests: results.length,
       avgImprovement:
         improvements.reduce((sum, val) => sum + val, 0) / improvements.length,
-      medianImprovement: improvements[Math.floor(improvements.length / 2)],
-      p95Improvement: improvements[Math.floor(improvements.length * 0.95)],
+      medianImprovement:
+        improvements[Math.floor(improvements.length / 2)] ?? 0,
+      p95Improvement: improvements[
+        Math.min(
+          improvements.length - 1,
+          Math.floor(improvements.length * 0.95)
+        )
+      ],
       totalSavings: results.reduce((sum, r) => sum + r.savings, 0),
       avgDuration:
         durations.reduce((sum, val) => sum + val, 0) / durations.length,
       successRate: (results.length / this.results.length) * 100,
+      pairSummaries,
     };
+  }
+
+  private async safeOracleVerification(
+    route: RouteCandidate,
+    inputMint: string,
+    outputMint: string,
+    amount: number
+  ): Promise<PriceVerification | undefined> {
+    try {
+      return await this.oracle.verifyRoutePrice(
+        route,
+        inputMint,
+        outputMint,
+        amount
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : String(error ?? "unknown");
+      console.warn("    ⚠️  Oracle verification skipped:", message);
+      return undefined;
+    }
   }
 
   private saveResultsToFile(
     results: BenchmarkResult[],
-    stats: BenchmarkStats
+    stats: BenchmarkStats,
+    metadata: BenchmarkRunMetadata,
+    config: BenchmarkRunOptions
   ): void {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    fs.mkdirSync(config.outputDir, { recursive: true });
+    const timestamp = metadata.startedAt.replace(/[:.]/g, "-");
+    const baseName = `benchmark-${timestamp}`;
 
-    // Save detailed results as JSON
+    const payload = {
+      metadata,
+      stats,
+      results,
+    };
+
     const resultsPath = path.join(
-      process.cwd(),
-      `benchmark-results-${timestamp}.json`
+      config.outputDir,
+      `${baseName}-results.json`
     );
-    fs.writeFileSync(resultsPath, JSON.stringify(results, null, 2));
-    console.log(`📄 Detailed results saved to: ${resultsPath}`);
+    fs.writeFileSync(resultsPath, JSON.stringify(payload, null, 2));
 
-    // Save summary stats as JSON
+    const summaryPayload = { metadata, stats };
     const statsPath = path.join(
-      process.cwd(),
-      `benchmark-stats-${timestamp}.json`
+      config.outputDir,
+      `${baseName}-summary.json`
     );
-    fs.writeFileSync(statsPath, JSON.stringify(stats, null, 2));
-    console.log(`📈 Summary stats saved to: ${statsPath}`);
+    fs.writeFileSync(statsPath, JSON.stringify(summaryPayload, null, 2));
+    fs.writeFileSync(
+      path.join(config.outputDir, `latest-summary.json`),
+      JSON.stringify(summaryPayload, null, 2)
+    );
 
-    // Save CSV for easy analysis
     const csvPath = path.join(
-      process.cwd(),
-      `benchmark-results-${timestamp}.csv`
+      config.outputDir,
+      `${baseName}-results.csv`
     );
     const csvHeader =
       "pair,amount,iteration,swapback_price_out,jupiter_price_out,improvement_bps,savings_usd,swapback_duration,jupiter_duration\n";
@@ -319,8 +550,10 @@ class SwapBackBenchmark {
           `${r.pair},${r.amount},${r.iteration},${r.swapback.priceOut},${r.jupiter.priceOut},${r.priceImprovement},${r.savings},${r.swapback.duration},${r.jupiter.duration}`
       )
       .join("\n");
-
     fs.writeFileSync(csvPath, csvHeader + csvData);
+
+    console.log(`📄 Detailed results saved to: ${resultsPath}`);
+    console.log(`📈 Summary stats saved to: ${statsPath}`);
     console.log(`📊 CSV data saved to: ${csvPath}`);
   }
 
@@ -368,19 +601,160 @@ class SwapBackBenchmark {
         return 0;
     }
   }
+
+  private resolveTestCases(pairFilter?: string[]): TestCase[] {
+    if (!pairFilter?.length) {
+      return DEFAULT_TEST_CASES;
+    }
+
+    const normalized = new Set(pairFilter.map((pair) => pair.toUpperCase()));
+    const filtered = DEFAULT_TEST_CASES.filter((testCase) =>
+      normalized.has(testCase.label.toUpperCase())
+    );
+
+    if (filtered.length === 0) {
+      console.warn("⚠️ Pair filter did not match any test cases, using defaults");
+      return DEFAULT_TEST_CASES;
+    }
+
+    return filtered;
+  }
+
+  private buildMetadata(
+    config: BenchmarkRunOptions,
+    testCases: TestCase[]
+  ): BenchmarkRunMetadata {
+    return {
+      startedAt: new Date().toISOString(),
+      rpcEndpoint: this.connection.rpcEndpoint,
+      iterations: config.iterations,
+      pairs: testCases.map((tc) => tc.label),
+      gitCommit: this.getGitCommit(),
+    };
+  }
+
+  private getGitCommit(): string | undefined {
+    try {
+      return execSync("git rev-parse --short HEAD", {
+        stdio: ["ignore", "pipe", "ignore"],
+      })
+        .toString()
+        .trim();
+    } catch (error) {
+      return undefined;
+    }
+  }
+}
+
+interface CliOptions extends BenchmarkRunOptions {
+  rpcUrl?: string;
+}
+
+function parseCliOptions(): CliOptions {
+  const options: CliOptions = {
+    iterations: Number.parseInt(process.env.ITERATIONS || "5", 10),
+    outputDir: process.env.BENCH_OUTPUT_DIR
+      ? path.resolve(process.cwd(), process.env.BENCH_OUTPUT_DIR)
+      : path.join(process.cwd(), "benchmarks"),
+    saveResults: process.env.SAVE_RESULTS !== "false",
+    improvementFloorBps: process.env.FAIL_BELOW_BPS
+      ? Number.parseFloat(process.env.FAIL_BELOW_BPS)
+      : undefined,
+    pairFilter: process.env.BENCH_PAIRS
+      ? process.env.BENCH_PAIRS.split(",")
+          .map((pair) => pair.trim().toUpperCase())
+          .filter(Boolean)
+      : undefined,
+    rpcUrl: process.env.RPC_URL,
+  };
+
+  const args = process.argv.slice(2);
+  if (args.includes("--help")) {
+    printHelpAndExit();
+  }
+
+  for (const rawArg of args) {
+    if (!rawArg.startsWith("--")) {
+      continue;
+    }
+    const [flag, value] = rawArg.slice(2).split("=");
+    switch (flag) {
+      case "iterations":
+        if (value) options.iterations = Number.parseInt(value, 10);
+        break;
+      case "rpc":
+        options.rpcUrl = value;
+        break;
+      case "output":
+        if (value) options.outputDir = path.resolve(process.cwd(), value);
+        break;
+      case "pairs":
+        if (value) {
+          options.pairFilter = value
+            .split(",")
+            .map((pairValue) => pairValue.trim().toUpperCase())
+            .filter(Boolean);
+        }
+        break;
+      case "floor":
+        if (value) options.improvementFloorBps = Number.parseFloat(value);
+        break;
+      case "no-save":
+        options.saveResults = false;
+        break;
+      case "save":
+        options.saveResults = value !== "false";
+        break;
+      default:
+        break;
+    }
+  }
+
+  return options;
+}
+
+function printHelpAndExit(): never {
+  console.log(`Usage: ts-node bench_ab.ts [options]
+
+Options:
+  --iterations=<n>      Number of iterations per test case (default: env ITERATIONS or 5)
+  --rpc=<url>           Custom Solana RPC endpoint
+  --pairs=a/b,c/d       Filter test pairs by symbol (e.g. SOL/USDC)
+  --output=<dir>        Directory to store benchmark artifacts (default: ./benchmarks)
+  --floor=<bps>         Minimum average improvement (bps) before exiting with code 1
+  --save=<true|false>   Force saving results (default: true)
+  --no-save             Disable saving artifacts
+  --help                Show this help message
+`);
+  process.exit(0);
 }
 
 // Main execution
 async function main() {
-  const iterations = Number.parseInt(process.env.ITERATIONS || "5", 10);
-  const rpcUrl = process.env.RPC_URL;
+  const options = parseCliOptions();
+  const benchmark = new SwapBackBenchmark(options.rpcUrl);
+  const stats = await benchmark.runBenchmark(options);
 
-  const benchmark = new SwapBackBenchmark(rpcUrl);
-  await benchmark.runBenchmark(iterations);
+  if (typeof options.improvementFloorBps === "number") {
+    if (
+      stats.successfulTests === 0 ||
+      stats.avgImprovement < options.improvementFloorBps
+    ) {
+      console.error(
+        `❌ Average improvement ${stats.avgImprovement.toFixed(
+          2
+        )} bps is below floor ${options.improvementFloorBps} bps`
+      );
+      process.exitCode = 1;
+    }
+  }
 }
 
 if (require.main === module) {
-  main().catch(console.error);
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
 }
 
 export { SwapBackBenchmark };

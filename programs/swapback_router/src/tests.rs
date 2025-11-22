@@ -3,6 +3,8 @@ mod tests {
     use super::*;
     use anchor_lang::prelude::*;
     use std::str::FromStr;
+    use crate::instructions::create_dca_plan::{CreateDcaPlanArgs, validate_plan_args};
+    use crate::{SwapbackError, MAX_SINGLE_SWAP_LAMPORTS};
 
     #[test]
     fn test_plan_weights_validation() {
@@ -89,5 +91,41 @@ mod tests {
             stale_price_time <= current_time - 60,
             "Stale price should be older than 60 seconds"
         );
+    }
+
+    fn sample_args() -> CreateDcaPlanArgs {
+        CreateDcaPlanArgs {
+            token_in: Pubkey::new_unique(),
+            token_out: Pubkey::new_unique(),
+            amount_per_swap: 1_000_000,
+            total_swaps: 10,
+            interval_seconds: 3600,
+            min_out_per_swap: 900_000,
+            expires_at: 0,
+        }
+    }
+
+    #[test]
+    fn test_plan_validation_identical_mints_rejected() {
+        let mut args = sample_args();
+        args.token_out = args.token_in;
+        let err = validate_plan_args(&args, 0).unwrap_err();
+        assert_eq!(err, SwapbackError::IdenticalMints.into());
+    }
+
+    #[test]
+    fn test_plan_validation_amount_limit() {
+        let mut args = sample_args();
+        args.amount_per_swap = MAX_SINGLE_SWAP_LAMPORTS + 1;
+        let err = validate_plan_args(&args, 0).unwrap_err();
+        assert_eq!(err, SwapbackError::AmountExceedsLimit.into());
+    }
+
+    #[test]
+    fn test_plan_validation_min_output() {
+        let mut args = sample_args();
+        args.min_out_per_swap = 0;
+        let err = validate_plan_args(&args, 0).unwrap_err();
+        assert_eq!(err, SwapbackError::InvalidMinOutput.into());
     }
 }

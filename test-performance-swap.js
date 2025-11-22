@@ -98,9 +98,10 @@ async function main() {
   const minOut = new anchor.BN(1); // Must be > 0
   
   // PDAs
-  const SOL_USD_FEED = new PublicKey("J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix");
+  const SWITCHBOARD_SOL_USD = new PublicKey("GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR");
+  const PYTH_SOL_USD = new PublicKey("H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG");
   const [oracleCachePda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("oracle_cache"), SOL_USD_FEED.toBuffer()],
+    [Buffer.from("oracle_cache"), SWITCHBOARD_SOL_USD.toBuffer()],
     program.programId
   );
   const [venueScorePda] = PublicKey.findProgramAddressSync(
@@ -120,13 +121,15 @@ async function main() {
         useDynamicPlan: false,
         planAccount: null,
         useBundle: false,
-        oracleAccount: SOL_USD_FEED,
+        primaryOracleAccount: SWITCHBOARD_SOL_USD,
+        fallbackOracleAccount: PYTH_SOL_USD,
         jupiterRoute: null
       })
       .accounts({
         state: routerStatePda,
         user: wallet.publicKey,
-        oracle: SOL_USD_FEED,
+        primaryOracle: SWITCHBOARD_SOL_USD,
+        fallbackOracle: PYTH_SOL_USD,
         userTokenAccountA: userTokenA.address,
         userTokenAccountB: userTokenB.address,
         vaultTokenAccountA: userTokenA.address, // Mock: using user account as vault for now

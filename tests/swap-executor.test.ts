@@ -232,6 +232,7 @@ const mockOracleService = {
   getTokenPrice: vi.fn(),
   isPriceFresh: vi.fn().mockReturnValue(true),
   verifyRoutePrice: vi.fn(),
+  getVerificationDetail: vi.fn().mockReturnValue(undefined),
 };
 
 // Mock JitoBundleService

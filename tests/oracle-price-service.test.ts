@@ -11,9 +11,10 @@
  * @module oracle-price-service.test
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, SpyInstance } from "vitest";
 import { Connection, PublicKey, AccountInfo } from "@solana/web3.js";
 import { OraclePriceService } from "../sdk/src/services/OraclePriceService";
+import { OraclePriceData } from "../sdk/src/types/smart-router";
 import { parsePriceData } from "@pythnetwork/client";
 
 // Mock Pyth SDK
@@ -53,6 +54,22 @@ const createMockPythPriceData = (
   publishTime: BigInt(Math.floor(Date.now() / 1000)),
 });
 
+const buildOraclePrice = (
+  provider: "pyth" | "switchboard",
+  price: number,
+  confidence = 0.5
+): OraclePriceData => {
+  const timestamp = Date.now();
+  return {
+    provider,
+    price,
+    confidence,
+    timestamp,
+    publishTime: timestamp,
+    exponent: -8,
+  };
+};
+
 // ============================================================================
 // TEST SUITE
 // ============================================================================
@@ -60,6 +77,7 @@ const createMockPythPriceData = (
 describe("OraclePriceService", () => {
   let service: OraclePriceService;
   let mockConnection: any;
+  let switchboardSpy: SpyInstance;
 
   beforeEach(() => {
     // Clear all mocks
@@ -72,6 +90,11 @@ describe("OraclePriceService", () => {
 
     // Create service
     service = new OraclePriceService(mockConnection as Connection, 5000);
+
+    // Default to disabling Switchboard fetches unless explicitly tested
+    switchboardSpy = vi
+      .spyOn(service as unknown as Record<string, any>, "fetchSwitchboardPrice")
+      .mockResolvedValue(null);
   });
 
   // ============================================================================
@@ -166,6 +189,8 @@ describe("OraclePriceService", () => {
     it("should fallback to Switchboard when Pyth fails", async () => {
       const mockMint = "So11111111111111111111111111111111111111112";
 
+      switchboardSpy.mockRestore();
+
       // Mock Pyth failure (no account)
       mockConnection.getAccountInfo.mockResolvedValueOnce(null);
 
@@ -217,29 +242,19 @@ describe("OraclePriceService", () => {
     it("should cache price and return from cache on subsequent calls", async () => {
       const mockMint = "So11111111111111111111111111111111111111112";
       const mockPrice = 100.0;
-      const mockConfidence = 0.5;
 
-      const mockAccountInfo: Partial<AccountInfo<Buffer>> = {
-        data: createMockPythAccountData(mockPrice, mockConfidence),
-        owner: new PublicKey("FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH"),
-        lamports: 1000000,
-        executable: false,
-      };
+      const pythSpy = vi
+        .spyOn(service as unknown as Record<string, any>, "fetchPythPrice")
+        .mockResolvedValue(buildOraclePrice("pyth", mockPrice, 0.5));
 
-      mockConnection.getAccountInfo.mockResolvedValue(mockAccountInfo);
-      (parsePriceData as any).mockReturnValue(
-        createMockPythPriceData(mockPrice, mockConfidence)
-      );
-
-      // First call - should fetch
+      // First call fetches from oracle
       const result1 = await service.getTokenPrice(mockMint);
-      expect(mockConnection.getAccountInfo).toHaveBeenCalledTimes(1);
+      expect(pythSpy).toHaveBeenCalledTimes(1);
 
-      // Second call - should use cache
+      // Second call should hit cache and avoid oracle fetch
       const result2 = await service.getTokenPrice(mockMint);
-      expect(mockConnection.getAccountInfo).toHaveBeenCalledTimes(1); // Still 1 (not called again)
+      expect(pythSpy).toHaveBeenCalledTimes(1);
 
-      // Results should match
       expect(result1.price).toBe(result2.price);
       expect(result1.timestamp).toBe(result2.timestamp);
     });
@@ -248,62 +263,49 @@ describe("OraclePriceService", () => {
       const mockMint = "So11111111111111111111111111111111111111112";
       const mockPrice = 100.0;
 
-      // Create service with very short cache (100ms)
       const shortCacheService = new OraclePriceService(mockConnection, 100);
+      const shortSwitchboardSpy = vi
+        .spyOn(shortCacheService as unknown as Record<string, any>, "fetchSwitchboardPrice")
+        .mockResolvedValue(null);
 
-      const mockAccountInfo: Partial<AccountInfo<Buffer>> = {
-        data: createMockPythAccountData(mockPrice, 0.5),
-        owner: new PublicKey("FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH"),
-        lamports: 1000000,
-        executable: false,
-      };
+      const pythSpy = vi
+        .spyOn(shortCacheService as unknown as Record<string, any>, "fetchPythPrice")
+        .mockResolvedValue(buildOraclePrice("pyth", mockPrice, 0.5));
 
-      mockConnection.getAccountInfo.mockResolvedValue(mockAccountInfo);
-      (parsePriceData as any).mockReturnValue(
-        createMockPythPriceData(mockPrice, 0.5)
-      );
-
-      // First call
       await shortCacheService.getTokenPrice(mockMint);
-      expect(mockConnection.getAccountInfo).toHaveBeenCalledTimes(1);
+      expect(pythSpy).toHaveBeenCalledTimes(1);
 
-      // Wait for cache expiry
       await new Promise((resolve) => setTimeout(resolve, 150));
 
-      // Second call - should refresh
       await shortCacheService.getTokenPrice(mockMint);
-      expect(mockConnection.getAccountInfo).toHaveBeenCalledTimes(2);
+      expect(pythSpy).toHaveBeenCalledTimes(2);
+
+      shortSwitchboardSpy.mockRestore();
     });
 
     it("should maintain separate cache entries for different tokens", async () => {
       const mockMint1 = "So11111111111111111111111111111111111111112"; // SOL
       const mockMint2 = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"; // USDC
 
-      const mockAccountInfo: Partial<AccountInfo<Buffer>> = {
-        data: createMockPythAccountData(100, 0.5),
-        owner: new PublicKey("FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH"),
-        lamports: 1000000,
-        executable: false,
-      };
+      const pythSpy = vi
+        .spyOn(service as unknown as Record<string, any>, "fetchPythPrice")
+        .mockImplementation(async (mint: string) => {
+          if (mint === mockMint1) {
+            return buildOraclePrice("pyth", 100, 0.5);
+          }
+          if (mint === mockMint2) {
+            return buildOraclePrice("pyth", 1, 0.001);
+          }
+          return null;
+        });
 
-      mockConnection.getAccountInfo.mockResolvedValue(mockAccountInfo);
-      (parsePriceData as any).mockReturnValue(
-        createMockPythPriceData(100, 0.5)
-      );
-
-      // Fetch both tokens
       await service.getTokenPrice(mockMint1);
       await service.getTokenPrice(mockMint2);
+      expect(pythSpy).toHaveBeenCalledTimes(2);
 
-      // Should have called getAccountInfo twice (different mints)
-      expect(mockConnection.getAccountInfo).toHaveBeenCalledTimes(2);
-
-      // Fetch again - should use cache
       await service.getTokenPrice(mockMint1);
       await service.getTokenPrice(mockMint2);
-
-      // Still only 2 calls (cache hit)
-      expect(mockConnection.getAccountInfo).toHaveBeenCalledTimes(2);
+      expect(pythSpy).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -316,24 +318,16 @@ describe("OraclePriceService", () => {
       const mockMint1 = "So11111111111111111111111111111111111111112"; // SOL
       const mockMint2 = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"; // USDC
 
-      // Mock SOL = $100, USDC = $1
-      const mockAccountInfo: Partial<AccountInfo<Buffer>> = {
-        data: createMockPythAccountData(100, 0.5),
-        owner: new PublicKey("FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH"),
-        lamports: 1000000,
-        executable: false,
-      };
-
-      mockConnection.getAccountInfo
-        .mockResolvedValueOnce(mockAccountInfo) // SOL
-        .mockResolvedValueOnce({
-          ...mockAccountInfo,
-          data: createMockPythAccountData(1, 0.001),
-        }); // USDC
-
-      (parsePriceData as any)
-        .mockReturnValueOnce(createMockPythPriceData(100, 0.5))
-        .mockReturnValueOnce(createMockPythPriceData(1, 0.001));
+      vi.spyOn(service as unknown as Record<string, any>, "fetchPythPrice")
+        .mockImplementation(async (mint: string) => {
+          if (mint === mockMint1) {
+            return buildOraclePrice("pyth", 100, 0.5);
+          }
+          if (mint === mockMint2) {
+            return buildOraclePrice("pyth", 1, 0.001);
+          }
+          return null;
+        });
 
       const mockRoute: any = {
         expectedOutput: 99.5, // $100 worth of SOL → 99.5 USDC (within 2% deviation)
@@ -355,23 +349,16 @@ describe("OraclePriceService", () => {
       const mockMint1 = "So11111111111111111111111111111111111111112";
       const mockMint2 = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
-      const mockAccountInfo: Partial<AccountInfo<Buffer>> = {
-        data: createMockPythAccountData(100, 0.5),
-        owner: new PublicKey("FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH"),
-        lamports: 1000000,
-        executable: false,
-      };
-
-      mockConnection.getAccountInfo
-        .mockResolvedValueOnce(mockAccountInfo)
-        .mockResolvedValueOnce({
-          ...mockAccountInfo,
-          data: createMockPythAccountData(1, 0.001),
+      vi.spyOn(service as unknown as Record<string, any>, "fetchPythPrice")
+        .mockImplementation(async (mint: string) => {
+          if (mint === mockMint1) {
+            return buildOraclePrice("pyth", 100, 0.5);
+          }
+          if (mint === mockMint2) {
+            return buildOraclePrice("pyth", 1, 0.001);
+          }
+          return null;
         });
-
-      (parsePriceData as any)
-        .mockReturnValueOnce(createMockPythPriceData(100, 0.5))
-        .mockReturnValueOnce(createMockPythPriceData(1, 0.001));
 
       const mockRoute: any = {
         expectedOutput: 90.0, // 10% worse than oracle (suspicious)
@@ -388,6 +375,51 @@ describe("OraclePriceService", () => {
       expect(result.isAcceptable).toBe(false);
       expect(result.warning).toBeDefined();
       expect(result.deviation).toBeGreaterThan(0.02);
+    });
+
+    it("should attach oracle metadata for both sides", async () => {
+      const mockMint1 = "So11111111111111111111111111111111111111112";
+      const mockMint2 = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+      vi.spyOn(service as unknown as Record<string, any>, "fetchPythPrice")
+        .mockImplementation(async (mint: string) => {
+          if (mint === mockMint1) {
+            return buildOraclePrice("pyth", 100, 0.1);
+          }
+          if (mint === mockMint2) {
+            return buildOraclePrice("pyth", 1, 0.002);
+          }
+          return null;
+        });
+
+      switchboardSpy.mockImplementation(async (mint: string) => {
+        if (mint === mockMint1) {
+          return buildOraclePrice("switchboard", 101, 0.8);
+        }
+        if (mint === mockMint2) {
+          return buildOraclePrice("switchboard", 0.99, 0.003);
+        }
+        return null;
+      });
+
+      const mockRoute: any = {
+        expectedOutput: 100,
+      };
+
+      const result = await service.verifyRoutePrice(
+        mockRoute,
+        mockMint1,
+        mockMint2,
+        1.0,
+        0.02
+      );
+
+      expect(result.metadata?.input?.providerUsed).toBe("pyth");
+      expect(result.metadata?.input?.fallbackUsed).toBe(false);
+      expect(result.metadata?.output?.sources?.switchboard?.price).toBeCloseTo(
+        0.99,
+        2
+      );
     });
   });
 

@@ -37,6 +37,7 @@ pub const CNFT_PROGRAM_ID: Pubkey = pubkey!("26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAK
 
 // Oracle constants
 pub const MAX_STALENESS_SECS: i64 = 300; // 5 minutes max staleness
+pub const MAX_ORACLE_DIVERGENCE_BPS: u64 = 200; // 2% max divergence between feeds
 
 // NPI (Routing Profit) allocation configuration (basis points, 10000 = 100%)
 // Total must equal 100% to avoid over-allocation
@@ -53,6 +54,7 @@ pub const PLATFORM_FEE_BUYBURN_BPS: u16 = 1500; // 15% des platform fees → Buy
 // Security limits
 pub const MAX_VENUES: usize = 10;
 pub const MAX_FALLBACKS: usize = 5;
+pub const MAX_SINGLE_SWAP_LAMPORTS: u64 = 5_000_000_000_000; // ~5k SOL equivalent
 
 // DCA Account Structures (moved here for Anchor compatibility)
 #[derive(Accounts)]
@@ -711,8 +713,11 @@ pub struct SwapToC<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
 
-    /// CHECK: Oracle account (Pyth price feed)
-    pub oracle: AccountInfo<'info>,
+    /// CHECK: Primary oracle account (e.g. Switchboard feed)
+    pub primary_oracle: AccountInfo<'info>,
+
+    /// CHECK: Optional fallback oracle (e.g. Pyth feed)
+    pub fallback_oracle: Option<AccountInfo<'info>>,
 
     #[account(mut)]
     pub user_token_account_a: Box<Account<'info, TokenAccount>>,
@@ -764,7 +769,7 @@ pub struct SwapToC<'info> {
     /// CHECK: Optional Oracle Cache for optimized price lookups
     #[account(
         mut,
-        seeds = [b"oracle_cache", oracle.key().as_ref()],
+        seeds = [b"oracle_cache", primary_oracle.key().as_ref()],
         bump
     )]
     pub oracle_cache: Option<Account<'info, oracle_cache::OracleCache>>,
@@ -905,7 +910,8 @@ pub struct SwapArgs {
     pub use_dynamic_plan: bool,          // Whether to use a dynamic plan from plan_account
     pub plan_account: Option<Pubkey>,    // Account containing AtomicSwapPlan (if use_dynamic_plan)
     pub use_bundle: bool,                // Whether to use MEV bundling
-    pub oracle_account: Pubkey,          // Oracle account for price validation (Pyth/Switchboard)
+    pub primary_oracle_account: Pubkey,  // Primary oracle account for price validation
+    pub fallback_oracle_account: Option<Pubkey>, // Optional fallback oracle account
     pub jupiter_route: Option<JupiterRouteParams>,
 }
 
@@ -1120,6 +1126,10 @@ pub enum ErrorCode {
     StaleOracleData,
     #[msg("Invalid oracle price")]
     InvalidOraclePrice,
+    #[msg("Missing fallback oracle account")]
+    MissingFallbackOracle,
+    #[msg("Dual oracle price divergence too high")]
+    OracleDivergenceTooHigh,
     #[msg("TWAP slice amount too small")]
     TwapSliceTooSmall,
     #[msg("Swap plan has expired")]
@@ -1222,7 +1232,7 @@ pub mod swap_toc_processor {
              let pool_tvl_estimate = 1_000_000_000_000u64;
              
              if let Ok(dynamic_slippage) = crate::slippage::calculate_dynamic_slippage(
-                 &ctx.accounts.oracle.key(),
+                 &ctx.accounts.primary_oracle.key(),
                  args.amount_in,
                  pool_tvl_estimate,
                  default_volatility
@@ -1231,15 +1241,34 @@ pub mod swap_toc_processor {
              }
         }
 
-        if ctx.accounts.oracle.key() != args.oracle_account {
+        if ctx.accounts.primary_oracle.key() != args.primary_oracle_account {
             return err!(ErrorCode::InvalidOraclePrice);
         }
+
+        let fallback_account = match (
+            args.fallback_oracle_account,
+            ctx.accounts.fallback_oracle.as_ref(),
+        ) {
+            (Some(expected_key), Some(account)) => {
+                if account.key() != expected_key {
+                    return err!(ErrorCode::InvalidOraclePrice);
+                }
+                Some(account)
+            }
+            (Some(_), None) => return err!(ErrorCode::MissingFallbackOracle),
+            (None, Some(account)) => Some(account),
+            (None, None) => None,
+        };
 
         if args.use_dynamic_plan {
             return process_dynamic_plan_swap(&mut ctx, args, &clock);
         }
 
-        let oracle_observation = get_oracle_price(&ctx.accounts.oracle, &clock)?;
+        let oracle_observation = get_oracle_price(
+            &ctx.accounts.primary_oracle,
+            fallback_account,
+            &clock,
+        )?;
         let expected_out = calculate_expected_output(args.amount_in, oracle_observation.price)?;
 
         let min_out = if let Some(slippage_tolerance) = args.slippage_tolerance {
@@ -1627,16 +1656,66 @@ pub mod swap_toc_processor {
         }
     }
 
-    fn get_oracle_price(oracle_account: &AccountInfo, clock: &Clock) -> Result<OracleObservation> {
-        let observation = oracle::read_price(oracle_account, clock)?;
+    fn get_oracle_price<'info>(
+        primary_oracle: &AccountInfo<'info>,
+        fallback_oracle: Option<&AccountInfo<'info>>,
+        clock: &Clock,
+    ) -> Result<OracleObservation> {
+        let primary_result = oracle::read_price(primary_oracle, clock);
+        let fallback_observation = fallback_oracle.and_then(|account| match oracle::read_price(account, clock) {
+            Ok(observation) => Some(observation),
+            Err(_) => {
+                msg!("⚠️ Fallback oracle read failed");
+                None
+            }
+        });
+
+        let observation = match (primary_result, fallback_observation) {
+            (Ok(primary), Some(fallback)) => {
+                let high = primary.price.max(fallback.price) as u128;
+                let low = primary.price.min(fallback.price) as u128;
+                if low == 0 {
+                    return err!(ErrorCode::InvalidOraclePrice);
+                }
+
+                let spread = high
+                    .checked_sub(low)
+                    .ok_or(ErrorCode::InvalidOraclePrice)?;
+                let divergence_bps = spread
+                    .checked_mul(10_000)
+                    .and_then(|value| value.checked_div(low))
+                    .ok_or(ErrorCode::InvalidOraclePrice)?;
+
+                if divergence_bps > MAX_ORACLE_DIVERGENCE_BPS as u128 {
+                    return err!(ErrorCode::OracleDivergenceTooHigh);
+                }
+
+                if primary.publish_time >= fallback.publish_time {
+                    primary
+                } else {
+                    fallback
+                }
+            }
+            (Ok(primary), None) => primary,
+            (Err(_), Some(fallback)) => {
+                msg!(
+                    "⚠️ Primary oracle unavailable, using fallback feed {}",
+                    fallback.feed
+                );
+                fallback
+            }
+            (Err(err), None) => return Err(err),
+        };
+
         emit!(OracleChecked {
-            feed: oracle_account.key(),
+            feed: observation.feed,
             price: observation.price,
             confidence: observation.confidence,
             slot: observation.slot,
             timestamp: observation.publish_time,
             oracle_type: observation.oracle_type,
         });
+
         Ok(observation)
     }
 
