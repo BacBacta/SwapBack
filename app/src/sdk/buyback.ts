@@ -92,6 +92,13 @@ export async function getBuybackStats(
     // Decode account data (Anchor format: 8 bytes discriminator + data)
     const data = accountInfo.data;
     
+    // Validate minimum data length to prevent BN assertion errors
+    const minLength = 8 + 32 + 32 + 32 + 8 + 8 + 8 + 8 + 1; // 137 bytes
+    if (data.length < minLength) {
+      console.error(`Invalid buyback state data: expected at least ${minLength} bytes, got ${data.length}`);
+      return null;
+    }
+    
     // Simple deserialization (adjust offsets based on actual struct)
     let offset = 8; // Skip discriminator
     
@@ -104,16 +111,17 @@ export async function getBuybackStats(
     const usdcVault = new PublicKey(data.slice(offset, offset + 32));
     offset += 32;
     
-    const minBuybackAmount = new BN(data.slice(offset, offset + 8), 'le');
+    // Use readBigUInt64LE() instead of BN(slice) to avoid BN assertion errors
+    const minBuybackAmount = new BN(data.readBigUInt64LE(offset).toString());
     offset += 8;
     
-    const totalUsdcSpent = new BN(data.slice(offset, offset + 8), 'le');
+    const totalUsdcSpent = new BN(data.readBigUInt64LE(offset).toString());
     offset += 8;
     
-    const totalBackBurned = new BN(data.slice(offset, offset + 8), 'le');
+    const totalBackBurned = new BN(data.readBigUInt64LE(offset).toString());
     offset += 8;
     
-    const buybackCount = new BN(data.slice(offset, offset + 8), 'le');
+    const buybackCount = new BN(data.readBigUInt64LE(offset).toString());
     offset += 8;
     
     const bump = data[offset];
