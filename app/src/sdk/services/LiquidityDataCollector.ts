@@ -569,34 +569,12 @@ export class LiquidityDataCollector {
       return result;
     }
 
-    // Fallback mock data for other AMMs
-    const reserves = {
-      input: 1000000,
-      output: 500000,
-    };
-
-    const inputWithFee = inputAmount * (1 - config.feeRate);
-    const outputAmount =
-      (reserves.output * inputWithFee) / (reserves.input + inputWithFee);
-
-    const effectivePrice = outputAmount / inputAmount;
-    const slippagePercent = 0.01; // Placeholder until venue-specific logic exists
-
-    return {
-      venue,
-      venueType: VenueType.AMM,
-      tokenPair: [inputMint, outputMint],
-      depth: Math.min(reserves.input, reserves.output) * 2,
-      reserves,
-      effectivePrice,
-      feeAmount: inputAmount - inputWithFee,
-      slippagePercent,
-      route: [inputMint, outputMint],
-      timestamp: Date.now(),
-      metadata: {
-        placeholder: true,
-      },
-    };
+    // All major AMM venues are now supported via dedicated adapters
+    // If we reach here, the venue is not yet implemented
+    console.warn(
+      `[liquidity][amm] Venue ${venue} not yet implemented - no mock fallback`
+    );
+    return null;
   }
 
   /**
