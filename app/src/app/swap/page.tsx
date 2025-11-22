@@ -1,10 +1,10 @@
-import dynamic from "next/dynamic";
+import dynamicImport from "next/dynamic";
 import { Breadcrumb } from "@/components/BackButton";
 
 export const dynamic = "force-dynamic";
 
 // Lazy load EnhancedSwapInterface to avoid webpack issues on Vercel
-const EnhancedSwapInterface = dynamic(
+const EnhancedSwapInterface = dynamicImport(
   () => import("@/components/EnhancedSwapInterface").then(mod => ({ default: mod.EnhancedSwapInterface })),
   { 
     ssr: false,
