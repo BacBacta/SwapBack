@@ -389,15 +389,6 @@ export function EnhancedSwapInterface() {
       `La résolution des comptes Raydium pour ${descriptor.label} nécessite un backend. Veuillez utiliser Jupiter API ou une route alternative.`
     );
   };
-      );
-    }
-
-    const payload = (await response.json()) as RaydiumDexAccounts;
-    return {
-      ...payload,
-      dexProgramId: RAYDIUM_PROGRAM_ID_STR,
-    };
-  };
 
   const buildOrcaAccountMetas = (
     dexAccounts: OrcaDexAccounts,
