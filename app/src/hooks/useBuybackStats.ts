@@ -50,10 +50,21 @@ async function getBuybackStatsFromChain(connection: Connection): Promise<Buyback
 
     // Decode account data (simplified - adjust based on actual struct)
     const data = accountInfo.data;
+    
+    // Verify minimum data length
+    const minLength = 8 + 32 + 32 + 32 + 8 + 8 + 8 + 8; // 137 bytes minimum
+    if (data.length < minLength) {
+      console.error(`Invalid buyback state data: expected at least ${minLength} bytes, got ${data.length}`);
+      return null;
+    }
+    
     let offset = 8 + 32 + 32 + 32; // Skip discriminator + authority + back_mint + usdc_vault
     
     // Read u64 values (8 bytes each, little-endian)
     const readU64 = (offset: number) => {
+      if (offset + 8 > data.length) {
+        throw new Error(`Buffer overflow: trying to read at offset ${offset}, buffer length ${data.length}`);
+      }
       return Number(data.readBigUInt64LE(offset));
     };
     
@@ -75,6 +86,13 @@ async function getBuybackStatsFromChain(connection: Connection): Promise<Buyback
     };
   } catch (error) {
     console.error('Error reading buyback stats:', error);
+    if (error instanceof Error) {
+      console.error('Buyback stats error details:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack?.slice(0, 200)
+      });
+    }
     return null;
   }
 }
