@@ -35,7 +35,9 @@ export interface UseBuybackStatsReturn {
 // Temporary mock function until SDK is installed
 async function getBuybackStatsFromChain(connection: Connection): Promise<BuybackStats | null> {
   try {
-    const BUYBACK_PROGRAM_ID = new PublicKey('EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf'); // Devnet
+    const BUYBACK_PROGRAM_ID = new PublicKey(
+      process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || '746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6'
+    );
     const [buybackStatePDA] = PublicKey.findProgramAddressSync(
       [Buffer.from('buyback_state')],
       BUYBACK_PROGRAM_ID
@@ -99,8 +101,10 @@ async function getBuybackStatsFromChain(connection: Connection): Promise<Buyback
 
 async function estimateNextBuybackFromChain(connection: Connection): Promise<BuybackEstimation> {
   try {
-    const BUYBACK_PROGRAM_ID = new PublicKey('EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf'); // Devnet
-    const [usdcVaultPDA] = PublicKey.findProgramAddressSync(
+    const BUYBACK_PROGRAM_ID = new PublicKey(
+      process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || '746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6'
+    );
+    const [buybackStatePDA] = PublicKey.findProgramAddressSync(
       [Buffer.from('usdc_vault')],
       BUYBACK_PROGRAM_ID
     );

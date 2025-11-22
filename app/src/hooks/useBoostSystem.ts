@@ -55,10 +55,10 @@ function getProgramIds() {
       process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru"
     ),
     swapback_router: new PublicKey(
-      process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt"
+      process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh"
     ),
     swapback_buyback: new PublicKey(
-      process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"
+      process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || "746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6"
     ),
   };
 }

@@ -34,27 +34,38 @@ export const RPC_ENDPOINTS: Record<NetworkEnvironment, string> = {
 /**
  * Program IDs - DEVNET
  * 
- * ✅ Programme déployé sur devnet avec unlock_tokens (vérifié Nov 14, 2025)
- * Program ID: 26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru
+ * ✅ Programme déployé sur devnet avec unlock_tokens (vérifié Nov 22, 2025)
+ * Router: 9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh
+ * CNFT: 26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru
+ * Buyback: 746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6
  */
 const DEVNET_PROGRAM_IDS: ProgramIds = {
-  cnftProgram: new PublicKey('26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru'),
-  routerProgram: new PublicKey('GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt'),
-  buybackProgram: new PublicKey('EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf'),
+  cnftProgram: new PublicKey(
+    process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || '26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru'
+  ),
+  routerProgram: new PublicKey(
+    process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || '9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh'
+  ),
+  buybackProgram: new PublicKey(
+    process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || '746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6'
+  ),
 };
 
 /**
  * Program IDs - TESTNET
  * 
- * ✅ Déployé le 28 Octobre 2025
- * Wallet: 3PiZ1xdHbPbj1UaPS8pfzKnHpmQQLfR8zrhy5RcksqAt
- * CNFT: 260KB, Router: 306KB, Buyback: 365KB
- * Coût total: ~6.5 SOL
+ * ✅ Mêmes IDs que devnet pour le moment
  */
 const TESTNET_PROGRAM_IDS: ProgramIds = {
-  cnftProgram: new PublicKey('26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru'),
-  routerProgram: new PublicKey('GTNyqcgqKHRu3o636WkrZfF6EjJu1KP62Bqdo52t3cgt'),
-  buybackProgram: new PublicKey('EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf'),
+  cnftProgram: new PublicKey(
+    process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || '26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru'
+  ),
+  routerProgram: new PublicKey(
+    process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || '9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh'
+  ),
+  buybackProgram: new PublicKey(
+    process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || '746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6'
+  ),
 };
 
 /**
