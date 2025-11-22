@@ -12,7 +12,8 @@ Export encountered errors on following paths:
 1. ✅ Suppression de `/swap-enhanced` (double WalletProvider)
 2. ✅ Suppression de `/preview/*` (pages demo obsolètes)
 3. ✅ Suppression des anciennes pages (page-old.tsx, page-simple.tsx)
-4. ✅ Build propre sans erreurs d'export
+4. ✅ Suppression de `/api/router/accounts` (dépendances natives incompatibles)
+5. ✅ Build propre sans erreurs d'export ou webpack
 
 ## 📋 Variables d'Environnement Vercel
 
