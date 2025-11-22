@@ -2,6 +2,7 @@
 
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { useCNFT } from "../hooks/useCNFT";
 import { useRealtimeStats } from "../hooks/useRealtimeStats";
 import { useGlobalState } from "../hooks/useGlobalState";
@@ -9,7 +10,6 @@ import { useUserNpiBalance } from "../hooks/useUserNpiBalance";
 import { SkeletonLoader } from "./Skeletons";
 import { NoActivityState, NoConnectionState } from "./EmptyState";
 import { SwapBackDashboard } from "./SwapBackDashboard";
-import { EnhancedSwapInterface } from "./EnhancedSwapInterface";
 import LockInterface from "./LockInterface";
 import UnlockInterface from "./UnlockInterface";
 import { logError } from "@/lib/errorLogger";
@@ -18,6 +18,23 @@ import { createClaimNpiTransaction } from "@/lib/claimNpi";
 // Import charts directly instead of lazy loading to avoid chunk errors
 import { VolumeChart, ActivityChart } from "./Charts";
 import OnChainHistoryWidget from "./OnChainHistoryWidget";
+
+// Lazy load EnhancedSwapInterface to avoid webpack issues
+const EnhancedSwapInterface = dynamic(
+  () => import("@/components/EnhancedSwapInterface").then(mod => ({ default: mod.EnhancedSwapInterface })),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="swap-card">
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-pulse text-[var(--primary)]">
+            Chargement...
+          </div>
+        </div>
+      </div>
+    )
+  }
+);
 
 export const Dashboard = () => {
   const { connection } = useConnection();
