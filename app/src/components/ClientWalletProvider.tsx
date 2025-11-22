@@ -2,6 +2,7 @@
 
 import { FC, ReactNode, useEffect, useState } from "react";
 import { WalletProvider } from "./WalletProvider";
+import { LoadingScreen } from "./LoadingScreen";
 
 /**
  * Wrapper client-only pour le WalletProvider
@@ -14,10 +15,9 @@ export const ClientWalletProvider: FC<{ children: ReactNode }> = ({ children }) 
     setMounted(true);
   }, []);
 
-  // Pendant le SSR, on rend quand même les children pour éviter un écran blanc
-  // Le WalletProvider gérera l'hydration proprement
+  // Afficher un loader pendant le SSR et le premier render
   if (!mounted) {
-    return <div suppressHydrationWarning>{children}</div>;
+    return <LoadingScreen />;
   }
 
   // Une fois monté côté client, on peut utiliser le WalletProvider complet
