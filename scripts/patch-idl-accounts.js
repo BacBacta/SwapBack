@@ -36,6 +36,67 @@ const accountDefinitions = {
       ]
     }
   },
+  SwapPlan: {
+    type: {
+      kind: 'struct',
+      fields: [
+        { name: 'planId', type: { array: ['u8', 32] } },
+        { name: 'user', type: 'pubkey' },
+        { name: 'tokenIn', type: 'pubkey' },
+        { name: 'tokenOut', type: 'pubkey' },
+        { name: 'amountIn', type: 'u64' },
+        { name: 'minOut', type: 'u64' },
+        { name: 'venues', type: { vec: { defined: 'VenueWeight' } } },
+        { name: 'fallbackPlans', type: { vec: { defined: 'FallbackPlan' } } },
+        { name: 'expiresAt', type: 'i64' },
+        { name: 'createdAt', type: 'i64' },
+        { name: 'bump', type: 'u8' }
+      ]
+    }
+  },
+  OracleCache: {
+    type: {
+      kind: 'struct',
+      fields: [
+        { name: 'tokenPair', type: { array: ['pubkey', 2] } },
+        { name: 'cachedPrice', type: 'u64' },
+        { name: 'cachedAt', type: 'i64' },
+        { name: 'cacheDuration', type: 'i64' },
+        { name: 'bump', type: 'u8' }
+      ]
+    }
+  },
+  VenueScore: {
+    type: {
+      kind: 'struct',
+      fields: [
+        { name: 'venue', type: 'pubkey' },
+        { name: 'venueType', type: { defined: 'VenueType' } },
+        { name: 'totalSwaps', type: 'u64' },
+        { name: 'totalVolume', type: 'u64' },
+        { name: 'totalNpiGenerated', type: 'i64' },
+        { name: 'avgLatencyMs', type: 'u32' },
+        { name: 'avgSlippageBps', type: 'u16' },
+        { name: 'qualityScore', type: 'u16' },
+        { name: 'lastUpdated', type: 'i64' },
+        { name: 'windowStart', type: 'i64' }
+      ]
+    }
+  },
+  UserNft: {
+    type: {
+      kind: 'struct',
+      fields: [
+        { name: 'user', type: 'pubkey' },
+        { name: 'level', type: { defined: 'LockLevel' } },
+        { name: 'amountLocked', type: 'u64' },
+        { name: 'lockDuration', type: 'i64' },
+        { name: 'boost', type: 'u16' },
+        { name: 'mintTime', type: 'i64' },
+        { name: 'isActive', type: 'bool' }
+      ]
+    }
+  },
   RouterState: {
     type: {
       kind: 'struct',
