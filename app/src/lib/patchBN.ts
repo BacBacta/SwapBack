@@ -13,15 +13,31 @@ if (BNPrototype && !BNPrototype.__swapbackPatched && typeof BNPrototype._initArr
     base?: number | 'hex',
     endian?: 'le' | 'be'
   ) {
-    if (src && typeof (src as { length?: number }).length === 'number') {
-      const length = (src as { length?: number }).length ?? 0;
-      if (length === 0) {
-        const safeBuffer = new Uint8Array([0]);
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn('[BNGuard] Empty buffer received; injecting zero byte to prevent assertion');
-        }
-        return originalInitArray.call(this, safeBuffer, base, endian);
+    const length = (() => {
+      if (!src) return 0;
+      if (typeof Buffer !== 'undefined' && Buffer.isBuffer(src)) {
+        return src.length;
       }
+      if (ArrayBuffer.isView(src)) {
+        return (src as ArrayBufferView).byteLength;
+      }
+      if (src instanceof ArrayBuffer) {
+        return src.byteLength;
+      }
+      if (typeof (src as { length?: number }).length === 'number') {
+        return (src as { length?: number }).length ?? 0;
+      }
+      return 0;
+    })();
+
+    if (length === 0) {
+      const safeBuffer = typeof Buffer !== 'undefined' ? Buffer.from([0]) : new Uint8Array([0]);
+      console.warn('[BNGuard] Empty buffer received; injecting zero byte to prevent assertion', {
+        base,
+        endian,
+        stack: process.env.NODE_ENV !== 'production' ? new Error().stack : undefined,
+      });
+      return originalInitArray.call(this, safeBuffer, base, endian);
     }
 
     return originalInitArray.call(this, src, base, endian);
