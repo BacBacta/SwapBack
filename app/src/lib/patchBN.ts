@@ -1,11 +1,18 @@
-import { BN } from '@coral-xyz/anchor';
+import { BN as AnchorBN } from '@coral-xyz/anchor';
+import BNjs from 'bn.js';
 
-const BNPrototype = BN.prototype as unknown as {
-  _initArray?: (src: unknown, base?: number | 'hex', endian?: 'le' | 'be') => BN;
-  __swapbackPatched?: boolean;
-};
+type BNish = typeof AnchorBN;
 
-if (BNPrototype && !BNPrototype.__swapbackPatched && typeof BNPrototype._initArray === 'function') {
+const patchBNPrototype = (BNClass: BNish | typeof BNjs) => {
+  const BNPrototype = BNClass?.prototype as unknown as {
+    _initArray?: (src: unknown, base?: number | 'hex', endian?: 'le' | 'be') => unknown;
+    __swapbackPatched?: boolean;
+  };
+
+  if (!BNPrototype || BNPrototype.__swapbackPatched || typeof BNPrototype._initArray !== 'function') {
+    return;
+  }
+
   const originalInitArray = BNPrototype._initArray;
 
   BNPrototype._initArray = function patchedInitArray(
@@ -44,4 +51,6 @@ if (BNPrototype && !BNPrototype.__swapbackPatched && typeof BNPrototype._initArr
   } as typeof BNPrototype._initArray;
 
   BNPrototype.__swapbackPatched = true;
-}
+};
+
+[AnchorBN, BNjs].forEach(patchBNPrototype);
