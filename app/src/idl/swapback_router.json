@@ -1168,7 +1168,81 @@
         241,
         52,
         84
-      ]
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "planId",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "tokenIn",
+            "type": "pubkey"
+          },
+          {
+            "name": "tokenOut",
+            "type": "pubkey"
+          },
+          {
+            "name": "amountPerSwap",
+            "type": "u64"
+          },
+          {
+            "name": "totalSwaps",
+            "type": "u32"
+          },
+          {
+            "name": "executedSwaps",
+            "type": "u32"
+          },
+          {
+            "name": "intervalSeconds",
+            "type": "i64"
+          },
+          {
+            "name": "nextExecution",
+            "type": "i64"
+          },
+          {
+            "name": "minOutPerSwap",
+            "type": "u64"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "expiresAt",
+            "type": "i64"
+          },
+          {
+            "name": "isActive",
+            "type": "bool"
+          },
+          {
+            "name": "totalInvested",
+            "type": "u64"
+          },
+          {
+            "name": "totalReceived",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
     },
     {
       "name": "OracleCache",
@@ -1194,7 +1268,54 @@
         251,
         46,
         139
-      ]
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "pendingAuthority",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "rebateBps",
+            "type": "u16"
+          },
+          {
+            "name": "treasuryBps",
+            "type": "u16"
+          },
+          {
+            "name": "boostVaultBps",
+            "type": "u16"
+          },
+          {
+            "name": "treasuryFromFeesBps",
+            "type": "u16"
+          },
+          {
+            "name": "buyburnFromFeesBps",
+            "type": "u16"
+          },
+          {
+            "name": "dynamicSlippageEnabled",
+            "type": "bool"
+          },
+          {
+            "name": "npiBenchmarkingEnabled",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
     },
     {
       "name": "RouterState",
@@ -1207,7 +1328,48 @@
         208,
         200,
         27
-      ]
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "rebatePercentage",
+            "type": "u16"
+          },
+          {
+            "name": "treasuryPercentage",
+            "type": "u16"
+          },
+          {
+            "name": "boostVaultPercentage",
+            "type": "u16"
+          },
+          {
+            "name": "totalSwaps",
+            "type": "u64"
+          },
+          {
+            "name": "totalVolume",
+            "type": "u64"
+          },
+          {
+            "name": "totalFees",
+            "type": "u64"
+          },
+          {
+            "name": "totalRebates",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
     },
     {
       "name": "SwapPlan",
@@ -1246,7 +1408,32 @@
         134,
         112,
         99
-      ]
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "totalRebates",
+            "type": "u64"
+          },
+          {
+            "name": "claimedRebates",
+            "type": "u64"
+          },
+          {
+            "name": "lastClaimAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
     },
     {
       "name": "VenueScore",
