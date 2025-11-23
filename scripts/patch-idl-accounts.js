@@ -8,12 +8,19 @@
 const fs = require('fs');
 const path = require('path');
 
-// Patch both target IDL (source) and app IDL (deployed)
+// Patch all IDL copies that the repo consumes
 const targetIdlPath = path.join(__dirname, '../target/idl/swapback_router.json');
 const appIdlPath = path.join(__dirname, '../app/src/idl/swapback_router.json');
+const sdkIdlPath = path.join(__dirname, '../sdk/src/idl/swapback_router.json');
 
-// Read from target (build output)
-const idl = JSON.parse(fs.readFileSync(targetIdlPath, 'utf8'));
+// Prefer target IDL (fresh anchor build). If missing, fall back to app copy.
+const sourcePath = fs.existsSync(targetIdlPath) ? targetIdlPath : appIdlPath;
+if (!fs.existsSync(sourcePath)) {
+  console.error('❌ Unable to find source IDL at target or app paths. Run `anchor build` first.');
+  process.exit(1);
+}
+
+const idl = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
 
 // Complete account definitions based on Rust structs
 const accountDefinitions = {
@@ -172,11 +179,25 @@ if (idl.accounts && Array.isArray(idl.accounts)) {
   });
 }
 
-// Write patched IDL to both locations
-fs.writeFileSync(targetIdlPath, JSON.stringify(idl, null, 2));
-fs.writeFileSync(appIdlPath, JSON.stringify(idl, null, 2));
-console.log('✅ IDL patched successfully with account definitions');
-console.log(`   Written to: target/idl/ and app/src/idl/`);
+// Write patched IDL to each consumer path that exists
+const outputPaths = [targetIdlPath, appIdlPath, sdkIdlPath];
+const writtenPaths = [];
+
+outputPaths.forEach((outputPath) => {
+  const dir = path.dirname(outputPath);
+  if (!fs.existsSync(dir)) {
+    return;
+  }
+  fs.writeFileSync(outputPath, JSON.stringify(idl, null, 2));
+  writtenPaths.push(path.relative(process.cwd(), outputPath));
+});
+
+if (writtenPaths.length === 0) {
+  console.warn('⚠️  IDL patch script ran but no output paths existed.');
+} else {
+  console.log('✅ IDL patched successfully with account definitions');
+  console.log(`   Written to: ${writtenPaths.join(', ')}`);
+}
 
 // Verify all accounts have type definitions
 const patchedAccounts = idl.accounts.filter(acc => acc.type && acc.type.fields);

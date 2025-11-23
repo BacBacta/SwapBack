@@ -9,7 +9,7 @@ import {
   SystemProgram,
 } from "@solana/web3.js";
 import { WalletContextState } from "@solana/wallet-adapter-react";
-import { Program, AnchorProvider, BN, type Idl } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, type Idl } from "@coral-xyz/anchor";
 import { 
   TOKEN_2022_PROGRAM_ID,
   TOKEN_PROGRAM_ID, 
@@ -19,6 +19,7 @@ import {
 } from "@solana/spl-token";
 import cnftIdl from "@/idl/swapback_cnft.json";
 import { validateEnv } from "./validateEnv";
+import { createProgramWithProvider } from "@/lib/program";
 
 /**
  * Helpers to lazily resolve environment program IDs and mints.
@@ -128,7 +129,7 @@ export async function createLockTokensTransaction(
 
   // Charger le programme avec l'ID explicite et le type correct pour éviter DeclaredProgramIdMismatch
   console.log('🔍 [LOCK TX] Loading program...');
-  const program = new Program(cnftIdl as Idl, CNFT_PROGRAM_ID, provider);
+  const program = createProgramWithProvider(cnftIdl as Idl, CNFT_PROGRAM_ID, provider);
   if (!program.programId.equals(CNFT_PROGRAM_ID)) {
     throw new Error(
       `❌ Program ID mismatch after initialization. Expected ${CNFT_PROGRAM_ID.toString()} but program.programId is ${program.programId.toString()}`
@@ -356,7 +357,7 @@ export async function createUnlockTokensTransaction(
 
   // Charger le programme avec l'ID explicite et le type correct pour éviter DeclaredProgramIdMismatch
   console.log('🔍 [UNLOCK TX] Loading program...');
-  const program = new Program(cnftIdl as Idl, CNFT_PROGRAM_ID, provider);
+  const program = createProgramWithProvider(cnftIdl as Idl, CNFT_PROGRAM_ID, provider);
   if (!program.programId.equals(CNFT_PROGRAM_ID)) {
     throw new Error(
       `❌ Program ID mismatch after initialization. Expected ${CNFT_PROGRAM_ID.toString()} but program.programId is ${program.programId.toString()}`

@@ -6,7 +6,7 @@
  */
 
 import { Connection, PublicKey, SystemProgram } from '@solana/web3.js';
-import { AnchorProvider, Program, BN, Idl } from '@coral-xyz/anchor';
+import { AnchorProvider, BN, Idl } from '@coral-xyz/anchor';
 import { bnToNumberWithFallback, lamportsToUiSafe } from '@/lib/bnUtils';
 import { 
   getAssociatedTokenAddress, 
@@ -16,6 +16,7 @@ import {
 
 import { validateEnv } from "./validateEnv";
 import routerIdl from "@/idl/swapback_router.json";
+import { createProgramWithProvider } from "@/lib/program";
 
 /**
  * Lazily resolve ROUTER_PROGRAM_ID to avoid throwing during module
@@ -256,7 +257,7 @@ export async function initializeRouterState(
   
   // Load IDL and create program instance
   const idl = getRouterIdl();
-  const program = new Program(idl, ROUTER_PROGRAM_ID, provider);
+  const program = createProgramWithProvider(idl, ROUTER_PROGRAM_ID, provider);
   
   // Derive state PDA
   const [statePda] = getRouterStatePDA();
@@ -324,7 +325,7 @@ export async function createDcaPlanTransaction(
   
   // Load IDL and create program instance
   const idl = getRouterIdl();
-  const program = new Program(idl, ROUTER_PROGRAM_ID, provider);
+  const program = createProgramWithProvider(idl, ROUTER_PROGRAM_ID, provider);
   
   // Generate unique plan ID
   const planId = generatePlanId();
@@ -448,7 +449,7 @@ export async function fetchUserDcaPlans(
   console.log('🔍 Fetching DCA plans for user:', userPublicKey.toBase58());
   
   const idl = getRouterIdl();
-  const program = new Program(idl, ROUTER_PROGRAM_ID, provider);
+  const program = createProgramWithProvider(idl, ROUTER_PROGRAM_ID, provider);
   
   // DcaPlan account structure:
   // - discriminator: 8 bytes [231, 97, 112, 227, 171, 241, 52, 84]
@@ -527,7 +528,7 @@ export async function executeDcaSwapTransaction(
   }
 
   const idl = getRouterIdl();
-  const program = new Program(idl, ROUTER_PROGRAM_ID, provider);
+  const program = createProgramWithProvider(idl, ROUTER_PROGRAM_ID, provider);
   
   const [statePda] = getRouterStatePDA();
   
@@ -595,7 +596,7 @@ export async function pauseDcaPlanTransaction(
   }
 
   const idl = getRouterIdl();
-  const program = new Program(idl, ROUTER_PROGRAM_ID, provider);
+  const program = createProgramWithProvider(idl, ROUTER_PROGRAM_ID, provider);
   
   console.log('⏸️  Pausing DCA plan:', planPda.toBase58());
   
@@ -635,7 +636,7 @@ export async function resumeDcaPlanTransaction(
   }
 
   const idl = getRouterIdl();
-  const program = new Program(idl, ROUTER_PROGRAM_ID, provider);
+  const program = createProgramWithProvider(idl, ROUTER_PROGRAM_ID, provider);
   
   console.log('▶️  Resuming DCA plan:', planPda.toBase58());
   
@@ -675,7 +676,7 @@ export async function cancelDcaPlanTransaction(
   }
 
   const idl = getRouterIdl();
-  const program = new Program(idl, ROUTER_PROGRAM_ID, provider);
+  const program = createProgramWithProvider(idl, ROUTER_PROGRAM_ID, provider);
   
   console.log('❌ Cancelling DCA plan:', planPda.toBase58());
   

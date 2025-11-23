@@ -1,8 +1,9 @@
 import { Connection, PublicKey, Transaction } from "@solana/web3.js";
 import { WalletContextState } from "@solana/wallet-adapter-react";
-import { AnchorProvider, BN, Program, type Idl } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, type Idl } from "@coral-xyz/anchor";
 import cnftIdl from "@/idl/swapback_cnft.json";
 import { validateEnv } from "./validateEnv";
+import { createProgramWithProvider } from "@/lib/program";
 
 const BASIS_POINTS = 10_000;
 
@@ -70,7 +71,7 @@ async function getProgram(connection: Connection, wallet: WalletContextState) {
     skipPreflight: false,
   });
 
-  const program = new Program(cnftIdl as Idl, CNFT_PROGRAM_ID, provider);
+  const program = createProgramWithProvider(cnftIdl as Idl, CNFT_PROGRAM_ID, provider);
 
   if (!(program as any)._coder?.accounts) {
     const { BorshAccountsCoder } = await import("@coral-xyz/anchor");

@@ -1,5 +1,6 @@
 import { Connection, Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { Program, AnchorProvider, Wallet, type Idl } from "@coral-xyz/anchor";
+import { createProgramWithProvider } from "./utils/program";
 
 // Note: L'IDL sera généré après le build du programme
 // Pour l'instant, on utilise une interface basique
@@ -27,7 +28,7 @@ export class CnftClient {
    */
   setProgram(idl: Idl) {
     const provider = new AnchorProvider(this.connection, this.wallet, {});
-    this.program = new Program(idl, provider);
+    this.program = createProgramWithProvider(idl, this.config.programId, provider);
   }
 
   /**

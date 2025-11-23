@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { AnchorProvider, BN, Idl, Program } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, Idl } from "@coral-xyz/anchor";
 import {
   AccountMeta,
   Connection,
@@ -21,6 +21,7 @@ import {
 } from "@solana/spl-token";
 import routerIdl from "@/idl/swapback_router.json";
 import { PROGRAM_IDS } from "@/constants/programIds";
+import { createProgramWithProvider } from "@/lib/program";
 import { getOracleFeedsForPair, type OracleFeedConfig } from "@/config/oracles";
 import { USDC_MINT } from "@/config/constants";
 import toast from "react-hot-toast";
@@ -44,7 +45,7 @@ function buildReadOnlyProgram(connection: Connection) {
   const provider = new AnchorProvider(connection, createReadonlyWallet(dummy), {
     commitment: "confirmed",
   });
-  return new Program(routerIdl as Idl, ROUTER_PROGRAM_ID, provider);
+  return createProgramWithProvider(routerIdl as Idl, ROUTER_PROGRAM_ID, provider);
 }
 
 export interface SwapRequest {
@@ -88,7 +89,7 @@ export function useSwapRouter() {
       const provider = new AnchorProvider(connection, wallet, {
         commitment: "confirmed",
       });
-      return new Program(routerIdl as Idl, ROUTER_PROGRAM_ID, provider);
+      return createProgramWithProvider(routerIdl as Idl, ROUTER_PROGRAM_ID, provider);
     }
     return buildReadOnlyProgram(connection);
   }, [connection, wallet]);

@@ -2,11 +2,12 @@
 
 import { useMemo } from "react";
 import { useConnection } from "@solana/wallet-adapter-react";
-import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
+import { AnchorProvider, Idl } from "@coral-xyz/anchor";
 import { Keypair, PublicKey, Transaction, VersionedTransaction } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
 import routerIdl from "@/idl/swapback_router.json";
 import { PROGRAM_IDS } from "@/constants/programIds";
+import { createProgramWithProvider } from "@/lib/program";
 
 const ROUTER_PROGRAM_ID = PROGRAM_IDS.routerProgram;
 
@@ -48,7 +49,7 @@ function getProgram(connection: ReturnType<typeof useConnection>["connection"]) 
     readonlyWallet,
     { commitment: "confirmed" }
   );
-  return new Program(routerIdl as Idl, ROUTER_PROGRAM_ID, provider);
+  return createProgramWithProvider(routerIdl as Idl, ROUTER_PROGRAM_ID, provider);
 }
 
 export function useRouterConfig() {

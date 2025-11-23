@@ -1,6 +1,6 @@
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AnchorProvider, Program, BN, Wallet } from '@coral-xyz/anchor';
+import { AnchorProvider, BN, Wallet, Idl } from '@coral-xyz/anchor';
 import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
 import { toast } from 'react-hot-toast';
 import { trackBuyback } from '@/lib/analytics';
@@ -10,6 +10,7 @@ import { lamportsToUiSafe } from '@/lib/bnUtils';
 import { TOKEN_DECIMALS } from '@/config/constants';
 import * as fs from 'fs';
 import * as path from 'path';
+import { createProgramWithProvider } from '@/lib/program';
 
 import {
   BUYBACK_PROGRAM_ID,
@@ -40,7 +41,7 @@ export function useExecuteBuyback() {
 
       // Load buyback program IDL
       const idlPath = path.join(process.cwd(), '../target/idl/swapback_buyback.json');
-      const idl = JSON.parse(fs.readFileSync(idlPath, 'utf-8'));
+      const idl = JSON.parse(fs.readFileSync(idlPath, 'utf-8')) as Idl;
 
       // Create Anchor provider
       const provider = new AnchorProvider(
@@ -50,7 +51,7 @@ export function useExecuteBuyback() {
       );
 
       // Initialize program
-      const program = new Program(idl, BUYBACK_PROGRAM_ID, provider);
+      const program = createProgramWithProvider(idl, BUYBACK_PROGRAM_ID, provider);
 
       // Get user's $BACK token account
       const userBackAccount = await getAssociatedTokenAddress(

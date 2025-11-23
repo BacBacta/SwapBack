@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { Program, AnchorProvider, BN, type Idl } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, type Idl } from "@coral-xyz/anchor";
+import { createProgramWithProvider } from "@/lib/program";
 
 // ============================
 // 🎯 CONFIGURATION SWAPBACK
@@ -148,7 +149,7 @@ export const SwapBackInterface = () => {
 
       // 2. Load program
       const routerProgramId = getRouterProgramId();
-      const program = new Program(
+      const program = createProgramWithProvider(
         ROUTER_IDL,
         routerProgramId,
         provider

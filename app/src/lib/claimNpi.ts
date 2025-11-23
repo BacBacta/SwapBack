@@ -1,9 +1,10 @@
 import { Connection, PublicKey, Transaction } from "@solana/web3.js";
 import { WalletContextState } from "@solana/wallet-adapter-react";
-import { Program, AnchorProvider, type Idl, BN } from "@coral-xyz/anchor";
+import { AnchorProvider, type Idl, BN } from "@coral-xyz/anchor";
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import cnftIdl from "@/idl/swapback_cnft.json";
 import { getNpiMint } from "./lockTokens";
+import { createProgramWithProvider } from "@/lib/program";
 
 const LAMPORTS_PER_NPI = 1_000_000_000;
 
@@ -38,7 +39,7 @@ export async function createClaimNpiTransaction(
     wallet as any,
     { commitment: "confirmed" }
   );
-  const program = new Program(cnftIdl as Idl, programId, provider);
+  const program = createProgramWithProvider(cnftIdl as Idl, programId, provider);
 
   const [globalState] = PublicKey.findProgramAddressSync(
     [Buffer.from("global_state")],
