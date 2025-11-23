@@ -70,7 +70,7 @@ async function getProgram(connection: Connection, wallet: WalletContextState) {
     skipPreflight: false,
   });
 
-  const program = new Program(cnftIdl as Idl, provider);
+  const program = new Program(cnftIdl as Idl, CNFT_PROGRAM_ID, provider);
 
   if (!(program as any)._coder?.accounts) {
     const { BorshAccountsCoder } = await import("@coral-xyz/anchor");

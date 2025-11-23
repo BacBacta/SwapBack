@@ -12,6 +12,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import {
+  BUYBACK_PROGRAM_ID,
   BUYBACK_STATE_PDA,
   USDC_VAULT_PDA,
   BACK_TOKEN_MINT,
@@ -49,7 +50,7 @@ export function useExecuteBuyback() {
       );
 
       // Initialize program
-      const program = new Program(idl, provider);
+      const program = new Program(idl, BUYBACK_PROGRAM_ID, provider);
 
       // Get user's $BACK token account
       const userBackAccount = await getAssociatedTokenAddress(

@@ -147,8 +147,10 @@ export const SwapBackInterface = () => {
       );
 
       // 2. Load program
+      const routerProgramId = getRouterProgramId();
       const program = new Program(
         ROUTER_IDL,
+        routerProgramId,
         provider
       );
 

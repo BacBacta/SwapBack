@@ -44,7 +44,7 @@ function buildReadOnlyProgram(connection: Connection) {
   const provider = new AnchorProvider(connection, createReadonlyWallet(dummy), {
     commitment: "confirmed",
   });
-  return new Program(routerIdl as Idl, provider);
+  return new Program(routerIdl as Idl, ROUTER_PROGRAM_ID, provider);
 }
 
 export interface SwapRequest {
@@ -88,7 +88,7 @@ export function useSwapRouter() {
       const provider = new AnchorProvider(connection, wallet, {
         commitment: "confirmed",
       });
-      return new Program(routerIdl as Idl, provider);
+      return new Program(routerIdl as Idl, ROUTER_PROGRAM_ID, provider);
     }
     return buildReadOnlyProgram(connection);
   }, [connection, wallet]);

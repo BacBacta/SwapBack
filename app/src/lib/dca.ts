@@ -273,7 +273,7 @@ export async function initializeRouterState(
   
   // Load IDL and create program instance
   const idl = await loadRouterIdl();
-  const program = new Program(idl, provider);
+  const program = new Program(idl, ROUTER_PROGRAM_ID, provider);
   
   // Derive state PDA
   const [statePda] = getRouterStatePDA();
@@ -341,7 +341,7 @@ export async function createDcaPlanTransaction(
   
   // Load IDL and create program instance
   const idl = await loadRouterIdl();
-  const program = new Program(idl, provider);
+  const program = new Program(idl, ROUTER_PROGRAM_ID, provider);
   
   // Generate unique plan ID
   const planId = generatePlanId();
@@ -458,7 +458,7 @@ export async function fetchUserDcaPlans(
   console.log('🔍 Fetching DCA plans for user:', userPublicKey.toBase58());
   
   const idl = await loadRouterIdl();
-  const program = new Program(idl, provider);
+  const program = new Program(idl, ROUTER_PROGRAM_ID, provider);
   
   // DcaPlan account structure:
   // - discriminator: 8 bytes [231, 97, 112, 227, 171, 241, 52, 84]
@@ -531,9 +531,13 @@ export async function executeDcaSwapTransaction(
   planPda: PublicKey,
   dcaPlan: DcaPlan
 ): Promise<string> {
-  
+  const ROUTER_PROGRAM_ID = getRouterProgramId();
+  if (!ROUTER_PROGRAM_ID) {
+    throw new Error('❌ NEXT_PUBLIC_ROUTER_PROGRAM_ID is not configured. Define it in Vercel or .env');
+  }
+
   const idl = await loadRouterIdl();
-  const program = new Program(idl, provider);
+  const program = new Program(idl, ROUTER_PROGRAM_ID, provider);
   
   const [statePda] = getRouterStatePDA();
   
@@ -595,9 +599,13 @@ export async function pauseDcaPlanTransaction(
   userPublicKey: PublicKey,
   planPda: PublicKey
 ): Promise<string> {
-  
+  const ROUTER_PROGRAM_ID = getRouterProgramId();
+  if (!ROUTER_PROGRAM_ID) {
+    throw new Error('❌ NEXT_PUBLIC_ROUTER_PROGRAM_ID is not configured. Define it in Vercel or .env');
+  }
+
   const idl = await loadRouterIdl();
-  const program = new Program(idl, provider);
+  const program = new Program(idl, ROUTER_PROGRAM_ID, provider);
   
   console.log('⏸️  Pausing DCA plan:', planPda.toBase58());
   
@@ -631,9 +639,13 @@ export async function resumeDcaPlanTransaction(
   userPublicKey: PublicKey,
   planPda: PublicKey
 ): Promise<string> {
-  
+  const ROUTER_PROGRAM_ID = getRouterProgramId();
+  if (!ROUTER_PROGRAM_ID) {
+    throw new Error('❌ NEXT_PUBLIC_ROUTER_PROGRAM_ID is not configured. Define it in Vercel or .env');
+  }
+
   const idl = await loadRouterIdl();
-  const program = new Program(idl, provider);
+  const program = new Program(idl, ROUTER_PROGRAM_ID, provider);
   
   console.log('▶️  Resuming DCA plan:', planPda.toBase58());
   
@@ -667,9 +679,13 @@ export async function cancelDcaPlanTransaction(
   userPublicKey: PublicKey,
   planPda: PublicKey
 ): Promise<string> {
-  
+  const ROUTER_PROGRAM_ID = getRouterProgramId();
+  if (!ROUTER_PROGRAM_ID) {
+    throw new Error('❌ NEXT_PUBLIC_ROUTER_PROGRAM_ID is not configured. Define it in Vercel or .env');
+  }
+
   const idl = await loadRouterIdl();
-  const program = new Program(idl, provider);
+  const program = new Program(idl, ROUTER_PROGRAM_ID, provider);
   
   console.log('❌ Cancelling DCA plan:', planPda.toBase58());
   

@@ -48,7 +48,7 @@ function getProgram(connection: ReturnType<typeof useConnection>["connection"]) 
     readonlyWallet,
     { commitment: "confirmed" }
   );
-  return new Program(routerIdl as Idl, provider);
+  return new Program(routerIdl as Idl, ROUTER_PROGRAM_ID, provider);
 }
 
 export function useRouterConfig() {

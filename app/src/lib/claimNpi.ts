@@ -38,7 +38,7 @@ export async function createClaimNpiTransaction(
     wallet as any,
     { commitment: "confirmed" }
   );
-  const program = new Program(cnftIdl as Idl, provider);
+  const program = new Program(cnftIdl as Idl, programId, provider);
 
   const [globalState] = PublicKey.findProgramAddressSync(
     [Buffer.from("global_state")],

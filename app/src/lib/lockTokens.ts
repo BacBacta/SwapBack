@@ -128,7 +128,7 @@ export async function createLockTokensTransaction(
 
   // Charger le programme avec l'ID explicite et le type correct pour éviter DeclaredProgramIdMismatch
   console.log('🔍 [LOCK TX] Loading program...');
-  const program = new Program(cnftIdl as Idl, provider);
+  const program = new Program(cnftIdl as Idl, CNFT_PROGRAM_ID, provider);
   if (!program.programId.equals(CNFT_PROGRAM_ID)) {
     throw new Error(
       `❌ Program ID mismatch after initialization. Expected ${CNFT_PROGRAM_ID.toString()} but program.programId is ${program.programId.toString()}`
@@ -356,7 +356,7 @@ export async function createUnlockTokensTransaction(
 
   // Charger le programme avec l'ID explicite et le type correct pour éviter DeclaredProgramIdMismatch
   console.log('🔍 [UNLOCK TX] Loading program...');
-  const program = new Program(cnftIdl as Idl, provider);
+  const program = new Program(cnftIdl as Idl, CNFT_PROGRAM_ID, provider);
   if (!program.programId.equals(CNFT_PROGRAM_ID)) {
     throw new Error(
       `❌ Program ID mismatch after initialization. Expected ${CNFT_PROGRAM_ID.toString()} but program.programId is ${program.programId.toString()}`
