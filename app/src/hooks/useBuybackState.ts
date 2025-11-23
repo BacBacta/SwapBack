@@ -6,10 +6,20 @@ import { lamportsToUiSafe, bnToNumberWithFallback } from '@/lib/bnUtils';
 import { getBackTokenMint, TOKEN_DECIMALS } from '@/config/constants';
 
 // Buyback Program addresses (devnet)
-export const BUYBACK_PROGRAM_ID = new PublicKey('92znK8METYTFW5dGDJUnHUMqubVGnPBTyjZ4HzjWQzir');
-export const BUYBACK_STATE_PDA = new PublicKey('74N3kmNZiRSJCFaYBFjmiQGMwv8vx3aJvMMKJECLNUNM');
-export const USDC_VAULT_PDA = new PublicKey('HiBn2KFwVUDuW9z1aiYcR1jVyBjSMirqzSQ7vpaLQKDT');
-export const USDC_MINT = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
+export const BUYBACK_PROGRAM_ID = new PublicKey(
+  process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || '746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6'
+);
+export const [BUYBACK_STATE_PDA] = PublicKey.findProgramAddressSync(
+  [Buffer.from('buyback_state')],
+  BUYBACK_PROGRAM_ID
+);
+export const [USDC_VAULT_PDA] = PublicKey.findProgramAddressSync(
+  [Buffer.from('usdc_vault')],
+  BUYBACK_PROGRAM_ID
+);
+export const USDC_MINT = new PublicKey(
+  process.env.NEXT_PUBLIC_USDC_MINT || 'BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR'
+);
 export const BACK_TOKEN_MINT = getBackTokenMint();
 
 export interface BuybackState {
@@ -43,26 +53,26 @@ export function useBuybackState() {
       }
 
       const data = accountInfo.data;
+      const minLength = 8 + 32 + 32 + 32 + 8 + 8 + 8 + 8 + 1;
+      if (data.length < minLength) {
+        throw new Error(`Invalid buyback state data: expected ${minLength} bytes, got ${data.length}`);
+      }
 
-      // Parse BuybackState struct (offsets validated from lib.rs)
-      // 8 bytes: discriminator
-      // 32 bytes: authority (8-40)
-      // 32 bytes: back_mint (40-72)
-      // 32 bytes: usdc_vault (72-104)
-      // 8 bytes: min_buyback_amount (104-112)
-      // 8 bytes: total_usdc_spent (112-120)
-      // 8 bytes: total_back_burned (120-128)
-      // 8 bytes: buyback_count (128-136)
-      // 1 byte: bump (136-137)
+      const readU64ToBN = (offset: number) => {
+        if (offset + 8 > data.length) {
+          throw new Error(`Invalid buffer read at offset ${offset}`);
+        }
+        return new BN(data.readBigUInt64LE(offset).toString());
+      };
 
       return {
         authority: new PublicKey(data.slice(8, 40)),
         backMint: new PublicKey(data.slice(40, 72)),
         usdcVault: new PublicKey(data.slice(72, 104)),
-        minBuybackAmount: lamportsToUiSafe(new BN(data.slice(104, 112), 'le'), 6),
-        totalUsdcSpent: lamportsToUiSafe(new BN(data.slice(112, 120), 'le'), 6),
-        totalBackBurned: lamportsToUiSafe(new BN(data.slice(120, 128), 'le'), TOKEN_DECIMALS),
-        buybackCount: bnToNumberWithFallback(new BN(data.slice(128, 136), 'le'), 0),
+        minBuybackAmount: lamportsToUiSafe(readU64ToBN(104), 6),
+        totalUsdcSpent: lamportsToUiSafe(readU64ToBN(112), 6),
+        totalBackBurned: lamportsToUiSafe(readU64ToBN(120), TOKEN_DECIMALS),
+        buybackCount: bnToNumberWithFallback(readU64ToBN(128), 0),
         bump: data[136],
       };
     },

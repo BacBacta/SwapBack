@@ -11,7 +11,9 @@ import { bnToNumberWithFallback, lamportsToUiSafe } from '@/lib/bnUtils';
 import { getBackTokenMint, TOKEN_DECIMALS } from '@/config/constants';
 
 // Program IDs et constants
-const BUYBACK_PROGRAM_ID = new PublicKey('92znK8METYTFW5dGDJUnHUMqubVGnPBTyjZ4HzjWQzir');
+const BUYBACK_PROGRAM_ID = new PublicKey(
+  process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || '746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6'
+);
 const BACK_TOKEN_MINT = getBackTokenMint();
 const USDC_MINT = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
 
@@ -58,18 +60,28 @@ export default function BuybackDashboard() {
       // Load buyback state account
       const accountInfo = await connection.getAccountInfo(buybackStatePDA);
       if (accountInfo) {
-        // Parser les données (simplifié - à adapter selon votre struct)
         const data = accountInfo.data;
+        const minLength = 8 + 32 + 32 + 32 + 8 + 8 + 8 + 8 + 1; // 137 bytes
+        if (data.length < minLength) {
+          throw new Error(`Invalid buyback account data: expected ${minLength} bytes, got ${data.length}`);
+        }
+
+        const readU64ToBN = (offset: number) => {
+          if (offset + 8 > data.length) {
+            throw new Error(`Invalid buffer read at offset ${offset}`);
+          }
+          return new BN(data.readBigUInt64LE(offset).toString());
+        };
+
         const authority = new PublicKey(data.slice(8, 40)).toBase58();
         const backMint = new PublicKey(data.slice(40, 72)).toBase58();
         const usdcVault = new PublicKey(data.slice(72, 104)).toBase58();
         
-        // Safe BN conversions with fallback
-        const totalUsdcCollectedBN = new BN(data.slice(104, 112), 'le');
-        const totalBackBurnedBN = new BN(data.slice(112, 120), 'le');
-        const minBuybackAmountBN = new BN(data.slice(120, 128), 'le');
-        const lastBuybackTimeBN = new BN(data.slice(128, 136), 'le');
-        
+        const totalUsdcCollectedBN = readU64ToBN(104);
+        const totalBackBurnedBN = readU64ToBN(112);
+        const minBuybackAmountBN = readU64ToBN(120);
+        const lastBuybackTimeBN = readU64ToBN(128);
+
         const totalUsdcCollected = lamportsToUiSafe(totalUsdcCollectedBN, 6) || 0;
         const totalBackBurned = lamportsToUiSafe(totalBackBurnedBN, TOKEN_DECIMALS) || 0;
         const minBuybackAmount = lamportsToUiSafe(minBuybackAmountBN, 6) || 0;
