@@ -46,8 +46,7 @@ export function useUserNpiBalance() {
   }, []);
 
   const coder = useMemo(() => {
-    // TEMPORARY: IDL format incompatibility - disabled
-    return null;
+    return new BorshAccountsCoder(cnftIdl as Idl);
   }, []);
 
   const fetchBalance = useCallback(async () => {
@@ -65,13 +64,6 @@ export function useUserNpiBalance() {
         programId
       );
 
-      // TEMPORARY: Return mock data due to IDL incompatibility
-      console.warn("[useUserNpiBalance] Using mock data due to IDL compatibility issue");
-      setState({ pendingNpi: 0, totalClaimed: 0, hasBalance: false, pda });
-      setIsLoading(false);
-      return;
-
-      /* DISABLED DUE TO IDL INCOMPATIBILITY
       const accountInfo = await connection.getAccountInfo(pda, "confirmed");
 
       if (!accountInfo) {
@@ -87,7 +79,6 @@ export function useUserNpiBalance() {
         hasBalance: decoded.pendingNpi > 0,
         pda,
       });
-      */
     } catch (err) {
       console.error("Failed to fetch user NPI balance", err);
       setError(err as Error);
