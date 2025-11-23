@@ -55,27 +55,51 @@ export function useDcaPlans() {
     queryKey: ['dca-plans', wallet.publicKey?.toBase58()],
     queryFn: async (): Promise<DcaPlanUI[]> => {
       if (!wallet.publicKey || !wallet.signTransaction) {
+        console.log('🔍 [useDcaPlans] No wallet connected, returning empty array');
         return [];
       }
 
-      const provider = new AnchorProvider(
-        connection,
-        wallet as unknown as Wallet,
-        { commitment: 'confirmed' }
-      );
+      try {
+        const provider = new AnchorProvider(
+          connection,
+          wallet as unknown as Wallet,
+          { commitment: 'confirmed' }
+        );
 
-      const plans = await fetchUserDcaPlans(connection, provider, wallet.publicKey);
+        console.log('🔍 [useDcaPlans] Fetching plans for user:', wallet.publicKey.toBase58());
+        const plans = await fetchUserDcaPlans(connection, provider, wallet.publicKey);
+        console.log(`✅ [useDcaPlans] Found ${plans.length} plan(s)`);
 
-      // Enrich plans with UI-friendly data
-      return plans.map((plan) => ({
-        ...plan,
-        // planPda is already included from fetchUserDcaPlans
-        readyForExecution: isPlanReadyForExecution(plan),
-        timeUntilNext: getTimeUntilNextExecution(plan.nextExecution),
-        progress: (plan.executedSwaps / plan.totalSwaps) * 100,
-        createdAtFormatted: formatTimestamp(plan.createdAt),
-        nextExecutionFormatted: formatTimestamp(plan.nextExecution),
-      }));
+        if (plans.length > 0) {
+          console.log('📋 [useDcaPlans] Plans:', plans.map(p => ({
+            pda: p.planPda.toBase58(),
+            tokenIn: p.tokenIn.toBase58(),
+            tokenOut: p.tokenOut.toBase58(),
+            executedSwaps: p.executedSwaps,
+            totalSwaps: p.totalSwaps,
+            status: p.status,
+          })));
+        }
+
+        // Enrich plans with UI-friendly data
+        return plans.map((plan) => ({
+          ...plan,
+          // planPda is already included from fetchUserDcaPlans
+          readyForExecution: isPlanReadyForExecution(plan),
+          timeUntilNext: getTimeUntilNextExecution(plan.nextExecution),
+          progress: (plan.executedSwaps / plan.totalSwaps) * 100,
+          createdAtFormatted: formatTimestamp(plan.createdAt),
+          nextExecutionFormatted: formatTimestamp(plan.nextExecution),
+        }));
+      } catch (error) {
+        console.error('❌ [useDcaPlans] Error fetching plans:', error);
+        // Return empty array on error but log it
+        if (error instanceof Error) {
+          console.error('   Error message:', error.message);
+          console.error('   Error stack:', error.stack);
+        }
+        return [];
+      }
     },
     enabled: !!wallet.publicKey && !!wallet.signTransaction && wallet.connected,
     refetchInterval: 30000, // Refetch every 30 seconds to check for ready plans
