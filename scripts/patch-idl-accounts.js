@@ -8,8 +8,12 @@
 const fs = require('fs');
 const path = require('path');
 
-const idlPath = path.join(__dirname, '../target/idl/swapback_router.json');
-const idl = JSON.parse(fs.readFileSync(idlPath, 'utf8'));
+// Patch both target IDL (source) and app IDL (deployed)
+const targetIdlPath = path.join(__dirname, '../target/idl/swapback_router.json');
+const appIdlPath = path.join(__dirname, '../app/src/idl/swapback_router.json');
+
+// Read from target (build output)
+const idl = JSON.parse(fs.readFileSync(targetIdlPath, 'utf8'));
 
 // Complete account definitions based on Rust structs
 const accountDefinitions = {
@@ -144,10 +148,20 @@ const accountDefinitions = {
   }
 };
 
-// Patch accounts
+// Patch accounts - copy definitions from types if missing
 if (idl.accounts && Array.isArray(idl.accounts)) {
   idl.accounts = idl.accounts.map(account => {
-    const definition = accountDefinitions[account.name];
+    // Try manual definitions first
+    let definition = accountDefinitions[account.name];
+    
+    // If no manual definition, check if it exists in types[]
+    if (!definition && idl.types) {
+      const typeDefinition = idl.types.find(t => t.name === account.name);
+      if (typeDefinition) {
+        definition = { type: typeDefinition.type };
+      }
+    }
+    
     if (definition) {
       return {
         ...account,
@@ -158,7 +172,16 @@ if (idl.accounts && Array.isArray(idl.accounts)) {
   });
 }
 
-// Write patched IDL
-fs.writeFileSync(idlPath, JSON.stringify(idl, null, 2));
+// Write patched IDL to both locations
+fs.writeFileSync(targetIdlPath, JSON.stringify(idl, null, 2));
+fs.writeFileSync(appIdlPath, JSON.stringify(idl, null, 2));
 console.log('✅ IDL patched successfully with account definitions');
-console.log(`Patched accounts: ${Object.keys(accountDefinitions).join(', ')}`);
+console.log(`   Written to: target/idl/ and app/src/idl/`);
+
+// Verify all accounts have type definitions
+const patchedAccounts = idl.accounts.filter(acc => acc.type && acc.type.fields);
+const missingAccounts = idl.accounts.filter(acc => !acc.type || !acc.type.fields);
+console.log(`Patched accounts (${patchedAccounts.length}/${idl.accounts.length}): ${patchedAccounts.map(a => a.name).join(', ')}`);
+if (missingAccounts.length > 0) {
+  console.warn(`⚠️  Still missing: ${missingAccounts.map(a => a.name).join(', ')}`);
+}
