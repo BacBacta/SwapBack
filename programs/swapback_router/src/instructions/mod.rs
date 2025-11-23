@@ -6,5 +6,5 @@ pub mod resume_dca_plan;
 
 // Re-export main types for use in lib.rs
 pub use cancel_dca_plan::CancelDcaPlan;
-pub use create_dca_plan::{CreateDcaPlan, CreateDcaPlanArgs};
+// CreateDcaPlan is defined in lib.rs for #[program] macro compatibility
 pub use execute_dca_swap::ExecuteDcaSwap;

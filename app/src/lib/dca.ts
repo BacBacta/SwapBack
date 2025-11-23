@@ -388,19 +388,17 @@ export async function createDcaPlanTransaction(
     expiresAt: new BN(params.expiresAt || 0),
   };
   
-  // Build transaction
+  // Build transaction with inline args (IDL now uses individual params, not CreateDcaPlanArgs struct)
   interface CreateDcaPlanMethods {
     createDcaPlan: (
       planId: number[],
-      args: {
-        tokenIn: PublicKey;
-        tokenOut: PublicKey;
-        amountPerSwap: BN;
-        totalSwaps: number;
-        intervalSeconds: BN;
-        minOutPerSwap: BN;
-        expiresAt: BN;
-      }
+      tokenIn: PublicKey,
+      tokenOut: PublicKey,
+      amountPerSwap: BN,
+      totalSwaps: number,
+      intervalSeconds: BN,
+      minOutPerSwap: BN,
+      expiresAt: BN
     ) => {
       accounts: (accounts: Record<string, unknown>) => {
         rpc: () => Promise<string>;
@@ -409,7 +407,16 @@ export async function createDcaPlanTransaction(
   }
   
   const signature = await (program.methods as unknown as CreateDcaPlanMethods)
-    .createDcaPlan(Array.from(planId), args)
+    .createDcaPlan(
+      Array.from(planId),
+      args.tokenIn,
+      args.tokenOut,
+      args.amountPerSwap,
+      args.totalSwaps,
+      args.intervalSeconds,
+      args.minOutPerSwap,
+      args.expiresAt
+    )
     .accounts({
       dcaPlan: planPda,
       state: statePda,

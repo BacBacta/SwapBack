@@ -228,12 +228,32 @@
           }
         },
         {
-          "name": "args",
-          "type": {
-            "defined": {
-              "name": "CreateDcaPlanArgs"
-            }
-          }
+          "name": "token_in",
+          "type": "pubkey"
+        },
+        {
+          "name": "token_out",
+          "type": "pubkey"
+        },
+        {
+          "name": "amount_per_swap",
+          "type": "u64"
+        },
+        {
+          "name": "total_swaps",
+          "type": "u32"
+        },
+        {
+          "name": "interval_seconds",
+          "type": "i64"
+        },
+        {
+          "name": "min_out_per_swap",
+          "type": "u64"
+        },
+        {
+          "name": "expires_at",
+          "type": "i64"
         }
       ]
     },
@@ -1555,63 +1575,6 @@
           },
           {
             "name": "timestamp",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "CreateDcaPlanArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "token_in",
-            "docs": [
-              "Input token mint"
-            ],
-            "type": "pubkey"
-          },
-          {
-            "name": "token_out",
-            "docs": [
-              "Output token mint"
-            ],
-            "type": "pubkey"
-          },
-          {
-            "name": "amount_per_swap",
-            "docs": [
-              "Amount per swap (in lamports/smallest unit)"
-            ],
-            "type": "u64"
-          },
-          {
-            "name": "total_swaps",
-            "docs": [
-              "Total number of swaps"
-            ],
-            "type": "u32"
-          },
-          {
-            "name": "interval_seconds",
-            "docs": [
-              "Interval between swaps (in seconds)"
-            ],
-            "type": "i64"
-          },
-          {
-            "name": "min_out_per_swap",
-            "docs": [
-              "Minimum output per swap (slippage protection)"
-            ],
-            "type": "u64"
-          },
-          {
-            "name": "expires_at",
-            "docs": [
-              "Optional expiry timestamp (0 = no expiry)"
-            ],
             "type": "i64"
           }
         ]
