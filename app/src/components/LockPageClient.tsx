@@ -63,10 +63,10 @@ function LockPageClient() {
             <div className="flex border-b border-gray-700 mb-8 animate-slide-up">
               <button
                 onClick={() => setActiveTab('lock')}
-                className={`flex-1 py-4 px-6 font-bold transition-all ${
-                  activeTab === 'lock'
-                    ? 'border-b-2 border-[var(--primary)] text-[var(--primary)] bg-[var(--primary)]/5'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-800/30'
+                className={`flex-1 py-4 px-6 font-bold transition-all border-2 rounded-lg ${
+                  activeTab === 'unlock'
+                    ? 'bg-[var(--primary)] border-[var(--primary)] text-black hover:bg-[var(--primary-hover)]'
+                    : 'bg-transparent border-transparent text-[var(--primary)] hover:bg-[var(--primary)]/10 hover:border-[var(--primary)]/30'
                 }`}
               >
                 <div className="flex items-center justify-center gap-2">

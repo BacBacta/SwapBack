@@ -270,20 +270,20 @@ export const TokenSelector = ({
           <div className="flex gap-2 mb-4">
             <button
               onClick={() => setActiveTab("all")}
-              className={`flex-1 py-2 px-4 text-sm font-semibold transition-all ${
+              className={`flex-1 py-2 px-4 text-sm font-bold transition-all border-2 rounded ${
                 activeTab === "all"
-                  ? "bg-[var(--primary)] text-black"
-                  : "bg-[var(--primary)]/10 terminal-text hover:bg-[var(--primary)]/20"
+                  ? "bg-[var(--primary)] border-[var(--primary)] text-black hover:bg-[var(--primary-hover)]"
+                  : "bg-transparent border-[var(--primary)]/30 text-[var(--primary)] hover:bg-[var(--primary)]/10 hover:border-[var(--primary)]/50"
               }`}
             >
               All
             </button>
             <button
               onClick={() => setActiveTab("recent")}
-              className={`flex-1 py-2 px-4 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+              className={`flex-1 py-2 px-4 text-sm font-bold transition-all border-2 rounded flex items-center justify-center gap-2 ${
                 activeTab === "recent"
-                  ? "bg-[var(--primary)] text-black"
-                  : "bg-[var(--primary)]/10 terminal-text hover:bg-[var(--primary)]/20"
+                  ? "bg-[var(--primary)] border-[var(--primary)] text-black hover:bg-[var(--primary-hover)]"
+                  : "bg-transparent border-[var(--primary)]/30 text-[var(--primary)] hover:bg-[var(--primary)]/10 hover:border-[var(--primary)]/50"
               }`}
             >
               <Clock size={14} />
@@ -291,10 +291,10 @@ export const TokenSelector = ({
             </button>
             <button
               onClick={() => setActiveTab("import")}
-              className={`flex-1 py-2 px-4 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+              className={`flex-1 py-2 px-4 text-sm font-bold transition-all border-2 rounded flex items-center justify-center gap-2 ${
                 activeTab === "import"
-                  ? "bg-[var(--primary)] text-black"
-                  : "bg-[var(--primary)]/10 terminal-text hover:bg-[var(--primary)]/20"
+                  ? "bg-[var(--primary)] border-[var(--primary)] text-black hover:bg-[var(--primary-hover)]"
+                  : "bg-transparent border-[var(--primary)]/30 text-[var(--primary)] hover:bg-[var(--primary)]/10 hover:border-[var(--primary)]/50"
               }`}
             >
               <Plus size={14} />

@@ -267,10 +267,10 @@ export const DCAClient = () => {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as typeof activeTab)}
-            className={`px-6 py-3 font-bold terminal-text transition-colors ${
+            className={`px-6 py-3 font-bold terminal-text transition-all border-2 rounded ${
               activeTab === tab.id
-                ? "border-b-2 border-[var(--primary)] text-[var(--primary)]"
-                : "text-gray-400 hover:text-white"
+                ? "bg-[var(--primary)] border-[var(--primary)] text-black hover:bg-[var(--primary-hover)]"
+                : "bg-transparent border-transparent text-[var(--primary)] hover:bg-[var(--primary)]/10 hover:border-[var(--primary)]/30"
             }`}
           >
             <span className="terminal-prefix">&gt;</span> [{tab.label}]

@@ -294,43 +294,43 @@ export const Dashboard = () => {
       {/* cNFT Card - REMOVED as per user request */}
 
       {/* Tabs Navigation */}
-      <div className="flex gap-1 p-1 bg-gray-900 rounded-xl border border-[var(--primary)]/20">
+      <div className="flex gap-2 p-2 bg-gray-900 rounded-xl border border-[var(--primary)]/20">
         <button
           onClick={() => setActiveTab("dca")}
-          className={`flex-1 px-6 py-3 font-semibold transition-all rounded-lg ${
+          className={`flex-1 px-6 py-3 font-bold transition-all border-2 rounded-lg ${
             activeTab === "dca"
-              ? "bg-[var(--primary)] text-black"
-              : "text-gray-400 hover:text-white hover:bg-gray-800"
+              ? "bg-[var(--primary)] border-[var(--primary)] text-black hover:bg-[var(--primary-hover)]"
+              : "bg-transparent border-transparent text-[var(--primary)] hover:bg-[var(--primary)]/10 hover:border-[var(--primary)]/30"
           }`}
         >
           📊 DCA
         </button>
         <button
           onClick={() => setActiveTab("lock-unlock")}
-          className={`flex-1 px-6 py-3 font-semibold transition-all rounded-lg ${
+          className={`flex-1 px-6 py-3 font-bold transition-all border-2 rounded-lg ${
             activeTab === "lock-unlock"
-              ? "bg-[var(--primary)] text-black"
-              : "text-gray-400 hover:text-white hover:bg-gray-800"
+              ? "bg-[var(--primary)] border-[var(--primary)] text-black hover:bg-[var(--primary-hover)]"
+              : "bg-transparent border-transparent text-[var(--primary)] hover:bg-[var(--primary)]/10 hover:border-[var(--primary)]/30"
           }`}
         >
           🔒 Lock/Unlock
         </button>
         <button
           onClick={() => setActiveTab("overview")}
-          className={`flex-1 px-6 py-3 font-semibold transition-all rounded-lg ${
+          className={`flex-1 px-6 py-3 font-bold transition-all border-2 rounded-lg ${
             activeTab === "overview"
-              ? "bg-[var(--primary)] text-black"
-              : "text-gray-400 hover:text-white hover:bg-gray-800"
+              ? "bg-[var(--primary)] border-[var(--primary)] text-black hover:bg-[var(--primary-hover)]"
+              : "bg-transparent border-transparent text-[var(--primary)] hover:bg-[var(--primary)]/10 hover:border-[var(--primary)]/30"
           }`}
         >
           👤 Overview
         </button>
         <button
           onClick={() => setActiveTab("analytics")}
-          className={`flex-1 px-6 py-3 font-semibold transition-all rounded-lg ${
+          className={`flex-1 px-6 py-3 font-bold transition-all border-2 rounded-lg ${
             activeTab === "analytics"
-              ? "bg-[var(--primary)] text-black"
-              : "text-gray-400 hover:text-white hover:bg-gray-800"
+              ? "bg-[var(--primary)] border-[var(--primary)] text-black hover:bg-[var(--primary-hover)]"
+              : "bg-transparent border-transparent text-[var(--primary)] hover:bg-[var(--primary)]/10 hover:border-[var(--primary)]/30"
           }`}
         >
           📈 Analytics

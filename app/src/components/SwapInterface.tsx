@@ -375,38 +375,32 @@ export const SwapInterface = () => {
           </div>
 
           {/* Router Tabs - Style moderne comme Uniswap */}
-          <div className="flex gap-2 p-1.5 bg-black/60 backdrop-blur-sm border-2 border-[var(--primary)]/20">
+          <div className="flex gap-2 p-1.5 bg-black/60 backdrop-blur-sm border-2 border-[var(--primary)]/20 rounded">
             <button
               onClick={() => setSelectedRouter("swapback")}
-              className={`flex-1 py-3 px-4 font-bold terminal-text uppercase tracking-wider transition-all relative ${
+              className={`flex-1 py-3 px-4 font-bold terminal-text uppercase tracking-wider transition-all border-2 rounded ${
                 selectedRouter === "swapback"
-                  ? "bg-[var(--primary)] text-black"
-                  : "text-[var(--primary)] hover:bg-[var(--primary)]/10"
+                  ? "bg-[var(--primary)] border-[var(--primary)] text-black hover:bg-[var(--primary-hover)]"
+                  : "bg-transparent border-transparent text-[var(--primary)] hover:bg-[var(--primary)]/10 hover:border-[var(--primary)]/30"
               }`}
             >
               <div className="flex items-center justify-center gap-2">
                 <Zap className="w-4 h-4" />
                 <span>SwapBack</span>
               </div>
-              {selectedRouter === "swapback" && (
-                <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-[var(--primary)] rotate-45"></div>
-              )}
             </button>
             <button
               onClick={() => setSelectedRouter("jupiter")}
-              className={`flex-1 py-3 px-4 font-bold terminal-text uppercase tracking-wider transition-all relative ${
+              className={`flex-1 py-3 px-4 font-bold terminal-text uppercase tracking-wider transition-all border-2 rounded ${
                 selectedRouter === "jupiter"
-                  ? "bg-[var(--secondary)] text-black"
-                  : "text-[var(--secondary)] hover:bg-[var(--secondary)]/10"
+                  ? "bg-[var(--secondary)] border-[var(--secondary)] text-black hover:opacity-90"
+                  : "bg-transparent border-transparent text-[var(--secondary)] hover:bg-[var(--secondary)]/10 hover:border-[var(--secondary)]/30"
               }`}
             >
               <div className="flex items-center justify-center gap-2">
                 <TrendingUp className="w-4 h-4" />
                 <span>Jupiter</span>
               </div>
-              {selectedRouter === "jupiter" && (
-                <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-[var(--secondary)] rotate-45"></div>
-              )}
             </button>
           </div>
         </div>

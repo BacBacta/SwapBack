@@ -14,10 +14,10 @@ export const SwapPage = () => {
         <div className="flex gap-1 bg-gradient-to-r from-white/5 to-white/3 rounded-xl p-1.5 backdrop-blur-md border border-white/10 shadow-lg">
           <button
             onClick={() => setActiveTab("swap")}
-            className={`px-8 py-3 rounded-lg font-semibold transition-all duration-300 ${
+            className={`px-8 py-3 rounded-lg font-bold transition-all border-2 ${
               activeTab === "swap"
-                ? "bg-gradient-to-r from-[var(--primary)] to-[var(--primary-hover)] text-white shadow-lg shadow-[var(--primary)]/30 scale-105"
-                : "text-gray-400 hover:text-white hover:bg-white/5"
+                ? "bg-[var(--primary)] border-[var(--primary)] text-black hover:bg-[var(--primary-hover)]"
+                : "bg-transparent border-transparent text-[var(--primary)] hover:bg-[var(--primary)]/10 hover:border-[var(--primary)]/30"
             }`}
           >
             <span className="flex items-center gap-2">
@@ -27,10 +27,10 @@ export const SwapPage = () => {
           </button>
           <button
             onClick={() => setActiveTab("history")}
-            className={`px-8 py-3 rounded-lg font-semibold transition-all duration-300 ${
+            className={`px-8 py-3 rounded-lg font-bold transition-all border-2 ${
               activeTab === "history"
-                ? "bg-gradient-to-r from-[var(--primary)] to-[var(--primary-hover)] text-white shadow-lg shadow-[var(--primary)]/30 scale-105"
-                : "text-gray-400 hover:text-white hover:bg-white/5"
+                ? "bg-[var(--primary)] border-[var(--primary)] text-black hover:bg-[var(--primary-hover)]"
+                : "bg-transparent border-transparent text-[var(--primary)] hover:bg-[var(--primary)]/10 hover:border-[var(--primary)]/30"
             }`}
           >
             <span className="flex items-center gap-2">
