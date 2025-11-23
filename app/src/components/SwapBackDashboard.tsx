@@ -101,12 +101,23 @@ export const SwapBackDashboard = () => {
         // Parser les comptes manuellement (IDL incomplet)
         const parsedPlans: DcaPlan[] = [];
 
+        const MIN_PLAN_LENGTH = 129;
+
         for (const { pubkey, account } of accounts) {
           try {
             const data = account.data;
 
-            // Skip si trop petit (< 200 bytes pour DcaPlan)
-            if (data.length < 200) continue;
+            if (data.length < MIN_PLAN_LENGTH) {
+              console.warn(`Plan ${pubkey.toBase58()} too short (${data.length}b)`);
+              continue;
+            }
+
+            const readU64ToBN = (offset: number) => {
+              if (offset + 8 > data.length) {
+                throw new Error(`Invalid plan buffer read at offset ${offset}`);
+              }
+              return new BN(data.readBigUInt64LE(offset).toString());
+            };
 
             // Parse manuel des champs (offset basé sur la structure Rust)
             // u8 discriminator (8 bytes)
@@ -131,14 +142,14 @@ export const SwapBackDashboard = () => {
               publicKey: pubkey,
               account: {
                 authority,
-                inputAmount: new BN(data.slice(40, 48), 'le'),
-                amountSwapped: new BN(data.slice(48, 56), 'le'),
+                inputAmount: readU64ToBN(40),
+                amountSwapped: readU64ToBN(48),
                 destinationToken: new PublicKey(data.slice(56, 88)),
-                dcaInterval: new BN(data.slice(88, 96), 'le'),
-                numberOfSwaps: new BN(data.slice(96, 104), 'le'),
-                swapsExecuted: new BN(data.slice(104, 112), 'le'),
-                lastSwapTime: new BN(data.slice(112, 120), 'le'),
-                minOutputAmount: new BN(data.slice(120, 128), 'le'),
+                dcaInterval: readU64ToBN(88),
+                numberOfSwaps: readU64ToBN(96),
+                swapsExecuted: readU64ToBN(104),
+                lastSwapTime: readU64ToBN(112),
+                minOutputAmount: readU64ToBN(120),
                 isPaused: data[128] === 1,
               },
             };
