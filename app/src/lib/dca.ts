@@ -462,14 +462,23 @@ export async function fetchUserDcaPlans(
     userOffset: 40,
   });
   
+  // Convert discriminator to base58 (Solana RPC requires base58, not base64)
+  const bs58 = await import('bs58');
+  const discriminatorBase58 = bs58.default.encode(Buffer.from([231, 97, 112, 227, 171, 241, 52, 84]));
+  
+  console.log('🔍 Discriminator formats:', {
+    hex: Buffer.from([231, 97, 112, 227, 171, 241, 52, 84]).toString('hex'),
+    base58: discriminatorBase58,
+  });
+  
   // Use getProgramAccounts to fetch all DCA plans owned by the user
   const accounts = await connection.getProgramAccounts(ROUTER_PROGRAM_ID, {
     filters: [
       {
-        // Filter by DcaPlan account discriminator
+        // Filter by DcaPlan account discriminator (must be base58)
         memcmp: {
           offset: 0,
-          bytes: Buffer.from([231, 97, 112, 227, 171, 241, 52, 84]).toString('base64'),
+          bytes: discriminatorBase58,
         },
       },
       {
