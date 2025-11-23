@@ -197,10 +197,13 @@ const JUPITER_ACCOUNT_SLOTS = 48;
 
 /**
  * Mock Mode (pour dev/test sans réseau)
- * Default: false
- * Vercel: Add USE_MOCK_QUOTES=false (or true for staging)
+ * Default: Auto-enabled on devnet (Jupiter doesn't support devnet tokens)
+ * Vercel: Add USE_MOCK_QUOTES=false to force real Jupiter on mainnet
  */
-const USE_MOCK_DATA = process.env.USE_MOCK_QUOTES === "true";
+const SOLANA_NETWORK = process.env.NEXT_PUBLIC_SOLANA_NETWORK || "devnet";
+const USE_MOCK_DATA = 
+  process.env.USE_MOCK_QUOTES === "true" || 
+  SOLANA_NETWORK === "devnet"; // Auto-enable mock for devnet
 
 export async function POST(request: NextRequest) {
   try {
@@ -293,9 +296,12 @@ export async function POST(request: NextRequest) {
       slippageBps,
     });
 
-    // MODE MOCK pour tests (si problème réseau)
+    // MODE MOCK pour tests (si problème réseau ou devnet)
     if (USE_MOCK_DATA) {
-      console.log("🧪 Using MOCK data (network unavailable)");
+      console.log(`🧪 Using MOCK data (network: ${SOLANA_NETWORK})`);
+      console.log("   Jupiter API only supports mainnet tokens");
+      console.log("   Mock quotes provide simulated swap routes for devnet testing");
+      
       const mockQuote = generateMockQuote(
         inputMint,
         outputMint,
@@ -311,6 +317,7 @@ export async function POST(request: NextRequest) {
           routeInfo: mockRouteInfo,
           jupiterCpi: null,
           timestamp: Date.now(),
+          mock: true, // Indicate this is mock data
         },
         withNoStore()
       );
