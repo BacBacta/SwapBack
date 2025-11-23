@@ -9,6 +9,7 @@ use anchor_lang::prelude::*;
 /// - Total number of swaps and progress tracking
 /// - Pause/Resume capability
 #[account]
+#[derive(InitSpace)]
 pub struct DcaPlan {
     /// Unique identifier for this plan (32 bytes for flexibility)
     pub plan_id: [u8; 32],

@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 
 /// Router State Account - Global configuration and statistics
 #[account]
+#[derive(InitSpace)]
 pub struct RouterState {
     /// Authority that can update configuration
     pub authority: Pubkey,
@@ -73,6 +74,7 @@ impl RouterState {
 
 /// User Rebate Tracking Account
 #[account]
+#[derive(InitSpace)]
 pub struct UserRebate {
     /// User who owns this rebate account
     pub user: Pubkey,

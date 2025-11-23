@@ -4,6 +4,7 @@ use crate::ErrorCode;
 
 /// RouterConfig stores governance-controlled parameters that can be updated without redeploying the program
 #[account]
+#[derive(InitSpace)]
 pub struct RouterConfig {
     pub authority: Pubkey,
     pub pending_authority: Option<Pubkey>,
