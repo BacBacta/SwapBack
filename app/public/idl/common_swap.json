@@ -1,0 +1,687 @@
+{
+  "address": "EtqKmwUHhaBJbmDzb3BrMf2iZ4RyGYPos9U78Xjpe3Ug",
+  "metadata": {
+    "name": "common_swap",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Programme de swap commun avec routage pondéré et protection MEV"
+  },
+  "docs": [
+    "Common swap program with weight-based routing and MEV protection"
+  ],
+  "instructions": [
+    {
+      "name": "execute_dynamic_swap",
+      "docs": [
+        "Execute swap with dynamic weight calculation based on oracle data"
+      ],
+      "discriminator": [
+        54,
+        90,
+        162,
+        165,
+        121,
+        246,
+        156,
+        12
+      ],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user_input_account"
+        },
+        {
+          "name": "user_output_account"
+        }
+      ],
+      "args": [
+        {
+          "name": "input_mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "output_mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "input_amount",
+          "type": "u64"
+        },
+        {
+          "name": "min_output_amount",
+          "type": "u64"
+        },
+        {
+          "name": "oracle_data",
+          "type": {
+            "defined": {
+              "name": "OracleData"
+            }
+          }
+        },
+        {
+          "name": "max_venues",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "execute_weighted_swap",
+      "docs": [
+        "Execute an optimized swap with weight-based routing",
+        "Weights must sum to 100, providing exact allocation across venues"
+      ],
+      "discriminator": [
+        49,
+        54,
+        183,
+        25,
+        12,
+        132,
+        133,
+        210
+      ],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user_input_account"
+        },
+        {
+          "name": "user_output_account"
+        }
+      ],
+      "args": [
+        {
+          "name": "input_mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "output_mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "total_input_amount",
+          "type": "u64"
+        },
+        {
+          "name": "min_output_amount",
+          "type": "u64"
+        },
+        {
+          "name": "weights",
+          "type": "bytes"
+        },
+        {
+          "name": "venue_addresses",
+          "type": {
+            "vec": "pubkey"
+          }
+        },
+        {
+          "name": "oracle_price",
+          "type": "u64"
+        },
+        {
+          "name": "oracle_confidence",
+          "type": "u64"
+        },
+        {
+          "name": "use_jito_bundling",
+          "type": "bool"
+        },
+        {
+          "name": "max_slippage_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "docs": [
+        "Initialize the common swap program"
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "pause_program",
+      "docs": [
+        "Pause/unpause the program (admin only)"
+      ],
+      "discriminator": [
+        91,
+        86,
+        253,
+        175,
+        66,
+        236,
+        172,
+        124
+      ],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "paused",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "set_emergency_mode",
+      "docs": [
+        "Emergency pause/unpause the program"
+      ],
+      "discriminator": [
+        79,
+        138,
+        190,
+        94,
+        0,
+        162,
+        205,
+        253
+      ],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  108,
+                  111,
+                  98,
+                  97,
+                  108,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "enabled",
+          "type": "bool"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "GlobalState",
+      "discriminator": [
+        163,
+        46,
+        74,
+        168,
+        216,
+        123,
+        133,
+        98
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "DynamicSwapExecuted",
+      "discriminator": [
+        213,
+        126,
+        200,
+        42,
+        232,
+        4,
+        12,
+        4
+      ]
+    },
+    {
+      "name": "EmergencyModeChanged",
+      "discriminator": [
+        20,
+        161,
+        39,
+        32,
+        151,
+        62,
+        192,
+        67
+      ]
+    },
+    {
+      "name": "ProgramPaused",
+      "discriminator": [
+        247,
+        9,
+        236,
+        38,
+        105,
+        35,
+        112,
+        115
+      ]
+    },
+    {
+      "name": "WeightedSwapExecuted",
+      "discriminator": [
+        153,
+        229,
+        159,
+        102,
+        227,
+        101,
+        211,
+        113
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "ProgramPaused",
+      "msg": "Program is currently paused"
+    },
+    {
+      "code": 6001,
+      "name": "EmergencyMode",
+      "msg": "Emergency mode is active"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidAmount",
+      "msg": "Invalid amount specified"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidWeights",
+      "msg": "Weights must sum to 100"
+    },
+    {
+      "code": 6004,
+      "name": "TooManyVenues",
+      "msg": "Too many venues specified"
+    },
+    {
+      "code": 6005,
+      "name": "WeightVenueMismatch",
+      "msg": "Number of weights must match number of venues"
+    },
+    {
+      "code": 6006,
+      "name": "InvalidOraclePrice",
+      "msg": "Invalid oracle price"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidOracleTimestamp",
+      "msg": "Invalid oracle timestamp"
+    },
+    {
+      "code": 6008,
+      "name": "SlippageExceeded",
+      "msg": "Slippage exceeded maximum allowed"
+    },
+    {
+      "code": 6009,
+      "name": "Unauthorized",
+      "msg": "Unauthorized access"
+    }
+  ],
+  "types": [
+    {
+      "name": "DynamicSwapExecuted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "input_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "output_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "input_amount",
+            "type": "u64"
+          },
+          {
+            "name": "estimated_output",
+            "type": "u64"
+          },
+          {
+            "name": "calculated_weights",
+            "type": "bytes"
+          },
+          {
+            "name": "oracle_provider",
+            "type": {
+              "defined": {
+                "name": "OracleProvider"
+              }
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EmergencyModeChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "enabled",
+            "type": "bool"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GlobalState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "is_paused",
+            "type": "bool"
+          },
+          {
+            "name": "emergency_mode",
+            "type": "bool"
+          },
+          {
+            "name": "total_swaps",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OracleData",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "provider",
+            "type": {
+              "defined": {
+                "name": "OracleProvider"
+              }
+            }
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "confidence",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "exponent",
+            "type": "i8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OracleProvider",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Pyth"
+          },
+          {
+            "name": "Switchboard"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProgramPaused",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WeightedSwapExecuted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "input_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "output_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_input_amount",
+            "type": "u64"
+          },
+          {
+            "name": "total_output_amount",
+            "type": "u64"
+          },
+          {
+            "name": "weights",
+            "type": "bytes"
+          },
+          {
+            "name": "venue_count",
+            "type": "u8"
+          },
+          {
+            "name": "oracle_price",
+            "type": "u64"
+          },
+          {
+            "name": "jito_protected",
+            "type": "bool"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    }
+  ]
+}
