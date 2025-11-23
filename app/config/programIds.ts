@@ -34,14 +34,14 @@ export const RPC_ENDPOINTS: Record<NetworkEnvironment, string> = {
 /**
  * Program IDs - DEVNET
  * 
- * ✅ Programme déployé sur devnet avec unlock_tokens (vérifié Nov 22, 2025)
+ * ✅ Programme déployé sur devnet avec unlock_tokens (vérifié Nov 23, 2025)
  * Router: 9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh
- * CNFT: 26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru
+ * CNFT: EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP
  * Buyback: 746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6
  */
 const DEVNET_PROGRAM_IDS: ProgramIds = {
   cnftProgram: new PublicKey(
-    process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || '26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru'
+    process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || 'EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP'
   ),
   routerProgram: new PublicKey(
     process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || '9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh'
@@ -58,7 +58,7 @@ const DEVNET_PROGRAM_IDS: ProgramIds = {
  */
 const TESTNET_PROGRAM_IDS: ProgramIds = {
   cnftProgram: new PublicKey(
-    process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || '26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru'
+    process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || 'EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP'
   ),
   routerProgram: new PublicKey(
     process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || '9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh'

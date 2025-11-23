@@ -52,7 +52,7 @@ export interface ClaimBuybackParams {
 function getProgramIds() {
   return {
     swapback_cnft: new PublicKey(
-      process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru"
+      process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP"
     ),
     swapback_router: new PublicKey(
       process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh"
