@@ -7,6 +7,7 @@ import { Toaster } from "react-hot-toast";
 import { GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 import { DebugLogPanel } from "@/components/DebugLogPanel";
 import { Navbar } from "@/components/Navbar";
+import "@/lib/patchBN";
 // import { WalletConnectionGuide } from "@/components/WalletConnectionGuide";
 // import { NetworkStatusIndicator } from "@/components/NetworkStatusIndicator";
 // import { NetworkInfoModal } from "@/components/NetworkInfoModal";
