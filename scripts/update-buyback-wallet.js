@@ -16,7 +16,7 @@ async function main() {
   const CNFT_PROGRAM_ID = new PublicKey(
     process.env.CNFT_PROGRAM_ID ||
     process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID ||
-    "DGDipfpHGVAnWXj7yPEBc3JYFWghQN76tEBzuK2Nojw3"
+    "EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP"
   );
   const BACK_MINT = new PublicKey("862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux");
   const TOKEN_2022_PROGRAM_ID = new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
