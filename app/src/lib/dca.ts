@@ -448,9 +448,6 @@ export async function fetchUserDcaPlans(
   
   console.log('🔍 Fetching DCA plans for user:', userPublicKey.toBase58());
   
-  const idl = getRouterIdl();
-  const program = createProgramWithProvider(idl, ROUTER_PROGRAM_ID, provider);
-  
   // DcaPlan account structure:
   // - discriminator: 8 bytes [231, 97, 112, 227, 171, 241, 52, 84]
   // - plan_id: 32 bytes (u8[32])
@@ -498,15 +495,105 @@ export async function fetchUserDcaPlans(
   for (const account of accounts) {
     try {
       console.log('🔓 Decoding account:', account.pubkey.toBase58());
-      // Deserialize account data
-      const dcaPlan = program.coder.accounts.decode('DcaPlan', account.account.data) as DcaPlan;
+      
+      // Manual deserialization of DcaPlan struct
+      // Layout:
+      // - 8 bytes: discriminator
+      // - 32 bytes: plan_id ([u8; 32])
+      // - 32 bytes: user (Pubkey)
+      // - 32 bytes: token_in (Pubkey)
+      // - 32 bytes: token_out (Pubkey)
+      // - 8 bytes: amount_per_swap (u64)
+      // - 4 bytes: total_swaps (u32)
+      // - 4 bytes: executed_swaps (u32)
+      // - 8 bytes: interval_seconds (i64)
+      // - 8 bytes: next_execution (i64)
+      // - 8 bytes: min_out_per_swap (u64)
+      // - 8 bytes: created_at (i64)
+      // - 8 bytes: expires_at (i64)
+      // - 1 byte: is_active (bool)
+      // - 8 bytes: total_invested (u64)
+      // - 8 bytes: total_received (u64)
+      // - 1 byte: bump (u8)
+      const data = account.account.data;
+      let offset = 8; // Skip discriminator
+      
+      const planId = Array.from(data.slice(offset, offset + 32));
+      offset += 32;
+      
+      const user = new PublicKey(data.slice(offset, offset + 32));
+      offset += 32;
+      
+      const tokenIn = new PublicKey(data.slice(offset, offset + 32));
+      offset += 32;
+      
+      const tokenOut = new PublicKey(data.slice(offset, offset + 32));
+      offset += 32;
+      
+      const amountPerSwap = new BN(data.slice(offset, offset + 8), 'le');
+      offset += 8;
+      
+      const totalSwaps = data.readUInt32LE(offset);
+      offset += 4;
+      
+      const executedSwaps = data.readUInt32LE(offset);
+      offset += 4;
+      
+      const intervalSeconds = new BN(data.slice(offset, offset + 8), 'le');
+      offset += 8;
+      
+      const nextExecution = new BN(data.slice(offset, offset + 8), 'le');
+      offset += 8;
+      
+      const minOutPerSwap = new BN(data.slice(offset, offset + 8), 'le');
+      offset += 8;
+      
+      const createdAt = new BN(data.slice(offset, offset + 8), 'le');
+      offset += 8;
+      
+      const expiresAt = new BN(data.slice(offset, offset + 8), 'le');
+      offset += 8;
+      
+      const isActive = data.readUInt8(offset) !== 0;
+      offset += 1;
+      
+      const totalInvested = new BN(data.slice(offset, offset + 8), 'le');
+      offset += 8;
+      
+      const totalReceived = new BN(data.slice(offset, offset + 8), 'le');
+      offset += 8;
+      
+      const bump = data.readUInt8(offset);
+      offset += 1;
+      
+      const dcaPlan: DcaPlan = {
+        planId,
+        user,
+        tokenIn,
+        tokenOut,
+        amountPerSwap,
+        totalSwaps,
+        executedSwaps,
+        intervalSeconds,
+        nextExecution,
+        minOutPerSwap,
+        createdAt,
+        expiresAt,
+        isActive,
+        totalInvested,
+        totalReceived,
+        bump,
+      };
+      
       console.log('✅ Decoded plan:', {
         user: dcaPlan.user.toBase58(),
         tokenIn: dcaPlan.tokenIn.toBase58(),
         tokenOut: dcaPlan.tokenOut.toBase58(),
         executedSwaps: dcaPlan.executedSwaps,
         totalSwaps: dcaPlan.totalSwaps,
+        isActive: dcaPlan.isActive,
       });
+      
       plans.push({
         ...dcaPlan,
         planPda: account.pubkey,
