@@ -11,7 +11,9 @@ import { bnToNumberWithFallback, lamportsToUiSafe } from '@/lib/bnUtils';
 import { 
   getAssociatedTokenAddress, 
   TOKEN_PROGRAM_ID,
-  TOKEN_2022_PROGRAM_ID 
+  TOKEN_2022_PROGRAM_ID,
+  createAssociatedTokenAccountInstruction,
+  getAccount
 } from '@solana/spl-token';
 
 import { validateEnv } from "./validateEnv";
@@ -628,37 +630,83 @@ export async function executeDcaSwapTransaction(
   
   const [statePda] = getRouterStatePDA();
   
+  // Determine token programs
+  const tokenInProgram = dcaPlan.tokenIn.equals(BACK_MINT) ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
+  const tokenOutProgram = dcaPlan.tokenOut.equals(BACK_MINT) ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
+  
   // Get user's token accounts
   const userTokenIn = await getAssociatedTokenAddress(
     dcaPlan.tokenIn,
     userPublicKey,
     false,
-    dcaPlan.tokenIn.equals(BACK_MINT) ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID
+    tokenInProgram
   );
   
   const userTokenOut = await getAssociatedTokenAddress(
     dcaPlan.tokenOut,
     userPublicKey,
     false,
-    dcaPlan.tokenOut.equals(BACK_MINT) ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID
+    tokenOutProgram
   );
+  
+  console.log('🔍 Checking token accounts:', {
+    userTokenIn: userTokenIn.toBase58(),
+    userTokenOut: userTokenOut.toBase58(),
+  });
+  
+  // Check if ATAs exist and create them if needed
+  const preInstructions = [];
+  
+  try {
+    await getAccount(connection, userTokenIn, 'confirmed', tokenInProgram);
+    console.log('✅ user_token_in exists');
+  } catch (error) {
+    console.log('⚠️  user_token_in does not exist, creating...');
+    preInstructions.push(
+      createAssociatedTokenAccountInstruction(
+        userPublicKey, // payer
+        userTokenIn, // ata
+        userPublicKey, // owner
+        dcaPlan.tokenIn, // mint
+        tokenInProgram
+      )
+    );
+  }
+  
+  try {
+    await getAccount(connection, userTokenOut, 'confirmed', tokenOutProgram);
+    console.log('✅ user_token_out exists');
+  } catch (error) {
+    console.log('⚠️  user_token_out does not exist, creating...');
+    preInstructions.push(
+      createAssociatedTokenAccountInstruction(
+        userPublicKey, // payer
+        userTokenOut, // ata
+        userPublicKey, // owner
+        dcaPlan.tokenOut, // mint
+        tokenOutProgram
+      )
+    );
+  }
   
   console.log('🔄 Executing DCA swap:', {
     planPda: planPda.toBase58(),
     executedSwaps: dcaPlan.executedSwaps,
     totalSwaps: dcaPlan.totalSwaps,
+    preInstructions: preInstructions.length,
   });
   
   // Build transaction
   interface ExecuteDcaSwapMethods {
     executeDcaSwap: () => {
       accounts: (accounts: Record<string, unknown>) => {
+        preInstructions?: (instructions: any[]) => { rpc: () => Promise<string> };
         rpc: () => Promise<string>;
       };
     };
   }
   
-  const signature = await (program.methods as unknown as ExecuteDcaSwapMethods)
+  const txBuilder = (program.methods as unknown as ExecuteDcaSwapMethods)
     .executeDcaSwap()
     .accounts({
       dcaPlan: planPda,
@@ -669,8 +717,15 @@ export async function executeDcaSwapTransaction(
       executor: provider.wallet.publicKey,
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
-    })
-    .rpc();
+    });
+  
+  // Add pre-instructions if needed
+  let signature: string;
+  if (preInstructions.length > 0) {
+    signature = await (txBuilder as any).preInstructions(preInstructions).rpc();
+  } else {
+    signature = await txBuilder.rpc();
+  }
   
   console.log('✅ DCA swap executed:', signature);
   
