@@ -3,6 +3,7 @@
 import { FC, ReactNode, useEffect, useState } from "react";
 import { WalletProvider } from "./WalletProvider";
 import { LoadingScreen } from "./LoadingScreen";
+import "@/lib/patchBN";
 
 /**
  * Wrapper client-only pour le WalletProvider
