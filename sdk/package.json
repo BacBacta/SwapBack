@@ -25,7 +25,7 @@
     "@pythnetwork/client": "^2.22.1",
     "@pythnetwork/pyth-solana-receiver": "^0.12.0",
     "@solana/spl-account-compression": "^0.2.1",
-    "@solana/spl-token": "^0.4.8",
+    "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.95.0",
     "@switchboard-xyz/solana.js": "^3.2.5",
     "bn.js": "^5.2.1",
