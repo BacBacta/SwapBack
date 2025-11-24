@@ -19,4 +19,4 @@ default = []
 [dependencies]
 anchor-lang = { workspace = true, features = ["init-if-needed"] }
 anchor-spl = { workspace = true }
-pyth-solana-receiver-sdk = "0.2.0"
+pyth-solana-receiver-sdk = "1.1.0"
