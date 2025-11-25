@@ -45,17 +45,17 @@ export default function Home() {
             </h1>
 
             {/* Subtitle with fade-in */}
-            <p className="text-xl sm:text-2xl lg:text-3xl text-slate-300 max-w-3xl mx-auto font-light animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+            <p className="text-xl sm:text-2xl lg:text-3xl text-slate-300 max-w-3xl mx-auto font-light animate-fade-in-up delay-200">
               Advanced Decentralized Trading Platform on Solana
             </p>
 
             {/* Description */}
-            <p className="text-base sm:text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
+            <p className="text-base sm:text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed animate-fade-in-up delay-400">
               Experience seamless token swaps, automated DCA strategies, and innovative deflationary mechanisms—all powered by cutting-edge blockchain technology
             </p>
 
             {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4 animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4 animate-fade-in-up delay-600">
               <Link
                 href="/dashboard"
                 className="group relative px-8 py-4 bg-gradient-to-r from-emerald-500 to-green-600 text-white text-lg font-semibold rounded-xl overflow-hidden transition-all duration-300 shadow-lg shadow-emerald-500/25 hover:shadow-2xl hover:shadow-emerald-500/50 hover:-translate-y-1 hover:scale-105 w-full sm:w-auto"
@@ -107,7 +107,7 @@ export default function Home() {
                 title: 'Lightning-Fast Swaps',
                 desc: 'Execute instant token swaps with optimal routing algorithms and best-in-class execution speeds on Solana',
                 link: '/swap',
-                delay: '0.1s'
+                delayClass: 'delay-100'
               },
               {
                 icon: (
@@ -118,7 +118,7 @@ export default function Home() {
                 title: 'Smart DCA Automation',
                 desc: 'Deploy sophisticated dollar-cost averaging strategies with customizable parameters that execute autonomously 24/7',
                 link: '/dca',
-                delay: '0.2s'
+                delayClass: 'delay-200'
               },
               {
                 icon: (
@@ -130,14 +130,13 @@ export default function Home() {
                 title: 'Deflationary Mechanics',
                 desc: 'Benefit from our innovative buyback & burn mechanism that creates sustainable value through systematic token reduction',
                 link: '/buyback',
-                delay: '0.3s'
+                delayClass: 'delay-300'
               },
             ].map((feature, i) => (
               <Link
                 key={i}
                 href={feature.link}
-                className="group relative p-8 bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-2xl border border-slate-700/50 hover:border-emerald-500/50 transition-all duration-500 backdrop-blur-sm hover:shadow-2xl hover:shadow-emerald-500/20 hover:-translate-y-2 animate-fade-in-up"
-                style={{ animationDelay: feature.delay }}
+                className={`group relative p-8 bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-2xl border border-slate-700/50 hover:border-emerald-500/50 transition-all duration-500 backdrop-blur-sm hover:shadow-2xl hover:shadow-emerald-500/20 hover:-translate-y-2 animate-fade-in-up ${feature.delayClass}`}
               >
                 {/* Animated gradient overlay */}
                 <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-emerald-500/0 to-green-500/0 group-hover:from-emerald-500/10 group-hover:to-green-500/10 transition-all duration-500" />
@@ -170,7 +169,7 @@ export default function Home() {
         </section>
 
         {/* Stats Section */}
-        <section className="relative animate-fade-in-up" style={{ animationDelay: '0.5s' }}>
+        <section className="relative animate-fade-in-up delay-500">
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-green-500/5 rounded-3xl blur-xl animate-pulse-slow" />
           <div className="relative p-8 lg:p-12 bg-slate-800/30 rounded-3xl border border-slate-700/50 backdrop-blur-sm hover:border-emerald-500/30 transition-all duration-500">
             <div className="text-center mb-12">
@@ -189,8 +188,7 @@ export default function Home() {
               ].map((stat, i) => (
                 <div 
                   key={i} 
-                  className="group text-center space-y-3 p-6 rounded-xl bg-slate-900/50 border border-slate-700/30 hover:border-emerald-500/50 hover:bg-slate-800/50 transition-all duration-300 hover:scale-105 animate-fade-in-up"
-                  style={{ animationDelay: `${0.6 + i * 0.1}s` }}
+                  className={`group text-center space-y-3 p-6 rounded-xl bg-slate-900/50 border border-slate-700/30 hover:border-emerald-500/50 hover:bg-slate-800/50 transition-all duration-300 hover:scale-105 animate-fade-in-up delay-${600 + i * 100}`}
                 >
                   <div className="text-2xl group-hover:scale-110 transition-transform duration-300">
                     {stat.icon}
@@ -225,7 +223,7 @@ export default function Home() {
         </section>
 
         {/* How It Works Section */}
-        <section className="space-y-12 animate-fade-in-up" style={{ animationDelay: '0.7s' }}>
+        <section className="space-y-12 animate-fade-in-up delay-700">
           <div className="text-center space-y-4">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-white to-emerald-100 bg-clip-text text-transparent">
               Seamless Trading Experience
@@ -262,7 +260,7 @@ export default function Home() {
                 icon: '💎'
               },
             ].map((step, i) => (
-              <div key={i} className="relative group animate-fade-in-up" style={{ animationDelay: `${0.8 + i * 0.1}s` }}>
+              <div key={i} className={`relative group animate-fade-in-up delay-${800 + i * 100}`}>
                 {/* Animated connecting line (desktop only) */}
                 {i < 3 && (
                   <div className="hidden lg:block absolute top-16 left-[60%] w-[80%] h-0.5 overflow-hidden">
@@ -304,7 +302,7 @@ export default function Home() {
         </section>
 
         {/* CTA Section */}
-        <section className="relative animate-fade-in-up" style={{ animationDelay: '1s' }}>
+        <section className="relative animate-fade-in-up delay-1000">
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 via-green-500/10 to-emerald-500/10 rounded-3xl blur-2xl animate-pulse-slow" />
           <div className="relative p-12 lg:p-20 bg-gradient-to-br from-slate-800/60 to-slate-900/60 rounded-3xl border border-slate-700/50 hover:border-emerald-500/50 backdrop-blur-sm text-center space-y-10 transition-all duration-500 hover:shadow-2xl hover:shadow-emerald-500/20">
             <div className="space-y-6">

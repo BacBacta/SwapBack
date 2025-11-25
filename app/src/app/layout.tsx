@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import "./animations.css";
 import { ClientWalletProvider } from "@/components/ClientWalletProvider";
 import { QueryProvider } from "@/components/QueryProvider";
 import { Toaster } from "react-hot-toast";
