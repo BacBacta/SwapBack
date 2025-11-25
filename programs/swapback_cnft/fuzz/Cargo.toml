@@ -1,0 +1,19 @@
+[package]
+name = "swapback_cnft-fuzz"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+honggfuzz = "0.5"
+arbitrary = { version = "1.3", features = ["derive"] }
+anchor-lang = "=0.30.1"
+solana-program = "=1.18.26"
+
+[[bin]]
+name = "fuzz_boost"
+path = "fuzz_targets/fuzz_boost.rs"
+
+[[bin]]
+name = "fuzz_lock_duration"
+path = "fuzz_targets/fuzz_lock_duration.rs"

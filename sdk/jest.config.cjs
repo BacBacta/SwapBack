@@ -8,13 +8,24 @@ module.exports = {
     "^.+\\.(t|j)sx?$": [
       "ts-jest",
       {
-        diagnostics: false,
+        tsconfig: {
+          esModuleInterop: true,
+          allowSyntheticDefaultImports: true,
+        },
       },
     ],
   },
-  globals: {
-    "ts-jest": {
-      diagnostics: false,
+  collectCoverageFrom: [
+    "src/**/*.ts",
+    "!src/**/*.d.ts",
+    "!src/**/__tests__/**",
+  ],
+  coverageThreshold: {
+    global: {
+      branches: 80,
+      functions: 80,
+      lines: 80,
+      statements: 80,
     },
   },
 };

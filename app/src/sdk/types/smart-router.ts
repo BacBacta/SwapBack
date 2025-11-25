@@ -387,6 +387,66 @@ export interface JitoBundleResult {
   priorityFeeMicroLamports?: number;
 }
 
+export interface BundleEligibilityConfig {
+  minTradeValueUSD: number; // 10000 USD default
+  minTradeValueSOL: number; // 10 SOL default
+  forceForHighRisk: boolean; // true - always bundle high risk
+  forceForAMMOnly: boolean; // true - always bundle AMM-only routes
+  forceForLargeTrades: boolean; // true - always bundle large trades
+  forceForHighSlippage: boolean; // true - always bundle high slippage
+}
+
+export interface BundleEligibilityFactors {
+  meetsValueThreshold: boolean; // USD or SOL threshold
+  hasHighMEVRisk: boolean; // medium/high MEV risk
+  isAMMOnly: boolean; // AMM-only route
+  hasHighSlippage: boolean; // >1% slippage
+  isLargeTrade: boolean; // >10k USD or >10 SOL
+}
+
+export interface BundleEligibilityResult {
+  eligible: boolean;
+  reason: string;
+  eligibilityFactors: BundleEligibilityFactors;
+  recommendedTipLamports: number;
+  riskLevel: "low" | "medium" | "high";
+}
+
+export interface BundleMetrics {
+  // Eligibility stats
+  totalSwaps: number;
+  bundledSwaps: number;
+  directSwaps: number;
+  bundleRate: number; // percentage (0-100)
+  eligibleSwaps?: number; // Optional: swaps eligible for bundling
+  ineligibleSwaps?: number; // Optional: swaps not eligible
+  eligibilityRate?: number; // Optional: percentage (0-100)
+
+  // Performance
+  avgBundleLandingTimeMs: number;
+  avgTipPaidLamports: number;
+  totalTipsPaidLamports: number;
+
+  // Savings
+  totalMEVSavingsUSD: number;
+  avgMEVSavingsPercent: number;
+
+  // Success rates (0-100)
+  jitoSuccessRate: number;
+  quicknodeSuccessRate: number;
+  directSuccessRate: number;
+
+  // Failures
+  jitoFailures: number;
+  quicknodeFailures: number;
+  timeouts: number;
+
+  // Timestamps
+  firstSwapAt: number;
+  lastSwapAt: number;
+  periodMs: number;
+}
+
 // ============================================================================
 // ERROR HANDLING
 // ============================================================================

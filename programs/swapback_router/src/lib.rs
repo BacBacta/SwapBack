@@ -29,8 +29,8 @@ pub const ORCA_WHIRLPOOL_PROGRAM_ID: Pubkey =
     pubkey!("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc");
 pub const JUPITER_PROGRAM_ID: Pubkey = pubkey!("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4");
 
-// Buyback Program ID (mis à jour)
-pub const BUYBACK_PROGRAM_ID: Pubkey = pubkey!("EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf");
+// Buyback Program ID - 100% Burn Model (deployed Nov 24, 2025)
+pub const BUYBACK_PROGRAM_ID: Pubkey = pubkey!("7wCCwRXxWvMY2DJDRrnhFg3b8jVPb5vVPxLH5YAGL6eJ");
 
 // cNFT Program ID with unlock_tokens (verified Nov 14, 2025)
 pub const CNFT_PROGRAM_ID: Pubkey = pubkey!("26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru");
@@ -654,10 +654,18 @@ pub struct SwapToC<'info> {
     /// CHECK: Optional fallback oracle (e.g. Pyth feed)
     pub fallback_oracle: Option<AccountInfo<'info>>,
 
-    #[account(mut)]
+    /// User's token account A - with ownership validation (H1 FIX)
+    #[account(
+        mut,
+        constraint = user_token_account_a.owner == user.key() @ ErrorCode::InvalidTokenAccountOwner
+    )]
     pub user_token_account_a: Box<Account<'info, TokenAccount>>,
 
-    #[account(mut)]
+    /// User's token account B - with ownership validation (H1 FIX)
+    #[account(
+        mut,
+        constraint = user_token_account_b.owner == user.key() @ ErrorCode::InvalidTokenAccountOwner
+    )]
     pub user_token_account_b: Box<Account<'info, TokenAccount>>,
 
     #[account(mut)]
@@ -1100,6 +1108,10 @@ pub enum ErrorCode {
     MissingJupiterRoute,
     #[msg("Invalid Jupiter route parameters")]
     InvalidJupiterRoute,
+    #[msg("Invalid token account owner")]
+    InvalidTokenAccountOwner,
+    #[msg("Swap amount exceeds maximum allowed")]
+    SwapAmountExceedsMaximum,
 }
 
 pub mod create_plan_processor {
@@ -1145,6 +1157,12 @@ pub mod swap_toc_processor {
         // ✅ SECURITY: Validate input parameters
         require!(args.amount_in > 0, ErrorCode::InvalidAmount);
         require!(args.min_out > 0, ErrorCode::InvalidAmount);
+
+        // ✅ SECURITY: Validate swap amount doesn't exceed maximum (anti-whale protection)
+        require!(
+            args.amount_in <= MAX_SINGLE_SWAP_LAMPORTS,
+            ErrorCode::SwapAmountExceedsMaximum
+        );
 
         // ✅ SECURITY: Validate slippage is reasonable (max 10%)
         if let Some(slippage) = args.slippage_tolerance {

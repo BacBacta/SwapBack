@@ -1,0 +1,42 @@
+[package]
+name = "swapback_router-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+# This workspace is separate from the parent workspace
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+
+# Pas de dépendance sur swapback_router pour éviter les conflits
+# On va tester la logique mathématique pure
+
+# Fuzzing target 1: Test des montants de swap et calculs de fees
+[[bin]]
+name = "fuzz_swap_amounts"
+path = "fuzz_targets/fuzz_swap_amounts.rs"
+test = false
+doc = false
+bench = false
+
+# Fuzzing target 2: Test de la logique d'oracle et divergence de prix
+[[bin]]
+name = "fuzz_oracle_price"
+path = "fuzz_targets/fuzz_oracle_price.rs"
+test = false
+doc = false
+bench = false
+
+# Fuzzing target 3: Test du flow de buyback et slippage protection
+[[bin]]
+name = "fuzz_buyback_flow"
+path = "fuzz_targets/fuzz_buyback_flow.rs"
+test = false
+doc = false
+bench = false

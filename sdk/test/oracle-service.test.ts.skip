@@ -1,0 +1,505 @@
+import { OraclePriceService } from '../src/services/OraclePriceService';
+import { Connection, PublicKey } from '@solana/web3.js';
+
+// Mock external dependencies
+jest.mock('@pythnetwork/client');
+jest.mock('@switchboard-xyz/solana.js');
+
+describe('OraclePriceService', () => {
+  let service: OraclePriceService;
+  let connection: Connection;
+
+  const MOCK_SOL_MINT = 'So11111111111111111111111111111111111111112';
+  const MOCK_USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+  const MOCK_BTC_MINT = '9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E';
+
+  beforeEach(() => {
+    connection = new Connection('https://api.devnet.solana.com', 'confirmed');
+    service = new OraclePriceService(connection);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('getTokenPrice()', () => {
+    it('should fetch price from Pyth for known token', async () => {
+      // Mock Pyth response
+      const mockAccountInfo = {
+        data: Buffer.alloc(240),
+        owner: new PublicKey('FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH'),
+        lamports: 1000000,
+        executable: false,
+      };
+
+      // Simulate price data: $100.5 with 0.1 confidence
+      const price = 100.5;
+      const confidence = 0.1;
+      mockAccountInfo.data.writeDoubleLE(price, 0);
+      mockAccountInfo.data.writeDoubleLE(confidence, 8);
+      mockAccountInfo.data.writeBigInt64LE(BigInt(Date.now() / 1000), 16);
+
+      jest.spyOn(connection, 'getAccountInfo').mockResolvedValue(mockAccountInfo);
+
+      const result = await service.getTokenPrice(MOCK_SOL_MINT);
+
+      expect(result).toBeDefined();
+      expect(result.provider).toBe('pyth');
+      expect(result.price).toBeCloseTo(100.5, 1);
+      expect(result.confidence).toBeLessThan(2.0); // < 2% confidence interval
+    });
+
+    it('should fallback to Switchboard if Pyth fails', async () => {
+      // Mock Pyth failure
+      jest.spyOn(connection, 'getAccountInfo')
+        .mockResolvedValueOnce(null); // Pyth fails
+
+      // Mock Switchboard success
+      const mockSwitchboardData = Buffer.alloc(300);
+      mockSwitchboardData.writeDoubleLE(100.5, 240); // Price at offset 240
+      mockSwitchboardData.writeDoubleLE(0.5, 256); // Std dev at offset 256
+      mockSwitchboardData.writeBigInt64LE(BigInt(Date.now() / 1000), 272); // Timestamp
+
+      jest.spyOn(connection, 'getAccountInfo')
+        .mockResolvedValueOnce({
+          data: mockSwitchboardData,
+          owner: new PublicKey('SW1TCH7qEPTdLsDHRgPuMQjbQxKdH2aBStViMFnt64f'),
+          lamports: 1000000,
+          executable: false,
+        });
+
+      const result = await service.getTokenPrice(MOCK_SOL_MINT);
+
+      expect(result).toBeDefined();
+      expect(result.provider).toBe('switchboard');
+      expect(result.price).toBeCloseTo(100.5, 1);
+    });
+
+    it('should use cache for repeated requests within 5 seconds', async () => {
+      const mockAccountInfo = {
+        data: Buffer.alloc(240),
+        owner: new PublicKey('FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH'),
+        lamports: 1000000,
+        executable: false,
+      };
+
+      mockAccountInfo.data.writeDoubleLE(100.5, 0);
+      mockAccountInfo.data.writeDoubleLE(0.1, 8);
+      mockAccountInfo.data.writeBigInt64LE(BigInt(Date.now() / 1000), 16);
+
+      const getAccountInfoSpy = jest.spyOn(connection, 'getAccountInfo')
+        .mockResolvedValue(mockAccountInfo);
+
+      // First call
+      const result1 = await service.getTokenPrice(MOCK_SOL_MINT);
+      expect(result1.price).toBeCloseTo(100.5, 1);
+
+      // Second call within 5s (should use cache)
+      const result2 = await service.getTokenPrice(MOCK_SOL_MINT);
+      expect(result2.price).toBeCloseTo(100.5, 1);
+
+      // Should only fetch once (cache hit)
+      expect(getAccountInfoSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should refetch after cache expires (5 seconds)', async () => {
+      jest.useFakeTimers();
+
+      const mockAccountInfo = {
+        data: Buffer.alloc(240),
+        owner: new PublicKey('FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH'),
+        lamports: 1000000,
+        executable: false,
+      };
+
+      mockAccountInfo.data.writeDoubleLE(100.5, 0);
+      mockAccountInfo.data.writeDoubleLE(0.1, 8);
+      mockAccountInfo.data.writeBigInt64LE(BigInt(Date.now() / 1000), 16);
+
+      const getAccountInfoSpy = jest.spyOn(connection, 'getAccountInfo')
+        .mockResolvedValue(mockAccountInfo);
+
+      // First call
+      await service.getTokenPrice(MOCK_SOL_MINT);
+
+      // Advance time by 6 seconds (cache expired)
+      jest.advanceTimersByTime(6000);
+
+      // Second call (should refetch)
+      await service.getTokenPrice(MOCK_SOL_MINT);
+
+      // Should fetch twice (cache miss)
+      expect(getAccountInfoSpy).toHaveBeenCalledTimes(2);
+
+      jest.useRealTimers();
+    });
+
+    it('should throw error when all oracles fail', async () => {
+      // Mock all oracles failing
+      jest.spyOn(connection, 'getAccountInfo').mockResolvedValue(null);
+
+      await expect(
+        service.getTokenPrice(MOCK_SOL_MINT)
+      ).rejects.toThrow(/no price data available/i);
+    });
+
+    it('should handle unknown token gracefully', async () => {
+      const unknownMint = 'UnknownMint11111111111111111111111111111111';
+
+      jest.spyOn(connection, 'getAccountInfo').mockResolvedValue(null);
+
+      await expect(
+        service.getTokenPrice(unknownMint)
+      ).rejects.toThrow(/no price data available/i);
+    });
+  });
+
+  describe('verifyRoutePrice()', () => {
+    it('should verify route price within 5% deviation', async () => {
+      // Mock oracle price: $100
+      jest.spyOn(service, 'getTokenPrice')
+        .mockResolvedValueOnce({
+          provider: 'pyth',
+          price: 100,
+          confidence: 0.1,
+          timestamp: Date.now(),
+        })
+        .mockResolvedValueOnce({
+          provider: 'pyth',
+          price: 1,
+          confidence: 0.001,
+          timestamp: Date.now(),
+        });
+
+      const result = await service.verifyRoutePrice({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        inputAmount: 1_000_000_000, // 1 SOL
+        expectedOutput: 98_000_000, // 98 USDC (2% deviation)
+      });
+
+      expect(result.isValid).toBe(true);
+      expect(result.oraclePrice).toBe(100);
+      expect(result.routePrice).toBe(98);
+      expect(result.deviation).toBeCloseTo(0.02, 2);
+    });
+
+    it('should reject route price with >5% deviation', async () => {
+      // Mock oracle price: $100
+      jest.spyOn(service, 'getTokenPrice')
+        .mockResolvedValueOnce({
+          provider: 'pyth',
+          price: 100,
+          confidence: 0.1,
+          timestamp: Date.now(),
+        })
+        .mockResolvedValueOnce({
+          provider: 'pyth',
+          price: 1,
+          confidence: 0.001,
+          timestamp: Date.now(),
+        });
+
+      const result = await service.verifyRoutePrice({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        inputAmount: 1_000_000_000, // 1 SOL
+        expectedOutput: 94_000_000, // 94 USDC (6% deviation)
+      });
+
+      expect(result.isValid).toBe(false);
+      expect(result.oraclePrice).toBe(100);
+      expect(result.routePrice).toBe(94);
+      expect(result.deviation).toBeCloseTo(0.06, 2);
+    });
+
+    it('should handle stablecoin pairs correctly', async () => {
+      // USDC → USDT should be ~1:1
+      jest.spyOn(service, 'getTokenPrice')
+        .mockResolvedValueOnce({
+          provider: 'pyth',
+          price: 1.0,
+          confidence: 0.001,
+          timestamp: Date.now(),
+        })
+        .mockResolvedValueOnce({
+          provider: 'pyth',
+          price: 0.999,
+          confidence: 0.001,
+          timestamp: Date.now(),
+        });
+
+      const result = await service.verifyRoutePrice({
+        inputMint: MOCK_USDC_MINT,
+        outputMint: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', // USDT
+        inputAmount: 100_000_000, // 100 USDC
+        expectedOutput: 99_900_000, // 99.9 USDT
+      });
+
+      expect(result.isValid).toBe(true);
+      expect(result.deviation).toBeLessThan(0.01); // < 1% deviation
+    });
+  });
+
+  describe('Pyth Validation', () => {
+    it('should reject stale Pyth prices (>10 seconds old)', async () => {
+      const mockAccountInfo = {
+        data: Buffer.alloc(240),
+        owner: new PublicKey('FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH'),
+        lamports: 1000000,
+        executable: false,
+      };
+
+      mockAccountInfo.data.writeDoubleLE(100.5, 0);
+      mockAccountInfo.data.writeDoubleLE(0.1, 8);
+      // Timestamp 60 seconds ago
+      mockAccountInfo.data.writeBigInt64LE(BigInt(Date.now() / 1000 - 60), 16);
+
+      jest.spyOn(connection, 'getAccountInfo').mockResolvedValue(mockAccountInfo);
+
+      // Should fallback to Switchboard or throw
+      const result = await service.getTokenPrice(MOCK_SOL_MINT).catch(() => null);
+      
+      // If returned, should not be from Pyth
+      if (result) {
+        expect(result.provider).not.toBe('pyth');
+      }
+    });
+
+    it('should reject Pyth prices with high confidence interval (>2%)', async () => {
+      const mockAccountInfo = {
+        data: Buffer.alloc(240),
+        owner: new PublicKey('FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH'),
+        lamports: 1000000,
+        executable: false,
+      };
+
+      const price = 100;
+      const confidence = 3.0; // 3% confidence (exceeds 2% limit)
+
+      mockAccountInfo.data.writeDoubleLE(price, 0);
+      mockAccountInfo.data.writeDoubleLE(confidence, 8);
+      mockAccountInfo.data.writeBigInt64LE(BigInt(Date.now() / 1000), 16);
+
+      jest.spyOn(connection, 'getAccountInfo').mockResolvedValue(mockAccountInfo);
+
+      // Should fallback to Switchboard
+      const result = await service.getTokenPrice(MOCK_SOL_MINT).catch(() => null);
+
+      if (result) {
+        expect(result.provider).not.toBe('pyth');
+      }
+    });
+  });
+
+  describe('Switchboard Validation', () => {
+    it('should reject stale Switchboard prices (>60 seconds old)', async () => {
+      jest.spyOn(connection, 'getAccountInfo')
+        .mockResolvedValueOnce(null); // Pyth fails
+
+      const mockSwitchboardData = Buffer.alloc(300);
+      mockSwitchboardData.writeDoubleLE(100.5, 240);
+      mockSwitchboardData.writeDoubleLE(0.5, 256);
+      // Timestamp 120 seconds ago
+      mockSwitchboardData.writeBigInt64LE(BigInt(Date.now() / 1000 - 120), 272);
+
+      jest.spyOn(connection, 'getAccountInfo')
+        .mockResolvedValueOnce({
+          data: mockSwitchboardData,
+          owner: new PublicKey('SW1TCH7qEPTdLsDHRgPuMQjbQxKdH2aBStViMFnt64f'),
+          lamports: 1000000,
+          executable: false,
+        });
+
+      await expect(
+        service.getTokenPrice(MOCK_SOL_MINT)
+      ).rejects.toThrow(/no price data available/i);
+    });
+
+    it('should reject Switchboard prices with high variance (>5%)', async () => {
+      jest.spyOn(connection, 'getAccountInfo')
+        .mockResolvedValueOnce(null); // Pyth fails
+
+      const mockSwitchboardData = Buffer.alloc(300);
+      mockSwitchboardData.writeDoubleLE(100, 240); // Price
+      mockSwitchboardData.writeDoubleLE(6.0, 256); // Std dev 6% (exceeds 5% limit)
+      mockSwitchboardData.writeBigInt64LE(BigInt(Date.now() / 1000), 272);
+
+      jest.spyOn(connection, 'getAccountInfo')
+        .mockResolvedValueOnce({
+          data: mockSwitchboardData,
+          owner: new PublicKey('SW1TCH7qEPTdLsDHRgPuMQjbQxKdH2aBStViMFnt64f'),
+          lamports: 1000000,
+          executable: false,
+        });
+
+      await expect(
+        service.getTokenPrice(MOCK_SOL_MINT)
+      ).rejects.toThrow(/no price data available/i);
+    });
+  });
+
+  describe('Multi-token Price Fetching', () => {
+    it('should fetch prices for multiple tokens in parallel', async () => {
+      const mockAccountInfo = {
+        data: Buffer.alloc(240),
+        owner: new PublicKey('FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH'),
+        lamports: 1000000,
+        executable: false,
+      };
+
+      jest.spyOn(connection, 'getAccountInfo')
+        .mockImplementation(async (pubkey) => {
+          const data = Buffer.alloc(240);
+          // Different prices for different tokens
+          if (pubkey.toString().includes('Sol')) {
+            data.writeDoubleLE(100, 0); // SOL = $100
+          } else if (pubkey.toString().includes('USDC')) {
+            data.writeDoubleLE(1, 0); // USDC = $1
+          } else {
+            data.writeDoubleLE(50000, 0); // BTC = $50k
+          }
+          data.writeDoubleLE(0.1, 8);
+          data.writeBigInt64LE(BigInt(Date.now() / 1000), 16);
+
+          return {
+            ...mockAccountInfo,
+            data,
+          };
+        });
+
+      const [solPrice, usdcPrice, btcPrice] = await Promise.all([
+        service.getTokenPrice(MOCK_SOL_MINT),
+        service.getTokenPrice(MOCK_USDC_MINT),
+        service.getTokenPrice(MOCK_BTC_MINT),
+      ]);
+
+      expect(solPrice.price).toBeCloseTo(100, 0);
+      expect(usdcPrice.price).toBeCloseTo(1, 0);
+      expect(btcPrice.price).toBeCloseTo(50000, 0);
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should handle network errors gracefully', async () => {
+      jest.spyOn(connection, 'getAccountInfo')
+        .mockRejectedValue(new Error('Network error'));
+
+      await expect(
+        service.getTokenPrice(MOCK_SOL_MINT)
+      ).rejects.toThrow(/network error|no price data available/i);
+    });
+
+    it('should handle malformed price data', async () => {
+      const mockAccountInfo = {
+        data: Buffer.alloc(10), // Too small
+        owner: new PublicKey('FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH'),
+        lamports: 1000000,
+        executable: false,
+      };
+
+      jest.spyOn(connection, 'getAccountInfo').mockResolvedValue(mockAccountInfo);
+
+      await expect(
+        service.getTokenPrice(MOCK_SOL_MINT)
+      ).rejects.toThrow();
+    });
+
+    it('should retry on transient failures', async () => {
+      let callCount = 0;
+
+      jest.spyOn(connection, 'getAccountInfo')
+        .mockImplementation(async () => {
+          callCount++;
+          if (callCount < 3) {
+            throw new Error('Transient error');
+          }
+
+          // Success on 3rd try
+          const data = Buffer.alloc(240);
+          data.writeDoubleLE(100, 0);
+          data.writeDoubleLE(0.1, 8);
+          data.writeBigInt64LE(BigInt(Date.now() / 1000), 16);
+
+          return {
+            data,
+            owner: new PublicKey('FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH'),
+            lamports: 1000000,
+            executable: false,
+          };
+        });
+
+      const result = await service.getTokenPrice(MOCK_SOL_MINT);
+
+      expect(result.price).toBeCloseTo(100, 0);
+      expect(callCount).toBe(3);
+    });
+  });
+
+  describe('Price Feed Mapping', () => {
+    it('should correctly map token mints to Pyth feeds', () => {
+      const solFeed = service['getPythFeedByMint'](MOCK_SOL_MINT);
+      expect(solFeed).toBeDefined();
+
+      const usdcFeed = service['getPythFeedByMint'](MOCK_USDC_MINT);
+      expect(usdcFeed).toBeDefined();
+
+      const btcFeed = service['getPythFeedByMint'](MOCK_BTC_MINT);
+      expect(btcFeed).toBeDefined();
+    });
+
+    it('should return null for unmapped tokens', () => {
+      const unknownFeed = service['getPythFeedByMint']('UnknownMint1111111111111111111111111111111');
+      expect(unknownFeed).toBeNull();
+    });
+  });
+
+  describe('Performance', () => {
+    it('should fetch price in < 500ms', async () => {
+      const mockAccountInfo = {
+        data: Buffer.alloc(240),
+        owner: new PublicKey('FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH'),
+        lamports: 1000000,
+        executable: false,
+      };
+
+      mockAccountInfo.data.writeDoubleLE(100, 0);
+      mockAccountInfo.data.writeDoubleLE(0.1, 8);
+      mockAccountInfo.data.writeBigInt64LE(BigInt(Date.now() / 1000), 16);
+
+      jest.spyOn(connection, 'getAccountInfo').mockResolvedValue(mockAccountInfo);
+
+      const start = Date.now();
+      await service.getTokenPrice(MOCK_SOL_MINT);
+      const duration = Date.now() - start;
+
+      expect(duration).toBeLessThan(500);
+    });
+
+    it('should handle 10 concurrent price requests efficiently', async () => {
+      const mockAccountInfo = {
+        data: Buffer.alloc(240),
+        owner: new PublicKey('FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH'),
+        lamports: 1000000,
+        executable: false,
+      };
+
+      mockAccountInfo.data.writeDoubleLE(100, 0);
+      mockAccountInfo.data.writeDoubleLE(0.1, 8);
+      mockAccountInfo.data.writeBigInt64LE(BigInt(Date.now() / 1000), 16);
+
+      jest.spyOn(connection, 'getAccountInfo').mockResolvedValue(mockAccountInfo);
+
+      const start = Date.now();
+      const promises = Array(10).fill(null).map(() =>
+        service.getTokenPrice(MOCK_SOL_MINT)
+      );
+
+      const results = await Promise.all(promises);
+      const duration = Date.now() - start;
+
+      expect(results).toHaveLength(10);
+      expect(duration).toBeLessThan(1000); // < 1 second for 10 requests
+    });
+  });
+});

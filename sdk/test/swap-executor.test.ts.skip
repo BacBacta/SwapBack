@@ -1,0 +1,599 @@
+import { SwapExecutor } from '../src/services/SwapExecutor';
+import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { CircuitBreaker, CircuitBreakerState } from '../src/utils/circuit-breaker';
+
+// Mock dependencies
+jest.mock('../src/services/LiquidityDataCollector');
+jest.mock('../src/services/RouteOptimizationEngine');
+jest.mock('../src/services/OraclePriceService');
+jest.mock('../src/services/JitoBundleService');
+
+describe('SwapExecutor', () => {
+  let executor: SwapExecutor;
+  let connection: Connection;
+  let wallet: Keypair;
+
+  const MOCK_SOL_MINT = 'So11111111111111111111111111111111111111112';
+  const MOCK_USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
+
+  beforeEach(() => {
+    connection = new Connection('https://api.devnet.solana.com', 'confirmed');
+    wallet = Keypair.generate();
+    executor = new SwapExecutor(connection, wallet);
+  });
+
+  describe('Constructor', () => {
+    it('should initialize with connection and wallet', () => {
+      expect(executor).toBeDefined();
+      expect(executor['connection']).toBe(connection);
+      expect(executor['wallet']).toBe(wallet);
+    });
+
+    it('should initialize circuit breaker in CLOSED state', () => {
+      const circuitBreaker = executor['circuitBreaker'];
+      expect(circuitBreaker).toBeDefined();
+      expect(circuitBreaker.getState()).toBe(CircuitBreakerState.CLOSED);
+    });
+
+    it('should initialize all service dependencies', () => {
+      expect(executor['liquidityCollector']).toBeDefined();
+      expect(executor['routeOptimizer']).toBeDefined();
+      expect(executor['oracleService']).toBeDefined();
+      expect(executor['jitoBundleService']).toBeDefined();
+    });
+  });
+
+  describe('executeSwap() - Happy Path', () => {
+    it('should execute swap successfully with valid inputs', async () => {
+      // Mock liquidity data
+      const mockLiquidity = [
+        {
+          venue: 'JUPITER',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 1_000_000_000, // 1 SOL
+          outputAmount: 100_000_000, // 100 USDC
+          priceImpact: 0.001,
+          fee: 0.003,
+        },
+      ];
+
+      jest.spyOn(executor['liquidityCollector'], 'fetchLiquidity')
+        .mockResolvedValue(mockLiquidity);
+
+      // Mock optimal route
+      const mockRoute = {
+        venues: ['JUPITER'],
+        splits: { JUPITER: 1.0 },
+        expectedOutput: 100_000_000,
+        totalFees: 0.003,
+        priceImpact: 0.001,
+      };
+
+      jest.spyOn(executor['routeOptimizer'], 'findOptimalRoute')
+        .mockResolvedValue(mockRoute);
+
+      // Mock oracle verification (5% max deviation)
+      jest.spyOn(executor['oracleService'], 'verifyRoutePrice')
+        .mockResolvedValue({
+          isValid: true,
+          oraclePrice: 100,
+          routePrice: 100,
+          deviation: 0,
+        });
+
+      // Mock transaction building
+      const mockSignature = 'mock_signature_123';
+      jest.spyOn(executor as any, 'buildTransaction')
+        .mockResolvedValue({ transaction: {}, signature: mockSignature });
+
+      // Mock Jito bundle submission
+      jest.spyOn(executor['jitoBundleService'], 'sendBundle')
+        .mockResolvedValue(mockSignature);
+
+      // Execute swap
+      const result = await executor.executeSwap({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+        slippageBps: 50, // 0.5%
+      });
+
+      // Assertions
+      expect(result).toBeDefined();
+      expect(result.signature).toBe(mockSignature);
+      expect(result.success).toBe(true);
+      expect(result.outputAmount).toBe(100_000_000);
+      expect(result.route).toEqual(mockRoute);
+      expect(result.metrics.executionTimeMs).toBeGreaterThan(0);
+    });
+
+    it('should calculate metrics correctly', async () => {
+      // Setup mocks
+      jest.spyOn(executor['liquidityCollector'], 'fetchLiquidity')
+        .mockResolvedValue([
+          {
+            venue: 'ORCA',
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            inputAmount: 1_000_000_000,
+            outputAmount: 98_000_000, // 98 USDC (2% slippage)
+            priceImpact: 0.02,
+            fee: 0.003,
+          },
+        ]);
+
+      jest.spyOn(executor['routeOptimizer'], 'findOptimalRoute')
+        .mockResolvedValue({
+          venues: ['ORCA'],
+          splits: { ORCA: 1.0 },
+          expectedOutput: 98_000_000,
+          totalFees: 0.003,
+          priceImpact: 0.02,
+        });
+
+      jest.spyOn(executor['oracleService'], 'verifyRoutePrice')
+        .mockResolvedValue({ isValid: true, oraclePrice: 100, routePrice: 98, deviation: 0.02 });
+
+      jest.spyOn(executor as any, 'buildTransaction')
+        .mockResolvedValue({ transaction: {}, signature: 'sig' });
+
+      jest.spyOn(executor['jitoBundleService'], 'sendBundle')
+        .mockResolvedValue('sig');
+
+      const result = await executor.executeSwap({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+        slippageBps: 50,
+      });
+
+      // Check metrics
+      expect(result.metrics).toBeDefined();
+      expect(result.metrics.slippagePercent).toBeCloseTo(2.0, 1);
+      expect(result.metrics.priceImpact).toBe(0.02);
+      expect(result.metrics.totalFees).toBe(0.003);
+      expect(result.metrics.executionTimeMs).toBeGreaterThan(0);
+    });
+  });
+
+  describe('executeSwap() - Error Handling', () => {
+    it('should reject swap when slippage exceeds tolerance', async () => {
+      jest.spyOn(executor['liquidityCollector'], 'fetchLiquidity')
+        .mockResolvedValue([
+          {
+            venue: 'JUPITER',
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            inputAmount: 1_000_000_000,
+            outputAmount: 90_000_000, // 10% slippage (exceeds 0.5% tolerance)
+            priceImpact: 0.1,
+            fee: 0.003,
+          },
+        ]);
+
+      jest.spyOn(executor['routeOptimizer'], 'findOptimalRoute')
+        .mockResolvedValue({
+          venues: ['JUPITER'],
+          splits: { JUPITER: 1.0 },
+          expectedOutput: 90_000_000,
+          totalFees: 0.003,
+          priceImpact: 0.1,
+        });
+
+      await expect(
+        executor.executeSwap({
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          amount: 1_000_000_000,
+          slippageBps: 50, // 0.5% max
+        })
+      ).rejects.toThrow(/slippage exceeds/i);
+    });
+
+    it('should reject swap when oracle deviation exceeds 5%', async () => {
+      jest.spyOn(executor['liquidityCollector'], 'fetchLiquidity')
+        .mockResolvedValue([
+          {
+            venue: 'JUPITER',
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            inputAmount: 1_000_000_000,
+            outputAmount: 100_000_000,
+            priceImpact: 0.001,
+            fee: 0.003,
+          },
+        ]);
+
+      jest.spyOn(executor['routeOptimizer'], 'findOptimalRoute')
+        .mockResolvedValue({
+          venues: ['JUPITER'],
+          splits: { JUPITER: 1.0 },
+          expectedOutput: 100_000_000,
+          totalFees: 0.003,
+          priceImpact: 0.001,
+        });
+
+      // Mock oracle rejection (>5% deviation)
+      jest.spyOn(executor['oracleService'], 'verifyRoutePrice')
+        .mockResolvedValue({
+          isValid: false,
+          oraclePrice: 100,
+          routePrice: 94, // 6% deviation
+          deviation: 0.06,
+        });
+
+      await expect(
+        executor.executeSwap({
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          amount: 1_000_000_000,
+          slippageBps: 50,
+        })
+      ).rejects.toThrow(/oracle verification failed/i);
+    });
+
+    it('should handle no liquidity found gracefully', async () => {
+      jest.spyOn(executor['liquidityCollector'], 'fetchLiquidity')
+        .mockResolvedValue([]); // No liquidity
+
+      await expect(
+        executor.executeSwap({
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          amount: 1_000_000_000,
+          slippageBps: 50,
+        })
+      ).rejects.toThrow(/no liquidity found/i);
+    });
+
+    it('should handle transaction failure', async () => {
+      jest.spyOn(executor['liquidityCollector'], 'fetchLiquidity')
+        .mockResolvedValue([
+          {
+            venue: 'JUPITER',
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            inputAmount: 1_000_000_000,
+            outputAmount: 100_000_000,
+            priceImpact: 0.001,
+            fee: 0.003,
+          },
+        ]);
+
+      jest.spyOn(executor['routeOptimizer'], 'findOptimalRoute')
+        .mockResolvedValue({
+          venues: ['JUPITER'],
+          splits: { JUPITER: 1.0 },
+          expectedOutput: 100_000_000,
+          totalFees: 0.003,
+          priceImpact: 0.001,
+        });
+
+      jest.spyOn(executor['oracleService'], 'verifyRoutePrice')
+        .mockResolvedValue({ isValid: true, oraclePrice: 100, routePrice: 100, deviation: 0 });
+
+      // Mock transaction failure
+      jest.spyOn(executor['jitoBundleService'], 'sendBundle')
+        .mockRejectedValue(new Error('Transaction failed'));
+
+      await expect(
+        executor.executeSwap({
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          amount: 1_000_000_000,
+          slippageBps: 50,
+        })
+      ).rejects.toThrow(/transaction failed/i);
+    });
+  });
+
+  describe('Circuit Breaker Integration', () => {
+    it('should trip circuit breaker after 3 consecutive failures', async () => {
+      // Mock consistent failures
+      jest.spyOn(executor['liquidityCollector'], 'fetchLiquidity')
+        .mockRejectedValue(new Error('Network error'));
+
+      // Attempt 3 swaps (should fail)
+      for (let i = 0; i < 3; i++) {
+        await expect(
+          executor.executeSwap({
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            amount: 1_000_000_000,
+            slippageBps: 50,
+          })
+        ).rejects.toThrow();
+      }
+
+      // Circuit breaker should be OPEN
+      expect(executor['circuitBreaker'].getState()).toBe(CircuitBreakerState.OPEN);
+
+      // Next call should fail immediately
+      await expect(
+        executor.executeSwap({
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          amount: 1_000_000_000,
+          slippageBps: 50,
+        })
+      ).rejects.toThrow(/circuit breaker is open/i);
+    });
+
+    it('should recover from OPEN to HALF_OPEN after timeout', async () => {
+      // Mock failures to open circuit breaker
+      jest.spyOn(executor['liquidityCollector'], 'fetchLiquidity')
+        .mockRejectedValue(new Error('Network error'));
+
+      for (let i = 0; i < 3; i++) {
+        await expect(
+          executor.executeSwap({
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            amount: 1_000_000_000,
+            slippageBps: 50,
+          })
+        ).rejects.toThrow();
+      }
+
+      expect(executor['circuitBreaker'].getState()).toBe(CircuitBreakerState.OPEN);
+
+      // Simulate timeout (60 seconds)
+      jest.advanceTimersByTime(60_000);
+
+      // Should be HALF_OPEN now (allowing trial requests)
+      expect(executor['circuitBreaker'].getState()).toBe(CircuitBreakerState.HALF_OPEN);
+    });
+
+    it('should close circuit breaker after 2 successful attempts in HALF_OPEN', async () => {
+      // First, trip the circuit breaker
+      jest.spyOn(executor['liquidityCollector'], 'fetchLiquidity')
+        .mockRejectedValue(new Error('Network error'));
+
+      for (let i = 0; i < 3; i++) {
+        await expect(
+          executor.executeSwap({
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            amount: 1_000_000_000,
+            slippageBps: 50,
+          })
+        ).rejects.toThrow();
+      }
+
+      expect(executor['circuitBreaker'].getState()).toBe(CircuitBreakerState.OPEN);
+
+      // Wait for timeout
+      jest.advanceTimersByTime(60_000);
+      expect(executor['circuitBreaker'].getState()).toBe(CircuitBreakerState.HALF_OPEN);
+
+      // Now mock successful swaps
+      jest.spyOn(executor['liquidityCollector'], 'fetchLiquidity')
+        .mockResolvedValue([
+          {
+            venue: 'JUPITER',
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            inputAmount: 1_000_000_000,
+            outputAmount: 100_000_000,
+            priceImpact: 0.001,
+            fee: 0.003,
+          },
+        ]);
+
+      jest.spyOn(executor['routeOptimizer'], 'findOptimalRoute')
+        .mockResolvedValue({
+          venues: ['JUPITER'],
+          splits: { JUPITER: 1.0 },
+          expectedOutput: 100_000_000,
+          totalFees: 0.003,
+          priceImpact: 0.001,
+        });
+
+      jest.spyOn(executor['oracleService'], 'verifyRoutePrice')
+        .mockResolvedValue({ isValid: true, oraclePrice: 100, routePrice: 100, deviation: 0 });
+
+      jest.spyOn(executor as any, 'buildTransaction')
+        .mockResolvedValue({ transaction: {}, signature: 'sig' });
+
+      jest.spyOn(executor['jitoBundleService'], 'sendBundle')
+        .mockResolvedValue('sig');
+
+      // Execute 2 successful swaps
+      for (let i = 0; i < 2; i++) {
+        const result = await executor.executeSwap({
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          amount: 1_000_000_000,
+          slippageBps: 50,
+        });
+        expect(result.success).toBe(true);
+      }
+
+      // Circuit breaker should be CLOSED now
+      expect(executor['circuitBreaker'].getState()).toBe(CircuitBreakerState.CLOSED);
+    });
+  });
+
+  describe('Execution Flow (8 Steps)', () => {
+    it('should execute all 8 steps in order', async () => {
+      const executionOrder: string[] = [];
+
+      jest.spyOn(executor['liquidityCollector'], 'fetchLiquidity')
+        .mockImplementation(async () => {
+          executionOrder.push('1. fetchLiquidity');
+          return [
+            {
+              venue: 'JUPITER',
+              inputMint: MOCK_SOL_MINT,
+              outputMint: MOCK_USDC_MINT,
+              inputAmount: 1_000_000_000,
+              outputAmount: 100_000_000,
+              priceImpact: 0.001,
+              fee: 0.003,
+            },
+          ];
+        });
+
+      jest.spyOn(executor['routeOptimizer'], 'findOptimalRoute')
+        .mockImplementation(async () => {
+          executionOrder.push('2. findOptimalRoute');
+          return {
+            venues: ['JUPITER'],
+            splits: { JUPITER: 1.0 },
+            expectedOutput: 100_000_000,
+            totalFees: 0.003,
+            priceImpact: 0.001,
+          };
+        });
+
+      jest.spyOn(executor['oracleService'], 'verifyRoutePrice')
+        .mockImplementation(async () => {
+          executionOrder.push('3. verifyRoutePrice');
+          return { isValid: true, oraclePrice: 100, routePrice: 100, deviation: 0 };
+        });
+
+      jest.spyOn(executor as any, 'buildTransaction')
+        .mockImplementation(async () => {
+          executionOrder.push('4. buildTransaction');
+          return { transaction: {}, signature: 'sig' };
+        });
+
+      jest.spyOn(executor['jitoBundleService'], 'sendBundle')
+        .mockImplementation(async () => {
+          executionOrder.push('5. sendBundle');
+          return 'sig';
+        });
+
+      jest.spyOn(executor as any, 'confirmTransaction')
+        .mockImplementation(async () => {
+          executionOrder.push('6. confirmTransaction');
+        });
+
+      jest.spyOn(executor as any, 'calculateMetrics')
+        .mockImplementation(() => {
+          executionOrder.push('7. calculateMetrics');
+          return {
+            executionTimeMs: 1000,
+            slippagePercent: 0,
+            priceImpact: 0.001,
+            totalFees: 0.003,
+            mevSavings: 0,
+          };
+        });
+
+      await executor.executeSwap({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+        slippageBps: 50,
+      });
+
+      // Verify execution order
+      expect(executionOrder).toEqual([
+        '1. fetchLiquidity',
+        '2. findOptimalRoute',
+        '3. verifyRoutePrice',
+        '4. buildTransaction',
+        '5. sendBundle',
+        '6. confirmTransaction',
+        '7. calculateMetrics',
+      ]);
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle extremely small amounts', async () => {
+      jest.spyOn(executor['liquidityCollector'], 'fetchLiquidity')
+        .mockResolvedValue([
+          {
+            venue: 'JUPITER',
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            inputAmount: 1, // 0.000000001 SOL
+            outputAmount: 1,
+            priceImpact: 0.001,
+            fee: 0.003,
+          },
+        ]);
+
+      jest.spyOn(executor['routeOptimizer'], 'findOptimalRoute')
+        .mockResolvedValue({
+          venues: ['JUPITER'],
+          splits: { JUPITER: 1.0 },
+          expectedOutput: 1,
+          totalFees: 0.003,
+          priceImpact: 0.001,
+        });
+
+      jest.spyOn(executor['oracleService'], 'verifyRoutePrice')
+        .mockResolvedValue({ isValid: true, oraclePrice: 1, routePrice: 1, deviation: 0 });
+
+      jest.spyOn(executor as any, 'buildTransaction')
+        .mockResolvedValue({ transaction: {}, signature: 'sig' });
+
+      jest.spyOn(executor['jitoBundleService'], 'sendBundle')
+        .mockResolvedValue('sig');
+
+      const result = await executor.executeSwap({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1,
+        slippageBps: 50,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.outputAmount).toBe(1);
+    });
+
+    it('should handle extremely large amounts', async () => {
+      const largeAmount = 1_000_000_000_000; // 1000 SOL
+
+      jest.spyOn(executor['liquidityCollector'], 'fetchLiquidity')
+        .mockResolvedValue([
+          {
+            venue: 'JUPITER',
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            inputAmount: largeAmount,
+            outputAmount: 100_000_000_000, // 100k USDC
+            priceImpact: 0.05, // 5% impact for large swap
+            fee: 0.003,
+          },
+        ]);
+
+      jest.spyOn(executor['routeOptimizer'], 'findOptimalRoute')
+        .mockResolvedValue({
+          venues: ['JUPITER'],
+          splits: { JUPITER: 1.0 },
+          expectedOutput: 100_000_000_000,
+          totalFees: 0.003,
+          priceImpact: 0.05,
+        });
+
+      jest.spyOn(executor['oracleService'], 'verifyRoutePrice')
+        .mockResolvedValue({
+          isValid: true,
+          oraclePrice: 100_000,
+          routePrice: 100_000,
+          deviation: 0,
+        });
+
+      jest.spyOn(executor as any, 'buildTransaction')
+        .mockResolvedValue({ transaction: {}, signature: 'sig' });
+
+      jest.spyOn(executor['jitoBundleService'], 'sendBundle')
+        .mockResolvedValue('sig');
+
+      const result = await executor.executeSwap({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: largeAmount,
+        slippageBps: 500, // 5% slippage tolerance for large swap
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.outputAmount).toBe(100_000_000_000);
+    });
+  });
+});

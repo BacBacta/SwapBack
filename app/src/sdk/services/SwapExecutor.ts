@@ -21,7 +21,6 @@ import {
   Transaction,
   TransactionInstruction,
   Signer,
-  ComputeBudgetProgram,
   SystemProgram,
 } from "@solana/web3.js";
 import {
@@ -49,6 +48,7 @@ import {
   VenueType,
   OraclePriceData,
   OracleVerificationDetail,
+  BundleEligibilityResult,
 } from "../types/smart-router";
 import { JitoBundleService, MEVProtectionAnalyzer } from "./JitoBundleService";
 
@@ -176,6 +176,7 @@ interface ExecutionContext {
   outputOracleDetail?: OracleVerificationDetail;
   tradeValueUSD?: number;
   bundleId?: string;
+  bundleEligibility?: BundleEligibilityResult;
   mevStrategy?: "jito" | "quicknode" | "direct";
   mevTipLamports?: number;
   priorityFeeMicroLamports?: number;
@@ -583,13 +584,50 @@ export class SwapExecutor {
     );
     attemptCtx.tradeValueUSD = this.estimateTradeValueUSD(plan, attemptCtx);
 
+    // Determine bundle eligibility with detailed analysis
+    const bundleEligibility = this.mevAnalyzer.isEligibleForBundling(
+      plan.baseRoute, // Use base route instead of routes[0]
+      attemptCtx.tradeValueUSD,
+      params.inputMint,
+      params.inputAmount
+    );
+
+    // Allow user override but default to eligibility analysis
+    const userEnabledMevProtection = params.routePreferences?.enableMevProtection;
+    const enableMevProtection =
+      userEnabledMevProtection !== undefined
+        ? userEnabledMevProtection
+        : bundleEligibility.eligible;
+
+    // Log bundle decision
+    if (enableMevProtection) {
+      console.log(
+        `🛡️  MEV Protection ENABLED - ${bundleEligibility.reason}`
+      );
+      console.log(`   Risk Level: ${bundleEligibility.riskLevel}`);
+      console.log(
+        `   Recommended Tip: ${bundleEligibility.recommendedTipLamports} lamports`
+      );
+      console.log(`   Factors:`, {
+        valueThreshold: bundleEligibility.eligibilityFactors.meetsValueThreshold,
+        highRisk: bundleEligibility.eligibilityFactors.hasHighMEVRisk,
+        ammOnly: bundleEligibility.eligibilityFactors.isAMMOnly,
+        highSlippage: bundleEligibility.eligibilityFactors.hasHighSlippage,
+      });
+    } else {
+      console.log(`📤 Direct Submission - ${bundleEligibility.reason}`);
+    }
+
+    // Store eligibility info in context
+    attemptCtx.bundleEligibility = bundleEligibility;
+
     const bundleResult = await this.submitProtectedBundle(
       params,
       plan,
       attemptCtx,
       attemptCtx.transaction,
       params.signer,
-      params.routePreferences?.enableMevProtection ?? true
+      enableMevProtection
     );
 
     attemptCtx.signature = bundleResult.signature;
@@ -1415,7 +1453,7 @@ export class SwapExecutor {
     }
 
     // Set recent blockhash
-    const { blockhash } = await this.connection.getLatestBlockhash("confirmed");
+    const { blockhash } = await this.connection.getRecentBlockhash("confirmed");
     transaction.recentBlockhash = blockhash;
     transaction.feePayer = params.userPublicKey;
 
@@ -1444,15 +1482,17 @@ export class SwapExecutor {
       ctx.priorityFeeMicroLamports = priorityPriceMicroLamports;
     }
 
-    const unitLimitIx = ComputeBudgetProgram.setComputeUnitLimit({
-      units: boundedUnits,
-    });
-
-    const unitPriceIx = ComputeBudgetProgram.setComputeUnitPrice({
-      microLamports: priorityPriceMicroLamports,
-    });
-
-    return [unitLimitIx, unitPriceIx];
+    // Note: ComputeBudgetProgram not available in web3.js v1.x
+    // Return empty array until web3.js v2 is used
+    // const unitLimitIx = ComputeBudgetProgram.setComputeUnitLimit({
+    //   units: boundedUnits,
+    // });
+    // const unitPriceIx = ComputeBudgetProgram.setComputeUnitPrice({
+    //   microLamports: priorityPriceMicroLamports,
+    // });
+    // return [unitLimitIx, unitPriceIx];
+    
+    return []; // Temporarily disabled for web3.js v1
   }
 
   /**

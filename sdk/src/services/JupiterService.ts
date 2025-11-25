@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from "axios";
-import { Connection, PublicKey, VersionedTransaction } from "@solana/web3.js";
+import { Connection, PublicKey, Transaction } from "@solana/web3.js";
 
 /**
  * Jupiter Quote Response from V6 API
@@ -206,8 +206,8 @@ export class JupiterService {
     amount: number | string,
     userPublicKey: PublicKey,
     signTransaction: (
-      transaction: VersionedTransaction
-    ) => Promise<VersionedTransaction>,
+      transaction: Transaction
+    ) => Promise<Transaction>,
     slippageBps: number = 50,
     priorityFee?: number
   ): Promise<string> {
@@ -241,12 +241,12 @@ export class JupiterService {
       priorityFee
     );
 
-    // Step 3: Deserialize transaction
+    // Step 3: Deserialize transaction (using Transaction for v1 compatibility)
     const swapTransactionBuf = Buffer.from(
       swapResponse.swapTransaction,
       "base64"
     );
-    const transaction = VersionedTransaction.deserialize(swapTransactionBuf);
+    const transaction = Transaction.from(swapTransactionBuf);
 
     console.log("📝 Transaction deserialized, requesting signature...");
 
@@ -257,7 +257,6 @@ export class JupiterService {
     const rawTransaction = signedTransaction.serialize();
     const txid = await this.connection.sendRawTransaction(rawTransaction, {
       skipPreflight: false,
-      maxRetries: 3,
     });
 
     console.log("✅ Transaction sent:", txid);

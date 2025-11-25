@@ -18,5 +18,6 @@ export function createProgramWithProvider<T extends Idl>(
   provider: AnchorProvider
 ): Program<T> {
   const normalized = normalizeIdlAddress(idl, programId);
+  // @ts-ignore - Type assertion for Anchor Program compatibility
   return new Program(normalized as Idl, provider) as Program<T>;
 }

@@ -11,6 +11,7 @@ import {
   PhantomWalletAdapter,
   SolflareWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
+import { BackpackWalletAdapter } from "@solana/wallet-adapter-backpack";
 import { clusterApiUrl } from "@solana/web3.js";
 import { DEFAULT_SOLANA_NETWORK, DEFAULT_SOLANA_RPC_URL } from "@/config/constants";
 
@@ -51,13 +52,14 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
   }, [network]);
 
   // Configuration des wallets supportés
-  // WalletMultiButton détectera automatiquement tous les wallets installés
-  // incluant Phantom, Solflare, Backpack, Glow, Slope, etc.
+  // Supporte explicitement: Phantom, Solflare, Backpack
+  // Autres wallets (Glow, Slope, etc.) auto-détectés via window.solana
   const wallets = useMemo(
     () => [
       new PhantomWalletAdapter(),
       new SolflareWalletAdapter(),
-      // Autres wallets auto-détectés via window.solana
+      new BackpackWalletAdapter(),
+      // Autres wallets auto-détectés par WalletMultiButton
     ],
     []
   );

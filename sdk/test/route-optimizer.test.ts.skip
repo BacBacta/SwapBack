@@ -1,0 +1,514 @@
+import { RouteOptimizationEngine } from '../src/services/RouteOptimizationEngine';
+
+describe('RouteOptimizationEngine', () => {
+  let optimizer: RouteOptimizationEngine;
+
+  const MOCK_SOL_MINT = 'So11111111111111111111111111111111111111112';
+  const MOCK_USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+
+  beforeEach(() => {
+    optimizer = new RouteOptimizationEngine();
+  });
+
+  describe('findOptimalRoute()', () => {
+    it('should find single-venue route when one option is best', async () => {
+      const liquidityData = [
+        {
+          venue: 'JUPITER',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 1_000_000_000,
+          outputAmount: 100_000_000,
+          priceImpact: 0.001,
+          fee: 0.003,
+        },
+        {
+          venue: 'PHOENIX',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 1_000_000_000,
+          outputAmount: 99_000_000, // Lower output
+          priceImpact: 0.01,
+          fee: 0.002,
+        },
+      ];
+
+      const result = await optimizer.findOptimalRoute({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+        liquidityData,
+      });
+
+      expect(result.venues).toEqual(['JUPITER']);
+      expect(result.splits).toEqual({ JUPITER: 1.0 });
+      expect(result.expectedOutput).toBe(100_000_000);
+    });
+
+    it('should split route across multiple venues when beneficial', async () => {
+      const liquidityData = [
+        {
+          venue: 'JUPITER',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 500_000_000, // 0.5 SOL
+          outputAmount: 50_500_000, // Better rate for smaller amount
+          priceImpact: 0.001,
+          fee: 0.003,
+        },
+        {
+          venue: 'PHOENIX',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 500_000_000, // 0.5 SOL
+          outputAmount: 50_300_000,
+          priceImpact: 0.002,
+          fee: 0.002,
+        },
+      ];
+
+      const result = await optimizer.findOptimalRoute({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+        liquidityData,
+      });
+
+      // Should split between both venues
+      expect(result.venues.length).toBeGreaterThan(1);
+      expect(result.splits.JUPITER).toBeGreaterThan(0);
+      expect(result.splits.PHOENIX).toBeGreaterThan(0);
+      expect(result.splits.JUPITER + result.splits.PHOENIX).toBeCloseTo(1.0, 5);
+    });
+
+    it('should apply greedy algorithm to maximize output', async () => {
+      const liquidityData = [
+        {
+          venue: 'JUPITER',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 1_000_000_000,
+          outputAmount: 100_000_000,
+          priceImpact: 0.001,
+          fee: 0.003,
+        },
+        {
+          venue: 'PHOENIX',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 1_000_000_000,
+          outputAmount: 100_500_000, // Best output
+          priceImpact: 0.0005,
+          fee: 0.002,
+        },
+        {
+          venue: 'ORCA',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 1_000_000_000,
+          outputAmount: 99_800_000,
+          priceImpact: 0.002,
+          fee: 0.003,
+        },
+      ];
+
+      const result = await optimizer.findOptimalRoute({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+        liquidityData,
+      });
+
+      // Should select Phoenix (best output)
+      expect(result.venues).toContain('PHOENIX');
+      expect(result.expectedOutput).toBe(100_500_000);
+    });
+
+    it('should calculate total fees correctly', async () => {
+      const liquidityData = [
+        {
+          venue: 'JUPITER',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 500_000_000,
+          outputAmount: 50_000_000,
+          priceImpact: 0.001,
+          fee: 0.003, // 0.3%
+        },
+        {
+          venue: 'PHOENIX',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 500_000_000,
+          outputAmount: 50_000_000,
+          priceImpact: 0.002,
+          fee: 0.002, // 0.2%
+        },
+      ];
+
+      const result = await optimizer.findOptimalRoute({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+        liquidityData,
+      });
+
+      // Total fees should be weighted average
+      const expectedFees = (0.003 * 0.5) + (0.002 * 0.5); // 0.0025
+      expect(result.totalFees).toBeCloseTo(expectedFees, 4);
+    });
+
+    it('should calculate price impact correctly', async () => {
+      const liquidityData = [
+        {
+          venue: 'JUPITER',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 1_000_000_000,
+          outputAmount: 99_000_000,
+          priceImpact: 0.01, // 1% impact
+          fee: 0.003,
+        },
+      ];
+
+      const result = await optimizer.findOptimalRoute({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+        liquidityData,
+      });
+
+      expect(result.priceImpact).toBe(0.01);
+    });
+  });
+
+  describe('Cost Minimization', () => {
+    it('should minimize total cost (fees + price impact)', async () => {
+      const liquidityData = [
+        {
+          venue: 'HIGH_FEE_LOW_IMPACT',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 1_000_000_000,
+          outputAmount: 99_500_000,
+          priceImpact: 0.001, // Low impact
+          fee: 0.005, // High fee (0.5%)
+        },
+        {
+          venue: 'LOW_FEE_HIGH_IMPACT',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 1_000_000_000,
+          outputAmount: 99_000_000,
+          priceImpact: 0.01, // High impact (1%)
+          fee: 0.001, // Low fee (0.1%)
+        },
+        {
+          venue: 'BALANCED',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 1_000_000_000,
+          outputAmount: 100_000_000, // Best output
+          priceImpact: 0.003,
+          fee: 0.003,
+        },
+      ];
+
+      const result = await optimizer.findOptimalRoute({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+        liquidityData,
+      });
+
+      // Should select BALANCED (highest output = lowest total cost)
+      expect(result.venues).toContain('BALANCED');
+      expect(result.expectedOutput).toBe(100_000_000);
+    });
+
+    it('should prefer lower fee when outputs are similar', async () => {
+      const liquidityData = [
+        {
+          venue: 'HIGH_FEE',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 1_000_000_000,
+          outputAmount: 100_000_000,
+          priceImpact: 0.001,
+          fee: 0.005, // 0.5%
+        },
+        {
+          venue: 'LOW_FEE',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 1_000_000_000,
+          outputAmount: 100_000_000, // Same output
+          priceImpact: 0.001,
+          fee: 0.002, // 0.2%
+        },
+      ];
+
+      const result = await optimizer.findOptimalRoute({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+        liquidityData,
+      });
+
+      expect(result.venues).toContain('LOW_FEE');
+      expect(result.totalFees).toBe(0.002);
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle empty liquidity data', async () => {
+      await expect(
+        optimizer.findOptimalRoute({
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          amount: 1_000_000_000,
+          liquidityData: [],
+        })
+      ).rejects.toThrow(/no liquidity/i);
+    });
+
+    it('should handle single liquidity source', async () => {
+      const liquidityData = [
+        {
+          venue: 'JUPITER',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 1_000_000_000,
+          outputAmount: 100_000_000,
+          priceImpact: 0.001,
+          fee: 0.003,
+        },
+      ];
+
+      const result = await optimizer.findOptimalRoute({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+        liquidityData,
+      });
+
+      expect(result.venues).toEqual(['JUPITER']);
+      expect(result.splits.JUPITER).toBe(1.0);
+    });
+
+    it('should handle extremely small amounts', async () => {
+      const liquidityData = [
+        {
+          venue: 'JUPITER',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 1, // 1 lamport
+          outputAmount: 1,
+          priceImpact: 0.001,
+          fee: 0.003,
+        },
+      ];
+
+      const result = await optimizer.findOptimalRoute({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1,
+        liquidityData,
+      });
+
+      expect(result.expectedOutput).toBe(1);
+    });
+
+    it('should handle extremely large amounts', async () => {
+      const liquidityData = [
+        {
+          venue: 'JUPITER',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 1_000_000_000_000, // 1000 SOL
+          outputAmount: 95_000_000_000, // 95k USDC (5% impact)
+          priceImpact: 0.05,
+          fee: 0.003,
+        },
+      ];
+
+      const result = await optimizer.findOptimalRoute({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000_000,
+        liquidityData,
+      });
+
+      expect(result.expectedOutput).toBe(95_000_000_000);
+      expect(result.priceImpact).toBe(0.05);
+    });
+  });
+
+  describe('Split Routing Logic', () => {
+    it('should calculate optimal split percentages', async () => {
+      const liquidityData = [
+        {
+          venue: 'VENUE_A',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 700_000_000, // 0.7 SOL
+          outputAmount: 70_000_000,
+          priceImpact: 0.001,
+          fee: 0.003,
+        },
+        {
+          venue: 'VENUE_B',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 300_000_000, // 0.3 SOL
+          outputAmount: 30_000_000,
+          priceImpact: 0.002,
+          fee: 0.002,
+        },
+      ];
+
+      const result = await optimizer.findOptimalRoute({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+        liquidityData,
+      });
+
+      // Should split 70% / 30%
+      expect(result.splits.VENUE_A).toBeCloseTo(0.7, 1);
+      expect(result.splits.VENUE_B).toBeCloseTo(0.3, 1);
+    });
+
+    it('should ensure split percentages sum to 1.0', async () => {
+      const liquidityData = [
+        {
+          venue: 'A',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 333_333_333,
+          outputAmount: 33_333_333,
+          priceImpact: 0.001,
+          fee: 0.003,
+        },
+        {
+          venue: 'B',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 333_333_333,
+          outputAmount: 33_333_333,
+          priceImpact: 0.001,
+          fee: 0.003,
+        },
+        {
+          venue: 'C',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 333_333_334,
+          outputAmount: 33_333_334,
+          priceImpact: 0.001,
+          fee: 0.003,
+        },
+      ];
+
+      const result = await optimizer.findOptimalRoute({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+        liquidityData,
+      });
+
+      const totalSplit = Object.values(result.splits).reduce((a, b) => a + b, 0);
+      expect(totalSplit).toBeCloseTo(1.0, 5);
+    });
+  });
+
+  describe('Performance', () => {
+    it('should optimize route in < 200ms', async () => {
+      const liquidityData = Array(10).fill(null).map((_, i) => ({
+        venue: `VENUE_${i}`,
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        inputAmount: 1_000_000_000,
+        outputAmount: 100_000_000 + Math.random() * 1_000_000,
+        priceImpact: Math.random() * 0.01,
+        fee: 0.003,
+      }));
+
+      const start = Date.now();
+      await optimizer.findOptimalRoute({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+        liquidityData,
+      });
+      const duration = Date.now() - start;
+
+      expect(duration).toBeLessThan(200);
+    });
+
+    it('should handle 20 venues efficiently', async () => {
+      const liquidityData = Array(20).fill(null).map((_, i) => ({
+        venue: `VENUE_${i}`,
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        inputAmount: 1_000_000_000,
+        outputAmount: 100_000_000 + Math.random() * 1_000_000,
+        priceImpact: Math.random() * 0.01,
+        fee: 0.003,
+      }));
+
+      const start = Date.now();
+      const result = await optimizer.findOptimalRoute({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+        liquidityData,
+      });
+      const duration = Date.now() - start;
+
+      expect(result).toBeDefined();
+      expect(duration).toBeLessThan(500);
+    });
+  });
+
+  describe('Deterministic Behavior', () => {
+    it('should return same result for same inputs', async () => {
+      const liquidityData = [
+        {
+          venue: 'JUPITER',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 1_000_000_000,
+          outputAmount: 100_000_000,
+          priceImpact: 0.001,
+          fee: 0.003,
+        },
+        {
+          venue: 'PHOENIX',
+          inputMint: MOCK_SOL_MINT,
+          outputMint: MOCK_USDC_MINT,
+          inputAmount: 1_000_000_000,
+          outputAmount: 100_500_000,
+          priceImpact: 0.0005,
+          fee: 0.002,
+        },
+      ];
+
+      const result1 = await optimizer.findOptimalRoute({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+        liquidityData,
+      });
+
+      const result2 = await optimizer.findOptimalRoute({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+        liquidityData,
+      });
+
+      expect(result1).toEqual(result2);
+    });
+  });
+});

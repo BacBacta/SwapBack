@@ -20,6 +20,7 @@ import { ClobTradeDirection } from "./ClobMath";
 import { OrcaService } from "./OrcaService";
 import { RaydiumService } from "./RaydiumService";
 import { StructuredLogger } from "../utils/StructuredLogger";
+import { RFQCompetitionService } from "./RFQCompetitionService";
 
 // ============================================================================
 // CONFIGURATION
@@ -537,10 +538,130 @@ export class LiquidityDataCollector {
   }
 
   /**
-   * Fetch RFQ (Jupiter, Metis) quote
-   * These are aggregators that already do routing
+   * Fetch RFQ (Jupiter, Metis) quote with competitive comparison
+   * Uses RFQCompetitionService to get best quote from multiple sources
    */
   private async fetchRFQLiquidity(
+    venue: VenueName,
+    inputMint: string,
+    outputMint: string,
+    inputAmount: number
+  ): Promise<LiquiditySource | null> {
+    try {
+      // Initialize RFQ competition service
+      const rfqService = new RFQCompetitionService(this.connection);
+
+      // Fetch quotes from all enabled sources (Jupiter, Metis)
+      console.log(`🎯 Fetching competitive RFQ quotes...`);
+      const result = await rfqService.fetchAllQuotes(
+        inputMint,
+        outputMint,
+        inputAmount
+      );
+
+      if (result.length === 0) {
+        console.warn("No RFQ quotes available");
+        return null;
+      }
+
+      // Get best quote based on scoring algorithm
+      const comparison = await rfqService.getBestQuote(result);
+      
+      if (!comparison || !comparison.comparison) {
+        console.warn("No valid comparison available");
+        return null;
+      }
+      
+      const bestQuote = comparison.bestQuote;
+
+      console.log(
+        `✅ Best RFQ: ${bestQuote.source} with ${bestQuote.outputAmount} output (score: ${comparison.comparison.find((c) => c.source === bestQuote.source)?.score.toFixed(2)})`
+      );
+
+      // Convert to LiquiditySource format
+      return {
+        venue: bestQuote.source as VenueName,
+        venueType: VenueType.RFQ,
+        tokenPair: [inputMint, outputMint],
+        depth: bestQuote.outputAmount * 10,
+        effectivePrice: bestQuote.effectivePrice,
+        feeAmount: bestQuote.fees,
+        slippagePercent: bestQuote.slippage / 100,
+        route: bestQuote.route || [inputMint, outputMint],
+        timestamp: Date.now(),
+        metadata: {
+          ...bestQuote.metadata,
+          rfqScore: comparison.comparison.find((c) => c.source === bestQuote.source)?.score || 0,
+          allQuotes: comparison.allQuotes.map((q) => ({
+            source: q.source,
+            outputAmount: q.outputAmount,
+          })),
+        },
+      };
+    } catch (error) {
+      console.error("RFQ competition error:", error);
+      
+      // Fallback to Jupiter only if competition fails
+      console.log("⚠️ RFQ competition failed, falling back to Jupiter");
+      return await this.fetchRFQWithTimeout(
+        VenueName.JUPITER,
+        inputMint,
+        outputMint,
+        inputAmount
+      );
+    }
+  }
+
+  /**
+   * Fetch RFQ quote with timeout protection
+   */
+  private async fetchRFQWithTimeout(
+    venue: VenueName,
+    inputMint: string,
+    outputMint: string,
+    inputAmount: number
+  ): Promise<LiquiditySource | null> {
+    const timeout = this.getRFQTimeout(venue);
+    
+    try {
+      const timeoutPromise = new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout")), timeout)
+      );
+
+      const fetchPromise = this.fetchRFQQuote(
+        venue,
+        inputMint,
+        outputMint,
+        inputAmount
+      );
+
+      const result = await Promise.race([fetchPromise, timeoutPromise]);
+      return result;
+    } catch (error) {
+      if (error instanceof Error && error.message === "Timeout") {
+        console.warn(`${venue} RFQ timeout after ${timeout}ms`);
+      } else {
+        console.error(`${venue} RFQ error:`, error);
+      }
+      return null;
+    }
+  }
+
+  /**
+   * Get timeout for specific RFQ venue
+   */
+  private getRFQTimeout(venue: VenueName): number {
+    const timeouts: Record<string, number> = {
+      [VenueName.JUPITER]: 2000, // 2s
+      [VenueName.METIS]: 3000, // 3s
+    };
+    return timeouts[venue] || 2500; // Default 2.5s
+  }
+
+  /**
+   * Fetch quote from specific RFQ venue
+   */
+  private async fetchRFQQuote(
     venue: VenueName,
     inputMint: string,
     outputMint: string,
@@ -556,10 +677,85 @@ export class LiquidityDataCollector {
       }
     }
 
-    // For other RFQ venues (Metis, etc), return null for now
-    // TODO: Implement Metis and other aggregator APIs
+    // Metis API integration
+    if (venue === VenueName.METIS) {
+      try {
+        return await this.fetchMetisQuote(inputMint, outputMint, inputAmount);
+      } catch (error) {
+        console.error("Metis API error:", error);
+        return null;
+      }
+    }
+
+    // For other RFQ venues, return null
     console.warn(`RFQ venue ${venue} not yet implemented`);
     return null;
+  }
+
+  /**
+   * Fetch quote from Metis aggregator
+   * @see https://docs.metis.ag/
+   */
+  private async fetchMetisQuote(
+    inputMint: string,
+    outputMint: string,
+    inputAmount: number
+  ): Promise<LiquiditySource | null> {
+    try {
+      const amountInSmallestUnit = Math.floor(inputAmount * 1e9);
+
+      // Metis API endpoint (to be confirmed with actual API)
+      const url = new URL("https://api.metis.ag/v1/quote");
+      url.searchParams.append("inputMint", inputMint);
+      url.searchParams.append("outputMint", outputMint);
+      url.searchParams.append("amount", amountInSmallestUnit.toString());
+      url.searchParams.append("slippageBps", "50");
+
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        console.warn(
+          `Metis API returned ${response.status}: ${response.statusText}`
+        );
+        return null;
+      }
+
+      const data = await response.json();
+
+      if (!data || !data.outputAmount) {
+        console.warn("Invalid Metis quote response:", data);
+        return null;
+      }
+
+      // Parse Metis response
+      const outputAmount = Number(data.outputAmount) / 1e9;
+      const priceImpact = Number(data.priceImpact ?? 0);
+      const route = data.route || [inputMint, outputMint];
+
+      return {
+        venue: VenueName.METIS,
+        venueType: VenueType.RFQ,
+        tokenPair: [inputMint, outputMint],
+        depth: outputAmount * 10,
+        effectivePrice: inputAmount / outputAmount,
+        feeAmount: data.fees?.total || 0,
+        slippagePercent: priceImpact / 100,
+        route,
+        timestamp: Date.now(),
+        metadata: {
+          marketMaker: data.marketMaker,
+          expiresAt: data.expiresAt,
+        },
+      };
+    } catch (error) {
+      console.error("Metis API error:", error);
+      return null;
+    }
   }
 
   /**

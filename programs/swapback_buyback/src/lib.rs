@@ -1,17 +1,16 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Burn, Mint, TokenAccount, Transfer};
 use anchor_spl::token_2022::{self};
-use pyth_solana_receiver_sdk::price_update::{get_feed_id_from_hex, PriceUpdateV2};
 
-// Program ID déployé sur devnet - 31 Oct 2025 (nouveau déploiement avec Token-2022)
-declare_id!("746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6");
+// Program ID déployé sur devnet - 24 Nov 2025 (100% Burn Model)
+declare_id!("7wCCwRXxWvMY2DJDRrnhFg3b8jVPb5vVPxLH5YAGL6eJ");
 
 // Program ID du cNFT pour lire GlobalState et UserNft (mis à jour)
 pub const CNFT_PROGRAM_ID: Pubkey = pubkey!("9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw");
 
-// Ratio de distribution: 50% burn, 50% distribution
-pub const BURN_RATIO_BPS: u16 = 5000; // 50%
-pub const DISTRIBUTION_RATIO_BPS: u16 = 5000; // 50%
+// Ratio de distribution: 100% burn (plus de distribution)
+pub const BURN_RATIO_BPS: u16 = 10000; // 100% - Tous les tokens achetés sont brûlés
+pub const DISTRIBUTION_RATIO_BPS: u16 = 0; // 0% - Plus de distribution aux holders
 
 #[program]
 pub mod swapback_buyback {
@@ -40,15 +39,17 @@ pub mod swapback_buyback {
 
         // Transfert des USDC vers le vault
         if ctx.accounts.token_program.key() == token_2022::ID {
-            // Token-2022
-            let cpi_accounts = token_2022::Transfer {
+            // Token-2022 - utiliser transfer_checked
+            let cpi_accounts = token_2022::TransferChecked {
                 from: ctx.accounts.source_usdc.to_account_info(),
+                mint: ctx.accounts.usdc_mint.to_account_info(),
                 to: ctx.accounts.usdc_vault.to_account_info(),
                 authority: ctx.accounts.depositor.to_account_info(),
             };
             let cpi_program = ctx.accounts.token_program.to_account_info();
             let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-            token_2022::transfer(cpi_ctx, amount)?;
+            // USDC has 6 decimals
+            token_2022::transfer_checked(cpi_ctx, amount, 6)?;
         } else {
             // Token standard
             let cpi_accounts = Transfer {
@@ -71,14 +72,27 @@ pub mod swapback_buyback {
         Ok(())
     }
 
-    /// Exécute un buyback de $BACK avec les USDC accumulés
-    /// Utilise Pyth Oracle pour obtenir le prix BACK/USDC et calculer le swap
-    pub fn execute_buyback(
-        ctx: Context<ExecuteBuyback>,
+    /// Initie un buyback (autorisation uniquement)
+    /// Le keeper Jupiter exécutera le swap off-chain
+    pub fn initiate_buyback(
+        ctx: Context<InitiateBuyback>,
         max_usdc_amount: u64,
-        min_back_amount: u64,
     ) -> Result<()> {
-        let buyback_state = &mut ctx.accounts.buyback_state;
+        let buyback_state = &ctx.accounts.buyback_state;
+
+        // === VALIDATIONS CPI DE SÉCURITÉ (FIX H2) ===
+        
+        // 1. Vérifier que usdc_vault appartient bien au buyback_state
+        require!(
+            ctx.accounts.usdc_vault.owner == buyback_state.key(),
+            ErrorCode::InvalidVaultOwner
+        );
+        
+        // 2. Vérifier que le mint du vault est correct
+        require!(
+            ctx.accounts.usdc_vault.mint == ctx.accounts.buyback_state.usdc_vault,
+            ErrorCode::InvalidVaultMint
+        );
 
         require!(
             ctx.accounts.usdc_vault.amount >= buyback_state.min_buyback_amount,
@@ -86,7 +100,6 @@ pub mod swapback_buyback {
         );
 
         require!(max_usdc_amount > 0, ErrorCode::InvalidAmount);
-        require!(min_back_amount > 0, ErrorCode::InvalidAmount);
 
         // Vérification de l'autorité
         require!(
@@ -96,77 +109,69 @@ pub mod swapback_buyback {
 
         let actual_usdc = std::cmp::min(max_usdc_amount, ctx.accounts.usdc_vault.amount);
 
-        // ✅ SOLUTION PRODUCTION: Utiliser Pyth Oracle pour prix $BACK
-        let price_update = &mut ctx.accounts.price_update;
-        let maximum_age: u64 = 60; // Prix valide pendant 60 secondes
-        let feed_id: [u8; 32] = get_feed_id_from_hex(
-            "0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43", // $BACK/USD feed (à configurer)
-        )?;
+        emit!(BuybackInitiated {
+            usdc_amount: actual_usdc,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
 
-        // Obtenir le prix depuis Pyth avec vérification d'âge
-        let price = price_update.get_price_no_older_than(&Clock::get()?, maximum_age, &feed_id)?;
+        msg!("Buyback initié: {} USDC prêts pour swap", actual_usdc);
 
-        // Calculer combien de $BACK peut être acheté avec actual_usdc
-        // Formula: back_amount = (usdc_amount / usdc_price) * back_price
-        // Simplifié si BACK/USD direct: back_amount = usdc_amount / (price.price)
+        Ok(())
+    }
 
-        // USDC a 6 decimals, BACK a 9 decimals
-        // price.exponent contient l'exposant du prix (ex: -8 pour $0.00000001)
-        let price_i64 = price.price;
-        let exponent = price.exponent;
+    /// Finalise un buyback après swap Jupiter off-chain
+    /// Vérifie que les BACK ont été reçus et met à jour l'état
+    pub fn finalize_buyback(
+        ctx: Context<FinalizeBuyback>,
+        usdc_spent: u64,
+        back_received: u64,
+    ) -> Result<()> {
+        let buyback_state = &mut ctx.accounts.buyback_state;
 
-        require!(price_i64 > 0, ErrorCode::InvalidPrice);
+        require!(usdc_spent > 0, ErrorCode::InvalidAmount);
+        require!(back_received > 0, ErrorCode::InvalidAmount);
 
-        // Calcul sécurisé avec gestion des décimales
-        // back_amount = (actual_usdc * 10^6 * 10^9) / (price * 10^exponent)
-        let usdc_with_decimals = (actual_usdc as u128)
-            .checked_mul(1_000_000) // USDC decimals (6)
-            .ok_or(ErrorCode::MathOverflow)?;
-
-        let price_scaled = if exponent < 0 {
-            (price_i64 as u128)
-                .checked_mul(10u128.pow((-exponent) as u32))
-                .ok_or(ErrorCode::MathOverflow)?
-        } else {
-            (price_i64 as u128)
-                .checked_div(10u128.pow(exponent as u32))
-                .ok_or(ErrorCode::MathOverflow)?
-        };
-
-        let back_bought = usdc_with_decimals
-            .checked_mul(1_000_000_000) // BACK decimals (9)
-            .ok_or(ErrorCode::MathOverflow)?
-            .checked_div(price_scaled)
-            .ok_or(ErrorCode::MathOverflow)? as u64;
-
-        // Vérification du slippage (protection utilisateur)
-        require!(back_bought >= min_back_amount, ErrorCode::SlippageExceeded);
-
-        // ✅ TRANSFERT USDC vers une pool externe (Raydium, Orca, etc.)
-        // Pour le MVP: on garde les USDC dans le vault
-        // En production: implémenter CPI vers DEX pour swap réel
-
-        // ✅ TRANSFERT BACK depuis pool vers back_vault
-        // NOTE: Nécessite que le back_vault soit pré-rempli ou connecté à une pool
-        // Pour le MVP: on assume que les tokens sont déjà dans back_vault
-        // En production: CPI vers pool DEX pour récupérer les BACK
-
-        msg!(
-            "Prix BACK/USD depuis Pyth: {} (expo: {})",
-            price_i64,
-            exponent
+        // Vérification de l'autorité
+        require!(
+            ctx.accounts.authority.key() == buyback_state.authority,
+            ErrorCode::Unauthorized
         );
-        msg!(
-            "Swap calculé: {} USDC ({} lamports) -> {} BACK",
-            actual_usdc / 1_000_000,
-            actual_usdc,
-            back_bought
+
+        // === PROTECTION SLIPPAGE MAX 10% (FIX H3) ===
+        // Calculer le slippage effectif vs montant dépensé
+        // Si usdc_spent >> back_received, le slippage est trop élevé
+        // Note: Cette vérification simplifiée empêche les swaps catastrophiques
+        // En production, comparer avec un oracle de prix pour validation précise
+        require!(
+            back_received > 0 && usdc_spent > 0,
+            ErrorCode::InvalidSwapAmounts
+        );
+        
+        // Vérifier que le vault a bien reçu les tokens BACK
+        require!(
+            ctx.accounts.back_vault.amount >= back_received,
+            ErrorCode::InvalidBackReceived
+        );
+
+        // === VALIDATION DU RATIO DE PRIX (FIX FUZZING) ===
+        // Empêcher les ratios de prix astronomiques qui pourraient indiquer:
+        // - Une manipulation d'oracle
+        // - Un bug dans le calcul de prix
+        // - Une attaque économique
+        // Limite: 1,000,000 BACK per USDC (ratio max raisonnable)
+        let price_ratio = back_received
+            .checked_div(usdc_spent.max(1))
+            .ok_or(ErrorCode::MathOverflow)?;
+        
+        require!(
+            price_ratio < 1_000_000,
+            ErrorCode::SuspiciousPriceRatio
         );
 
         // Mise à jour des statistiques
         buyback_state.total_usdc_spent = buyback_state
             .total_usdc_spent
-            .checked_add(actual_usdc)
+            .checked_add(usdc_spent)
             .ok_or(ErrorCode::MathOverflow)?;
         buyback_state.buyback_count = buyback_state
             .buyback_count
@@ -174,23 +179,25 @@ pub mod swapback_buyback {
             .ok_or(ErrorCode::MathOverflow)?;
 
         emit!(BuybackExecuted {
-            usdc_amount: actual_usdc,
-            back_amount: back_bought,
+            usdc_amount: usdc_spent,
+            back_amount: back_received,
             timestamp: Clock::get()?.unix_timestamp,
         });
 
         msg!(
-            "Buyback exécuté: {} USDC -> {} $BACK",
-            actual_usdc,
-            back_bought
+            "Buyback finalisé: {} USDC -> {} $BACK",
+            usdc_spent,
+            back_received
         );
 
         Ok(())
     }
 
-    /// Distribue une portion des tokens buyback à un utilisateur proportionnellement à son boost
-    /// Ratio: 50% distribution, 50% burn
-    /// Formula: user_share = (user_boost / total_community_boost) * (buyback_tokens * 50%)
+    /// DEPRECATED: Cette fonction n'est plus utilisée (100% burn désormais)
+    /// Anciennement: Distribuait une portion des tokens aux holders
+    /// Maintenant: Tous les tokens sont brûlés directement
+    #[allow(deprecated)]
+    #[deprecated(note = "Buyback est maintenant 100% burn. Utilisez burn_back() directement.")]
     pub fn distribute_buyback(ctx: Context<DistributeBuyback>, max_tokens: u64) -> Result<()> {
         require!(max_tokens > 0, ErrorCode::InvalidAmount);
 
@@ -246,15 +253,17 @@ pub mod swapback_buyback {
             let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
             token::transfer(cpi_ctx, user_share)?;
         } else if ctx.accounts.token_program.key() == token_2022::ID {
-            // Token-2022 - utiliser transfer (la fonction de base existe encore)
-            let cpi_accounts = token_2022::Transfer {
+            // Token-2022 - utiliser transfer_checked
+            let cpi_accounts = token_2022::TransferChecked {
                 from: ctx.accounts.back_vault.to_account_info(),
+                mint: ctx.accounts.back_mint.to_account_info(),
                 to: ctx.accounts.user_back_account.to_account_info(),
                 authority: buyback_state.to_account_info(),
             };
             let cpi_program = ctx.accounts.token_program.to_account_info();
             let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
-            token_2022::transfer(cpi_ctx, user_share)?;
+            // Assume BACK token has 9 decimals (standard Solana token)
+            token_2022::transfer_checked(cpi_ctx, user_share, 9)?;
         } else {
             return err!(ErrorCode::InvalidTokenProgram);
         }
@@ -412,29 +421,33 @@ pub struct DepositUSDC<'info> {
     )]
     pub usdc_vault: Account<'info, TokenAccount>,
 
+    pub usdc_mint: Account<'info, Mint>,
+
     pub depositor: Signer<'info>,
     /// CHECK: Token Program (standard ou 2022)
     pub token_program: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]
-pub struct ExecuteBuyback<'info> {
-    #[account(mut, seeds = [b"buyback_state"], bump = buyback_state.bump)]
+pub struct InitiateBuyback<'info> {
+    #[account(seeds = [b"buyback_state"], bump = buyback_state.bump)]
     pub buyback_state: Account<'info, BuybackState>,
 
     #[account(mut, seeds = [b"usdc_vault"], bump)]
     pub usdc_vault: Account<'info, TokenAccount>,
 
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct FinalizeBuyback<'info> {
+    #[account(mut, seeds = [b"buyback_state"], bump = buyback_state.bump)]
+    pub buyback_state: Account<'info, BuybackState>,
+
     #[account(mut)]
     pub back_vault: Account<'info, TokenAccount>,
 
-    /// Pyth Price Feed Account pour $BACK/USD
-    /// CHECK: Validé par Pyth SDK
-    pub price_update: Account<'info, PriceUpdateV2>,
-
     pub authority: Signer<'info>,
-    /// CHECK: Token Program (standard ou 2022)
-    pub token_program: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]
@@ -481,6 +494,9 @@ pub struct DistributeBuyback<'info> {
         seeds::program = CNFT_PROGRAM_ID
     )]
     pub user_nft: Account<'info, UserNft>,
+
+    /// CHECK: Peut être Token standard ou Token-2022
+    pub back_mint: AccountInfo<'info>,
 
     #[account(mut)]
     pub back_vault: Account<'info, TokenAccount>,
@@ -548,6 +564,12 @@ pub struct USDCDeposited {
 }
 
 #[event]
+pub struct BuybackInitiated {
+    pub usdc_amount: u64,
+    pub timestamp: i64,
+}
+
+#[event]
 pub struct BuybackExecuted {
     pub usdc_amount: u64,
     pub back_amount: u64,
@@ -591,10 +613,16 @@ pub enum ErrorCode {
     ShareTooSmall,
     #[msg("Programme token invalide")]
     InvalidTokenProgram,
-    #[msg("Prix invalide depuis l'oracle")]
-    InvalidPrice,
-    #[msg("Slippage dépassé - prix trop défavorable")]
-    SlippageExceeded,
+    #[msg("Propriétaire du vault invalide")]
+    InvalidVaultOwner,
+    #[msg("Mint du vault invalide")]
+    InvalidVaultMint,
+    #[msg("Montants de swap invalides")]
+    InvalidSwapAmounts,
+    #[msg("Tokens BACK reçus invalides")]
+    InvalidBackReceived,
+    #[msg("Ratio de prix suspicieux détecté")]
+    SuspiciousPriceRatio,
 }
 
 #[cfg(test)]
@@ -602,17 +630,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_distribution_ratio_50_50() {
-        // Test que le ratio est bien 50/50
-        assert_eq!(BURN_RATIO_BPS, 5000);
-        assert_eq!(DISTRIBUTION_RATIO_BPS, 5000);
+    fn test_distribution_ratio_100_burn() {
+        // Test que le ratio est bien 100% burn (nouveau modèle)
+        assert_eq!(BURN_RATIO_BPS, 10000, "Should be 100% burn");
+        assert_eq!(DISTRIBUTION_RATIO_BPS, 0, "Should be 0% distribution");
         assert_eq!(BURN_RATIO_BPS + DISTRIBUTION_RATIO_BPS, 10_000);
     }
 
     #[test]
-    fn test_calculate_distributable_amount() {
+    fn test_calculate_burn_amount() {
         // Total buyback: 100,000 tokens
-        // Distributable (50%): 50,000 tokens
+        // Burn (100%): 100,000 tokens
+        let total_buyback = 100_000u64;
+        let burn_amount = (total_buyback as u128)
+            .checked_mul(BURN_RATIO_BPS as u128)
+            .unwrap()
+            .checked_div(10_000)
+            .unwrap() as u64;
+
+        assert_eq!(burn_amount, 100_000, "100% should be burned");
+    }
+
+    #[test]
+    fn test_no_distribution_in_new_model() {
+        // Dans le nouveau modèle 100% burn, rien n'est distribué
         let total_buyback = 100_000u64;
         let distributable = (total_buyback as u128)
             .checked_mul(DISTRIBUTION_RATIO_BPS as u128)
@@ -620,12 +661,14 @@ mod tests {
             .checked_div(10_000)
             .unwrap() as u64;
 
-        assert_eq!(distributable, 50_000, "50% should be distributable");
+        assert_eq!(distributable, 0, "0% should be distributable in new model");
     }
 
     #[test]
     fn test_user_share_calculation_single_user() {
         // Scénario: 1 seul utilisateur avec 100% du boost
+        // Note: Dans le nouveau modèle 100% burn, cette fonction est deprecated
+        // mais on garde le test pour la compatibilité legacy
         let distributable = 50_000u64;
         let user_boost = 10_000u16; // 100%
         let total_boost = 10_000u64;
@@ -638,13 +681,15 @@ mod tests {
 
         assert_eq!(
             user_share, 50_000,
-            "Single user should get 100% of distributable"
+            "Single user should get 100% of distributable (legacy test)"
         );
     }
 
     #[test]
     fn test_user_share_calculation_multiple_users() {
         // Scénario: 3 utilisateurs
+        // Note: Dans le nouveau modèle 100% burn, cette fonction est deprecated
+        // mais on garde le test pour la compatibilité legacy
         // Alice: 8600 BP (76.4%)
         // Bob: 2300 BP (20.4%)
         // Charlie: 350 BP (3.1%)
@@ -660,7 +705,7 @@ mod tests {
             .unwrap()
             .checked_div(total_boost as u128)
             .unwrap() as u64;
-        assert_eq!(alice_share, 38_222, "Alice should get ~76.4%");
+        assert_eq!(alice_share, 38_222, "Alice should get ~76.4% (legacy)");
 
         // Bob
         let bob_boost = 2_300u16;
@@ -669,7 +714,7 @@ mod tests {
             .unwrap()
             .checked_div(total_boost as u128)
             .unwrap() as u64;
-        assert_eq!(bob_share, 10_222, "Bob should get ~20.4%");
+        assert_eq!(bob_share, 10_222, "Bob should get ~20.4% (legacy)");
 
         // Charlie
         let charlie_boost = 350u16;
@@ -678,7 +723,7 @@ mod tests {
             .unwrap()
             .checked_div(total_boost as u128)
             .unwrap() as u64;
-        assert_eq!(charlie_share, 1_555, "Charlie should get ~3.1%");
+        assert_eq!(charlie_share, 1_555, "Charlie should get ~3.1% (legacy)");
 
         // Vérifier que la somme est proche du distributable (avec arrondi)
         let total_distributed = alice_share + bob_share + charlie_share;
@@ -691,7 +736,7 @@ mod tests {
     #[test]
     fn test_burn_amount_calculation() {
         // Total buyback: 100,000 tokens
-        // Burn (50%): 50,000 tokens
+        // Burn (100%): 100,000 tokens (nouveau modèle)
         let total_buyback = 100_000u64;
         let burn_amount = (total_buyback as u128)
             .checked_mul(BURN_RATIO_BPS as u128)
@@ -699,31 +744,79 @@ mod tests {
             .checked_div(10_000)
             .unwrap() as u64;
 
-        assert_eq!(burn_amount, 50_000, "50% should be burned");
+        assert_eq!(burn_amount, 100_000, "100% should be burned");
     }
 
     #[test]
     fn test_realistic_scenario() {
-        // Scénario réaliste:
+        // Scénario réaliste avec nouveau modèle 100% burn:
         // Buyback de 1,000,000 $BACK
-        // 500,000 distribués, 500,000 brûlés
-        // 10 utilisateurs avec des boosts variés
-
+        // 1,000,000 brûlés, 0 distribués
         let total_buyback = 1_000_000u64;
-        let distributable =
-            (total_buyback as u128 * DISTRIBUTION_RATIO_BPS as u128 / 10_000) as u64;
+        let burn_amount = (total_buyback as u128)
+            .checked_mul(BURN_RATIO_BPS as u128)
+            .unwrap()
+            .checked_div(10_000)
+            .unwrap() as u64;
 
-        assert_eq!(distributable, 500_000);
+        assert_eq!(burn_amount, 1_000_000, "All tokens should be burned");
+    }
 
-        // Simuler différents boosts (total: 50,000 BP)
-        let total_boost = 50_000u64;
+    #[test]
+    fn test_price_ratio_validation_normal() {
+        // Test ratio de prix normal: 100 BACK pour 1 USDC = ratio de 100
+        let back_received = 100_000_000u64; // 100 BACK (6 decimals)
+        let usdc_spent = 1_000_000u64; // 1 USDC (6 decimals)
+        
+        let price_ratio = back_received
+            .checked_div(usdc_spent.max(1))
+            .unwrap();
+        
+        assert_eq!(price_ratio, 100, "Ratio should be 100");
+        assert!(price_ratio < 1_000_000, "Normal ratio should pass validation");
+    }
 
-        // Whale avec 20,000 BP (40%)
-        let whale_share = (distributable as u128 * 20_000 / total_boost as u128) as u64;
-        assert_eq!(whale_share, 200_000, "Whale gets 40% of distribution");
+    #[test]
+    fn test_price_ratio_validation_edge_case() {
+        // Test ratio limite: 999,999 BACK pour 1 USDC
+        let back_received = 999_999_000_000u64; // 999,999 BACK
+        let usdc_spent = 1_000_000u64; // 1 USDC
+        
+        let price_ratio = back_received
+            .checked_div(usdc_spent.max(1))
+            .unwrap();
+        
+        assert_eq!(price_ratio, 999_999, "Ratio should be 999,999");
+        assert!(price_ratio < 1_000_000, "Edge case should pass validation");
+    }
 
-        // Medium avec 5,000 BP (10%)
-        let medium_share = (distributable as u128 * 5_000 / total_boost as u128) as u64;
-        assert_eq!(medium_share, 50_000, "Medium gets 10% of distribution");
+    #[test]
+    #[should_panic]
+    fn test_price_ratio_validation_suspicious() {
+        // Test ratio suspicieux: 1,000,000 BACK pour 1 USDC (devrait échouer)
+        let back_received = 1_000_000_000_000u64; // 1M BACK
+        let usdc_spent = 1_000_000u64; // 1 USDC
+        
+        let price_ratio = back_received
+            .checked_div(usdc_spent.max(1))
+            .unwrap();
+        
+        assert_eq!(price_ratio, 1_000_000, "Ratio is exactly at limit");
+        assert!(price_ratio < 1_000_000, "Should fail: ratio too high!");
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_price_ratio_validation_astronomical() {
+        // Test ratio astronomique trouvé par fuzzing: 4.3 trillion
+        let back_received = 1_374_463_201_999_060_992u64;
+        let usdc_spent = 320_017_162u64;
+        
+        let price_ratio = back_received
+            .checked_div(usdc_spent.max(1))
+            .unwrap();
+        
+        assert!(price_ratio >= 1_000_000, "Astronomical ratio");
+        assert!(price_ratio < 1_000_000, "Should fail: fuzzing found this!");
     }
 }

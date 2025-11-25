@@ -175,15 +175,15 @@ export class OpenBookService {
   }
 
   private orderbookToLevels(bids: Orderbook, asks: Orderbook): OrderbookLevels {
-    const mapSide = (levels: Array<[number, number]>): OrderbookLevel[] =>
+    const mapSide = (levels: Array<[number, number, any?, any?]>): OrderbookLevel[] =>
       levels.slice(0, this.ladderDepth).map(([price, size]) => ({
         price: Number(price),
         size: Number(size),
       }));
 
     return {
-      bids: mapSide(bids.getL2(this.ladderDepth)),
-      asks: mapSide(asks.getL2(this.ladderDepth)),
+      bids: mapSide(bids.getL2(this.ladderDepth) as any),
+      asks: mapSide(asks.getL2(this.ladderDepth) as any),
     };
   }
 }

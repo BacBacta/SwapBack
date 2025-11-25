@@ -1,30 +1,28 @@
-import { describe, it, vi, beforeEach } from "vitest";
-import type { Mock } from "vitest";
 import { Connection } from "@solana/web3.js";
 import { OraclePriceService } from "../src/services/OraclePriceService";
 import { VenueName, RouteCandidate } from "../src/types/smart-router";
 import { parsePriceData } from "@pythnetwork/client";
 
 // Mock Solana connection
-vi.mock("@solana/web3.js", () => ({
-  Connection: vi.fn().mockImplementation(() => ({
-    getAccountInfo: vi.fn(),
+jest.mock("@solana/web3.js", () => ({
+  Connection: jest.fn().mockImplementation(() => ({
+    getAccountInfo: jest.fn(),
   })),
-  clusterApiUrl: vi.fn(),
-  PublicKey: vi.fn().mockImplementation((value) => ({
-    toString: vi.fn(() => value),
-    toBase58: vi.fn(() => value),
-    toBytes: vi.fn(() => new Uint8Array()),
-    toBuffer: vi.fn(() => Buffer.from([])),
+  clusterApiUrl: jest.fn(),
+  PublicKey: jest.fn().mockImplementation((value) => ({
+    toString: jest.fn(() => value),
+    toBase58: jest.fn(() => value),
+    toBytes: jest.fn(() => new Uint8Array()),
+    toBuffer: jest.fn(() => Buffer.from([])),
   })),
 }));
 
-vi.mock("@pythnetwork/client", () => ({
-  parsePriceData: vi.fn(),
+jest.mock("@pythnetwork/client", () => ({
+  parsePriceData: jest.fn(),
 }));
 
-vi.mock("@switchboard-xyz/solana.js", () => ({
-  AggregatorAccount: vi.fn(),
+jest.mock("@switchboard-xyz/solana.js", () => ({
+  AggregatorAccount: jest.fn(),
 }));
 
 describe("Pyth Oracle Integration", () => {
@@ -32,7 +30,7 @@ describe("Pyth Oracle Integration", () => {
   let mockConnection: any;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     mockConnection = new Connection("mock-url");
     oracleService = new OraclePriceService(mockConnection, 5000);
 
@@ -43,9 +41,9 @@ describe("Pyth Oracle Integration", () => {
       executable: false,
     };
 
-    (mockConnection.getAccountInfo as Mock).mockResolvedValue(accountInfo);
+    (mockConnection.getAccountInfo as jest.Mock).mockResolvedValue(accountInfo);
 
-    (parsePriceData as Mock).mockReturnValue({
+    (parsePriceData as jest.Mock).mockReturnValue({
       price: BigInt(100_000_000_00),
       confidence: BigInt(500_000_00),
       exponent: -8,

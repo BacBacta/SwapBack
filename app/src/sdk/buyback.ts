@@ -54,8 +54,8 @@ export interface BuybackEstimation {
 /**
  * Dérive l'adresse PDA du buyback state
  */
-export function getBuybackStatePDA(): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
+export async function getBuybackStatePDA(): Promise<[PublicKey, number]> {
+  return PublicKey.findProgramAddress(
     [Buffer.from('buyback_state')],
     BUYBACK_PROGRAM_ID
   );
@@ -64,8 +64,8 @@ export function getBuybackStatePDA(): [PublicKey, number] {
 /**
  * Dérive l'adresse PDA du USDC vault
  */
-export function getUsdcVaultPDA(): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
+export async function getUsdcVaultPDA(): Promise<[PublicKey, number]> {
+  return PublicKey.findProgramAddress(
     [Buffer.from('usdc_vault')],
     BUYBACK_PROGRAM_ID
   );
@@ -81,7 +81,7 @@ export async function getBuybackStats(
   connection: Connection
 ): Promise<BuybackState | null> {
   try {
-    const [buybackStatePDA] = getBuybackStatePDA();
+    const [buybackStatePDA] = await getBuybackStatePDA();
     
     const accountInfo = await connection.getAccountInfo(buybackStatePDA);
     if (!accountInfo) {
@@ -163,7 +163,7 @@ export async function estimateNextBuyback(
     }
 
     // Get USDC vault balance
-    const [usdcVaultPDA] = getUsdcVaultPDA();
+    const [usdcVaultPDA] = await getUsdcVaultPDA();
     const vaultInfo = await connection.getTokenAccountBalance(usdcVaultPDA);
     const usdcAvailable = vaultInfo.value.uiAmount || 0;
 
@@ -241,8 +241,8 @@ export async function executeBuyback(
 ): Promise<string> {
   try {
     // Get PDAs
-    const [buybackStatePDA] = getBuybackStatePDA();
-    const [usdcVaultPDA] = getUsdcVaultPDA();
+    const [buybackStatePDA] = await getBuybackStatePDA();
+    const [usdcVaultPDA] = await getUsdcVaultPDA();
 
     // Get $BACK vault (owned by buyback program)
     const backVault = await getAssociatedTokenAddress(
@@ -289,7 +289,7 @@ export async function executeBuyback(
     // Create and send transaction
     const transaction = new Transaction().add(instruction);
     transaction.feePayer = authority.publicKey;
-    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
 
     const signature = await connection.sendTransaction(transaction, [authority], {
       skipPreflight: false,
@@ -320,8 +320,8 @@ export async function initializeBuyback(
   minBuybackAmount: number = 100_000_000 // 100 USDC par défaut
 ): Promise<string> {
   try {
-    const [buybackStatePDA] = getBuybackStatePDA();
-    const [usdcVaultPDA] = getUsdcVaultPDA();
+    const [buybackStatePDA] = await getBuybackStatePDA();
+    const [usdcVaultPDA] = await getUsdcVaultPDA();
 
     // Build instruction data
     const discriminator = Buffer.from([0xaf, 0xaf, 0x6d, 0x1f, 0x0d, 0x98, 0x9b, 0xed]); // initialize
@@ -349,7 +349,7 @@ export async function initializeBuyback(
 
     const transaction = new Transaction().add(instruction);
     transaction.feePayer = authority.publicKey;
-    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
 
     const signature = await connection.sendTransaction(transaction, [authority]);
     await connection.confirmTransaction(signature);
@@ -398,8 +398,8 @@ export async function depositUsdc(
   amount: number
 ): Promise<string> {
   try {
-    const [buybackStatePDA] = getBuybackStatePDA();
-    const [usdcVaultPDA] = getUsdcVaultPDA();
+    const [buybackStatePDA] = await getBuybackStatePDA();
+    const [usdcVaultPDA] = await getUsdcVaultPDA();
 
     // Get user's USDC token account
     const userUsdcAccount = await getAssociatedTokenAddress(
@@ -429,7 +429,7 @@ export async function depositUsdc(
 
     const transaction = new Transaction().add(instruction);
     transaction.feePayer = payer.publicKey;
-    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
 
     // Sign and send
     let signature: string;

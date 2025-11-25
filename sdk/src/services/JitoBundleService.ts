@@ -15,7 +15,11 @@ import {
   JitoBundleConfig,
   JitoBundleResult,
   RouteCandidate,
+  BundleEligibilityConfig,
+  BundleEligibilityResult,
+  BundleEligibilityFactors,
 } from "../types/smart-router";
+import { BundleOptimizer } from "./BundleOptimizer";
 
 // ============================================================================
 // JITO BUNDLE SERVICE
@@ -38,6 +42,7 @@ export class JitoBundleService {
   private readonly jitoBlockEngineUrl: string;
   private readonly defaultTipLamports: number;
   private readonly tipAccounts: PublicKey[];
+  private readonly optimizer: BundleOptimizer;
 
   constructor(
     connection: Connection,
@@ -47,6 +52,7 @@ export class JitoBundleService {
     this.connection = connection;
     this.jitoBlockEngineUrl = jitoBlockEngineUrl;
     this.defaultTipLamports = defaultTipLamports;
+    this.optimizer = new BundleOptimizer();
     this.tipAccounts = [
       "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
       "HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe",
@@ -122,6 +128,14 @@ export class JitoBundleService {
     }
 
     try {
+      // Log bundle details
+      console.log(`📦 Submitting Jito bundle with ${transactions.length} transaction(s)`);
+      
+      // NOTE: BundleOptimizer should be called BEFORE transaction construction
+      // in SwapExecutor.buildTransactionsForRoute() to optimize instructions
+      // before they are serialized into Transaction objects.
+      // Here we receive already-built transactions, so optimization happens upstream.
+
       // Add tip instruction to first transaction if tipLamports > 0
       if (bundleConfig.tipLamports > 0 && transactions.length > 0) {
         const tipAccount = this.pickTipAccount();
@@ -133,12 +147,15 @@ export class JitoBundleService {
           lamports: bundleConfig.tipLamports,
         });
         transactions[0].add(tipInstruction);
+        console.log(`   💰 Tip: ${bundleConfig.tipLamports} lamports → ${tipAccount.toBase58().slice(0, 8)}...`);
       }
 
       // Serialize transactions
       const serializedTxs = transactions.map((tx) => {
         return tx.serialize({ requireAllSignatures: false }).toString("base64");
       });
+
+      console.log(`   🚀 Submitting to Jito Block Engine: ${this.jitoBlockEngineUrl}`);
 
       // Submit to Jito block engine
       const response = await fetch(this.jitoBlockEngineUrl, {
@@ -161,6 +178,8 @@ export class JitoBundleService {
           `Jito bundle submission failed: ${result.error.message}`
         );
       }
+
+      console.log(`   ✅ Bundle submitted: ${result.result}`);
 
       return {
         bundleId: result.result,
@@ -353,6 +372,107 @@ export class JitoBundleService {
  * Analyzes routes for MEV risk and recommends protection strategies
  */
 export class MEVProtectionAnalyzer {
+  private readonly defaultConfig: BundleEligibilityConfig = {
+    minTradeValueUSD: 10000, // $10k
+    minTradeValueSOL: 10, // 10 SOL
+    forceForHighRisk: true,
+    forceForAMMOnly: true,
+    forceForLargeTrades: true,
+    forceForHighSlippage: true,
+  };
+
+  /**
+   * Determine if a swap should use bundle protection
+   * Analyzes trade value, MEV risk, route characteristics
+   */
+  isEligibleForBundling(
+    route: RouteCandidate,
+    tradeValueUSD: number,
+    inputMint: string,
+    inputAmount: number,
+    config?: Partial<BundleEligibilityConfig>
+  ): BundleEligibilityResult {
+    const cfg: BundleEligibilityConfig = {
+      ...this.defaultConfig,
+      ...config,
+    };
+
+    // Check if input is SOL
+    const SOL_MINT = "So11111111111111111111111111111111111111112";
+    const isSOL = inputMint === SOL_MINT;
+
+    // Check USD threshold
+    const meetsUSDThreshold = tradeValueUSD >= cfg.minTradeValueUSD;
+
+    // Check SOL threshold (if input is SOL)
+    const meetsSOLThreshold = isSOL && inputAmount >= cfg.minTradeValueSOL;
+
+    // Determine if threshold met
+    const meetsValueThreshold = meetsUSDThreshold || meetsSOLThreshold;
+
+    // MEV risk analysis
+    const mevAnalysis = this.assessMEVRisk(route);
+    const hasHighMEVRisk =
+      mevAnalysis.riskLevel === "high" || mevAnalysis.riskLevel === "medium";
+
+    // AMM-only check
+    const isAMMOnly = route.splits.every(
+      (s) => s.liquiditySource.venueType === "amm"
+    );
+
+    // High slippage check (>1%)
+    const hasHighSlippage = route.splits.some(
+      (s) => s.liquiditySource.slippagePercent > 0.01
+    );
+
+    // Large trade check
+    const isLargeTrade =
+      tradeValueUSD >= cfg.minTradeValueUSD ||
+      (isSOL && inputAmount >= cfg.minTradeValueSOL);
+
+    // Build eligibility factors
+    const eligibilityFactors: BundleEligibilityFactors = {
+      meetsValueThreshold,
+      hasHighMEVRisk,
+      isAMMOnly,
+      hasHighSlippage,
+      isLargeTrade,
+    };
+
+    // Determine eligibility
+    let eligible = false;
+    let reason = "";
+
+    if (meetsValueThreshold) {
+      eligible = true;
+      reason = isSOL
+        ? `Trade size ${inputAmount.toFixed(2)} SOL >= ${cfg.minTradeValueSOL} SOL threshold`
+        : `Trade value $${tradeValueUSD.toFixed(0)} >= $${cfg.minTradeValueUSD} threshold`;
+    } else if (hasHighMEVRisk && cfg.forceForHighRisk) {
+      eligible = true;
+      reason = `MEV risk ${mevAnalysis.riskLevel} - protection recommended`;
+    } else if (isAMMOnly && cfg.forceForAMMOnly) {
+      eligible = true;
+      reason = "AMM-only route vulnerable to sandwich attacks";
+    } else if (hasHighSlippage && cfg.forceForHighSlippage) {
+      eligible = true;
+      reason = "High slippage tolerance (>1%) increases MEV risk";
+    } else {
+      reason = "Below thresholds and low MEV risk";
+    }
+
+    // Calculate recommended tip
+    const recommendedTipLamports = this.calculateRecommendedTip(tradeValueUSD);
+
+    return {
+      eligible,
+      reason,
+      eligibilityFactors,
+      recommendedTipLamports,
+      riskLevel: mevAnalysis.riskLevel,
+    };
+  }
+
   /**
    * Assess MEV risk for a route
    */

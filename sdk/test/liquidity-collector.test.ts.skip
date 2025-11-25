@@ -1,0 +1,542 @@
+import { LiquidityDataCollector } from '../src/services/LiquidityDataCollector';
+import { Connection, PublicKey } from '@solana/web3.js';
+
+// Mock external APIs
+jest.mock('axios');
+jest.mock('@ellipsis-labs/phoenix-sdk');
+jest.mock('@orca-so/whirlpools-sdk');
+
+describe('LiquidityDataCollector', () => {
+  let collector: LiquidityDataCollector;
+  let connection: Connection;
+
+  const MOCK_SOL_MINT = 'So11111111111111111111111111111111111111112';
+  const MOCK_USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+
+  beforeEach(() => {
+    connection = new Connection('https://api.devnet.solana.com', 'confirmed');
+    collector = new LiquidityDataCollector(connection);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('fetchLiquidity()', () => {
+    it('should fetch liquidity from all venues', async () => {
+      // Mock Jupiter response
+      jest.spyOn(collector as any, 'fetchJupiterLiquidity')
+        .mockResolvedValue([
+          {
+            venue: 'JUPITER',
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            inputAmount: 1_000_000_000,
+            outputAmount: 100_000_000,
+            priceImpact: 0.001,
+            fee: 0.003,
+          },
+        ]);
+
+      // Mock Phoenix response
+      jest.spyOn(collector as any, 'fetchPhoenixLiquidity')
+        .mockResolvedValue([
+          {
+            venue: 'PHOENIX',
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            inputAmount: 1_000_000_000,
+            outputAmount: 100_500_000,
+            priceImpact: 0.0005,
+            fee: 0.002,
+          },
+        ]);
+
+      // Mock Orca response
+      jest.spyOn(collector as any, 'fetchOrcaLiquidity')
+        .mockResolvedValue([
+          {
+            venue: 'ORCA',
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            inputAmount: 1_000_000_000,
+            outputAmount: 99_800_000,
+            priceImpact: 0.002,
+            fee: 0.003,
+          },
+        ]);
+
+      const result = await collector.fetchLiquidity({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+      });
+
+      expect(result).toHaveLength(3);
+      expect(result.map(r => r.venue)).toContain('JUPITER');
+      expect(result.map(r => r.venue)).toContain('PHOENIX');
+      expect(result.map(r => r.venue)).toContain('ORCA');
+    });
+
+    it('should fetch liquidity in parallel', async () => {
+      const startTime = Date.now();
+
+      jest.spyOn(collector as any, 'fetchJupiterLiquidity')
+        .mockImplementation(async () => {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          return [{ venue: 'JUPITER', inputMint: MOCK_SOL_MINT, outputMint: MOCK_USDC_MINT, inputAmount: 1_000_000_000, outputAmount: 100_000_000, priceImpact: 0.001, fee: 0.003 }];
+        });
+
+      jest.spyOn(collector as any, 'fetchPhoenixLiquidity')
+        .mockImplementation(async () => {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          return [{ venue: 'PHOENIX', inputMint: MOCK_SOL_MINT, outputMint: MOCK_USDC_MINT, inputAmount: 1_000_000_000, outputAmount: 100_500_000, priceImpact: 0.0005, fee: 0.002 }];
+        });
+
+      jest.spyOn(collector as any, 'fetchOrcaLiquidity')
+        .mockImplementation(async () => {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          return [{ venue: 'ORCA', inputMint: MOCK_SOL_MINT, outputMint: MOCK_USDC_MINT, inputAmount: 1_000_000_000, outputAmount: 99_800_000, priceImpact: 0.002, fee: 0.003 }];
+        });
+
+      await collector.fetchLiquidity({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+      });
+
+      const duration = Date.now() - startTime;
+
+      // Should complete in ~100ms (parallel), not 300ms (sequential)
+      expect(duration).toBeLessThan(200);
+    });
+
+    it('should handle partial failures gracefully', async () => {
+      jest.spyOn(collector as any, 'fetchJupiterLiquidity')
+        .mockResolvedValue([
+          {
+            venue: 'JUPITER',
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            inputAmount: 1_000_000_000,
+            outputAmount: 100_000_000,
+            priceImpact: 0.001,
+            fee: 0.003,
+          },
+        ]);
+
+      jest.spyOn(collector as any, 'fetchPhoenixLiquidity')
+        .mockRejectedValue(new Error('Phoenix API down'));
+
+      jest.spyOn(collector as any, 'fetchOrcaLiquidity')
+        .mockResolvedValue([
+          {
+            venue: 'ORCA',
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            inputAmount: 1_000_000_000,
+            outputAmount: 99_800_000,
+            priceImpact: 0.002,
+            fee: 0.003,
+          },
+        ]);
+
+      const result = await collector.fetchLiquidity({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+      });
+
+      // Should return 2 results (Jupiter + Orca)
+      expect(result).toHaveLength(2);
+      expect(result.map(r => r.venue)).not.toContain('PHOENIX');
+    });
+
+    it('should return empty array when all venues fail', async () => {
+      jest.spyOn(collector as any, 'fetchJupiterLiquidity')
+        .mockRejectedValue(new Error('Jupiter API down'));
+
+      jest.spyOn(collector as any, 'fetchPhoenixLiquidity')
+        .mockRejectedValue(new Error('Phoenix API down'));
+
+      jest.spyOn(collector as any, 'fetchOrcaLiquidity')
+        .mockRejectedValue(new Error('Orca API down'));
+
+      const result = await collector.fetchLiquidity({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+      });
+
+      expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('fetchJupiterLiquidity()', () => {
+    it('should fetch Jupiter quote via API', async () => {
+      const mockJupiterResponse = {
+        data: {
+          data: [
+            {
+              inAmount: '1000000000',
+              outAmount: '100000000',
+              priceImpactPct: 0.1,
+              marketInfos: [
+                {
+                  id: 'jupiter-market',
+                  label: 'Jupiter',
+                  inputMint: MOCK_SOL_MINT,
+                  outputMint: MOCK_USDC_MINT,
+                  lpFee: { amount: '3000000', pct: 0.003 },
+                },
+              ],
+            },
+          ],
+        },
+      };
+
+      const axios = require('axios');
+      axios.get.mockResolvedValue(mockJupiterResponse);
+
+      const result = await collector['fetchJupiterLiquidity']({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].venue).toBe('JUPITER');
+      expect(result[0].outputAmount).toBe(100_000_000);
+      expect(result[0].priceImpact).toBeCloseTo(0.001, 3);
+    });
+
+    it('should handle Jupiter API errors', async () => {
+      const axios = require('axios');
+      axios.get.mockRejectedValue(new Error('API error'));
+
+      const result = await collector['fetchJupiterLiquidity']({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+      });
+
+      expect(result).toHaveLength(0);
+    });
+
+    it('should handle malformed Jupiter response', async () => {
+      const axios = require('axios');
+      axios.get.mockResolvedValue({ data: null });
+
+      const result = await collector['fetchJupiterLiquidity']({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+      });
+
+      expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('fetchPhoenixLiquidity()', () => {
+    it('should fetch Phoenix orderbook data', async () => {
+      // Mock Phoenix SDK
+      const mockPhoenixClient = {
+        getMarket: jest.fn().mockResolvedValue({
+          data: {
+            bids: [
+              { price: 100.5, size: 1000 },
+              { price: 100.4, size: 2000 },
+            ],
+            asks: [
+              { price: 100.6, size: 1500 },
+              { price: 100.7, size: 2500 },
+            ],
+          },
+        }),
+      };
+
+      jest.spyOn(collector as any, 'getPhoenixClient')
+        .mockReturnValue(mockPhoenixClient);
+
+      const result = await collector['fetchPhoenixLiquidity']({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].venue).toBe('PHOENIX');
+    });
+
+    it('should handle Phoenix SDK errors', async () => {
+      jest.spyOn(collector as any, 'getPhoenixClient')
+        .mockImplementation(() => {
+          throw new Error('Phoenix SDK error');
+        });
+
+      const result = await collector['fetchPhoenixLiquidity']({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+      });
+
+      expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('fetchOrcaLiquidity()', () => {
+    it('should fetch Orca Whirlpool data', async () => {
+      const mockPoolData = {
+        sqrtPrice: BigInt('1000000000000'),
+        liquidity: BigInt('50000000000'),
+        feeRate: 3000, // 0.3%
+      };
+
+      jest.spyOn(connection, 'getAccountInfo').mockResolvedValue({
+        data: Buffer.alloc(653),
+        owner: new PublicKey('whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc'),
+        lamports: 1000000,
+        executable: false,
+      });
+
+      jest.spyOn(collector as any, 'parseWhirlpoolData')
+        .mockReturnValue(mockPoolData);
+
+      const result = await collector['fetchOrcaLiquidity']({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].venue).toBe('ORCA');
+      expect(result[0].fee).toBeCloseTo(0.003, 3);
+    });
+
+    it('should handle Orca data parsing errors', async () => {
+      jest.spyOn(connection, 'getAccountInfo').mockResolvedValue(null);
+
+      const result = await collector['fetchOrcaLiquidity']({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+      });
+
+      expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('Liquidity Filtering', () => {
+    it('should filter out low liquidity venues', async () => {
+      jest.spyOn(collector as any, 'fetchJupiterLiquidity')
+        .mockResolvedValue([
+          {
+            venue: 'JUPITER',
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            inputAmount: 1_000_000_000,
+            outputAmount: 100, // Very low output
+            priceImpact: 0.9, // 90% impact
+            fee: 0.003,
+          },
+        ]);
+
+      jest.spyOn(collector as any, 'fetchPhoenixLiquidity')
+        .mockResolvedValue([
+          {
+            venue: 'PHOENIX',
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            inputAmount: 1_000_000_000,
+            outputAmount: 100_000_000, // Good output
+            priceImpact: 0.001,
+            fee: 0.002,
+          },
+        ]);
+
+      const result = await collector.fetchLiquidity({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+      });
+
+      // Should filter out Jupiter (too low liquidity)
+      expect(result.length).toBeGreaterThan(0);
+      const goodRoutes = result.filter(r => r.priceImpact < 0.1);
+      expect(goodRoutes.length).toBeGreaterThan(0);
+    });
+
+    it('should sort results by output amount descending', async () => {
+      jest.spyOn(collector as any, 'fetchJupiterLiquidity')
+        .mockResolvedValue([
+          {
+            venue: 'JUPITER',
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            inputAmount: 1_000_000_000,
+            outputAmount: 99_000_000,
+            priceImpact: 0.01,
+            fee: 0.003,
+          },
+        ]);
+
+      jest.spyOn(collector as any, 'fetchPhoenixLiquidity')
+        .mockResolvedValue([
+          {
+            venue: 'PHOENIX',
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            inputAmount: 1_000_000_000,
+            outputAmount: 100_500_000,
+            priceImpact: 0.005,
+            fee: 0.002,
+          },
+        ]);
+
+      jest.spyOn(collector as any, 'fetchOrcaLiquidity')
+        .mockResolvedValue([
+          {
+            venue: 'ORCA',
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            inputAmount: 1_000_000_000,
+            outputAmount: 100_000_000,
+            priceImpact: 0.002,
+            fee: 0.003,
+          },
+        ]);
+
+      const result = await collector.fetchLiquidity({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+      });
+
+      // Phoenix should be first (highest output)
+      expect(result[0].venue).toBe('PHOENIX');
+      expect(result[0].outputAmount).toBe(100_500_000);
+    });
+  });
+
+  describe('Cache Management', () => {
+    it('should cache liquidity data for 10 seconds', async () => {
+      jest.useFakeTimers();
+
+      jest.spyOn(collector as any, 'fetchJupiterLiquidity')
+        .mockResolvedValue([
+          {
+            venue: 'JUPITER',
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            inputAmount: 1_000_000_000,
+            outputAmount: 100_000_000,
+            priceImpact: 0.001,
+            fee: 0.003,
+          },
+        ]);
+
+      jest.spyOn(collector as any, 'fetchPhoenixLiquidity')
+        .mockResolvedValue([]);
+
+      jest.spyOn(collector as any, 'fetchOrcaLiquidity')
+        .mockResolvedValue([]);
+
+      // First call
+      await collector.fetchLiquidity({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+      });
+
+      // Second call within 10s (should use cache)
+      await collector.fetchLiquidity({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+      });
+
+      // Should only fetch once
+      expect(collector['fetchJupiterLiquidity']).toHaveBeenCalledTimes(1);
+
+      jest.useRealTimers();
+    });
+
+    it('should refetch after cache expires', async () => {
+      jest.useFakeTimers();
+
+      jest.spyOn(collector as any, 'fetchJupiterLiquidity')
+        .mockResolvedValue([
+          {
+            venue: 'JUPITER',
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            inputAmount: 1_000_000_000,
+            outputAmount: 100_000_000,
+            priceImpact: 0.001,
+            fee: 0.003,
+          },
+        ]);
+
+      jest.spyOn(collector as any, 'fetchPhoenixLiquidity')
+        .mockResolvedValue([]);
+
+      jest.spyOn(collector as any, 'fetchOrcaLiquidity')
+        .mockResolvedValue([]);
+
+      // First call
+      await collector.fetchLiquidity({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+      });
+
+      // Advance time by 11 seconds
+      jest.advanceTimersByTime(11_000);
+
+      // Second call (cache expired, should refetch)
+      await collector.fetchLiquidity({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+      });
+
+      // Should fetch twice
+      expect(collector['fetchJupiterLiquidity']).toHaveBeenCalledTimes(2);
+
+      jest.useRealTimers();
+    });
+  });
+
+  describe('Performance', () => {
+    it('should complete fetch in < 1 second', async () => {
+      jest.spyOn(collector as any, 'fetchJupiterLiquidity')
+        .mockResolvedValue([
+          {
+            venue: 'JUPITER',
+            inputMint: MOCK_SOL_MINT,
+            outputMint: MOCK_USDC_MINT,
+            inputAmount: 1_000_000_000,
+            outputAmount: 100_000_000,
+            priceImpact: 0.001,
+            fee: 0.003,
+          },
+        ]);
+
+      jest.spyOn(collector as any, 'fetchPhoenixLiquidity')
+        .mockResolvedValue([]);
+
+      jest.spyOn(collector as any, 'fetchOrcaLiquidity')
+        .mockResolvedValue([]);
+
+      const start = Date.now();
+      await collector.fetchLiquidity({
+        inputMint: MOCK_SOL_MINT,
+        outputMint: MOCK_USDC_MINT,
+        amount: 1_000_000_000,
+      });
+      const duration = Date.now() - start;
+
+      expect(duration).toBeLessThan(1000);
+    });
+  });
+});

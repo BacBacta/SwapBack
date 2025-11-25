@@ -341,6 +341,14 @@ export class IntelligentOrderRouter {
       minLiquidityRatio: rebalanceCfg.minLiquidityRatio,
       maxStalenessMs: rebalanceCfg.maxStalenessMs,
       liquiditySnapshot,
+      strategy: {
+        profile: "single-venue" as const,
+        splitsEnabled: legs.length > 1,
+        splitVenues: Array.from(new Set(legs.map(l => l.venue))) as VenueName[],
+        fallbackEnabled: false,
+        fallbackCount: 0,
+        notes: [`${legs.length}-leg atomic swap`],
+      },
     };
   }
 
@@ -717,8 +725,8 @@ export class IntelligentOrderRouter {
 
     const config = this.liquidityCollector.getVenueConfig(source.venue);
     let outputAmount = 0;
-    let effectivePrice: number;
-    let slippagePercent: number;
+    let effectivePrice: number = 0;
+    let slippagePercent: number = 0;
     let feeAmount = inputAmount * config.feeRate;
     let postTradeLiquidity: number | undefined;
     let bumpOutputFn: ((amount: number) => number) | undefined;

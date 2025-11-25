@@ -1,24 +1,28 @@
 {
   "name": "@swapback/oracle",
   "version": "0.1.0",
-  "description": "Service Oracle pour le routage et l'optimisation des swaps",
+  "description": "Service Oracle pour le routage et l'optimisation des swaps + DCA Keeper",
   "main": "dist/index.js",
   "scripts": {
     "dev": "ts-node src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "keeper": "ts-node src/dca-keeper.ts",
+    "keeper:dry-run": "DRY_RUN=true ts-node src/dca-keeper.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.30.1",
+    "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.95.0",
-    "express": "^4.18.0",
-    "axios": "^1.7.0",
-    "dotenv": "^16.0.0"
+    "axios": "^1.13.2",
+    "bs58": "^6.0.0",
+    "dotenv": "^16.0.0",
+    "express": "^4.18.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
     "@types/express": "^4.17.0",
-    "typescript": "^5.0.0",
-    "ts-node": "^10.0.0"
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.0.0",
+    "typescript": "^5.0.0"
   }
 }

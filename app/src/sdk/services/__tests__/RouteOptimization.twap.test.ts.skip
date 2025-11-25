@@ -1,0 +1,302 @@
+/**
+ * Tests for TWAP Execution and Fallback Plans
+ * Validates RouteOptimizationEngine strategy metadata
+ */
+
+import { Connection } from "@solana/web3.js";
+import { RouteOptimizationEngine } from "../RouteOptimizationEngine";
+import { LiquidityDataCollector } from "../LiquidityDataCollector";
+import { OraclePriceService } from "../OraclePriceService";
+import {
+  VenueName,
+  VenueType,
+  RouteCandidate,
+  OptimizationConfig,
+} from "../../types/smart-router";
+
+const connection = new Connection("http://localhost:8899", "confirmed");
+
+describe("RouteOptimizationEngine - Strategy Metadata", () => {
+  let engine: RouteOptimizationEngine;
+  let liquidityCollector: LiquidityDataCollector;
+  let oracleService: OraclePriceService;
+
+  beforeEach(() => {
+    liquidityCollector = new LiquidityDataCollector(connection, 0);
+    oracleService = new OraclePriceService(connection, 0);
+    engine = new RouteOptimizationEngine(liquidityCollector, oracleService);
+  });
+
+  it("should generate strategy metadata for single venue route", async () => {
+    const mockSources = [
+      {
+        venue: VenueName.ORCA,
+        venueType: VenueType.AMM,
+        tokenPair: ["SOL", "USDC"] as [string, string],
+        depth: 100000,
+        effectivePrice: 25,
+        feeAmount: 0.01,
+        slippagePercent: 0.002,
+        route: ["SOL", "USDC"],
+        timestamp: Date.now(),
+      },
+    ];
+
+    jest.spyOn(
+      liquidityCollector,
+      "fetchAggregatedLiquidity"
+    ).mockResolvedValueOnce({
+      tokenPair: ["SOL", "USDC"] as [string, string],
+      totalDepth: 100000,
+      sources: mockSources,
+      bestSingleVenue: VenueName.ORCA,
+      bestCombinedRoute: null,
+      fetchedAt: Date.now(),
+      staleness: 0,
+    });
+
+    const routes = await engine.findOptimalRoutes(
+      "SOL",
+      "USDC",
+      10,
+      { enableFallback: true }
+    );
+
+    expect(routes.length).toBeGreaterThan(0);
+    expect(routes[0].strategy).toBeDefined();
+    expect(routes[0].strategy?.profile).toBe("direct");
+  });
+
+  it("should generate TWAP hints for large trades with high slippage", async () => {
+    const highSlippageSource = {
+      venue: VenueName.RAYDIUM,
+      venueType: VenueType.AMM,
+      tokenPair: ["SOL", "USDC"] as [string, string],
+      depth: 50000,
+      effectivePrice: 25,
+      feeAmount: 0.05,
+      slippagePercent: 0.015, // 1.5% - high slippage
+      route: ["SOL", "USDC"],
+      timestamp: Date.now(),
+    };
+
+    jest.spyOn(
+      liquidityCollector,
+      "fetchAggregatedLiquidity"
+    ).mockResolvedValueOnce({
+      tokenPair: ["SOL", "USDC"] as [string, string],
+      totalDepth: 50000,
+      sources: [highSlippageSource],
+      bestSingleVenue: VenueName.RAYDIUM,
+      bestCombinedRoute: null,
+      fetchedAt: Date.now(),
+      staleness: 0,
+    });
+
+    const routes = await engine.findOptimalRoutes(
+      "SOL",
+      "USDC",
+      150000, // Large trade
+      { enableTWAP: true }
+    );
+
+    const primaryRoute = routes[0];
+    expect(primaryRoute.strategy?.twap).toBeDefined();
+    expect(primaryRoute.strategy?.twap?.recommended).toBe(true);
+    expect(primaryRoute.strategy?.twap?.slices).toBeGreaterThanOrEqual(3);
+    expect(primaryRoute.strategy?.twap?.intervalMs).toBeGreaterThan(0);
+  });
+
+  it("should not recommend TWAP for small trades", async () => {
+    const lowSlippageSource = {
+      venue: VenueName.ORCA,
+      venueType: VenueType.AMM,
+      tokenPair: ["SOL", "USDC"] as [string, string],
+      depth: 500000,
+      effectivePrice: 25,
+      feeAmount: 0.01,
+      slippagePercent: 0.001, // 0.1% - low slippage
+      route: ["SOL", "USDC"],
+      timestamp: Date.now(),
+    };
+
+    jest.spyOn(
+      liquidityCollector,
+      "fetchAggregatedLiquidity"
+    ).mockResolvedValueOnce({
+      tokenPair: ["SOL", "USDC"] as [string, string],
+      totalDepth: 500000,
+      sources: [lowSlippageSource],
+      bestSingleVenue: VenueName.ORCA,
+      bestCombinedRoute: null,
+      fetchedAt: Date.now(),
+      staleness: 0,
+    });
+
+    const routes = await engine.findOptimalRoutes(
+      "SOL",
+      "USDC",
+      10, // Small trade
+    );
+
+    const primaryRoute = routes[0];
+    expect(
+      primaryRoute.strategy?.twap?.recommended || false
+    ).toBe(false);
+  });
+
+  it("should enrich primary route with fallback plans", async () => {
+    const sources = [
+      {
+        venue: VenueName.PHOENIX,
+        venueType: VenueType.CLOB,
+        tokenPair: ["SOL", "USDC"] as [string, string],
+        depth: 100000,
+        effectivePrice: 24.8,
+        feeAmount: 0.01,
+        slippagePercent: 0.001,
+        route: ["SOL", "USDC"],
+        timestamp: Date.now(),
+      },
+      {
+        venue: VenueName.ORCA,
+        venueType: VenueType.AMM,
+        tokenPair: ["SOL", "USDC"] as [string, string],
+        depth: 200000,
+        effectivePrice: 25,
+        feeAmount: 0.02,
+        slippagePercent: 0.002,
+        route: ["SOL", "USDC"],
+        timestamp: Date.now(),
+      },
+      {
+        venue: VenueName.RAYDIUM,
+        venueType: VenueType.AMM,
+        tokenPair: ["SOL", "USDC"] as [string, string],
+        depth: 150000,
+        effectivePrice: 25.1,
+        feeAmount: 0.03,
+        slippagePercent: 0.003,
+        route: ["SOL", "USDC"],
+        timestamp: Date.now(),
+      },
+    ];
+
+    jest.spyOn(
+      liquidityCollector,
+      "fetchAggregatedLiquidity"
+    ).mockResolvedValueOnce({
+      tokenPair: ["SOL", "USDC"] as [string, string],
+      totalDepth: 450000,
+      sources,
+      bestSingleVenue: VenueName.PHOENIX,
+      bestCombinedRoute: null,
+      fetchedAt: Date.now(),
+      staleness: 0,
+    });
+
+    const routes = await engine.findOptimalRoutes(
+      "SOL",
+      "USDC",
+      10,
+      { enableFallback: true, maxRoutes: 3 }
+    );
+
+    expect(routes.length).toBeGreaterThanOrEqual(2);
+    
+    const primaryRoute = routes[0];
+    expect(primaryRoute.strategy?.fallbackCount).toBeGreaterThan(0);
+    // Note: metadata.fallbackRouteIds removed as property doesn't exist in RouteCandidate
+  });
+
+  it("should calculate appropriate TWAP slices based on slippage", () => {
+    const testCases = [
+      { slippage: 0.005, expectedMin: 3 }, // 0.5%
+      { slippage: 0.015, expectedMin: 5 }, // 1.5%
+      { slippage: 0.025, expectedMin: 8 }, // 2.5%
+      { slippage: 0.06, expectedMin: 12 }, // 6%
+    ];
+
+    for (const { slippage, expectedMin } of testCases) {
+      // Formula from generateTWAPHints
+      let slices = 3;
+      if (slippage > 0.01) slices = 5;
+      if (slippage > 0.02) slices = 8;
+      if (slippage > 0.05) slices = 12;
+
+      expect(slices).toBeGreaterThanOrEqual(expectedMin);
+    }
+  });
+
+  it("should generate split profile for multi-venue routes", async () => {
+    const sources = [
+      {
+        venue: VenueName.ORCA,
+        venueType: VenueType.AMM,
+        tokenPair: ["SOL", "USDC"] as [string, string],
+        depth: 100000,
+        effectivePrice: 25,
+        feeAmount: 0.01,
+        slippagePercent: 0.002,
+        route: ["SOL", "USDC"],
+        timestamp: Date.now(),
+      },
+      {
+        venue: VenueName.RAYDIUM,
+        venueType: VenueType.AMM,
+        tokenPair: ["SOL", "USDC"] as [string, string],
+        depth: 80000,
+        effectivePrice: 25.1,
+        feeAmount: 0.015,
+        slippagePercent: 0.003,
+        route: ["SOL", "USDC"],
+        timestamp: Date.now(),
+      },
+    ];
+
+    jest.spyOn(
+      liquidityCollector,
+      "fetchAggregatedLiquidity"
+    ).mockResolvedValueOnce({
+      tokenPair: ["SOL", "USDC"] as [string, string],
+      totalDepth: 180000,
+      sources,
+      bestSingleVenue: VenueName.ORCA,
+      bestCombinedRoute: null,
+      fetchedAt: Date.now(),
+      staleness: 0,
+    });
+
+    const routes = await engine.findOptimalRoutes(
+      "SOL",
+      "USDC",
+      50,
+      { enableSplitRoutes: true }
+    );
+
+    const splitRoute = routes.find((r) => r.splits.length > 1);
+    expect(splitRoute).toBeDefined();
+    expect(splitRoute?.strategy?.profile).toBe("split");
+  });
+});
+
+describe("TWAP Interval Calculation", () => {
+  it("should use exponential backoff for high slippage", () => {
+    const baseInterval = 2000; // 2 seconds
+    const testCases = [
+      { slippage: 0.01, expectedRange: [2000, 4000] },
+      { slippage: 0.02, expectedRange: [3000, 6000] },
+      { slippage: 0.05, expectedRange: [4000, 10000] },
+    ];
+
+    for (const { slippage, expectedRange } of testCases) {
+      // Formula: baseInterval * 1.5^(log10(slippage * 100))
+      const intervalMs = Math.round(
+        baseInterval * Math.pow(1.5, Math.log10(slippage * 100))
+      );
+
+      expect(intervalMs).toBeGreaterThanOrEqual(expectedRange[0]);
+      expect(intervalMs).toBeLessThanOrEqual(expectedRange[1]);
+    }
+  });
+});

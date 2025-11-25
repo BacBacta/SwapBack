@@ -1,0 +1,323 @@
+/**
+ * 🧮 RewardsCalculator - Simulateur APY pour Holders cNFT
+ * 
+ * Permet aux utilisateurs de simuler leurs rewards potentiels
+ * basés sur boost, fréquence buybacks, et volume USDC
+ * 
+ * @author SwapBack Team
+ * @date November 23, 2025 - Phase 5.5
+ */
+
+'use client';
+
+import React, { useState, useEffect } from 'react';
+
+interface SimulationParams {
+  userBoost: number;
+  totalBoost: number;
+  buybackFrequency: 'weekly' | 'biweekly' | 'monthly';
+  avgUsdcPerBuyback: number;
+  backPrice: number;
+}
+
+interface SimulationResults {
+  dailyRewards: number;
+  weeklyRewards: number;
+  monthlyRewards: number;
+  yearlyRewards: number;
+  estimatedAPY: number;
+  userSharePercent: number;
+}
+
+export default function RewardsCalculator() {
+  const [params, setParams] = useState<SimulationParams>({
+    userBoost: 5000,
+    totalBoost: 100000,
+    buybackFrequency: 'biweekly',
+    avgUsdcPerBuyback: 1000,
+    backPrice: 0.10, // $0.10 per $BACK
+  });
+
+  const [results, setResults] = useState<SimulationResults | null>(null);
+
+  useEffect(() => {
+    calculateRewards();
+  }, [params]);
+
+  const calculateRewards = () => {
+    const { userBoost, totalBoost, buybackFrequency, avgUsdcPerBuyback, backPrice } = params;
+
+    // User's share of distribution pool
+    const sharePercent = totalBoost > 0 ? (userBoost / totalBoost) * 100 : 0;
+
+    // Buybacks per year
+    const buybacksPerYear =
+      buybackFrequency === 'weekly' ? 52 :
+      buybackFrequency === 'biweekly' ? 26 :
+      12; // monthly
+
+    // Calculate $BACK bought per buyback (USDC / price)
+    const backPerBuyback = avgUsdcPerBuyback / backPrice;
+
+    // 50% of buyback goes to distribution
+    const distributionPerBuyback = backPerBuyback * 0.5;
+
+    // User's share per buyback
+    const userSharePerBuyback = (distributionPerBuyback * sharePercent) / 100;
+
+    // Calculate rewards over different periods
+    const yearlyRewards = userSharePerBuyback * buybacksPerYear;
+    const monthlyRewards = yearlyRewards / 12;
+    const weeklyRewards = yearlyRewards / 52;
+    const dailyRewards = yearlyRewards / 365;
+
+    // Calculate APY (assuming user locked equivalent value)
+    // APY = (yearly rewards value / locked value) * 100
+    // Assuming user locked value proportional to boost
+    const lockedValueEstimate = userBoost * backPrice; // Simplified
+    const estimatedAPY = lockedValueEstimate > 0
+      ? ((yearlyRewards * backPrice) / lockedValueEstimate) * 100
+      : 0;
+
+    setResults({
+      dailyRewards,
+      weeklyRewards,
+      monthlyRewards,
+      yearlyRewards,
+      estimatedAPY,
+      userSharePercent: sharePercent,
+    });
+  };
+
+  const handleParamChange = (key: keyof SimulationParams, value: number | string) => {
+    setParams(prev => ({ ...prev, [key]: value }));
+  };
+
+  return (
+    <div className="bg-black/50 border border-[var(--primary)]/30 rounded-lg p-6">
+      {/* Header */}
+      <div className="mb-6">
+        <h3 className="text-2xl font-bold text-[var(--primary)] terminal-text terminal-glow uppercase tracking-wider mb-2">
+          🧮 [REWARDS CALCULATOR]
+        </h3>
+        <p className="text-sm text-gray-400 uppercase tracking-wider">
+          Simulate your potential earnings from buyback distribution
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Input Parameters */}
+        <div className="space-y-4">
+          <h4 className="text-lg font-bold text-[var(--secondary)] uppercase tracking-wider mb-4">
+            [PARAMETERS]
+          </h4>
+
+          {/* User Boost */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-2 uppercase">
+              Your Boost
+            </label>
+            <input
+              type="number"
+              value={params.userBoost}
+              onChange={(e) => handleParamChange('userBoost', parseInt(e.target.value) || 0)}
+              className="w-full bg-black/50 border-2 border-gray-700 px-4 py-3 text-white focus:border-[var(--primary)] outline-none transition-colors font-mono text-lg"
+              min="0"
+              step="1000"
+            />
+            <div className="text-xs text-gray-500 mt-1">
+              💡 Increase boost by locking more tokens for longer periods
+            </div>
+          </div>
+
+          {/* Total Community Boost */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-2 uppercase">
+              Total Community Boost
+            </label>
+            <input
+              type="number"
+              value={params.totalBoost}
+              onChange={(e) => handleParamChange('totalBoost', parseInt(e.target.value) || 1)}
+              className="w-full bg-black/50 border-2 border-gray-700 px-4 py-3 text-white focus:border-[var(--primary)] outline-none transition-colors font-mono text-lg"
+              min="1"
+              step="10000"
+            />
+            <div className="text-xs text-gray-500 mt-1">
+              📊 Estimated from all locked positions
+            </div>
+          </div>
+
+          {/* Buyback Frequency */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-2 uppercase">
+              Buyback Frequency
+            </label>
+            <select
+              value={params.buybackFrequency}
+              onChange={(e) => handleParamChange('buybackFrequency', e.target.value)}
+              className="w-full bg-black/50 border-2 border-gray-700 px-4 py-3 text-white focus:border-[var(--primary)] outline-none transition-colors uppercase tracking-wider"
+            >
+              <option value="weekly">Weekly (52/year)</option>
+              <option value="biweekly">Bi-Weekly (26/year)</option>
+              <option value="monthly">Monthly (12/year)</option>
+            </select>
+          </div>
+
+          {/* Average USDC per Buyback */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-2 uppercase">
+              Avg USDC per Buyback
+            </label>
+            <input
+              type="number"
+              value={params.avgUsdcPerBuyback}
+              onChange={(e) => handleParamChange('avgUsdcPerBuyback', parseFloat(e.target.value) || 0)}
+              className="w-full bg-black/50 border-2 border-gray-700 px-4 py-3 text-white focus:border-[var(--primary)] outline-none transition-colors font-mono text-lg"
+              min="0"
+              step="100"
+            />
+            <div className="text-xs text-gray-500 mt-1">
+              💵 USDC collected from swap fees
+            </div>
+          </div>
+
+          {/* BACK Price */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-2 uppercase">
+              $BACK Price (USD)
+            </label>
+            <input
+              type="number"
+              value={params.backPrice}
+              onChange={(e) => handleParamChange('backPrice', parseFloat(e.target.value) || 0.01)}
+              className="w-full bg-black/50 border-2 border-gray-700 px-4 py-3 text-white focus:border-[var(--primary)] outline-none transition-colors font-mono text-lg"
+              min="0.001"
+              step="0.01"
+            />
+            <div className="text-xs text-gray-500 mt-1">
+              📈 Current market price estimate
+            </div>
+          </div>
+        </div>
+
+        {/* Results */}
+        <div>
+          <h4 className="text-lg font-bold text-[var(--accent)] uppercase tracking-wider mb-4">
+            [ESTIMATED REWARDS]
+          </h4>
+
+          {results && (
+            <div className="space-y-4">
+              {/* Your Share */}
+              <div className="bg-gradient-to-r from-[var(--primary)]/10 to-[var(--accent)]/10 border-2 border-[var(--primary)] rounded-lg p-4">
+                <div className="text-sm text-gray-400 mb-2 uppercase">Your Distribution Share</div>
+                <div className="text-4xl font-bold text-[var(--primary)] terminal-glow">
+                  {results.userSharePercent.toFixed(2)}%
+                </div>
+                <div className="text-xs text-gray-500 mt-2">
+                  Based on {params.userBoost.toLocaleString()} / {params.totalBoost.toLocaleString()} boost
+                </div>
+              </div>
+
+              {/* Rewards Breakdown */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-black/30 border border-gray-700 rounded-lg p-3 text-center">
+                  <div className="text-xs text-gray-400 mb-1 uppercase">Daily</div>
+                  <div className="text-lg font-bold text-[var(--primary)]">
+                    {results.dailyRewards.toFixed(2)}
+                  </div>
+                  <div className="text-xs text-gray-500">$BACK</div>
+                </div>
+
+                <div className="bg-black/30 border border-gray-700 rounded-lg p-3 text-center">
+                  <div className="text-xs text-gray-400 mb-1 uppercase">Weekly</div>
+                  <div className="text-lg font-bold text-[var(--primary)]">
+                    {results.weeklyRewards.toFixed(2)}
+                  </div>
+                  <div className="text-xs text-gray-500">$BACK</div>
+                </div>
+
+                <div className="bg-black/30 border border-gray-700 rounded-lg p-3 text-center">
+                  <div className="text-xs text-gray-400 mb-1 uppercase">Monthly</div>
+                  <div className="text-lg font-bold text-[var(--secondary)]">
+                    {results.monthlyRewards.toFixed(2)}
+                  </div>
+                  <div className="text-xs text-gray-500">$BACK</div>
+                </div>
+
+                <div className="bg-black/30 border border-gray-700 rounded-lg p-3 text-center">
+                  <div className="text-xs text-gray-400 mb-1 uppercase">Yearly</div>
+                  <div className="text-lg font-bold text-[var(--accent)]">
+                    {results.yearlyRewards.toFixed(2)}
+                  </div>
+                  <div className="text-xs text-gray-500">$BACK</div>
+                </div>
+              </div>
+
+              {/* APY Estimate */}
+              <div className="bg-gradient-to-r from-green-900/20 to-emerald-900/20 border-2 border-green-700/50 rounded-lg p-4">
+                <div className="text-sm text-green-400 mb-2 uppercase font-bold">
+                  Estimated APY
+                </div>
+                <div className="text-5xl font-bold text-green-300 terminal-glow mb-2">
+                  {results.estimatedAPY.toFixed(2)}%
+                </div>
+                <div className="text-xs text-gray-400">
+                  Annual percentage yield from buyback rewards
+                </div>
+              </div>
+
+              {/* USD Value */}
+              <div className="bg-black/30 border border-gray-700 rounded-lg p-4">
+                <div className="text-sm text-gray-400 mb-3 uppercase">USD Value Estimates</div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Monthly:</span>
+                    <span className="text-green-400 font-bold">
+                      ${(results.monthlyRewards * params.backPrice).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Yearly:</span>
+                    <span className="text-green-400 font-bold">
+                      ${(results.yearlyRewards * params.backPrice).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Boost Optimization Tip */}
+              <div className="bg-blue-900/10 border border-blue-700/50 rounded-lg p-4">
+                <div className="text-sm text-blue-400 mb-2 font-bold uppercase">
+                  💡 Optimization Tip
+                </div>
+                <p className="text-xs text-gray-400">
+                  {params.userBoost < params.totalBoost * 0.01 && 
+                    "Your boost is very low. Consider locking more tokens to increase your share!"
+                  }
+                  {params.userBoost >= params.totalBoost * 0.01 && params.userBoost < params.totalBoost * 0.05 &&
+                    "You're earning a decent share. Lock more tokens for longer periods to boost further!"
+                  }
+                  {params.userBoost >= params.totalBoost * 0.05 &&
+                    "Great boost! You're earning a significant share of buyback rewards."
+                  }
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Disclaimer */}
+      <div className="mt-6 bg-yellow-900/10 border border-yellow-700/50 rounded-lg p-4">
+        <div className="text-xs text-yellow-400 font-bold mb-2 uppercase">⚠️ Disclaimer</div>
+        <p className="text-xs text-gray-400">
+          These are estimates based on your input parameters. Actual rewards may vary depending on:
+          market conditions, buyback frequency, community participation, and $BACK price fluctuations.
+          Past performance does not guarantee future results.
+        </p>
+      </div>
+    </div>
+  );
+}

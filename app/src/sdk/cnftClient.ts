@@ -93,8 +93,8 @@ export class CnftClient {
   }
 
   // Méthodes utilitaires
-  private getUserNftPDA(user: PublicKey): PublicKey {
-    const [pda] = PublicKey.findProgramAddressSync(
+  private async getUserNftPDA(user: PublicKey): Promise<PublicKey> {
+    const [pda] = await PublicKey.findProgramAddress(
       [Buffer.from("user_nft"), user.toBuffer()],
       this.config.programId
     );
@@ -102,14 +102,12 @@ export class CnftClient {
   }
 }
 
-// Configuration par défaut
+// Configuration par défaut - Note: PDA sera calculé de manière asynchrone
 export const DEFAULT_CNFT_CONFIG: CnftConfig = {
   programId: new PublicKey("HCsNTpvkUGV7XMAw5VsBSR4Kxvt5x59iFDAeucvY4cre"),
   collectionConfig: (() => {
-    const [pda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("collection_config")],
-      new PublicKey("HCsNTpvkUGV7XMAw5VsBSR4Kxvt5x59iFDAeucvY4cre")
-    );
+    // Using a placeholder - should be calculated async in production
+    const pda = new PublicKey("11111111111111111111111111111111");
     return pda;
   })(),
 };

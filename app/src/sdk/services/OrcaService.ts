@@ -32,9 +32,11 @@ const DEFAULT_ORCA_SLIPPAGE_BPS = Number(
 
 class ReadonlyWallet implements Wallet {
   publicKey: PublicKey;
+  payer: Keypair;
 
   constructor(keypair: Keypair = Keypair.generate()) {
     this.publicKey = keypair.publicKey;
+    this.payer = keypair;
   }
 
   async signTransaction<T extends Transaction>(tx: T): Promise<T> {
@@ -247,7 +249,7 @@ export class OrcaService {
     return new BN(Math.max(scaled, 0));
   }
 
-  private fromLamports(amount: BN, decimals: number): number {
+  private fromLamports(amount: BN | bigint, decimals: number): number {
     const scale = Math.pow(10, decimals);
     return Number(amount.toString()) / scale;
   }

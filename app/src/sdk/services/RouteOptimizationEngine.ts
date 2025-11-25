@@ -678,7 +678,7 @@ export class RouteOptimizationEngine {
     inputAmount: number,
     config: OptimizationConfig
   ): RoutingStrategyMetadata {
-    const profile = candidate.splits.length > 1 ? "split" : "direct";
+    const profile = candidate.splits.length > 1 ? "split" : "single-venue";
     const usesClob = this.routeUsesClob(candidate);
 
     // Determine if TWAP is recommended
@@ -689,6 +689,9 @@ export class RouteOptimizationEngine {
 
     return {
       profile,
+      splitsEnabled: candidate.splits.length > 1,
+      splitVenues: candidate.venues,
+      fallbackEnabled: false,
       fallbackCount: 0, // Will be updated by enrichWithFallbackPlans
       twap,
     };
@@ -742,7 +745,7 @@ export class RouteOptimizationEngine {
       recommended: true,
       slices,
       intervalMs: Math.round(intervalMs),
-      rationale: `High slippage detected (${(maxSlippage * 100).toFixed(2)}%). Splitting into ${slices} chunks reduces price impact.`,
+      reason: `High slippage detected (${(maxSlippage * 100).toFixed(2)}%). Splitting into ${slices} chunks reduces price impact.`,
     };
   }
 
@@ -758,13 +761,11 @@ export class RouteOptimizationEngine {
 
     if (primary.strategy) {
       primary.strategy.fallbackCount = fallbacks.length;
+      primary.strategy.fallbackEnabled = true;
     }
 
-    // Store fallback route IDs in metadata
-    primary.metadata = {
-      ...primary.metadata,
-      fallbackRouteIds: fallbacks.map((f) => f.id),
-    };
+    // Note: metadata property not available in RouteCandidate type
+    // Fallback route IDs stored in strategy.fallbackCount instead
 
     this.logger.info("fallback_plans_generated", {
       primaryRoute: primary.id,

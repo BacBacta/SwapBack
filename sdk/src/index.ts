@@ -77,6 +77,37 @@ export interface UserStats {
   rebateBoost: number;
 }
 
+/**
+ * Types pour Dollar-Cost Averaging (DCA)
+ */
+export interface DCAOrderParams {
+  inputMint: PublicKey;
+  outputMint: PublicKey;
+  amountPerSwap: number;
+  intervalSeconds: number;
+  totalSwaps: number;
+  minOutPerSwap?: number;
+}
+
+export interface DCAOrder {
+  planPda: PublicKey;
+  planId: number[];
+  user: PublicKey;
+  tokenIn: PublicKey;
+  tokenOut: PublicKey;
+  amountPerSwap: number;
+  totalSwaps: number;
+  executedSwaps: number;
+  intervalSeconds: number;
+  nextExecution: Date;
+  minOutPerSwap: number;
+  createdAt: Date;
+  expiresAt: Date;
+  isActive: boolean;
+  totalInvested: number;
+  totalReceived: number;
+}
+
 export interface SwapBackWallet {
   publicKey: PublicKey | null;
   signTransaction: (transaction: Transaction) => Promise<Transaction>;
@@ -277,7 +308,7 @@ export class SwapBackClient {
 
     try {
       // Dérivation du PDA pour UserRebate
-      const [userRebatePDA] = PublicKey.findProgramAddressSync(
+      const [userRebatePDA] = await PublicKey.findProgramAddress(
         [Buffer.from("user_rebate"), pubkey.toBuffer()],
         this.routerProgramId
       );
@@ -330,7 +361,7 @@ export class SwapBackClient {
       });
 
       // Dériver le PDA user_lock
-      const [userLockPDA] = PublicKey.findProgramAddressSync(
+      const [userLockPDA] = await PublicKey.findProgramAddress(
         [Buffer.from("user_lock"), this.wallet.publicKey.toBuffer()],
         this.routerProgramId
       );
@@ -374,7 +405,7 @@ export class SwapBackClient {
       console.log("🔓 Unlocking tokens for:", this.wallet.publicKey.toBase58());
 
       // Dériver le PDA user_lock
-      const [userLockPDA] = PublicKey.findProgramAddressSync(
+      const [userLockPDA] = await PublicKey.findProgramAddress(
         [Buffer.from("user_lock"), this.wallet.publicKey.toBuffer()],
         this.routerProgramId
       );
@@ -415,7 +446,7 @@ export class SwapBackClient {
       console.log("💰 Claiming rewards for:", this.wallet.publicKey.toBase58());
 
       // Dériver les PDAs
-      const [userRebatePDA] = PublicKey.findProgramAddressSync(
+      const [userRebatePDA] = await PublicKey.findProgramAddress(
         [Buffer.from("user_rebate"), this.wallet.publicKey.toBuffer()],
         this.routerProgramId
       );
@@ -449,7 +480,7 @@ export class SwapBackClient {
    */
   async getGlobalStats() {
     try {
-      const [globalStatePDA] = PublicKey.findProgramAddressSync(
+      const [globalStatePDA] = await PublicKey.findProgramAddress(
         [Buffer.from("global_state")],
         this.routerProgramId
       );
@@ -470,6 +501,361 @@ export class SwapBackClient {
     } catch (error) {
       console.error(
         "Erreur lors de la récupération des stats globales:",
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Crée un ordre DCA (Dollar-Cost Averaging)
+   * 
+   * @param params - Paramètres de l'ordre DCA
+   * @returns PDA de l'ordre DCA créé
+   * 
+   * @example
+   * ```typescript
+   * // Créer un ordre DCA : acheter 10 USDC de SOL toutes les 24h pendant 30 jours
+   * const orderPda = await client.createDCAOrder({
+   *   inputMint: USDC_MINT,
+   *   outputMint: SOL_MINT,
+   *   amountPerSwap: 10,
+   *   intervalSeconds: 86400, // 24 heures
+   *   totalSwaps: 30,
+   *   minOutPerSwap: 0.05 // Minimum 0.05 SOL par swap
+   * });
+   * ```
+   */
+  async createDCAOrder(params: DCAOrderParams): Promise<PublicKey> {
+    if (!this.wallet.publicKey) {
+      throw new Error("Wallet non connecté");
+    }
+
+    try {
+      console.log("📋 Creating DCA order:", {
+        inputMint: params.inputMint.toBase58(),
+        outputMint: params.outputMint.toBase58(),
+        amountPerSwap: params.amountPerSwap,
+        intervalSeconds: params.intervalSeconds,
+        totalSwaps: params.totalSwaps,
+      });
+
+      // Générer un ID unique pour le plan DCA
+      const planId = Array.from(crypto.getRandomValues(new Uint8Array(8)));
+
+      // Dériver le PDA pour le plan DCA
+      const [dcaPlanPDA] = await PublicKey.findProgramAddress(
+        [
+          Buffer.from("dca_plan"),
+          this.wallet.publicKey.toBuffer(),
+          Buffer.from(planId),
+        ],
+        this.routerProgramId
+      );
+
+      // NOTE: Return mock PDA until programs are deployed
+      console.warn(
+        "⚠️ SwapBack DCA program not yet deployed - returning mock PDA"
+      );
+      console.log("   Plan PDA:", dcaPlanPDA.toBase58());
+      console.log("   Plan will execute", params.totalSwaps, "swaps");
+      console.log(
+        "   Interval:",
+        params.intervalSeconds,
+        "seconds (",
+        params.intervalSeconds / 3600,
+        "hours)"
+      );
+
+      return dcaPlanPDA;
+
+      /*
+      // CODE DISABLED UNTIL IDL IS AVAILABLE AND PROGRAMS ARE DEPLOYED
+      
+      const provider = new AnchorProvider(
+        this.connection,
+        this.wallet,
+        { commitment: "confirmed" }
+      );
+      
+      const idl = require("./idl/swapback_router.json");
+      const program = new Program(idl as any, provider);
+
+      // Calculer le montant minimum de sortie si non fourni
+      const minOutPerSwap = params.minOutPerSwap || 0;
+
+      // Créer l'instruction create_dca_plan
+      const amountPerSwapBN = new BN(params.amountPerSwap * 1e9);
+      const intervalSecondsBN = new BN(params.intervalSeconds);
+      const minOutPerSwapBN = new BN(minOutPerSwap * 1e9);
+
+      const transaction = new Transaction();
+
+      const createDcaPlanIx = await program.methods
+        .createDcaPlan(
+          Buffer.from(planId),
+          amountPerSwapBN,
+          params.totalSwaps,
+          intervalSecondsBN,
+          minOutPerSwapBN
+        )
+        .accounts({
+          dcaPlan: dcaPlanPDA,
+          user: this.wallet.publicKey,
+          tokenIn: params.inputMint,
+          tokenOut: params.outputMint,
+          systemProgram: SystemProgram.programId,
+        })
+        .instruction();
+
+      transaction.add(createDcaPlanIx);
+
+      // Signature et envoi
+      console.log("✍️ Signing and sending transaction...");
+      const signature = await this.wallet.sendTransaction(
+        transaction,
+        this.connection
+      );
+
+      console.log("⏳ Confirming transaction:", signature);
+      await this.connection.confirmTransaction(signature, "confirmed");
+
+      console.log("✅ DCA order created:", dcaPlanPDA.toBase58());
+
+      return dcaPlanPDA;
+      */
+    } catch (error) {
+      console.error("❌ Erreur lors de la création de l'ordre DCA:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Annule un ordre DCA existant
+   * 
+   * @param dcaPlanPda - PDA de l'ordre DCA à annuler
+   * @returns Signature de la transaction
+   * 
+   * @example
+   * ```typescript
+   * const signature = await client.cancelDCAOrder(orderPda);
+   * console.log('DCA order cancelled:', signature);
+   * ```
+   */
+  async cancelDCAOrder(dcaPlanPda: PublicKey): Promise<string> {
+    if (!this.wallet.publicKey) {
+      throw new Error("Wallet non connecté");
+    }
+
+    try {
+      console.log("❌ Cancelling DCA order:", dcaPlanPda.toBase58());
+
+      // NOTE: Return mock signature until programs are deployed
+      console.warn(
+        "⚠️ SwapBack DCA program not yet deployed - returning mock signature"
+      );
+      const mockSignature = "MockDCACancelSignature" + Date.now();
+      console.log("   Signature:", mockSignature);
+
+      return mockSignature;
+
+      /*
+      // CODE DISABLED UNTIL IDL IS AVAILABLE AND PROGRAMS ARE DEPLOYED
+      
+      const provider = new AnchorProvider(
+        this.connection,
+        this.wallet,
+        { commitment: "confirmed" }
+      );
+      
+      const idl = require("./idl/swapback_router.json");
+      const program = new Program(idl as any, provider);
+
+      // Créer l'instruction cancel_dca_plan
+      const transaction = new Transaction();
+
+      const cancelDcaPlanIx = await program.methods
+        .cancelDcaPlan()
+        .accounts({
+          dcaPlan: dcaPlanPda,
+          user: this.wallet.publicKey,
+        })
+        .instruction();
+
+      transaction.add(cancelDcaPlanIx);
+
+      // Signature et envoi
+      console.log("✍️ Signing and sending transaction...");
+      const signature = await this.wallet.sendTransaction(
+        transaction,
+        this.connection
+      );
+
+      console.log("⏳ Confirming transaction:", signature);
+      await this.connection.confirmTransaction(signature, "confirmed");
+
+      console.log("✅ DCA order cancelled:", signature);
+
+      return signature;
+      */
+    } catch (error) {
+      console.error("❌ Erreur lors de l'annulation de l'ordre DCA:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère tous les ordres DCA d'un utilisateur
+   * 
+   * @param userPubkey - Clé publique de l'utilisateur (optionnel, utilise le wallet connecté par défaut)
+   * @returns Liste des ordres DCA
+   * 
+   * @example
+   * ```typescript
+   * const orders = await client.getDCAOrders();
+   * for (const order of orders) {
+   *   console.log(`Order ${order.planPda.toBase58()}:`);
+   *   console.log(`  Progress: ${order.executedSwaps}/${order.totalSwaps}`);
+   *   console.log(`  Next execution: ${order.nextExecution}`);
+   *   console.log(`  Active: ${order.isActive}`);
+   * }
+   * ```
+   */
+  async getDCAOrders(userPubkey?: PublicKey): Promise<DCAOrder[]> {
+    const pubkey = userPubkey || this.wallet.publicKey;
+    if (!pubkey) {
+      throw new Error("Clé publique requise");
+    }
+
+    try {
+      console.log("📋 Fetching DCA orders for:", pubkey.toBase58());
+
+      // NOTE: Return empty array until programs are deployed
+      console.warn(
+        "⚠️ SwapBack DCA program not yet deployed - returning empty array"
+      );
+      return [];
+
+      /*
+      // CODE DISABLED UNTIL IDL IS AVAILABLE AND PROGRAMS ARE DEPLOYED
+      
+      // Discriminateur pour les comptes DCA plan
+      const DCA_DISCRIMINATOR = Buffer.from([231, 97, 112, 227, 171, 241, 52, 84]);
+
+      // Fetch tous les comptes DCA appartenant à l'utilisateur
+      const accounts = await this.connection.getProgramAccounts(
+        this.routerProgramId,
+        {
+          filters: [
+            {
+              memcmp: {
+                offset: 0,
+                bytes: bs58.encode(DCA_DISCRIMINATOR),
+              },
+            },
+            {
+              memcmp: {
+                offset: 8, // Après le discriminateur
+                bytes: pubkey.toBase58(),
+              },
+            },
+          ],
+        }
+      );
+
+      // Désérialiser les comptes
+      const orders: DCAOrder[] = [];
+
+      for (const { pubkey: planPda, account } of accounts) {
+        try {
+          // Désérialiser le compte avec Anchor
+          const data = account.data;
+          
+          // Structure du compte DCA plan (basé sur le programme Rust)
+          // discriminator (8) + plan_id (8) + user (32) + token_in (32) + token_out (32)
+          // + amount_per_swap (8) + total_swaps (2) + executed_swaps (2) + interval_seconds (8)
+          // + next_execution (8) + min_out_per_swap (8) + created_at (8) + expires_at (8)
+          // + is_active (1) + total_invested (8) + total_received (8) + bump (1)
+          
+          let offset = 8; // Skip discriminator
+          
+          const planId = Array.from(data.slice(offset, offset + 8));
+          offset += 8;
+          
+          const user = new PublicKey(data.slice(offset, offset + 32));
+          offset += 32;
+          
+          const tokenIn = new PublicKey(data.slice(offset, offset + 32));
+          offset += 32;
+          
+          const tokenOut = new PublicKey(data.slice(offset, offset + 32));
+          offset += 32;
+          
+          const amountPerSwap = Number(new BN(data.slice(offset, offset + 8), 'le')) / 1e9;
+          offset += 8;
+          
+          const totalSwaps = data.readUInt16LE(offset);
+          offset += 2;
+          
+          const executedSwaps = data.readUInt16LE(offset);
+          offset += 2;
+          
+          const intervalSeconds = Number(new BN(data.slice(offset, offset + 8), 'le'));
+          offset += 8;
+          
+          const nextExecutionTimestamp = Number(new BN(data.slice(offset, offset + 8), 'le'));
+          const nextExecution = new Date(nextExecutionTimestamp * 1000);
+          offset += 8;
+          
+          const minOutPerSwap = Number(new BN(data.slice(offset, offset + 8), 'le')) / 1e9;
+          offset += 8;
+          
+          const createdAtTimestamp = Number(new BN(data.slice(offset, offset + 8), 'le'));
+          const createdAt = new Date(createdAtTimestamp * 1000);
+          offset += 8;
+          
+          const expiresAtTimestamp = Number(new BN(data.slice(offset, offset + 8), 'le'));
+          const expiresAt = new Date(expiresAtTimestamp * 1000);
+          offset += 8;
+          
+          const isActive = data[offset] === 1;
+          offset += 1;
+          
+          const totalInvested = Number(new BN(data.slice(offset, offset + 8), 'le')) / 1e9;
+          offset += 8;
+          
+          const totalReceived = Number(new BN(data.slice(offset, offset + 8), 'le')) / 1e9;
+
+          orders.push({
+            planPda,
+            planId,
+            user,
+            tokenIn,
+            tokenOut,
+            amountPerSwap,
+            totalSwaps,
+            executedSwaps,
+            intervalSeconds,
+            nextExecution,
+            minOutPerSwap,
+            createdAt,
+            expiresAt,
+            isActive,
+            totalInvested,
+            totalReceived,
+          });
+        } catch (err) {
+          console.error("Error parsing DCA plan:", err);
+          continue;
+        }
+      }
+
+      console.log(`✅ Found ${orders.length} DCA orders`);
+      return orders;
+      */
+    } catch (error) {
+      console.error(
+        "❌ Erreur lors de la récupération des ordres DCA:",
         error
       );
       throw error;

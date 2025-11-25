@@ -18,7 +18,7 @@ swapback_router = "Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa"
 [programs.devnet]
 swapback_cnft = "EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP"
 swapback_router = "9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh"
-swapback_buyback = "746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6"
+swapback_buyback = "F8S1r81FcTsSBb9vP3jFNuVoTMYNrxaCptbvkzSXcEce"
 
 [programs.mainnet]
 swapback_buyback = "Fx6yfXhqq1i3CJjocwnLXMw3VMLFt5mfoLtWPJzSRQvn"

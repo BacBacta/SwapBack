@@ -6,6 +6,7 @@ import BuybackProgressBar from './components/BuybackProgressBar';
 import ExecuteBuybackButton from './components/ExecuteBuybackButton';
 import BuybackChart from './components/BuybackChart';
 import RecentBuybacks from './components/RecentBuybacks';
+import BurnVisualization from '@/components/BurnVisualization';
 import { getNetworkLabel } from '@/utils/explorer';
 import { getBackTokenMint } from '@/config/constants';
 
@@ -89,6 +90,16 @@ export default function BuybackPage() {
       {/* Recent Transactions */}
       <div className="mb-6">
         <RecentBuybacks />
+      </div>
+
+      {/* NEW: Claim Distribution Section */}
+      <div className="mb-6">
+        <ClaimBuyback />
+      </div>
+
+      {/* NEW: Burn Visualization - 100% Burn Model */}
+      <div className="mb-6">
+        <BurnVisualization />
       </div>
 
       {/* Info Section */}

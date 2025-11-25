@@ -1,5 +1,6 @@
 import { AccountInfo, Connection, PublicKey } from "@solana/web3.js";
-import { AccountLayout, u64 } from "@solana/spl-token";
+import { AccountLayout } from "@solana/spl-token";
+import BN from "bn.js";
 import { getAmountOut as lifinityGetAmountOut, getPoolList } from "@lifinity/sdk";
 import { LiquiditySource, VenueName, VenueType } from "../types/smart-router";
 
@@ -277,7 +278,9 @@ export class LifinityService {
 
     try {
       const decoded = AccountLayout.decode(info.data);
-      const rawAmount = u64.fromBuffer(decoded.amount);
+      const rawAmount = typeof decoded.amount === 'bigint' 
+        ? decoded.amount 
+        : new BN(decoded.amount as any, 'le');
       return Number(rawAmount.toString()) / Math.pow(10, decimals);
     } catch (error) {
       console.warn("[lifinity] token_account_decode_failed", { error });
