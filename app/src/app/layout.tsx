@@ -6,7 +6,7 @@ import { QueryProvider } from "@/components/QueryProvider";
 import { Toaster } from "react-hot-toast";
 import { GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 import { DebugLogPanel } from "@/components/DebugLogPanel";
-import { Navbar } from "@/components/Navbar";
+import { ConditionalNavbar } from "@/components/ConditionalNavbar";
 import "@/lib/patchBN";
 // import { WalletConnectionGuide } from "@/components/WalletConnectionGuide";
 // import { NetworkStatusIndicator } from "@/components/NetworkStatusIndicator";
@@ -66,7 +66,7 @@ export default function RootLayout({
                   />
                 </div>
               </div>
-              <Navbar />
+              <ConditionalNavbar />
               <main id="main-content" className="relative z-10">
                 {children}
               </main>
