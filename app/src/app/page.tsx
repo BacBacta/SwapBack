@@ -108,20 +108,20 @@ export default function Home() {
             transition={{ delay: 0.5, duration: 0.8 }}
             className="flex flex-col sm:flex-row gap-4 justify-center items-center"
           >
-            <Link href="/dashboard">
+            <Link href="/app">
               <motion.button
-                whileHover={{ scale: 1.05, boxShadow: "0 0 40px rgba(0,255,0,0.6)" }}
+                whileHover={{ scale: 1.05, boxShadow: "0 0 40px rgba(16,185,129,0.6)" }}
                 whileTap={{ scale: 0.95 }}
-                className="px-8 py-4 bg-[#10B981] text-[#0C0C0C] font-bold text-lg rounded-xl shadow-[0_0_30px_rgba(0,255,0,0.4)] hover:bg-[#10B981]/90 transition-all font-sans uppercase tracking-wider"
+                className="px-8 py-4 bg-primary text-[#0C0C0C] font-bold text-lg rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.4)] hover:bg-primary-hover transition-all font-sans"
               >
-                Launch App
+                Launch App →
               </motion.button>
             </Link>
             <a href="https://github.com/BacBacta/SwapBack" target="_blank" rel="noopener noreferrer">
               <motion.button
-                whileHover={{ scale: 1.05, borderColor: "rgba(0,255,0,1)" }}
+                whileHover={{ scale: 1.05, borderColor: "rgba(16,185,129,1)" }}
                 whileTap={{ scale: 0.95 }}
-                className="px-8 py-4 bg-transparent border-2 border-[#10B981]/30 text-[#10B981] font-bold text-lg rounded-xl hover:bg-[#10B981]/10 transition-all font-sans uppercase tracking-wider"
+                className="px-8 py-4 bg-transparent border-2 border-primary/30 text-primary font-bold text-lg rounded-xl hover:bg-primary/10 transition-all font-sans"
               >
                 Read Docs
               </motion.button>
