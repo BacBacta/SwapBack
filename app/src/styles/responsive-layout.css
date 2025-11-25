@@ -29,13 +29,13 @@
 
 @media (min-width: 1920px) {
   .responsive-container {
-    max-width: 1536px; /* 9xl */
+    max-width: 1792px; /* 10xl - 90% de 1920px */
   }
 }
 
 @media (min-width: 2560px) {
   .responsive-container {
-    max-width: 1920px; /* ultra */
+    max-width: 2304px; /* ultra - 90% de 2560px */
     padding-left: 3rem;
     padding-right: 3rem;
   }
@@ -71,7 +71,7 @@
 
 @media (min-width: 2560px) {
   .responsive-grid {
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     gap: 2.5rem;
   }
 }

@@ -46,7 +46,7 @@ export default function BuybackPage() {
   }
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl 3xl:max-w-9xl">
+    <div className="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl 3xl:max-w-10xl 4xl:max-w-11xl">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-4xl font-bold terminal-text terminal-glow uppercase tracking-wider text-[var(--primary)] mb-2 flex items-center gap-3">
@@ -107,7 +107,7 @@ export default function BuybackPage() {
       <div>
 
         {/* Additional Info Sections */}
-        <div className="max-w-7xl 3xl:max-w-9xl mx-auto mt-12 grid grid-cols-1 md:grid-cols-2 3xl:grid-cols-3 gap-4 lg:gap-6">
+        <div className="max-w-7xl 3xl:max-w-10xl 4xl:max-w-11xl mx-auto mt-12 grid grid-cols-1 md:grid-cols-2 3xl:grid-cols-3 4xl:grid-cols-4 gap-4 lg:gap-6">
           {/* How It Works */}
           <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
             <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
@@ -183,7 +183,7 @@ export default function BuybackPage() {
         </div>
 
         {/* Technical Details */}
-        <div className="max-w-6xl mx-auto mt-6">
+        <div className="mx-auto mt-6">
           <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
             <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
               <span>🔧</span> Détails Techniques
@@ -210,7 +210,7 @@ export default function BuybackPage() {
         </div>
 
         {/* FAQ */}
-        <div className="max-w-6xl mx-auto mt-12 mb-8">
+        <div className="mx-auto mt-12 mb-8">
           <h2 className="text-3xl font-bold text-white mb-6 text-center">
             ❓ Questions Fréquentes
           </h2>

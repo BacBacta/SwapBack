@@ -22,8 +22,9 @@ module.exports = {
       maxWidth: {
         '8xl': '88rem',   // 1408px
         '9xl': '96rem',   // 1536px
-        '10xl': '104rem', // 1664px
-        'ultra': '120rem', // 1920px
+        '10xl': '112rem', // 1792px
+        '11xl': '128rem', // 2048px
+        'ultra': '144rem', // 2304px (90% de 2560px)
       },
       animation: {
         'gradient': 'gradient 8s linear infinite',

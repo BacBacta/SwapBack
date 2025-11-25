@@ -8,7 +8,7 @@ export const metadata = {
 export default function HistoryPage() {
   return (
     <div className="min-h-screen p-4 md:p-8">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl 3xl:max-w-10xl 4xl:max-w-11xl mx-auto">
         <OnChainHistory />
       </div>
     </div>
