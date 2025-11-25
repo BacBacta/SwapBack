@@ -3,6 +3,7 @@
 import { ClientOnlyWallet } from "./ClientOnlyWallet";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Image from "next/image";
 
 export const Navbar = () => {
   const pathname = usePathname();
@@ -23,11 +24,16 @@ export const Navbar = () => {
             href="/" 
             className="flex items-center space-x-2 hover:opacity-80 transition-opacity group"
           >
-            <div className="w-8 h-8 bg-[var(--primary)] rounded-sm flex items-center justify-center group-hover:shadow-[0_0_15px_rgba(0,255,0,0.5)] transition-all">
-              <span className="text-[#0C0C0C] font-bold text-lg">S</span>
-            </div>
-            <span className="terminal-text text-xl font-bold">
-              SWAP<span className="text-[var(--primary)]">BACK</span>
+            <Image
+              src="/icons/icon_swapback.svg"
+              alt="SwapBack Logo"
+              width={32}
+              height={32}
+              className="transition-all group-hover:scale-110 group-hover:drop-shadow-[0_0_15px_rgba(16,185,129,0.5)]"
+              priority
+            />
+            <span className="text-xl font-bold font-sans">
+              SWAP<span className="text-primary">BACK</span>
             </span>
           </Link>
 
