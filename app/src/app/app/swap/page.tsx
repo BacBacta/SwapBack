@@ -1,5 +1,4 @@
 import dynamicImport from "next/dynamic";
-import { Breadcrumb } from "@/components/BackButton";
 
 export const dynamic = "force-dynamic";
 
@@ -22,20 +21,12 @@ const EnhancedSwapInterface = dynamicImport(
 
 export default function SwapPage() {
   return (
-    <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl 3xl:max-w-10xl 4xl:max-w-11xl mx-auto">
-        <div className="mb-8">
-          <Breadcrumb 
-            items={[
-              { label: "Home", href: "/" },
-              { label: "Swap", href: "/swap" }
-            ]} 
-          />
-        </div>
-        <div className="backdrop-blur-xl bg-[#06B6D4]/5 border-2 border-[#06B6D4]/30 rounded-2xl p-8 shadow-[0_0_30px_rgba(0,255,255,0.2)] transition-all hover:border-[#06B6D4]/50">
-          <EnhancedSwapInterface />
-        </div>
+    <div className="max-w-7xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold mb-2">Swap</h1>
+        <p className="text-gray-400">Trade tokens on Solana with best execution</p>
       </div>
+      <EnhancedSwapInterface />
     </div>
   );
 }

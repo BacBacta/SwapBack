@@ -1,27 +1,17 @@
 "use client";
 
-import { DCA } from "@/components/DCA";
-import { PageHeader } from "@/components/BackButton";
+import dynamic from "next/dynamic";
+
+const DCAClient = dynamic(() => import("@/components/DCAClient"), { ssr: false });
 
 export default function DCAPage() {
   return (
-    <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 max-w-7xl 3xl:max-w-10xl 4xl:max-w-11xl mx-auto">
-      <div className="mx-auto">
-        <div className="mb-8">
-          <PageHeader
-            title="📊 Dollar Cost Averaging"
-            description="Invest automatically at regular intervals to smooth out the purchase price"
-            breadcrumbItems={[
-              { label: "Home", href: "/" },
-              { label: "DCA", href: "/dca" }
-            ]}
-            showBackButton={true}
-          />
-        </div>
-        <div className="backdrop-blur-xl bg-[#10B981]/5 border-2 border-[#10B981]/30 rounded-2xl p-8 shadow-[0_0_30px_rgba(0,255,0,0.2)] transition-all hover:border-[#10B981]/50">
-          <DCA />
-        </div>
+    <div className="max-w-7xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold mb-2">DCA (Dollar-Cost Averaging)</h1>
+        <p className="text-gray-400">Automate your token purchases over time</p>
       </div>
+      <DCAClient />
     </div>
   );
 }
