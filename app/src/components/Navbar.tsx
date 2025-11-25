@@ -8,6 +8,7 @@ export const Navbar = () => {
   const pathname = usePathname();
 
   const navLinks = [
+    { href: "/", label: "Home" },
     { href: "/dashboard", label: "Dashboard" },
     { href: "/swap", label: "Swap" },
     { href: "/dca", label: "DCA" },
@@ -20,7 +21,7 @@ export const Navbar = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link 
-            href="/dashboard" 
+            href="/" 
             className="flex items-center space-x-2 hover:opacity-80 transition-opacity"
           >
             <div className="w-8 h-8 bg-[var(--primary)] rounded-sm flex items-center justify-center">

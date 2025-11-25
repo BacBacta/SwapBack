@@ -85,5 +85,6 @@
     "RUSTUP_HOME": "/usr/local/rustup",
     "CARGO_HOME": "/usr/local/cargo",
     "PATH": "/home/codespace/.local/share/solana/install/active_release/bin:/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin"
-  }
+  },
+  "markdown.validate.enabled": true
 }
