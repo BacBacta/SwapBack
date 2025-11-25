@@ -1,8 +1,8 @@
+"use client";
+
 import dynamic from "next/dynamic";
 
 const OnChainHistoryWidget = dynamic(() => import("@/components/OnChainHistoryWidget"), { ssr: false });
-
-export const dynamic = "force-dynamic";
 
 export default function HistoryPage() {
   return (
