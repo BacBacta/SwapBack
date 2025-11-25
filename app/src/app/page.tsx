@@ -181,14 +181,14 @@ export default function Home() {
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 lg:gap-8">
               {[
-                { label: '24-Hour Volume', value: '$0.00', trend: '+0%', loading: true, icon: '📈' },
-                { label: 'Total Transactions', value: '0', trend: 'Active', loading: true, icon: '⚡' },
-                { label: 'Active Participants', value: '0', trend: 'Growing', loading: true, icon: '👥' },
-                { label: 'Tokens Burned', value: '0', trend: '+0%', loading: true, icon: '🔥' },
+                { label: '24-Hour Volume', value: '$0.00', trend: '+0%', loading: true, icon: '📈', delay: 'delay-600' },
+                { label: 'Total Transactions', value: '0', trend: 'Active', loading: true, icon: '⚡', delay: 'delay-700' },
+                { label: 'Active Participants', value: '0', trend: 'Growing', loading: true, icon: '👥', delay: 'delay-800' },
+                { label: 'Tokens Burned', value: '0', trend: '+0%', loading: true, icon: '🔥', delay: 'delay-900' },
               ].map((stat, i) => (
                 <div 
                   key={i} 
-                  className={`group text-center space-y-3 p-6 rounded-xl bg-slate-900/50 border border-slate-700/30 hover:border-emerald-500/50 hover:bg-slate-800/50 transition-all duration-300 hover:scale-105 animate-fade-in-up delay-${600 + i * 100}`}
+                  className={`group text-center space-y-3 p-6 rounded-xl bg-slate-900/50 border border-slate-700/30 hover:border-emerald-500/50 hover:bg-slate-800/50 transition-all duration-300 hover:scale-105 animate-fade-in-up ${stat.delay}`}
                 >
                   <div className="text-2xl group-hover:scale-110 transition-transform duration-300">
                     {stat.icon}
@@ -239,28 +239,32 @@ export default function Home() {
                 num: '01',
                 title: 'Connect Your Wallet',
                 desc: 'Securely link your Solana wallet using Phantom, Solflare, Ledger, or any compatible Web3 wallet provider',
-                icon: '🔐'
+                icon: '🔐',
+                delay: 'delay-800'
               },
               {
                 num: '02',
                 title: 'Select Trading Strategy',
                 desc: 'Choose from instant token swaps, automated DCA schedules, or participate in our deflationary buyback programs',
-                icon: '🎯'
+                icon: '🎯',
+                delay: 'delay-900'
               },
               {
                 num: '03',
                 title: 'Execute Transactions',
                 desc: 'Execute trades with institutional-grade security, optimal routing algorithms, and sub-second settlement times',
-                icon: '⚡'
+                icon: '⚡',
+                delay: 'delay-1000'
               },
               {
                 num: '04',
                 title: 'Maximize Returns',
                 desc: 'Earn rewards through our deflationary BACK token economics and protocol participation incentives',
-                icon: '💎'
+                icon: '💎',
+                delay: 'delay-1100'
               },
             ].map((step, i) => (
-              <div key={i} className={`relative group animate-fade-in-up delay-${800 + i * 100}`}>
+              <div key={i} className={`relative group animate-fade-in-up ${step.delay}`}>
                 {/* Animated connecting line (desktop only) */}
                 {i < 3 && (
                   <div className="hidden lg:block absolute top-16 left-[60%] w-[80%] h-0.5 overflow-hidden">
