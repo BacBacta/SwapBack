@@ -12,15 +12,19 @@ import {
   Cog6ToothIcon,
   BellIcon,
   WalletIcon,
+  LockClosedIcon,
+  ChartPieIcon,
 } from "@heroicons/react/24/outline";
 
 const commands = [
+  { id: "home", name: "Go to home", icon: HomeIcon, href: "/app", shortcut: "H" },
   { id: "swap", name: "Swap tokens", icon: ArrowsRightLeftIcon, href: "/app/swap", shortcut: "S" },
   { id: "dca", name: "Create DCA plan", icon: ChartBarIcon, href: "/app/dca", shortcut: "D" },
+  { id: "lock", name: "Lock/Unlock tokens", icon: LockClosedIcon, href: "/app/lock", shortcut: "L" },
   { id: "buyback", name: "Claim buyback rewards", icon: FireIcon, href: "/app/buyback", shortcut: "B" },
-  { id: "history", name: "View transaction history", icon: ClockIcon, href: "/app/history", shortcut: "H" },
+  { id: "analytics", name: "View analytics", icon: ChartPieIcon, href: "/app/analytics", shortcut: "A" },
+  { id: "history", name: "View transaction history", icon: ClockIcon, href: "/app/history", shortcut: "T" },
   { id: "settings", name: "Open settings", icon: Cog6ToothIcon, href: "/app/settings", shortcut: "," },
-  { id: "home", name: "Go to home", icon: HomeIcon, href: "/app", shortcut: "↑" },
 ];
 
 export function CommandPalette() {

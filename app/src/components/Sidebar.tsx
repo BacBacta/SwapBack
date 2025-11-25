@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
-import { ClientOnlyWallet } from "./ClientOnlyWallet";
 import {
   HomeIcon,
   ArrowsRightLeftIcon,
@@ -11,14 +10,17 @@ import {
   FireIcon,
   ClockIcon,
   Cog6ToothIcon,
-  BellIcon,
+  LockClosedIcon,
+  ChartPieIcon,
 } from "@heroicons/react/24/outline";
 
 const navigationItems = [
   { name: "Home", href: "/app", icon: HomeIcon },
   { name: "Swap", href: "/app/swap", icon: ArrowsRightLeftIcon },
   { name: "DCA", href: "/app/dca", icon: ChartBarIcon },
+  { name: "Lock/Unlock", href: "/app/lock", icon: LockClosedIcon },
   { name: "Buyback", href: "/app/buyback", icon: FireIcon },
+  { name: "Analytics", href: "/app/analytics", icon: ChartPieIcon },
   { name: "History", href: "/app/history", icon: ClockIcon },
   { name: "Settings", href: "/app/settings", icon: Cog6ToothIcon },
 ];
@@ -78,12 +80,7 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* Wallet Section */}
-        <div className="flex-shrink-0 border-t border-primary/20 p-4">
-          <ClientOnlyWallet />
-        </div>
-
-        {/* Quick Stats Footer */}
+        {/* Network Status Footer */}
         <div className="flex-shrink-0 px-4 py-3 border-t border-primary/20 bg-primary/5">
           <div className="text-xs text-gray-400">
             <div className="flex justify-between mb-1">

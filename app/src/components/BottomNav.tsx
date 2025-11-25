@@ -7,15 +7,15 @@ import {
   ArrowsRightLeftIcon,
   ChartBarIcon,
   FireIcon,
-  ClockIcon,
+  LockClosedIcon,
 } from "@heroicons/react/24/outline";
 
 const mobileNavItems = [
   { name: "Home", href: "/app", icon: HomeIcon },
   { name: "Swap", href: "/app/swap", icon: ArrowsRightLeftIcon },
   { name: "DCA", href: "/app/dca", icon: ChartBarIcon },
+  { name: "Lock", href: "/app/lock", icon: LockClosedIcon },
   { name: "Buyback", href: "/app/buyback", icon: FireIcon },
-  { name: "History", href: "/app/history", icon: ClockIcon },
 ];
 
 export function BottomNav() {
