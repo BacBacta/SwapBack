@@ -1016,20 +1016,24 @@ export function EnhancedSwapInterface() {
               </div>
             )}
           </div>
-          {/* Amount Presets */}
-          {swap.inputToken?.balance && (
-            <div className="flex gap-2 mt-2">
-              {[25, 50, 75, 100].map((pct) => (
-                <button
-                  key={pct}
-                  onClick={() => handleAmountPreset(pct)}
-                  className="flex-1 text-xs py-1.5 bg-gray-800 hover:bg-[var(--primary)] hover:text-black rounded-lg transition-all font-semibold text-gray-400"
-                >
-                  {pct}%
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Amount Presets - Always visible */}
+          <div className="flex gap-2 mt-2">
+            {[25, 50, 75, 100].map((pct) => (
+              <button
+                key={pct}
+                onClick={() => handleAmountPreset(pct)}
+                disabled={!swap.inputToken?.balance}
+                className={`flex-1 text-xs py-1.5 rounded-lg transition-all font-semibold ${
+                  swap.inputToken?.balance
+                    ? 'bg-gray-800 hover:bg-[var(--primary)] hover:text-black text-gray-400 cursor-pointer'
+                    : 'bg-gray-900 text-gray-600 cursor-not-allowed opacity-50'
+                }`}
+                title={!swap.inputToken?.balance ? 'Select a token with balance first' : `Set ${pct}% of balance`}
+              >
+                {pct === 100 ? 'MAX' : `${pct}%`}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Switch Button */}
