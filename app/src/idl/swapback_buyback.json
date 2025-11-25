@@ -141,6 +141,9 @@
           }
         },
         {
+          "name": "usdc_mint"
+        },
+        {
           "name": "depositor",
           "signer": true
         },
@@ -319,6 +322,9 @@
               ]
             }
           }
+        },
+        {
+          "name": "back_mint"
         },
         {
           "name": "back_vault",
@@ -783,6 +789,31 @@
       "code": 6007,
       "name": "InvalidTokenProgram",
       "msg": "Programme token invalide"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidVaultOwner",
+      "msg": "Propriétaire du vault invalide"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidVaultMint",
+      "msg": "Mint du vault invalide"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidSwapAmounts",
+      "msg": "Montants de swap invalides"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidBackReceived",
+      "msg": "Tokens BACK reçus invalides"
+    },
+    {
+      "code": 6012,
+      "name": "SuspiciousPriceRatio",
+      "msg": "Ratio de prix suspicieux détecté"
     }
   ],
   "types": [

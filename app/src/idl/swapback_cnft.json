@@ -788,32 +788,7 @@
         157,
         106,
         255
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "authority",
-            "type": "pubkey"
-          },
-          {
-            "name": "collectionMint",
-            "type": "pubkey"
-          },
-          {
-            "name": "boostBps",
-            "type": "u16"
-          },
-          {
-            "name": "isActive",
-            "type": "bool"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
+      ]
     },
     {
       "name": "GlobalState",
@@ -826,72 +801,7 @@
         123,
         133,
         98
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "authority",
-            "type": "pubkey"
-          },
-          {
-            "name": "backToken",
-            "type": "pubkey"
-          },
-          {
-            "name": "backTokenDecimals",
-            "type": "u8"
-          },
-          {
-            "name": "usdcMint",
-            "type": "pubkey"
-          },
-          {
-            "name": "usdcDecimals",
-            "type": "u8"
-          },
-          {
-            "name": "feeRecipient",
-            "type": "pubkey"
-          },
-          {
-            "name": "baseFee",
-            "type": "u16"
-          },
-          {
-            "name": "nftBoostBps",
-            "type": "u16"
-          },
-          {
-            "name": "vipTierCount",
-            "type": "u8"
-          },
-          {
-            "name": "isPaused",
-            "type": "bool"
-          },
-          {
-            "name": "rebateVault",
-            "type": "pubkey"
-          },
-          {
-            "name": "buybackWallet",
-            "type": "pubkey"
-          },
-          {
-            "name": "lockVault",
-            "type": "pubkey"
-          },
-          {
-            "name": "lockVaultAuthority",
-            "type": "pubkey"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
+      ]
     },
     {
       "name": "UserLock",
@@ -904,40 +814,7 @@
         188,
         205,
         98
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "user",
-            "type": "pubkey"
-          },
-          {
-            "name": "totalLocked",
-            "type": "u64"
-          },
-          {
-            "name": "npiBalance",
-            "type": "u64"
-          },
-          {
-            "name": "lastClaimAt",
-            "type": "i64"
-          },
-          {
-            "name": "lockStart",
-            "type": "i64"
-          },
-          {
-            "name": "lockEnd",
-            "type": "i64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
+      ]
     },
     {
       "name": "UserNpiBalance",
@@ -950,28 +827,7 @@
         93,
         201,
         121
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "user",
-            "type": "pubkey"
-          },
-          {
-            "name": "balance",
-            "type": "u64"
-          },
-          {
-            "name": "lastUpdated",
-            "type": "i64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
+      ]
     }
   ],
   "events": [

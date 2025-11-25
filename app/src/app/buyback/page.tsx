@@ -7,6 +7,7 @@ import ExecuteBuybackButton from './components/ExecuteBuybackButton';
 import BuybackChart from './components/BuybackChart';
 import RecentBuybacks from './components/RecentBuybacks';
 import BurnVisualization from '@/components/BurnVisualization';
+import ClaimBuyback from '@/components/ClaimBuyback';
 import { getNetworkLabel } from '@/utils/explorer';
 import { getBackTokenMint } from '@/config/constants';
 
