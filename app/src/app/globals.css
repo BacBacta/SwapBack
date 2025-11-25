@@ -53,8 +53,7 @@
   }
 }
 
-/* Import custom animations */
-@import '../styles/animations.css';
+/* Import responsive layout styles */
 @import '../styles/responsive-layout.css';
 
 :root {
