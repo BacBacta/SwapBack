@@ -165,6 +165,20 @@ export const DCAClient = () => {
       // Convert frequency to seconds
       const intervalSeconds = frequencyToSeconds(frequency);
 
+      // Calculate minimum output with 1% slippage tolerance
+      // This ensures we always have a positive value for minOutPerSwap
+      const estimatedOutput = Number.parseFloat(amountPerOrder) * 0.99;
+      const minOut = Math.max(1, Math.floor(estimatedOutput * 1000000)); // At least 1 lamport
+
+      console.log('📊 DCA Plan Parameters:', {
+        tokenIn: inputMint,
+        tokenOut: outputMint,
+        amountPerSwap: Number.parseFloat(amountPerOrder),
+        totalSwaps: Number.parseInt(totalOrders),
+        intervalSeconds,
+        minOutPerSwap: minOut,
+      });
+
       // Create plan on-chain
       await createPlan({
         tokenIn: new PublicKey(inputMint),
@@ -172,7 +186,7 @@ export const DCAClient = () => {
         amountPerSwap: Number.parseFloat(amountPerOrder),
         totalSwaps: Number.parseInt(totalOrders),
         intervalSeconds,
-        minOutPerSwap: 0, // Can add slippage tolerance here
+        minOutPerSwap: minOut, // Minimum output with slippage protection
         expiresAt: 0, // No expiration
       });
 
