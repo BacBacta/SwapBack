@@ -175,7 +175,7 @@ export const Dashboard = () => {
       </div>
 
       {/* Global Stats */}
-      <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6">
+      <div className="backdrop-blur-xl bg-[#00FF00]/5 border-2 border-[#00FF00]/30 rounded-2xl p-6 shadow-[0_0_30px_rgba(0,255,0,0.2)] transition-all hover:border-[#00FF00]/50">
         <div className="flex items-center justify-between mb-6">
           <h2
             className="text-2xl font-bold text-white"
@@ -192,7 +192,7 @@ export const Dashboard = () => {
                 refreshNpiBalance();
               }}
               disabled={loading || globalStateLoading}
-              className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg border border-[var(--primary)]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-3 py-1.5 backdrop-blur-lg bg-[#00FF00]/10 hover:bg-[#00FF00]/20 rounded-lg border border-[#00FF00]/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(0,255,0,0.2)]"
               title="Refresh statistics"
             >
               <svg
@@ -214,7 +214,7 @@ export const Dashboard = () => {
             </button>
 
             {/* Indicateur Live */}
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-900 rounded-lg border border-[var(--secondary)]/30">
+            <div className="flex items-center gap-2 px-3 py-1.5 backdrop-blur-lg bg-[#00FFFF]/10 rounded-lg border border-[#00FFFF]/40 shadow-[0_0_15px_rgba(0,255,255,0.2)]">
               <span
                 className="w-2 h-2 bg-[var(--secondary)] rounded-full"
                 aria-hidden="true"
@@ -294,7 +294,7 @@ export const Dashboard = () => {
       {/* cNFT Card - REMOVED as per user request */}
 
       {/* Tabs Navigation */}
-      <div className="flex gap-2 p-2 bg-gray-900 rounded-xl border border-[var(--primary)]/20">
+      <div className="flex gap-2 p-2 backdrop-blur-xl bg-[#00FF00]/5 rounded-2xl border-2 border-[#00FF00]/30 shadow-[0_0_20px_rgba(0,255,0,0.15)]">
         <button
           onClick={() => setActiveTab("dca")}
           className={`flex-1 px-6 py-3 font-bold transition-all border-2 rounded-lg ${
@@ -346,7 +346,7 @@ export const Dashboard = () => {
 
       {activeTab === "lock-unlock" && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6">
+          <div className="backdrop-blur-xl bg-[#00FF00]/5 border-2 border-[#00FF00]/30 rounded-2xl p-6 shadow-[0_0_30px_rgba(0,255,0,0.2)] hover:border-[#00FF00]/50 transition-all">
             <h3 className="text-xl font-bold mb-6 text-white flex items-center gap-2">
               <span>🔒</span>
               <span>Lock $BACK</span>
@@ -358,7 +358,7 @@ export const Dashboard = () => {
               }}
             />
           </div>
-          <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6">
+          <div className="backdrop-blur-xl bg-[#00FF00]/5 border-2 border-[#00FF00]/30 rounded-2xl p-6 shadow-[0_0_30px_rgba(0,255,0,0.2)] hover:border-[#00FF00]/50 transition-all">
             <h3 className="text-xl font-bold mb-6 text-white flex items-center gap-2">
               <span>🔓</span>
               <span>Unlock $BACK</span>
@@ -377,7 +377,7 @@ export const Dashboard = () => {
         <div className="space-y-6">
           {/* Quick Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-gray-900 rounded-lg p-5 hover:border hover:border-[var(--primary)]/30 transition-all">
+            <div className="backdrop-blur-xl bg-[#00FF00]/5 border-2 border-[#00FF00]/30 rounded-2xl p-5 hover:border-[#00FF00]/60 hover:shadow-[0_0_25px_rgba(0,255,0,0.3)] transition-all">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 border border-[var(--primary)] rounded flex items-center justify-center">
                   <span className="text-lg">🔄</span>
@@ -389,7 +389,7 @@ export const Dashboard = () => {
               </div>
             </div>
 
-            <div className="bg-gray-900 rounded-lg p-5 hover:border hover:border-[var(--secondary)]/30 transition-all">
+            <div className="backdrop-blur-xl bg-[#00FFFF]/5 border-2 border-[#00FFFF]/30 rounded-2xl p-5 hover:border-[#00FFFF]/60 hover:shadow-[0_0_25px_rgba(0,255,255,0.3)] transition-all">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 border border-[var(--secondary)] rounded flex items-center justify-center">
                   <span className="text-lg">💰</span>
@@ -401,7 +401,7 @@ export const Dashboard = () => {
               </div>
             </div>
 
-            <div className="bg-gray-900 rounded-lg p-5 hover:border hover:border-[var(--secondary)]/30 transition-all">
+            <div className="backdrop-blur-xl bg-[#00FFFF]/5 border-2 border-[#00FFFF]/30 rounded-2xl p-5 hover:border-[#00FFFF]/60 hover:shadow-[0_0_25px_rgba(0,255,255,0.3)] transition-all">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 border border-[var(--secondary)] rounded flex items-center justify-center">
                   <span className="text-lg">📈</span>
@@ -413,7 +413,7 @@ export const Dashboard = () => {
               </div>
             </div>
 
-            <div className="bg-gray-900 rounded-lg p-5 hover:border hover:border-[var(--secondary)]/30 transition-all">
+            <div className="backdrop-blur-xl bg-[#00FFFF]/5 border-2 border-[#00FFFF]/30 rounded-2xl p-5 hover:border-[#00FFFF]/60 hover:shadow-[0_0_25px_rgba(0,255,255,0.3)] transition-all">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 border border-[var(--secondary)] rounded flex items-center justify-center">
                   <span className="text-lg">✅</span>
@@ -428,7 +428,7 @@ export const Dashboard = () => {
 
           {/* Lock & Boost Card */}
           {cnftData && cnftData.exists && cnftData.isActive && (
-            <div className="bg-gray-900 rounded-lg p-5 border border-[var(--primary)]/30">
+            <div className="backdrop-blur-xl bg-[#00FF00]/5 border-2 border-[#00FF00]/30 rounded-2xl p-5 shadow-[0_0_25px_rgba(0,255,0,0.2)]">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 border border-[var(--accent)] rounded flex items-center justify-center">
                   <span className="text-lg">🔒</span>
@@ -458,7 +458,7 @@ export const Dashboard = () => {
 
           {/* Pending Rebates Card */}
           {hasBalance && pendingNpi > 0 && (
-            <div className="bg-black border border-[var(--primary)] rounded-xl p-6 hover:scale-[1.01] transition-all">
+            <div className="backdrop-blur-xl bg-[#00FF00]/10 border-2 border-[#00FF00]/50 rounded-2xl p-6 hover:border-[#00FF00] hover:shadow-[0_0_40px_rgba(0,255,0,0.4)] hover:scale-[1.01] transition-all">
               <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 border border-[var(--accent)] rounded flex items-center justify-center">
@@ -495,7 +495,7 @@ export const Dashboard = () => {
           {/* Protocol Revenue Metrics */}
           {globalState && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6">
+              <div className="backdrop-blur-xl bg-[#00FF00]/5 border-2 border-[#00FF00]/30 rounded-2xl p-6 shadow-[0_0_30px_rgba(0,255,0,0.2)] hover:border-[#00FF00]/50 transition-all">
                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-white">
                   <span>💸</span>
                   <span>Swap Fees (85/15 Split)</span>
@@ -520,7 +520,7 @@ export const Dashboard = () => {
                 </div>
               </div>
 
-              <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6">
+              <div className="backdrop-blur-xl bg-[#00FF00]/5 border-2 border-[#00FF00]/30 rounded-2xl p-6 shadow-[0_0_30px_rgba(0,255,0,0.2)] hover:border-[#00FF00]/50 transition-all">
                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-white">
                   <span>📊</span>
                   <span>NPI Distribution (70/20/10)</span>
@@ -552,7 +552,7 @@ export const Dashboard = () => {
           )}
 
           {/* Volume Chart */}
-          <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6">
+          <div className="backdrop-blur-xl bg-[#00FF00]/5 border-2 border-[#00FF00]/30 rounded-2xl p-6 shadow-[0_0_30px_rgba(0,255,0,0.2)] hover:border-[#00FF00]/50 transition-all">
             <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-white">
               <span>📊</span>
               <span>Volume Trend (7 Days)</span>
@@ -563,7 +563,7 @@ export const Dashboard = () => {
           </div>
 
           {/* Activity Chart */}
-          <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6">
+          <div className="backdrop-blur-xl bg-[#00FF00]/5 border-2 border-[#00FF00]/30 rounded-2xl p-6 shadow-[0_0_30px_rgba(0,255,0,0.2)] hover:border-[#00FF00]/50 transition-all">
             <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-white">
               <span>📈</span>
               <span>Trading Activity (7 Days)</span>
@@ -575,7 +575,7 @@ export const Dashboard = () => {
 
           {/* Stats Summary */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6">
+            <div className="backdrop-blur-xl bg-[#00FF00]/5 border-2 border-[#00FF00]/30 rounded-2xl p-6 shadow-[0_0_30px_rgba(0,255,0,0.2)] hover:border-[#00FF00]/50 transition-all">
               <h4 className="font-bold mb-4 text-[var(--primary)]">
                 Performance
               </h4>
@@ -612,7 +612,7 @@ export const Dashboard = () => {
               </div>
             </div>
 
-            <div className="bg-black border border-[var(--primary)]/20 rounded-xl p-6">
+            <div className="backdrop-blur-xl bg-[#00FF00]/5 border-2 border-[#00FF00]/30 rounded-2xl p-6 shadow-[0_0_30px_rgba(0,255,0,0.2)] hover:border-[#00FF00]/50 transition-all">
               <h4 className="font-bold mb-4 text-[var(--secondary)]">
                 Rewards
               </h4>
