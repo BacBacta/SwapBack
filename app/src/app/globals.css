@@ -4,6 +4,7 @@
 
 /* Import custom animations */
 @import '../styles/animations.css';
+@import '../styles/responsive-layout.css';
 
 :root {
   /* Terminal Hacker Theme Colors */

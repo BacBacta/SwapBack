@@ -1,0 +1,337 @@
+/* 
+ * Responsive Layout Utilities for Large Screens
+ * 
+ * Optimise l'affichage sur les écrans larges (>1920px)
+ */
+
+/* Container adaptatif */
+.responsive-container {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .responsive-container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .responsive-container {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+@media (min-width: 1920px) {
+  .responsive-container {
+    max-width: 1536px; /* 9xl */
+  }
+}
+
+@media (min-width: 2560px) {
+  .responsive-container {
+    max-width: 1920px; /* ultra */
+    padding-left: 3rem;
+    padding-right: 3rem;
+  }
+}
+
+/* Grid adaptatif pour cards */
+.responsive-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .responsive-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .responsive-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+}
+
+@media (min-width: 1920px) {
+  .responsive-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2rem;
+  }
+}
+
+@media (min-width: 2560px) {
+  .responsive-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 2.5rem;
+  }
+}
+
+/* Typography responsive pour grands écrans */
+.responsive-heading {
+  font-size: clamp(2rem, 3vw, 4rem);
+  line-height: 1.2;
+}
+
+@media (min-width: 1920px) {
+  .responsive-heading {
+    font-size: clamp(2.5rem, 3vw, 5rem);
+  }
+}
+
+.responsive-text {
+  font-size: clamp(0.875rem, 1vw, 1.25rem);
+  line-height: 1.6;
+}
+
+@media (min-width: 1920px) {
+  .responsive-text {
+    font-size: clamp(1rem, 1vw, 1.5rem);
+  }
+}
+
+/* Cards avec espacement adaptatif */
+.responsive-card {
+  padding: 1.5rem;
+  border: 2px solid var(--border);
+  background: var(--card-bg);
+  transition: all var(--duration-base);
+}
+
+@media (min-width: 1920px) {
+  .responsive-card {
+    padding: 2rem;
+  }
+}
+
+@media (min-width: 2560px) {
+  .responsive-card {
+    padding: 2.5rem;
+  }
+}
+
+.responsive-card:hover {
+  background: var(--card-bg-hover);
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-md);
+}
+
+/* Sidebar adaptatif */
+.responsive-sidebar {
+  width: 100%;
+  max-width: 320px;
+}
+
+@media (min-width: 1920px) {
+  .responsive-sidebar {
+    max-width: 384px;
+  }
+}
+
+@media (min-width: 2560px) {
+  .responsive-sidebar {
+    max-width: 448px;
+  }
+}
+
+/* Main content area */
+.responsive-main {
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .responsive-main {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* Chart containers pour grands écrans */
+.responsive-chart {
+  width: 100%;
+  height: 300px;
+}
+
+@media (min-width: 768px) {
+  .responsive-chart {
+    height: 400px;
+  }
+}
+
+@media (min-width: 1920px) {
+  .responsive-chart {
+    height: 500px;
+  }
+}
+
+@media (min-width: 2560px) {
+  .responsive-chart {
+    height: 600px;
+  }
+}
+
+/* Table responsive */
+.responsive-table {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 1920px) {
+  .responsive-table {
+    font-size: 1.125rem;
+  }
+  
+  .responsive-table th,
+  .responsive-table td {
+    padding: 1rem 1.5rem;
+  }
+}
+
+/* Button sizing pour grands écrans */
+.responsive-button {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  transition: all var(--duration-base);
+}
+
+@media (min-width: 1920px) {
+  .responsive-button {
+    padding: 1rem 2rem;
+    font-size: 1.125rem;
+  }
+}
+
+@media (min-width: 2560px) {
+  .responsive-button {
+    padding: 1.25rem 2.5rem;
+    font-size: 1.25rem;
+  }
+}
+
+/* Modal/Dialog adaptatif */
+.responsive-modal {
+  width: 90vw;
+  max-width: 640px;
+}
+
+@media (min-width: 1920px) {
+  .responsive-modal {
+    max-width: 768px;
+  }
+}
+
+@media (min-width: 2560px) {
+  .responsive-modal {
+    max-width: 896px;
+  }
+}
+
+/* Spacing utilities pour grands écrans */
+@media (min-width: 1920px) {
+  .spacing-3xl\:gap-8 {
+    gap: 2rem;
+  }
+  
+  .spacing-3xl\:gap-10 {
+    gap: 2.5rem;
+  }
+  
+  .spacing-3xl\:p-8 {
+    padding: 2rem;
+  }
+  
+  .spacing-3xl\:px-10 {
+    padding-left: 2.5rem;
+    padding-right: 2.5rem;
+  }
+  
+  .spacing-3xl\:py-8 {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+  }
+}
+
+@media (min-width: 2560px) {
+  .spacing-4xl\:gap-12 {
+    gap: 3rem;
+  }
+  
+  .spacing-4xl\:p-10 {
+    padding: 2.5rem;
+  }
+}
+
+/* Navigation adaptatif */
+.responsive-nav {
+  padding: 1rem;
+}
+
+@media (min-width: 1920px) {
+  .responsive-nav {
+    padding: 1.5rem 2rem;
+    font-size: 1.125rem;
+  }
+}
+
+@media (min-width: 2560px) {
+  .responsive-nav {
+    padding: 2rem 3rem;
+    font-size: 1.25rem;
+  }
+}
+
+/* Dashboard stats cards */
+.stats-card-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .stats-card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .stats-card-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1920px) {
+  .stats-card-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2rem;
+  }
+}
+
+@media (min-width: 2560px) {
+  .stats-card-grid {
+    grid-template-columns: repeat(6, 1fr);
+    gap: 2.5rem;
+  }
+}
+
+/* Utility: Centrer le contenu avec padding adaptatif */
+.safe-area-padding {
+  padding-left: max(env(safe-area-inset-left), 1rem);
+  padding-right: max(env(safe-area-inset-right), 1rem);
+}
+
+@media (min-width: 1920px) {
+  .safe-area-padding {
+    padding-left: max(env(safe-area-inset-left), 2rem);
+    padding-right: max(env(safe-area-inset-right), 2rem);
+  }
+}

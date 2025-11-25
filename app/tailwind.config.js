@@ -14,6 +14,17 @@ module.exports = {
         secondary: 'var(--secondary)',
         accent: 'var(--accent)',
       },
+      screens: {
+        'xs': '475px',
+        '3xl': '1920px',
+        '4xl': '2560px',
+      },
+      maxWidth: {
+        '8xl': '88rem',   // 1408px
+        '9xl': '96rem',   // 1536px
+        '10xl': '104rem', // 1664px
+        'ultra': '120rem', // 1920px
+      },
       animation: {
         'gradient': 'gradient 8s linear infinite',
       },
