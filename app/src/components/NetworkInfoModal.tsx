@@ -85,7 +85,7 @@ export const NetworkInfoModal = () => {
                     {Object.entries(currentNetwork.contracts).map(([name, address]) => (
                       <div key={name} className="flex items-center justify-between">
                         <span className="text-gray-300 font-medium">{name}:</span>
-                        <code className="bg-gray-800 px-2 py-1 rounded text-xs font-mono text-[var(--primary)]">
+                        <code className="bg-gray-800 px-2 py-1 rounded text-xs font-sans text-[var(--primary)]">
                           {address}
                         </code>
                       </div>

@@ -18,7 +18,7 @@ export default function DCAPage() {
             showBackButton={true}
           />
         </div>
-        <div className="backdrop-blur-xl bg-[#00FF00]/5 border-2 border-[#00FF00]/30 rounded-2xl p-8 shadow-[0_0_30px_rgba(0,255,0,0.2)] transition-all hover:border-[#00FF00]/50">
+        <div className="backdrop-blur-xl bg-[#10B981]/5 border-2 border-[#10B981]/30 rounded-2xl p-8 shadow-[0_0_30px_rgba(0,255,0,0.2)] transition-all hover:border-[#10B981]/50">
           <DCA />
         </div>
       </div>

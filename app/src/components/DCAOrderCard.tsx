@@ -152,7 +152,7 @@ export const DCAOrderCard = ({ plan }: DCAOrderCardProps) => {
           
           <div>
             <p className="text-xs text-gray-400 terminal-text mb-1">PLAN PDA</p>
-            <p className="text-xs text-white terminal-text font-mono break-all">
+            <p className="text-xs text-white terminal-text font-sans break-all">
               {plan.planPda.toBase58()}
             </p>
           </div>

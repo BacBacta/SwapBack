@@ -42,7 +42,7 @@ export default function ExecuteBuybackButton() {
           step="1"
           value={usdcAmount}
           onChange={(e) => setUsdcAmount(Number(e.target.value))}
-          className="w-full px-4 py-3 bg-black/60 border-2 border-[var(--primary)]/30 text-[var(--primary)] font-mono focus:border-[var(--primary)] focus:outline-none transition-all"
+          className="w-full px-4 py-3 bg-black/60 border-2 border-[var(--primary)]/30 text-[var(--primary)] font-sans focus:border-[var(--primary)] focus:outline-none transition-all"
           disabled={isPending}
         />
         <p className="text-xs text-[var(--primary)]/50 mt-2 uppercase tracking-wider">

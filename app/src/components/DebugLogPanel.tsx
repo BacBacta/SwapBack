@@ -180,7 +180,7 @@ export function DebugLogPanel() {
                           </span>
                         )}
                       </div>
-                      <p className="text-red-400 mt-2 font-mono text-sm">
+                      <p className="text-red-400 mt-2 font-sans text-sm">
                         {log.error.message}
                       </p>
                     </div>

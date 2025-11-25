@@ -172,7 +172,7 @@ export default function BetaActivation({ onClose, onActivated }: BetaActivationP
               value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
               placeholder="SWAP-ALPHA-001"
-              className="w-full bg-black/60 border border-green-500/30 rounded-lg px-4 py-3 text-white font-mono placeholder-gray-500 focus:outline-none focus:border-green-500 text-center text-lg tracking-wider"
+              className="w-full bg-black/60 border border-green-500/30 rounded-lg px-4 py-3 text-white font-sans placeholder-gray-500 focus:outline-none focus:border-green-500 text-center text-lg tracking-wider"
               disabled={isValidating}
               required
             />

@@ -47,14 +47,14 @@ export default function BuybackPage() {
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl 3xl:max-w-10xl 4xl:max-w-11xl min-h-screen">
-      <div className="backdrop-blur-xl bg-[#00FF00]/5 border-2 border-[#00FF00]/30 rounded-2xl p-8 shadow-[0_0_30px_rgba(0,255,0,0.2)] transition-all hover:border-[#00FF00]/50">
+      <div className="backdrop-blur-xl bg-[#10B981]/5 border-2 border-[#10B981]/30 rounded-2xl p-8 shadow-[0_0_30px_rgba(0,255,0,0.2)] transition-all hover:border-[#10B981]/50">
         {/* Header */}
       <div className="mb-8">
         <h1 className="text-4xl font-bold terminal-text terminal-glow uppercase tracking-wider text-[var(--primary)] mb-2 flex items-center gap-3">
           <span>💰</span>
           <span>Buyback Dashboard</span>
         </h1>
-        <p className="text-[var(--primary)]/70 font-mono text-sm uppercase tracking-wider">
+        <p className="text-[var(--primary)]/70 font-sans text-sm uppercase tracking-wider">
           Track $BACK token buyback and burn statistics
         </p>
       </div>

@@ -92,7 +92,7 @@ export class ErrorBoundary extends Component<Props, State> {
             </div>
 
             {/* Error Details */}
-            <div className="bg-black/50 border-2 border-[var(--error)]/30 p-6 mb-6 font-mono text-sm">
+            <div className="bg-black/50 border-2 border-[var(--error)]/30 p-6 mb-6 font-sans text-sm">
               <div className="text-[var(--error)] mb-2">
                 <span className="opacity-70">&gt;</span> ERROR:{" "}
                 {this.state.error?.message || "Unknown error"}

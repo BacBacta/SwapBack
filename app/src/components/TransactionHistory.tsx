@@ -257,7 +257,7 @@ export const TransactionHistory = ({
                                 <span className="terminal-prefix">&gt;</span>{" "}
                                 FULL_SIGNATURE
                               </div>
-                              <div className="text-xs terminal-text font-mono break-all">
+                              <div className="text-xs terminal-text font-sans break-all">
                                 {tx.signature}
                               </div>
                               <button

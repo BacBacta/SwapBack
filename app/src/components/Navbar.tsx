@@ -16,7 +16,7 @@ export const Navbar = () => {
   ];
 
   return (
-    <nav className="sticky top-0 z-50 backdrop-blur-xl bg-[#0C0C0C]/90 border-b border-[#00FF00]/30 shadow-[0_0_20px_rgba(0,255,0,0.15)]">
+    <nav className="sticky top-0 z-50 backdrop-blur-xl bg-[#0C0C0C]/90 border-b border-[#10B981]/30 shadow-[0_0_20px_rgba(0,255,0,0.15)]">
       <div className="max-w-7xl 3xl:max-w-10xl 4xl:max-w-11xl mx-auto px-4 sm:px-6 lg:px-8">\n        <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link 

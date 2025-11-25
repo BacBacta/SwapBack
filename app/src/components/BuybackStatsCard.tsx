@@ -160,7 +160,7 @@ export const BuybackStatsCard = () => {
             </div>
             <div>
               <span className="text-gray-400">Estimated $BACK:</span>
-              <span className="ml-2 terminal-text font-mono text-[var(--accent)]">
+              <span className="ml-2 terminal-text font-sans text-[var(--accent)]">
                 {estimation.estimatedBackAmount.toFixed(0)}
               </span>
             </div>

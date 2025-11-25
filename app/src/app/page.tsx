@@ -19,9 +19,9 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-br from-[#0C0C0C] via-[#1a1a1a] to-[#0C0C0C] overflow-hidden relative">
       {/* Gradient Mesh Background */}
       <div className="absolute inset-0 opacity-30">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#00FF00] rounded-full mix-blend-multiply filter blur-3xl animate-blob" />
-        <div className="absolute top-0 right-1/4 w-96 h-96 bg-[#00FFFF] rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000" />
-        <div className="absolute bottom-0 left-1/3 w-96 h-96 bg-[#00FF00] rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000" />
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#10B981] rounded-full mix-blend-multiply filter blur-3xl animate-blob" />
+        <div className="absolute top-0 right-1/4 w-96 h-96 bg-[#06B6D4] rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000" />
+        <div className="absolute bottom-0 left-1/3 w-96 h-96 bg-[#10B981] rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000" />
       </div>
 
       {/* Grid Background */}
@@ -30,8 +30,8 @@ export default function Home() {
           className="h-full w-full"
           style={{
             backgroundImage: `
-              linear-gradient(to right, #00FF00 1px, transparent 1px),
-              linear-gradient(to bottom, #00FF00 1px, transparent 1px)
+              linear-gradient(to right, #10B981 1px, transparent 1px),
+              linear-gradient(to bottom, #10B981 1px, transparent 1px)
             `,
             backgroundSize: '50px 50px',
           }}
@@ -58,13 +58,13 @@ export default function Home() {
             y: (mousePosition.y - window.innerHeight / 2) * 0.02,
           }}
         >
-          <div className="backdrop-blur-xl bg-[#00FF00]/5 border-2 border-[#00FF00]/30 rounded-2xl p-6 shadow-[0_0_30px_rgba(0,255,0,0.3)]">
-            <div className="text-[#00FF00] font-mono text-sm">
+          <div className="backdrop-blur-xl bg-[#10B981]/5 border-2 border-[#10B981]/30 rounded-2xl p-6 shadow-[0_0_30px_rgba(0,255,0,0.3)]">
+            <div className="text-[#10B981] font-sans text-sm">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-2xl">🌊</span>
                 <span className="font-bold">Low Fees</span>
               </div>
-              <p className="text-[#00FF00]/70">Swap with 0.2% fees</p>
+              <p className="text-[#10B981]/70">Swap with 0.2% fees</p>
             </div>
           </div>
         </motion.div>
@@ -83,11 +83,11 @@ export default function Home() {
             className="mb-8"
           >
             <h1 className="text-6xl md:text-7xl lg:text-8xl font-bold mb-6">
-              <span className="bg-gradient-to-r from-[#00FF00] via-[#00FFFF] to-[#00FF00] bg-clip-text text-transparent animate-gradient">
+              <span className="bg-gradient-to-r from-[#10B981] via-[#06B6D4] to-[#10B981] bg-clip-text text-transparent animate-gradient">
                 SwapBack
               </span>
             </h1>
-            <p className="text-2xl md:text-3xl text-[#00FF00]/90 font-mono">
+            <p className="text-2xl md:text-3xl text-[#10B981]/90 font-mono">
               Next-Gen DEX for Solana
             </p>
           </motion.div>
@@ -96,7 +96,7 @@ export default function Home() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3, duration: 0.8 }}
-            className="text-lg md:text-xl text-[#00FF00]/70 max-w-2xl mx-auto mb-12 font-mono"
+            className="text-lg md:text-xl text-[#10B981]/70 max-w-2xl mx-auto mb-12 font-mono"
           >
             Trade smarter with automated tools, low fees, and advanced DeFi features
           </motion.p>
@@ -112,7 +112,7 @@ export default function Home() {
               <motion.button
                 whileHover={{ scale: 1.05, boxShadow: "0 0 40px rgba(0,255,0,0.6)" }}
                 whileTap={{ scale: 0.95 }}
-                className="px-8 py-4 bg-[#00FF00] text-[#0C0C0C] font-bold text-lg rounded-xl shadow-[0_0_30px_rgba(0,255,0,0.4)] hover:bg-[#00FF00]/90 transition-all font-mono uppercase tracking-wider"
+                className="px-8 py-4 bg-[#10B981] text-[#0C0C0C] font-bold text-lg rounded-xl shadow-[0_0_30px_rgba(0,255,0,0.4)] hover:bg-[#10B981]/90 transition-all font-sans uppercase tracking-wider"
               >
                 Launch App
               </motion.button>
@@ -121,7 +121,7 @@ export default function Home() {
               <motion.button
                 whileHover={{ scale: 1.05, borderColor: "rgba(0,255,0,1)" }}
                 whileTap={{ scale: 0.95 }}
-                className="px-8 py-4 bg-transparent border-2 border-[#00FF00]/30 text-[#00FF00] font-bold text-lg rounded-xl hover:bg-[#00FF00]/10 transition-all font-mono uppercase tracking-wider"
+                className="px-8 py-4 bg-transparent border-2 border-[#10B981]/30 text-[#10B981] font-bold text-lg rounded-xl hover:bg-[#10B981]/10 transition-all font-sans uppercase tracking-wider"
               >
                 Read Docs
               </motion.button>
@@ -145,14 +145,14 @@ export default function Home() {
               x: (mousePosition.x - window.innerWidth / 2) * 0.01,
               y: (mousePosition.y - window.innerHeight / 2) * 0.01,
             }}
-            className="backdrop-blur-xl bg-[#00FF00]/5 border-2 border-[#00FF00]/30 rounded-2xl p-8 shadow-[0_0_30px_rgba(0,255,0,0.2)] hover:border-[#00FF00]/60 transition-all cursor-pointer"
+            className="backdrop-blur-xl bg-[#10B981]/5 border-2 border-[#10B981]/30 rounded-2xl p-8 shadow-[0_0_30px_rgba(0,255,0,0.2)] hover:border-[#10B981]/60 transition-all cursor-pointer"
           >
             <div className="text-5xl mb-4">📊</div>
-            <h3 className="text-2xl font-bold text-[#00FF00] mb-3 font-mono">DCA Orders</h3>
-            <p className="text-[#00FF00]/70 mb-4 font-mono text-sm">
+            <h3 className="text-2xl font-bold text-[#10B981] mb-3 font-mono">DCA Orders</h3>
+            <p className="text-[#10B981]/70 mb-4 font-sans text-sm">
               Automate your investments with Dollar-Cost Averaging. Schedule recurring buys and let the protocol handle the rest.
             </p>
-            <Link href="/dca" className="text-[#00FFFF] hover:text-[#00FF00] font-mono text-sm font-bold inline-flex items-center gap-2">
+            <Link href="/dca" className="text-[#06B6D4] hover:text-[#10B981] font-sans text-sm font-bold inline-flex items-center gap-2">
               Learn More →
             </Link>
           </motion.div>
@@ -170,14 +170,14 @@ export default function Home() {
               x: (mousePosition.x - window.innerWidth / 2) * 0.015,
               y: (mousePosition.y - window.innerHeight / 2) * 0.015,
             }}
-            className="backdrop-blur-xl bg-[#00FFFF]/5 border-2 border-[#00FFFF]/30 rounded-2xl p-8 shadow-[0_0_30px_rgba(0,255,255,0.2)] hover:border-[#00FFFF]/60 transition-all cursor-pointer"
+            className="backdrop-blur-xl bg-[#06B6D4]/5 border-2 border-[#06B6D4]/30 rounded-2xl p-8 shadow-[0_0_30px_rgba(0,255,255,0.2)] hover:border-[#06B6D4]/60 transition-all cursor-pointer"
           >
             <div className="text-5xl mb-4">⚡</div>
-            <h3 className="text-2xl font-bold text-[#00FFFF] mb-3 font-mono">Instant Swaps</h3>
-            <p className="text-[#00FFFF]/70 mb-4 font-mono text-sm">
+            <h3 className="text-2xl font-bold text-[#06B6D4] mb-3 font-mono">Instant Swaps</h3>
+            <p className="text-[#06B6D4]/70 mb-4 font-sans text-sm">
               Trade any Solana token instantly with best-in-class routing and minimal slippage. Lightning-fast execution.
             </p>
-            <Link href="/swap" className="text-[#00FF00] hover:text-[#00FFFF] font-mono text-sm font-bold inline-flex items-center gap-2">
+            <Link href="/swap" className="text-[#10B981] hover:text-[#06B6D4] font-sans text-sm font-bold inline-flex items-center gap-2">
               Start Trading →
             </Link>
           </motion.div>
@@ -195,14 +195,14 @@ export default function Home() {
               x: (mousePosition.x - window.innerWidth / 2) * 0.012,
               y: (mousePosition.y - window.innerHeight / 2) * 0.012,
             }}
-            className="backdrop-blur-xl bg-[#00FF00]/5 border-2 border-[#00FF00]/30 rounded-2xl p-8 shadow-[0_0_30px_rgba(0,255,0,0.2)] hover:border-[#00FF00]/60 transition-all cursor-pointer"
+            className="backdrop-blur-xl bg-[#10B981]/5 border-2 border-[#10B981]/30 rounded-2xl p-8 shadow-[0_0_30px_rgba(0,255,0,0.2)] hover:border-[#10B981]/60 transition-all cursor-pointer"
           >
             <div className="text-5xl mb-4">🔥</div>
-            <h3 className="text-2xl font-bold text-[#00FF00] mb-3 font-mono">Buyback & Burn</h3>
-            <p className="text-[#00FF00]/70 mb-4 font-mono text-sm">
+            <h3 className="text-2xl font-bold text-[#10B981] mb-3 font-mono">Buyback & Burn</h3>
+            <p className="text-[#10B981]/70 mb-4 font-sans text-sm">
               Deflationary tokenomics powered by protocol fees. Watch $BACK supply decrease while value increases.
             </p>
-            <Link href="/buyback" className="text-[#00FFFF] hover:text-[#00FF00] font-mono text-sm font-bold inline-flex items-center gap-2">
+            <Link href="/buyback" className="text-[#06B6D4] hover:text-[#10B981] font-sans text-sm font-bold inline-flex items-center gap-2">
               View Stats →
             </Link>
           </motion.div>
@@ -225,13 +225,13 @@ export default function Home() {
             y: (mousePosition.y - window.innerHeight / 2) * 0.025,
           }}
         >
-          <div className="backdrop-blur-xl bg-[#00FFFF]/5 border-2 border-[#00FFFF]/30 rounded-2xl p-6 shadow-[0_0_30px_rgba(0,255,255,0.3)]">
-            <div className="text-[#00FFFF] font-mono text-sm">
+          <div className="backdrop-blur-xl bg-[#06B6D4]/5 border-2 border-[#06B6D4]/30 rounded-2xl p-6 shadow-[0_0_30px_rgba(0,255,255,0.3)]">
+            <div className="text-[#06B6D4] font-sans text-sm">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-2xl">🔒</span>
                 <span className="font-bold">Secure</span>
               </div>
-              <p className="text-[#00FFFF]/70">Non-custodial protocol</p>
+              <p className="text-[#06B6D4]/70">Non-custodial protocol</p>
             </div>
           </div>
         </motion.div>
@@ -244,17 +244,17 @@ export default function Home() {
           className="mt-32 text-center relative z-20"
         >
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="backdrop-blur-xl bg-[#00FF00]/5 border-2 border-[#00FF00]/20 rounded-2xl p-6">
-              <div className="text-4xl font-bold text-[#00FF00] mb-2 font-mono">$2.4M+</div>
-              <div className="text-[#00FF00]/70 font-mono text-sm uppercase tracking-wider">Total Volume</div>
+            <div className="backdrop-blur-xl bg-[#10B981]/5 border-2 border-[#10B981]/20 rounded-2xl p-6">
+              <div className="text-4xl font-bold text-[#10B981] mb-2 font-mono">$2.4M+</div>
+              <div className="text-[#10B981]/70 font-sans text-sm uppercase tracking-wider">Total Volume</div>
             </div>
-            <div className="backdrop-blur-xl bg-[#00FFFF]/5 border-2 border-[#00FFFF]/20 rounded-2xl p-6">
-              <div className="text-4xl font-bold text-[#00FFFF] mb-2 font-mono">12,345</div>
-              <div className="text-[#00FFFF]/70 font-mono text-sm uppercase tracking-wider">Total Swaps</div>
+            <div className="backdrop-blur-xl bg-[#06B6D4]/5 border-2 border-[#06B6D4]/20 rounded-2xl p-6">
+              <div className="text-4xl font-bold text-[#06B6D4] mb-2 font-mono">12,345</div>
+              <div className="text-[#06B6D4]/70 font-sans text-sm uppercase tracking-wider">Total Swaps</div>
             </div>
-            <div className="backdrop-blur-xl bg-[#00FF00]/5 border-2 border-[#00FF00]/20 rounded-2xl p-6">
-              <div className="text-4xl font-bold text-[#00FF00] mb-2 font-mono">856</div>
-              <div className="text-[#00FF00]/70 font-mono text-sm uppercase tracking-wider">Active Users</div>
+            <div className="backdrop-blur-xl bg-[#10B981]/5 border-2 border-[#10B981]/20 rounded-2xl p-6">
+              <div className="text-4xl font-bold text-[#10B981] mb-2 font-mono">856</div>
+              <div className="text-[#10B981]/70 font-sans text-sm uppercase tracking-wider">Active Users</div>
             </div>
           </div>
         </motion.div>

@@ -52,7 +52,7 @@ export default function BetaDashboard() {
           </p>
         </div>
         <div className="bg-purple-500/20 px-4 py-2 rounded-lg">
-          <span className="text-purple-300 font-mono text-sm">
+          <span className="text-purple-300 font-sans text-sm">
             {userData?.inviteCode}
           </span>
         </div>

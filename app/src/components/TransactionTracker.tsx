@@ -105,7 +105,7 @@ export function TransactionTracker() {
                   href={getExplorerLink(transaction.signature)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-blue-400 hover:text-blue-300 font-mono truncate max-w-[200px]"
+                  className="text-sm text-blue-400 hover:text-blue-300 font-sans truncate max-w-[200px]"
                 >
                   {transaction.signature.slice(0, 8)}...
                   {transaction.signature.slice(-8)}

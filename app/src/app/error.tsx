@@ -63,7 +63,7 @@ export default function Error({
           {error.digest && (
             <div>
               <span className="text-gray-400 text-sm">Error ID:</span>
-              <p className="text-white font-mono text-xs">{error.digest}</p>
+              <p className="text-white font-sans text-xs">{error.digest}</p>
             </div>
           )}
 

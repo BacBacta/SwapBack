@@ -384,7 +384,7 @@ export default function OnChainHistory() {
                     </span>
                   </div>
 
-                  <div className="text-xs text-gray-400 font-mono mb-2">
+                  <div className="text-xs text-gray-400 font-sans mb-2">
                     {tx.signature.slice(0, 16)}...{tx.signature.slice(-16)}
                   </div>
 
@@ -444,7 +444,7 @@ export default function OnChainHistory() {
                   {/* Full Signature */}
                   <div className="p-3 bg-black/30 rounded-lg">
                     <div className="text-xs text-gray-400 mb-2 font-bold">FULL SIGNATURE</div>
-                    <div className="text-xs font-mono text-gray-300 break-all">{tx.signature}</div>
+                    <div className="text-xs font-sans text-gray-300 break-all">{tx.signature}</div>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -495,7 +495,7 @@ export default function OnChainHistory() {
                           </div>
                           <div className="text-gray-400">Type: {ix.type}</div>
                           {ix.data && ix.data.length < 200 && (
-                            <div className="text-gray-500 mt-1 font-mono text-[10px] break-all">
+                            <div className="text-gray-500 mt-1 font-sans text-[10px] break-all">
                               {ix.data}
                             </div>
                           )}

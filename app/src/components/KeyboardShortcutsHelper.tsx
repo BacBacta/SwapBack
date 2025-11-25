@@ -90,7 +90,7 @@ export const KeyboardShortcutsHelper = () => {
                   className="flex items-center justify-between p-4 rounded-xl bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 transition-colors border border-[var(--primary)]/5"
                 >
                   <span className="text-gray-300">{shortcut.description}</span>
-                  <kbd className="px-3 py-1.5 rounded-lg bg-black/50 border border-[var(--primary)]/10 font-mono text-sm text-[var(--primary)] font-semibold">
+                  <kbd className="px-3 py-1.5 rounded-lg bg-black/50 border border-[var(--primary)]/10 font-sans text-sm text-[var(--primary)] font-semibold">
                     {shortcut.keys}
                   </kbd>
                 </div>
@@ -115,7 +115,7 @@ export const KeyboardShortcutsHelper = () => {
           {/* Footer */}
           <div className="mt-8 pt-6 border-t border-[var(--primary)]/10 text-center">
             <p className="text-sm text-gray-500">
-              Press <kbd className="px-2 py-1 rounded bg-black/30 border border-[var(--primary)]/10 font-mono text-xs">Esc</kbd> to close
+              Press <kbd className="px-2 py-1 rounded bg-black/30 border border-[var(--primary)]/10 font-sans text-xs">Esc</kbd> to close
             </p>
           </div>
         </div>

@@ -346,7 +346,7 @@ export const DCAClient = () => {
                 <select
                   value={inputToken}
                   onChange={(e) => setInputToken(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-mono focus:border-[var(--primary)] focus:outline-none"
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-sans focus:border-[var(--primary)] focus:outline-none"
                 >
                   <option value="SOL">SOL</option>
                   <option value="USDC">USDC</option>
@@ -362,7 +362,7 @@ export const DCAClient = () => {
                 <select
                   value={outputToken}
                   onChange={(e) => setOutputToken(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-mono focus:border-[var(--primary)] focus:outline-none"
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-sans focus:border-[var(--primary)] focus:outline-none"
                 >
                   <option value="USDC">USDC</option>
                   <option value="USDT">USDT</option>
@@ -383,7 +383,7 @@ export const DCAClient = () => {
                     value={amountPerOrder}
                     onChange={(e) => setAmountPerOrder(e.target.value)}
                     placeholder="0.00"
-                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-mono focus:border-[var(--primary)] focus:outline-none pr-16"
+                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-sans focus:border-[var(--primary)] focus:outline-none pr-16"
                   />
                   <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
                     {inputToken}
@@ -441,7 +441,7 @@ export const DCAClient = () => {
                   onChange={(e) =>
                     setFrequency(e.target.value as typeof frequency)
                   }
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-mono focus:border-[var(--primary)] focus:outline-none"
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-sans focus:border-[var(--primary)] focus:outline-none"
                 >
                   <option value="hourly">Hourly</option>
                   <option value="daily">Daily</option>
@@ -463,7 +463,7 @@ export const DCAClient = () => {
                   placeholder="10"
                   min="1"
                   max="100"
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-mono focus:border-[var(--primary)] focus:outline-none"
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-sans focus:border-[var(--primary)] focus:outline-none"
                 />
               </div>
 

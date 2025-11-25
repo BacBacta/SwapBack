@@ -114,7 +114,7 @@ export default function OnChainHistoryWidget({
                     <span className={tx.success ? "text-green-400" : "text-red-400"}>
                       {tx.success ? "✅" : "❌"}
                     </span>
-                    <span className="text-xs font-mono text-gray-400 truncate">
+                    <span className="text-xs font-sans text-gray-400 truncate">
                       {tx.signature.slice(0, 8)}...{tx.signature.slice(-8)}
                     </span>
                   </div>

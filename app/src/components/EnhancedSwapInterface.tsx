@@ -777,7 +777,7 @@ export function EnhancedSwapInterface() {
   return (
     <div className="max-w-lg mx-auto">
       {/* Main Swap Card */}
-      <div className="backdrop-blur-xl bg-[#00FFFF]/5 border-2 border-[#00FFFF]/30 rounded-2xl p-6 shadow-[0_0_30px_rgba(0,255,255,0.2)] hover:border-[#00FFFF]/50 transition-all">
+      <div className="backdrop-blur-xl bg-[#06B6D4]/5 border-2 border-[#06B6D4]/30 rounded-2xl p-6 shadow-[0_0_30px_rgba(0,255,255,0.2)] hover:border-[#06B6D4]/50 transition-all">
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
@@ -836,7 +836,7 @@ export function EnhancedSwapInterface() {
 
         {/* Input Token */}
         <div className="mb-2">
-          <div className="backdrop-blur-xl bg-[#00FF00]/10 border border-[#00FF00]/30 rounded-2xl p-4 shadow-[0_0_20px_rgba(0,255,0,0.15)]">
+          <div className="backdrop-blur-xl bg-[#10B981]/10 border border-[#10B981]/30 rounded-2xl p-4 shadow-[0_0_20px_rgba(0,255,0,0.15)]">
             <div className="flex justify-between mb-2">
               <label className="text-sm text-gray-400">You Pay</label>
               {swap.inputToken?.balance && (
@@ -916,7 +916,7 @@ export function EnhancedSwapInterface() {
         <div className="flex justify-center -my-3 relative z-10">
           <button
             onClick={switchTokens}
-            className="backdrop-blur-lg bg-[#00FF00]/10 border-2 border-[#00FF00]/40 hover:border-[#00FF00] rounded-xl p-2 transition-all hover:shadow-[0_0_20px_rgba(0,255,0,0.3)]"
+            className="backdrop-blur-lg bg-[#10B981]/10 border-2 border-[#10B981]/40 hover:border-[#10B981] rounded-xl p-2 transition-all hover:shadow-[0_0_20px_rgba(0,255,0,0.3)]"
           >
             <svg
               className="w-5 h-5 text-gray-400"
@@ -936,7 +936,7 @@ export function EnhancedSwapInterface() {
 
         {/* Output Token */}
         <div className="mb-6">
-          <div className="backdrop-blur-xl bg-[#00FF00]/10 border border-[#00FF00]/30 rounded-2xl p-4 shadow-[0_0_20px_rgba(0,255,0,0.15)]">
+          <div className="backdrop-blur-xl bg-[#10B981]/10 border border-[#10B981]/30 rounded-2xl p-4 shadow-[0_0_20px_rgba(0,255,0,0.15)]">
             <div className="flex justify-between mb-2">
               <label className="text-sm text-gray-400">You Receive</label>
               {swap.outputToken?.balance && (
@@ -1217,7 +1217,7 @@ export function EnhancedSwapInterface() {
       {/* Slippage Modal */}
       {showSlippageModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="backdrop-blur-xl bg-[#00FF00]/5 border-2 border-[#00FF00]/40 rounded-2xl p-6 max-w-md w-full shadow-[0_0_40px_rgba(0,255,0,0.3)]">
+          <div className="backdrop-blur-xl bg-[#10B981]/5 border-2 border-[#10B981]/40 rounded-2xl p-6 max-w-md w-full shadow-[0_0_40px_rgba(0,255,0,0.3)]">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-white">
                 Slippage Settings

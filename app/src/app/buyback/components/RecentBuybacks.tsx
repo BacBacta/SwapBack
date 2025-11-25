@@ -32,27 +32,27 @@ export default function RecentBuybacks() {
       {loading && (
         <div className="flex flex-col items-center justify-center py-8 bg-black/60 border-2 border-[var(--primary)]/20">
           <div className="text-4xl mb-3 animate-pulse-green">⏳</div>
-          <p className="text-[var(--primary)]/70 font-mono text-sm">Loading transactions...</p>
+          <p className="text-[var(--primary)]/70 font-sans text-sm">Loading transactions...</p>
         </div>
       )}
 
       {error && (
         <div className="flex flex-col items-center justify-center py-8 bg-black/60 border-2 border-red-500/20">
           <div className="text-4xl mb-3">⚠️</div>
-          <p className="text-red-400 font-mono text-sm">{error.message || 'Failed to load transactions'}</p>
+          <p className="text-red-400 font-sans text-sm">{error.message || 'Failed to load transactions'}</p>
         </div>
       )}
 
       {!loading && !error && transactions.length === 0 && (
         <div className="flex flex-col items-center justify-center py-8 bg-black/60 border-2 border-[var(--primary)]/20">
           <div className="text-5xl mb-3">📝</div>
-          <p className="text-[var(--primary)]/70 font-mono text-sm">No recent buybacks</p>
+          <p className="text-[var(--primary)]/70 font-sans text-sm">No recent buybacks</p>
         </div>
       )}
 
       {!loading && !error && transactions.length > 0 && (
         <div className="bg-black/60 border-2 border-[var(--primary)]/20 overflow-hidden">
-          <table className="w-full font-mono text-xs">
+          <table className="w-full font-sans text-xs">
             <thead>
               <tr className="bg-[var(--primary)]/10 border-b-2 border-[var(--primary)]/30">
                 <th className="text-left p-3 text-[var(--primary)] uppercase tracking-wider">Time</th>
@@ -98,7 +98,7 @@ export default function RecentBuybacks() {
         </div>
       )}
 
-      <div className="mt-2 text-xs font-mono text-[var(--primary)]/50 flex items-center gap-2">
+      <div className="mt-2 text-xs font-sans text-[var(--primary)]/50 flex items-center gap-2">
         <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
         <span>Live data from Helius API • Refreshes every 30s</span>
       </div>
