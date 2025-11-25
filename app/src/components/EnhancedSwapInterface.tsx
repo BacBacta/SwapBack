@@ -23,6 +23,11 @@ import { getExplorerUrl } from "@/config/constants";
 import { ClientOnlyConnectionStatus } from "./ClientOnlyConnectionStatus";
 import { TokenSelector } from "./TokenSelector";
 import { DistributionBreakdown } from "./DistributionBreakdown";
+import { SwapPreviewModal } from "./SwapPreviewModal";
+import { LoadingProgress } from "./LoadingProgress";
+import { RecentSwapsSidebar } from "./RecentSwapsSidebar";
+import { ClockIcon, ExclamationTriangleIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
+import { motion, AnimatePresence } from "framer-motion";
 // import { debounce } from "lodash"; // Désactivé - Pas d'auto-fetch
 
 interface RouteStep {
@@ -245,6 +250,24 @@ export function EnhancedSwapInterface() {
   const [swapError, setSwapError] = useState<string | null>(null);
   const [isSwapping, setIsSwapping] = useState(false);
   const [swapSignature, setSwapSignature] = useState<string | null>(null);
+  
+  // New UX features state
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [priceRefreshCountdown, setPriceRefreshCountdown] = useState(10);
+  const [loadingStep, setLoadingStep] = useState<'fetching' | 'routing' | 'building' | 'signing' | 'confirming'>('fetching');
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [showRecentSwaps, setShowRecentSwaps] = useState(false);
+  const [recentSwaps, setRecentSwaps] = useState<Array<{
+    id: string;
+    fromToken: string;
+    toToken: string;
+    fromAmount: string;
+    toAmount: string;
+    timestamp: number;
+    status: 'success' | 'pending' | 'failed';
+    txSignature?: string;
+  }>>([]);
+  const [suggestedSlippage, setSuggestedSlippage] = useState<number | null>(null);
 
   // ⚠️ AUTO-FETCH DÉSACTIVÉ pour éviter les boucles infinies
   // User must click "Search Route" manually
@@ -265,13 +288,45 @@ export function EnhancedSwapInterface() {
   //   debouncedFetchRoutes(swap.inputToken, swap.outputToken, swap.inputAmount);
   // }, [swap.inputToken, swap.outputToken, swap.inputAmount, debouncedFetchRoutes]);
 
-  // Calculate price impact
+  // Calculate price impact and suggest slippage
   useEffect(() => {
     if (routes.selectedRoute) {
       // RouteCandidate n'a pas priceImpact, on utilise 0.5% par défaut
-      setPriceImpact(0.5);
+      const impact = 0.5;
+      setPriceImpact(impact);
+      
+      // Smart slippage suggestions based on price impact
+      if (impact < 0.1) {
+        setSuggestedSlippage(0.1);
+      } else if (impact < 1) {
+        setSuggestedSlippage(0.5);
+      } else if (impact < 5) {
+        setSuggestedSlippage(1.0);
+      } else {
+        setSuggestedSlippage(2.0);
+      }
     }
   }, [routes.selectedRoute]);
+  
+  // Real-time price refresh countdown
+  useEffect(() => {
+    if (!hasSearchedRoute || routes.isLoading) return;
+    
+    const interval = setInterval(() => {
+      setPriceRefreshCountdown((prev) => {
+        if (prev <= 1) {
+          // Auto-refresh route
+          if (swap.inputToken && swap.outputToken && parseFloat(swap.inputAmount) > 0) {
+            fetchRoutes({ userPublicKey: publicKey?.toBase58() ?? null }).catch(() => {});
+          }
+          return 10;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [hasSearchedRoute, routes.isLoading, swap.inputToken, swap.outputToken, swap.inputAmount, publicKey, fetchRoutes]);
 
   // Handlers
   const handleInputChange = (value: string) => {
@@ -531,12 +586,20 @@ export function EnhancedSwapInterface() {
       setRouteError(null);
       setSwapError(null);
       setSwapSignature(null);
+      setLoadingStep('fetching');
+      setLoadingProgress(0);
+      
       try {
+        setLoadingProgress(30);
+        setLoadingStep('routing');
         await fetchRoutes({ userPublicKey: publicKey?.toBase58() ?? null });
+        setLoadingProgress(100);
         setHasSearchedRoute(true);
+        setPriceRefreshCountdown(10);
       } catch (error) {
         setRouteError("No route found. Try adjusting the amount or selecting different tokens.");
         setHasSearchedRoute(false);
+        setLoadingProgress(0);
       }
     } else {
       setRouteError("Enter a valid amount and select tokens to search a route.");
@@ -545,6 +608,12 @@ export function EnhancedSwapInterface() {
   };
 
   const handleExecuteSwap = async () => {
+    // Show preview modal first
+    if (!showPreviewModal) {
+      setShowPreviewModal(true);
+      return;
+    }
+    
     const activeRoutePlan = getActiveRoutePlan();
 
     if (selectedRouter !== "swapback") {
@@ -640,8 +709,25 @@ export function EnhancedSwapInterface() {
     setSwapError(null);
     setSwapSignature(null);
     setIsSwapping(true);
+    setShowPreviewModal(false);
+    setLoadingStep('building');
+    setLoadingProgress(20);
+    
+    // Add to pending swaps
+    const tempSwap = {
+      id: Date.now().toString(),
+      fromToken: swap.inputToken!.symbol,
+      toToken: swap.outputToken!.symbol,
+      fromAmount: swap.inputAmount,
+      toAmount: swap.outputAmount,
+      timestamp: Date.now(),
+      status: 'pending' as const,
+    };
+    setRecentSwaps(prev => [tempSwap, ...prev]);
 
     try {
+      setLoadingProgress(40);
+      setLoadingStep('signing');
       const signature = await swapWithRouter({
         tokenIn: new PublicKey(swap.inputToken.mint),
         tokenOut: new PublicKey(swap.outputToken.mint),
@@ -660,11 +746,31 @@ export function EnhancedSwapInterface() {
         jupiterRoute: jupiterRoutePayload,
       });
 
+      setLoadingProgress(70);
+      setLoadingStep('confirming');
+      
       if (signature) {
         setSwapSignature(signature);
+        setLoadingProgress(100);
+        
+        // Update swap status to success
+        setRecentSwaps(prev => prev.map(s => 
+          s.id === tempSwap.id 
+            ? { ...s, status: 'success' as const, txSignature: signature }
+            : s
+        ));
       }
     } catch (error) {
-      setSwapError(error instanceof Error ? error.message : "Swap échoué");
+      const errorMsg = error instanceof Error ? error.message : "Swap échoué";
+      setSwapError(errorMsg);
+      setLoadingProgress(0);
+      
+      // Update swap status to failed
+      setRecentSwaps(prev => prev.map(s => 
+        s.id === tempSwap.id 
+            ? { ...s, status: 'failed' as const }
+            : s
+      ));
     } finally {
       setIsSwapping(false);
     }
@@ -782,7 +888,21 @@ export function EnhancedSwapInterface() {
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-white">Swap</h2>
-            <ClientOnlyConnectionStatus />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowRecentSwaps(!showRecentSwaps)}
+                className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors relative"
+                title="Recent Swaps"
+              >
+                <ClockIcon className="w-5 h-5 text-gray-400" />
+                {recentSwaps.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-cyan-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                    {recentSwaps.length}
+                  </span>
+                )}
+              </button>
+              <ClientOnlyConnectionStatus />
+            </div>
           </div>
 
           {/* Router Selection */}
@@ -996,34 +1116,56 @@ export function EnhancedSwapInterface() {
           </div>
         </div>
 
-        {/* Loading Skeleton */}
+        {/* Loading Progress */}
         {routes.isLoading && (
-          <div className="mb-6 space-y-3 animate-pulse" role="status" aria-live="polite" aria-label="Searching for best route">
-            <div className="bg-gray-900 rounded-lg p-4">
-              <div className="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-              <div className="h-4 bg-gray-700 rounded w-1/2"></div>
-            </div>
-            <div className="bg-gray-900 rounded-lg p-4">
-              <div className="h-4 bg-gray-700 rounded w-full mb-2"></div>
-              <div className="h-4 bg-gray-700 rounded w-2/3"></div>
-            </div>
-            <div className="text-center text-sm text-[var(--primary)] mt-2">
-              🔍 Finding best route...
-            </div>
+          <div className="mb-6" role="status" aria-live="polite" aria-label="Searching for best route">
+            <LoadingProgress step={loadingStep} progress={loadingProgress} />
           </div>
         )}
 
-        {/* Error State */}
+        {/* Enhanced Error State */}
         {routeError && (
-          <div className="mb-6 bg-red-500/10 border border-red-500/30 rounded-lg p-4" role="alert" aria-live="assertive">
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 bg-red-500/10 border border-red-500/30 rounded-lg p-4" 
+            role="alert" 
+            aria-live="assertive"
+          >
             <div className="flex items-start gap-3">
-              <span className="text-red-400 text-xl">⚠️</span>
-              <div>
-                <div className="text-red-400 font-semibold mb-1">Route Error</div>
-                <div className="text-sm text-red-300">{routeError}</div>
+              <ExclamationTriangleIcon className="w-6 h-6 text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <div className="text-red-400 font-semibold mb-1">Route Not Found</div>
+                <div className="text-sm text-red-300 mb-3">{routeError}</div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => {
+                      setInputAmount((parseFloat(swap.inputAmount) * 0.9).toString());
+                      setRouteError(null);
+                    }}
+                    className="text-xs px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg transition-colors"
+                  >
+                    Try 10% Less
+                  </button>
+                  <button
+                    onClick={() => {
+                      switchTokens();
+                      setRouteError(null);
+                    }}
+                    className="text-xs px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg transition-colors"
+                  >
+                    Reverse Direction
+                  </button>
+                  <button
+                    onClick={() => setRouteError(null)}
+                    className="text-xs px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg transition-colors"
+                  >
+                    Dismiss
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {/* Route Info - Show after search */}
@@ -1051,8 +1193,23 @@ export function EnhancedSwapInterface() {
               </div>
             )}
 
-            {/* Price Info */}
+            {/* Price Info with Real-time Updates */}
             <div className="bg-gray-900 rounded-lg p-3">
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-sm text-gray-400">Price Updates</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-cyan-400">Refreshing in {priceRefreshCountdown}s</span>
+                  <button
+                    onClick={handleSearchRoute}
+                    className="p-1 bg-cyan-500/10 hover:bg-cyan-500/20 rounded transition-colors"
+                    title="Refresh now"
+                  >
+                    <svg className="w-4 h-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-gray-400">Rate</span>
                 <span className="text-white font-medium">
@@ -1077,14 +1234,25 @@ export function EnhancedSwapInterface() {
                   {priceImpact.toFixed(2)}%
                 </span>
               </div>
-              <div className="flex justify-between text-sm">
+              <div className="flex justify-between text-sm items-center">
                 <span className="text-gray-400">Slippage Tolerance</span>
-                <button
-                  onClick={() => setShowSlippageModal(true)}
-                  className="text-[var(--primary)] hover:text-[var(--primary)]/80"
-                >
-                  {swap.slippageTolerance}% ⚙️
-                </button>
+                <div className="flex items-center gap-2">
+                  {suggestedSlippage !== null && suggestedSlippage !== swap.slippageTolerance && (
+                    <button
+                      onClick={() => setSlippageTolerance(suggestedSlippage)}
+                      className="text-xs px-2 py-0.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded transition-colors"
+                      title="Suggested based on price impact"
+                    >
+                      Use {suggestedSlippage}%
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowSlippageModal(true)}
+                    className="text-[var(--primary)] hover:text-[var(--primary)]/80"
+                  >
+                    {swap.slippageTolerance}% ⚙️
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1151,26 +1319,53 @@ export function EnhancedSwapInterface() {
               />
             )}
 
-            {/* Route Visualization */}
+            {/* Enhanced Route Visualization */}
             {routes.selectedRoute.venues &&
               routes.selectedRoute.venues.length > 0 && (
-                <div className="bg-gray-900 rounded-lg p-3">
-                  <div className="text-sm font-semibold text-gray-300 mb-2">
-                    Route
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-gray-900 rounded-lg p-4 border border-gray-800"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-sm font-semibold text-gray-300">Route Path</div>
+                    <div className="text-xs text-gray-500">{routes.selectedRoute.venues.length} hop{routes.selectedRoute.venues.length > 1 ? 's' : ''}</div>
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-gray-400">
+                  <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                    {/* Start Token */}
+                    <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 rounded-lg flex-shrink-0">
+                      {swap.inputToken?.logoURI && (
+                        <img src={swap.inputToken.logoURI} alt="" className="w-4 h-4 rounded-full" />
+                      )}
+                      <span className="text-sm font-medium text-emerald-400">{swap.inputToken?.symbol}</span>
+                    </div>
+                    
+                    {/* DEX Steps */}
                     {routes.selectedRoute.venues.map((venue, index) => (
-                      <div key={index} className="flex items-center">
-                        <span className="bg-gray-800 px-2 py-1 rounded">
-                          {venue}
-                        </span>
-                        {index < routes.selectedRoute!.venues.length - 1 && (
-                          <span className="mx-1">→</span>
-                        )}
+                      <div key={index} className="flex items-center gap-2 flex-shrink-0">
+                        <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                        <div className="bg-cyan-500/10 border border-cyan-500/30 px-3 py-2 rounded-lg">
+                          <span className="text-xs text-cyan-400 font-medium">{venue}</span>
+                        </div>
                       </div>
                     ))}
+                    
+                    {/* Arrow to End */}
+                    <svg className="w-4 h-4 text-gray-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                    
+                    {/* End Token */}
+                    <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 rounded-lg flex-shrink-0">
+                      {swap.outputToken?.logoURI && (
+                        <img src={swap.outputToken.logoURI} alt="" className="w-4 h-4 rounded-full" />
+                      )}
+                      <span className="text-sm font-medium text-emerald-400">{swap.outputToken?.symbol}</span>
+                    </div>
                   </div>
-                </div>
+                </motion.div>
               )}
           </div>
         )}
@@ -1291,6 +1486,45 @@ export function EnhancedSwapInterface() {
           onClose={() => setShowTokenSelector(false)}
         />
       )}
+      
+      {/* Swap Preview Modal */}
+      <AnimatePresence>
+        {showPreviewModal && mockRouteInfo && (
+          <SwapPreviewModal
+            isOpen={showPreviewModal}
+            onClose={() => setShowPreviewModal(false)}
+            onConfirm={handleExecuteSwap}
+            fromToken={{
+              symbol: swap.inputToken?.symbol || '',
+              amount: swap.inputAmount,
+              logoURI: swap.inputToken?.logoURI,
+            }}
+            toToken={{
+              symbol: swap.outputToken?.symbol || '',
+              amount: swap.outputAmount,
+              logoURI: swap.outputToken?.logoURI,
+            }}
+            rate={outputAmount > 0 && inputAmount > 0 ? (outputAmount / inputAmount).toFixed(6) : '0'}
+            priceImpact={priceImpact}
+            minReceived={(outputAmount * (1 - swap.slippageTolerance / 100)).toFixed(6)}
+            slippage={swap.slippageTolerance}
+            networkFee="0.000005 SOL"
+            platformFee={mockRouteInfo.fees.toFixed(6)}
+            route={routes.selectedRoute.venues}
+          />
+        )}
+      </AnimatePresence>
+      
+      {/* Recent Swaps Sidebar */}
+      <AnimatePresence>
+        {showRecentSwaps && (
+          <RecentSwapsSidebar
+            swaps={recentSwaps}
+            isOpen={showRecentSwaps}
+            onClose={() => setShowRecentSwaps(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
