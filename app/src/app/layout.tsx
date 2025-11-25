@@ -45,8 +45,29 @@ export default function RootLayout({
         <GlobalErrorBoundary>
           <QueryProvider>
             <ClientWalletProvider>
+              {/* Gradient Mesh Background - Global */}
+              <div className="fixed inset-0 -z-10">
+                <div className="absolute inset-0 bg-gradient-to-br from-[#0C0C0C] via-[#1a1a1a] to-[#0C0C0C]" />
+                <div className="absolute inset-0 opacity-20">
+                  <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#00FF00] rounded-full mix-blend-multiply filter blur-3xl animate-blob" />
+                  <div className="absolute top-0 right-1/4 w-96 h-96 bg-[#00FFFF] rounded-full mix-blend-multiply filter blur-3xl animate-blob" style={{ animationDelay: '2s' }} />
+                  <div className="absolute bottom-0 left-1/3 w-96 h-96 bg-[#00FF00] rounded-full mix-blend-multiply filter blur-3xl animate-blob" style={{ animationDelay: '4s' }} />
+                </div>
+                <div className="absolute inset-0 opacity-10">
+                  <div 
+                    className="h-full w-full"
+                    style={{
+                      backgroundImage: `
+                        linear-gradient(to right, #00FF00 1px, transparent 1px),
+                        linear-gradient(to bottom, #00FF00 1px, transparent 1px)
+                      `,
+                      backgroundSize: '50px 50px',
+                    }}
+                  />
+                </div>
+              </div>
               <Navbar />
-              <main id="main-content">
+              <main id="main-content" className="relative z-10">
                 {children}
               </main>
               {/* <WalletConnectionGuide /> */}
