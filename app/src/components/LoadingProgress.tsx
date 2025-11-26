@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowPathIcon } from "@heroicons/react/24/outline";
+import { ArrowPathIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 
 interface LoadingProgressProps {
   step: 'fetching' | 'routing' | 'building' | 'signing' | 'confirming';
@@ -9,25 +9,36 @@ interface LoadingProgressProps {
 }
 
 const STEPS = [
-  { id: 'fetching', label: 'Fetching quote', color: 'text-blue-400' },
-  { id: 'routing', label: 'Finding best route', color: 'text-cyan-400' },
-  { id: 'building', label: 'Building transaction', color: 'text-emerald-400' },
-  { id: 'signing', label: 'Waiting for signature', color: 'text-yellow-400' },
-  { id: 'confirming', label: 'Confirming on chain', color: 'text-purple-400' },
+  { id: 'fetching', label: 'Fetching prices', color: 'text-blue-400', estimatedTime: '~2s' },
+  { id: 'routing', label: 'Finding best route', color: 'text-cyan-400', estimatedTime: '~3s' },
+  { id: 'building', label: 'Building transaction', color: 'text-emerald-400', estimatedTime: '~1s' },
+  { id: 'signing', label: 'Awaiting signature', color: 'text-yellow-400', estimatedTime: '~5s' },
+  { id: 'confirming', label: 'Confirming on-chain', color: 'text-purple-400', estimatedTime: '~20s' },
 ];
 
 export function LoadingProgress({ step, progress }: LoadingProgressProps) {
   const currentStepIndex = STEPS.findIndex(s => s.id === step);
+  const currentStep = STEPS[currentStepIndex];
 
   return (
-    <div className="w-full space-y-4">
-      {/* Progress Bar */}
-      <div className="relative w-full h-2 bg-white/5 rounded-full overflow-hidden">
+    <div className="w-full space-y-4 p-4 bg-white/5 rounded-xl border border-white/10">
+      {/* Header with current step */}
+      <div className="flex items-center justify-between mb-2">
+        <span className={`text-sm font-medium ${currentStep?.color || 'text-gray-400'}`}>
+          {currentStep?.label || 'Processing...'}
+        </span>
+        <span className="text-xs text-gray-500">
+          {currentStep?.estimatedTime || ''}
+        </span>
+      </div>
+
+      {/* Progress Bar with Gradient */}
+      <div className="relative w-full h-2.5 bg-white/5 rounded-full overflow-hidden">
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
-          transition={{ duration: 0.3 }}
-          className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-500 to-emerald-500 rounded-full"
+          transition={{ duration: 0.5, ease: "easeInOut" }}
+          className="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500 rounded-full"
         />
         
         {/* Shimmer Effect */}
@@ -38,12 +49,24 @@ export function LoadingProgress({ step, progress }: LoadingProgressProps) {
             duration: 1.5, 
             ease: 'linear' 
           }}
-          className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+          className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/40 to-transparent blur-sm"
         />
       </div>
 
-      {/* Steps */}
-      <div className="space-y-2">
+      {/* Percentage Display */}
+      <div className="text-center">
+        <motion.span
+          key={progress}
+          initial={{ scale: 1.2, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-2xl font-bold text-white"
+        >
+          {Math.round(progress)}%
+        </motion.span>
+      </div>
+
+      {/* Steps List */}
+      <div className="space-y-2 pt-2 border-t border-white/10">
         {STEPS.map((s, index) => {
           const isActive = index === currentStepIndex;
           const isCompleted = index < currentStepIndex;
@@ -53,22 +76,21 @@ export function LoadingProgress({ step, progress }: LoadingProgressProps) {
               key={s.id}
               initial={{ opacity: 0, x: -10 }}
               animate={{ 
-                opacity: isActive || isCompleted ? 1 : 0.4,
+                opacity: isActive ? 1 : isCompleted ? 0.7 : 0.3,
                 x: 0 
               }}
-              className="flex items-center space-x-3"
+              transition={{ delay: index * 0.05 }}
+              className="flex items-center gap-3"
             >
-              {/* Step Indicator */}
-              <div className="relative">
+              {/* Step Icon */}
+              <div className="relative flex-shrink-0">
                 {isCompleted ? (
                   <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center"
+                    initial={{ scale: 0, rotate: -180 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ type: "spring", stiffness: 200 }}
                   >
-                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
+                    <CheckCircleIcon className="w-5 h-5 text-emerald-500" />
                   </motion.div>
                 ) : isActive ? (
                   <motion.div
@@ -83,21 +105,36 @@ export function LoadingProgress({ step, progress }: LoadingProgressProps) {
                     <ArrowPathIcon />
                   </motion.div>
                 ) : (
-                  <div className="w-5 h-5 rounded-full border-2 border-gray-600" />
+                  <div className="w-5 h-5 rounded-full border-2 border-gray-700" />
                 )}
               </div>
 
               {/* Step Label */}
-              <span className={`text-sm ${isActive ? s.color : 'text-gray-400'} ${isActive ? 'font-medium' : ''}`}>
+              <span className={`text-sm ${
+                isActive ? `${s.color} font-medium` : 
+                isCompleted ? 'text-gray-300' : 
+                'text-gray-600'
+              }`}>
                 {s.label}
               </span>
+
+              {/* Time estimate for active step */}
+              {isActive && (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-xs text-gray-500 ml-auto"
+                >
+                  {s.estimatedTime}
+                </motion.span>
+              )}
             </motion.div>
           );
         })}
       </div>
-
-      {/* Percentage */}
-      <div className="text-center">
+    </div>
+  );
+}
         <motion.span
           key={progress}
           initial={{ opacity: 0, scale: 0.8 }}

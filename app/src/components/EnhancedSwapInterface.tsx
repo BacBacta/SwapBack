@@ -35,6 +35,14 @@ import { ClockIcon, ExclamationTriangleIcon, CheckCircleIcon } from "@heroicons/
 import { motion, AnimatePresence } from "framer-motion";
 import { useSwipeable } from "react-swipeable";
 import { toast } from "sonner";
+import { 
+  formatNumberWithCommas, 
+  parseFormattedNumber, 
+  validateNumberInput,
+  formatCurrency,
+  getAdaptiveFontSize 
+} from "@/utils/formatNumber";
+import { PriceImpactAlert } from "@/components/PriceImpactAlert";
 // import { debounce } from "lodash"; // Désactivé - Pas d'auto-fetch
 
 interface RouteStep {
@@ -338,7 +346,18 @@ export function EnhancedSwapInterface() {
 
   // Handlers
   const handleInputChange = (value: string) => {
-    setInputAmount(value);
+    // Remove commas for validation
+    const cleanValue = parseFormattedNumber(value);
+    
+    // Validate input
+    const validation = validateNumberInput(
+      cleanValue, 
+      swap.inputToken?.decimals || 9
+    );
+    
+    if (validation.valid) {
+      setInputAmount(validation.value);
+    }
   };
 
   const handleSlippagePreset = (value: number) => {
@@ -372,6 +391,15 @@ export function EnhancedSwapInterface() {
     if (swap.inputToken?.balance) {
       const amount = (swap.inputToken.balance * percentage / 100).toFixed(swap.inputToken.decimals > 6 ? 6 : swap.inputToken.decimals);
       setInputAmount(amount);
+    }
+  };
+
+  const handleReduceAmount = (percentage: number = 10) => {
+    haptic.light();
+    const currentAmount = parseFloat(swap.inputAmount);
+    if (currentAmount > 0) {
+      const reduced = currentAmount * (1 - percentage / 100);
+      setInputAmount(reduced.toFixed(swap.inputToken?.decimals || 6));
     }
   };
 
@@ -826,6 +854,16 @@ export function EnhancedSwapInterface() {
   const inputAmount = parseFloat(swap.inputAmount) || 0;
   const outputAmount = parseFloat(swap.outputAmount) || 0;
 
+  // Mock USD prices (in real app, fetch from price oracle)
+  const inputTokenUsdPrice = 1; // Assume $1 per token as mock
+  const outputTokenUsdPrice = 1;
+  const inputUsdValue = inputAmount * inputTokenUsdPrice;
+  const outputUsdValue = outputAmount * outputTokenUsdPrice;
+
+  // Display formatted amounts
+  const displayInputAmount = inputAmount > 0 ? formatNumberWithCommas(inputAmount) : '';
+  const displayOutputAmount = outputAmount > 0 ? formatNumberWithCommas(outputAmount) : '';
+
   const mockRouteInfo = routes.selectedRoute
     ? {
         type: "Aggregator" as const,
@@ -875,21 +913,45 @@ export function EnhancedSwapInterface() {
     Boolean(routes.selectedRoute) &&
     !routes.isLoading;
 
+  // Check insufficient balance
+  const hasInsufficientBalance = swap.inputToken?.balance 
+    ? inputAmount > swap.inputToken.balance 
+    : false;
+
   const primaryButtonDisabled =
     !connected ||
     !swap.inputToken ||
     !swap.outputToken ||
     inputAmount <= 0 ||
+    hasInsufficientBalance ||
     routes.isLoading ||
     isSwapping;
 
+  // Get contextual button text
+  const getButtonText = () => {
+    if (!connected) return "Connect Wallet";
+    if (!swap.inputToken || !swap.outputToken) return "Select Tokens";
+    if (inputAmount <= 0) return "Enter Amount";
+    if (hasInsufficientBalance) {
+      return `Insufficient ${swap.inputToken?.symbol} Balance`;
+    }
+    if (routes.isLoading) return "🔍 Finding Best Route...";
+    if (isSwapping) return "⚡ Executing Swap...";
+    if (canExecuteSwap) {
+      return `Swap for ~${formatNumberWithCommas(outputAmount.toFixed(4))} ${swap.outputToken?.symbol}`;
+    }
+    return "🔍 Search Best Route";
+  };
+
   const primaryButtonClass = !connected || !swap.inputToken || !swap.outputToken || inputAmount <= 0
-    ? "bg-gray-800 text-gray-600 cursor-not-allowed"
-    : routes.isLoading || isSwapping
-      ? "bg-[var(--primary)]/50 text-black cursor-wait"
-      : canExecuteSwap
-        ? "bg-green-600 text-white hover:bg-green-700"
-        : "bg-[var(--primary)] text-black hover:bg-[var(--primary)]/90";
+    ? "bg-white/5 text-gray-600 cursor-not-allowed shadow-none"
+    : hasInsufficientBalance
+      ? "bg-red-500/20 text-red-400 cursor-not-allowed border border-red-500/30 shadow-none"
+      : routes.isLoading || isSwapping
+        ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white opacity-70 cursor-wait"
+        : canExecuteSwap
+          ? "bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-emerald-500/20"
+          : "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-blue-500/20";
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -976,12 +1038,12 @@ export function EnhancedSwapInterface() {
                 type="text"
                 inputMode="decimal"
                 pattern="[0-9]*"
-                value={swap.inputAmount || ""}
+                value={displayInputAmount}
                 onChange={(e) => handleInputChange(e.target.value)}
                 placeholder="0.00"
-                className="flex-1 bg-transparent font-bold text-white outline-none min-h-[44px] tracking-tight caret-emerald-500 [-webkit-appearance:none]"
+                className="flex-1 bg-transparent font-bold text-white outline-none min-h-[44px] tracking-tight caret-emerald-500 [-webkit-appearance:none] transition-all"
                 style={{
-                  fontSize: 'clamp(1.75rem, 6vw, 3rem)',
+                  fontSize: getAdaptiveFontSize(displayInputAmount.length),
                   lineHeight: 1.2,
                   letterSpacing: '-0.02em'
                 }}
@@ -1022,9 +1084,13 @@ export function EnhancedSwapInterface() {
               </button>
             </div>
             {inputAmount > 0 && (
-              <div className="text-sm text-gray-500 mt-2">
-                ≈ ${(inputAmount * 1).toFixed(2)}
-              </div>
+              <motion.div 
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-sm text-gray-400 mt-2 font-medium"
+              >
+                ≈ {formatCurrency(inputUsdValue)}
+              </motion.div>
             )}
           </div>
           {/* Amount Presets */}
@@ -1099,12 +1165,12 @@ export function EnhancedSwapInterface() {
               <input
                 type="text"
                 inputMode="decimal"
-                value={swap.outputAmount || ""}
+                value={displayOutputAmount}
                 readOnly
                 placeholder="0.00"
-                className="flex-1 bg-transparent font-bold text-white outline-none min-h-[44px] tracking-tight [-webkit-appearance:none]"
+                className="flex-1 bg-transparent font-bold text-white outline-none min-h-[44px] tracking-tight [-webkit-appearance:none] transition-all"
                 style={{
-                  fontSize: 'clamp(1.75rem, 6vw, 3rem)',
+                  fontSize: getAdaptiveFontSize(displayOutputAmount.length),
                   lineHeight: 1.2,
                   letterSpacing: '-0.02em'
                 }}
@@ -1145,12 +1211,26 @@ export function EnhancedSwapInterface() {
               </button>
             </div>
             {outputAmount > 0 && (
-              <div className="text-sm text-gray-500 mt-2">
-                ≈ ${(outputAmount * 1).toFixed(2)}
-              </div>
+              <motion.div 
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-sm text-gray-400 mt-2 font-medium"
+              >
+                ≈ {formatCurrency(outputUsdValue)}
+              </motion.div>
             )}
           </div>
         </div>
+
+        {/* Price Impact Alert */}
+        {hasSearchedRoute && routes.selectedRoute && priceImpact > 0 && (
+          <div className="mb-4">
+            <PriceImpactAlert 
+              priceImpact={priceImpact}
+              onReduceAmount={() => handleReduceAmount(10)}
+            />
+          </div>
+        )}
 
         {/* Loading Progress */}
         {routes.isLoading && (
@@ -1437,36 +1517,12 @@ export function EnhancedSwapInterface() {
         <button
           onClick={canExecuteSwap ? handleExecuteSwap : handleSearchRoute}
           disabled={primaryButtonDisabled}
-          className={`w-full py-4 min-h-[60px] rounded-xl font-bold text-lg transition-all active:scale-[0.98] shadow-lg ${
-            !connected || !swap.inputToken || !swap.outputToken || inputAmount <= 0
-              ? "bg-white/5 text-gray-600 cursor-not-allowed shadow-none"
-              : routes.isLoading || isSwapping
-                ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white opacity-70 cursor-wait"
-                : canExecuteSwap
-                  ? "bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-emerald-500/20"
-                  : "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-blue-500/20"
-          }`}
-          aria-label={
-            !connected
-              ? "Connect wallet to swap"
-              : canExecuteSwap
-                ? "Execute swap"
-                : "Search for best route"
-          }
+          className={`w-full py-4 min-h-[60px] rounded-xl font-bold text-lg transition-all active:scale-[0.98] shadow-lg ${primaryButtonClass}`}
+          aria-label={getButtonText()}
         >
-          {!connected
-            ? "Connect Wallet"
-            : !swap.inputToken || !swap.outputToken
-              ? "Select Tokens"
-              : inputAmount <= 0
-                ? "Enter Amount"
-                : routes.isLoading
-                  ? "🔍 Searching Routes..."
-                  : canExecuteSwap
-                    ? isSwapping
-                      ? "⚡ Executing Swap..."
-                      : "✅ Execute Swap"
-                    : "🔍 Search Best Route"}
+          <div className="flex items-center justify-center gap-2">
+            {getButtonText()}
+          </div>
         </button>
 
         {/* Footer Info */}
