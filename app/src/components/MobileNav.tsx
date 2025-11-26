@@ -15,7 +15,7 @@ import {
   HomeIcon
 } from "@heroicons/react/24/outline";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/Sheet";
-import { WalletButton } from "@/components/WalletButton";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 
 const navItems = [
   { 
@@ -131,7 +131,7 @@ export function MobileNav() {
 
         {/* Wallet Button at Bottom */}
         <div className="absolute bottom-6 left-4 right-4">
-          <WalletButton />
+          <WalletMultiButton className="w-full !bg-[var(--primary)] !text-black hover:!bg-[var(--primary)]/90 !rounded-xl !font-semibold !py-3 !text-base" />
         </div>
       </SheetContent>
     </Sheet>
