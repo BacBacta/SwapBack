@@ -6,6 +6,7 @@ import { MobileNav } from "@/components/MobileNav";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ClientOnlyWallet } from "@/components/ClientOnlyWallet";
 import { MobileWalletGuide } from "@/hooks/useMobileWalletDetection";
+import { MobileWalletConnect } from "@/components/MobileWalletConnect";
 
 export default function AppLayout({
   children,
@@ -45,6 +46,9 @@ export default function AppLayout({
 
       {/* Bottom Nav Mobile */}
       <BottomNav />
+
+      {/* Mobile Wallet Connect - Floating button with deep linking */}
+      <MobileWalletConnect />
 
       {/* Mobile Wallet Guide - Shows instructions if no wallet detected */}
       <MobileWalletGuide />

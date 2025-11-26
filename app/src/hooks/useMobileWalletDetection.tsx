@@ -58,18 +58,17 @@ export function useMobileWalletDetection() {
 
 /**
  * Composant pour afficher des instructions si l'utilisateur est sur mobile sans wallet
+ * Note: Ce guide est maintenant remplacé par le MobileWalletConnect avec deep linking
+ * Il reste disponible comme fallback
  */
 export function MobileWalletGuide() {
   const { needsWalletApp } = useMobileWalletDetection();
   const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
-    // Afficher le guide seulement après un délai pour éviter le flash
-    const timer = setTimeout(() => {
-      setShowGuide(needsWalletApp);
-    }, 1000);
-
-    return () => clearTimeout(timer);
+    // Ne plus afficher ce guide car le bouton flottant est plus efficace
+    // Garder le code pour référence mais ne jamais afficher
+    setShowGuide(false);
   }, [needsWalletApp]);
 
   if (!showGuide) return null;
