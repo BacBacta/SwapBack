@@ -95,27 +95,3 @@ export default function BuybackPage() {
     </div>
   );
 }
-            progressPercent={buybackState.progressPercent || 0}
-          />
-        </div>
-
-        {/* Execute Button */}
-        {buybackState.canExecute && (
-          <div className="backdrop-blur-xl bg-gradient-to-r from-orange-500/20 to-emerald-500/20 border border-orange-500/30 rounded-xl p-4 sm:p-6">
-            <ExecuteBuybackButton />
-          </div>
-        )}
-
-        {/* Chart */}
-        <div className="backdrop-blur-xl bg-[#0C0C0C]/40 border border-emerald-500/20 rounded-xl p-4 sm:p-6">
-          <BuybackChart />
-        </div>
-
-        {/* Recent */}
-        <div className="backdrop-blur-xl bg-[#0C0C0C]/40 border border-emerald-500/20 rounded-xl p-4 sm:p-6">
-          <RecentBuybacks />
-        </div>
-      </motion.div>
-    </div>
-  );
-}
