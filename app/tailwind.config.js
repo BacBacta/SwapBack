@@ -61,6 +61,10 @@ module.exports = {
         '3xl': '1920px',
         '4xl': '2560px',
       },
+      spacing: {
+        'safe-or-4': 'max(1rem, env(safe-area-inset-bottom))',
+        'safe-or-6': 'max(1.5rem, env(safe-area-inset-bottom))',
+      },
       maxWidth: {
         '8xl': '88rem',   // 1408px
         '9xl': '96rem',   // 1536px

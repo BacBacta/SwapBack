@@ -12,6 +12,7 @@ import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useSwapStore } from "@/store/swapStore";
 import { useSwapWebSocket } from "@/hooks/useSwapWebSocket";
+import { useHaptic } from "@/hooks/useHaptic";
 import {
   useSwapRouter,
   DerivedSwapAccounts,
@@ -217,6 +218,7 @@ function decodeBase64ToUint8Array(data: string): Uint8Array {
 export function EnhancedSwapInterface() {
   const { connected, publicKey } = useWallet();
   const { swapWithRouter } = useSwapRouter();
+  const haptic = useHaptic();
 
   // Store
   const {
@@ -360,6 +362,7 @@ export function EnhancedSwapInterface() {
   };
 
   const handleAmountPreset = (percentage: number) => {
+    haptic.light();
     if (swap.inputToken?.balance) {
       const amount = (swap.inputToken.balance * percentage / 100).toFixed(swap.inputToken.decimals > 6 ? 6 : swap.inputToken.decimals);
       setInputAmount(amount);
@@ -750,6 +753,7 @@ export function EnhancedSwapInterface() {
       setLoadingStep('confirming');
       
       if (signature) {
+        haptic.success();
         setSwapSignature(signature);
         setLoadingProgress(100);
         
@@ -761,6 +765,7 @@ export function EnhancedSwapInterface() {
         ));
       }
     } catch (error) {
+      haptic.error();
       const errorMsg = error instanceof Error ? error.message : "Swap échoué";
       setSwapError(errorMsg);
       setLoadingProgress(0);
@@ -908,7 +913,10 @@ export function EnhancedSwapInterface() {
           {/* Router Selection */}
           <div className="flex gap-1.5 sm:gap-2 mb-3 sm:mb-4">
             <button
-              onClick={() => setSelectedRouter("swapback")}
+              onClick={() => {
+                haptic.medium();
+                setSelectedRouter("swapback");
+              }}
               className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-4 rounded-lg text-sm sm:text-base font-semibold transition-all relative ${
                 selectedRouter === "swapback"
                   ? "bg-[var(--primary)] text-black"
@@ -931,7 +939,10 @@ export function EnhancedSwapInterface() {
               )}
             </button>
             <button
-              onClick={() => setSelectedRouter("jupiter")}
+              onClick={() => {
+                haptic.medium();
+                setSelectedRouter("jupiter");
+              }}
               className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-4 rounded-lg text-sm sm:text-base font-semibold transition-all relative ${
                 selectedRouter === "jupiter"
                   ? "bg-[var(--secondary)] text-black"

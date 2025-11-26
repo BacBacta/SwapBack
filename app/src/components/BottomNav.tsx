@@ -2,63 +2,129 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import {
   HomeIcon,
   ArrowsRightLeftIcon,
   ChartBarIcon,
   FireIcon,
   LockClosedIcon,
+  EllipsisHorizontalIcon,
+  Cog6ToothIcon,
+  ChartPieIcon
 } from "@heroicons/react/24/outline";
+import {
+  HomeIcon as HomeIconSolid,
+  ArrowsRightLeftIcon as ArrowsRightLeftIconSolid,
+  ChartBarIcon as ChartBarIconSolid,
+  FireIcon as FireIconSolid,
+} from "@heroicons/react/24/solid";
+import { Sheet, SheetContent } from "@/components/ui/Sheet";
 
 const mobileNavItems = [
-  { name: "Home", href: "/app", icon: HomeIcon },
-  { name: "Swap", href: "/app/swap", icon: ArrowsRightLeftIcon },
-  { name: "DCA", href: "/app/dca", icon: ChartBarIcon },
-  { name: "Lock", href: "/app/lock", icon: LockClosedIcon },
-  { name: "Buyback", href: "/app/buyback", icon: FireIcon },
+  { name: "Home", href: "/app", icon: HomeIcon, iconSolid: HomeIconSolid },
+  { name: "Swap", href: "/app/swap", icon: ArrowsRightLeftIcon, iconSolid: ArrowsRightLeftIconSolid },
+  { name: "DCA", href: "/app/dca", icon: ChartBarIcon, iconSolid: ChartBarIconSolid },
+  { name: "Buyback", href: "/app/buyback", icon: FireIcon, iconSolid: FireIconSolid },
+];
+
+const moreNavItems = [
+  { name: "Lock Tokens", href: "/app/lock", icon: LockClosedIcon },
+  { name: "Portfolio", href: "/app/portfolio", icon: ChartPieIcon },
+  { name: "Settings", href: "/app/settings", icon: Cog6ToothIcon },
 ];
 
 export function BottomNav() {
   const pathname = usePathname();
+  const [showMore, setShowMore] = useState(false);
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0C0C0C]/95 backdrop-blur-xl border-t border-primary/20 safe-area-bottom">
-      <div className="flex justify-around items-center h-16 px-2">
-        {mobileNavItems.map((item) => {
-          const isActive = pathname === item.href;
-          const Icon = item.icon;
-          
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={`
-                flex flex-col items-center justify-center flex-1 h-full
-                transition-all duration-200
-                ${isActive ? "text-primary" : "text-gray-400"}
-              `}
-            >
-              <Icon
+    <>
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0C0C0C]/95 backdrop-blur-xl border-t border-primary/20 pb-safe-or-4">
+        <div className="flex justify-around items-center h-16 px-2">
+          {mobileNavItems.map((item) => {
+            const isActive = pathname === item.href;
+            const Icon = isActive ? item.iconSolid : item.icon;
+            
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
                 className={`
-                  h-6 w-6 mb-1
-                  ${isActive ? "text-primary scale-110" : "text-gray-400"}
-                `}
-              />
-              <span
-                className={`
-                  text-xs font-medium
-                  ${isActive ? "text-primary" : "text-gray-400"}
+                  flex flex-col items-center justify-center gap-1
+                  min-w-[64px] h-12 rounded-xl transition-all
+                  active:scale-90
+                  ${isActive ? "text-primary" : "text-gray-400 active:text-primary"}
                 `}
               >
-                {item.name}
-              </span>
-              {isActive && (
-                <div className="absolute -top-0.5 h-0.5 w-12 bg-primary rounded-full"></div>
-              )}
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
+                {/* Icon with badge */}
+                <div className="relative">
+                  <Icon className="w-7 h-7" />
+                  {isActive && (
+                    <div className="absolute -top-1 -right-1 w-2 h-2 
+                                    bg-primary rounded-full 
+                                    animate-pulse" />
+                  )}
+                </div>
+                
+                {/* Label */}
+                <span className={`
+                  text-[10px] font-medium transition-all
+                  ${isActive && "scale-110"}
+                `}>
+                  {item.name}
+                </span>
+              </Link>
+            );
+          })}
+
+          {/* More Button */}
+          <button
+            onClick={() => setShowMore(true)}
+            className="flex flex-col items-center justify-center gap-1
+                       min-w-[64px] h-12 rounded-xl transition-all
+                       active:scale-90 text-gray-400 active:text-primary"
+          >
+            <EllipsisHorizontalIcon className="w-7 h-7" />
+            <span className="text-[10px] font-medium">More</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* More Menu Sheet */}
+      <Sheet open={showMore} onOpenChange={setShowMore}>
+        <SheetContent 
+          side="right"
+          className="w-[280px] bg-black/95 backdrop-blur-xl border-l border-primary/20"
+        >
+          <div className="pt-6 px-4">
+            <h3 className="text-lg font-bold text-white mb-4">More Options</h3>
+            <div className="space-y-1">
+              {moreNavItems.map((item) => {
+                const isActive = pathname === item.href;
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    onClick={() => setShowMore(false)}
+                    className={`
+                      flex items-center gap-3 px-4 py-3 rounded-xl transition-all
+                      ${isActive 
+                        ? "bg-primary/20 text-primary" 
+                        : "text-gray-400 hover:bg-white/5 hover:text-white"
+                      }
+                    `}
+                  >
+                    <Icon className="w-6 h-6" />
+                    <span className="text-base font-medium">{item.name}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }
