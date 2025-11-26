@@ -1,7 +1,6 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { FireIcon } from '@heroicons/react/24/outline';
 import { useBuybackState } from '@/hooks/useBuybackState';
 import BuybackStats from './components/BuybackStats';
 import BuybackProgressBar from './components/BuybackProgressBar';
@@ -14,15 +13,9 @@ export default function BuybackPage() {
 
   if (error) {
     return (
-      <div className="max-w-4xl mx-auto">
-        <div className="backdrop-blur-xl bg-red-500/10 border border-red-500/30 rounded-xl p-6">
-          <div className="flex items-center gap-3">
-            <FireIcon className="w-6 h-6 text-red-400" />
-            <div>
-              <p className="font-semibold text-red-400">Error Loading Data</p>
-              <p className="text-sm text-red-400/70 mt-1">{error.message}</p>
-            </div>
-          </div>
+      <div className="max-w-3xl mx-auto px-4">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
+          <p className="text-red-400 text-sm">Error: {error.message}</p>
         </div>
       </div>
     );
@@ -30,7 +23,7 @@ export default function BuybackPage() {
 
   if (isLoading || !buybackState) {
     return (
-      <div className="max-w-4xl mx-auto space-y-4 animate-pulse">
+      <div className="max-w-3xl mx-auto px-4 space-y-4 animate-pulse">
         <div className="h-20 bg-white/5 rounded-xl" />
         <div className="h-32 bg-white/5 rounded-xl" />
         <div className="h-32 bg-white/5 rounded-xl" />
@@ -39,33 +32,33 @@ export default function BuybackPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header épuré */}
+    <div className="max-w-3xl mx-auto px-4 space-y-6">
+      {/* Minimal Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-8"
+        className="text-center pt-4"
       >
-        <div className="flex items-center justify-center gap-3 mb-3">
-          <FireIcon className="w-8 h-8 text-orange-400" />
-          <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-orange-400 to-emerald-400 bg-clip-text text-transparent">
-            Buyback & Burn
+        <div className="inline-flex items-center gap-2 mb-3">
+          <span className="text-3xl">🔥</span>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white/90">
+            Buyback
           </h1>
         </div>
-        <p className="text-gray-400 text-sm sm:text-base">
-          Automated deflationary mechanism powered by swap fees
+        <p className="text-sm text-gray-500">
+          Automated token burn mechanism
         </p>
       </motion.div>
 
-      {/* Contenu principal */}
+      {/* Content */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="space-y-6"
+        className="space-y-4"
       >
         {/* Stats */}
-        <div className="backdrop-blur-xl bg-[#0C0C0C]/40 border border-emerald-500/20 rounded-xl p-4 sm:p-6">
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4 sm:p-6">
           <BuybackStats
             totalUsdcSpent={buybackState.totalUsdcSpent}
             totalBackBurned={buybackState.totalBackBurned}
@@ -74,10 +67,34 @@ export default function BuybackPage() {
         </div>
 
         {/* Progress */}
-        <div className="backdrop-blur-xl bg-[#0C0C0C]/40 border border-emerald-500/20 rounded-xl p-4 sm:p-6">
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4 sm:p-6">
           <BuybackProgressBar
             currentBalance={buybackState.vaultBalance || 0}
             threshold={buybackState.minBuybackAmount}
+            progressPercent={buybackState.progressPercent || 0}
+          />
+        </div>
+
+        {/* Execute Button */}
+        {buybackState.canExecute && (
+          <div className="bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/30 rounded-xl p-4 sm:p-6">
+            <ExecuteBuybackButton />
+          </div>
+        )}
+
+        {/* Chart */}
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4 sm:p-6">
+          <BuybackChart />
+        </div>
+
+        {/* Recent */}
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4 sm:p-6">
+          <RecentBuybacks />
+        </div>
+      </motion.div>
+    </div>
+  );
+}
             progressPercent={buybackState.progressPercent || 0}
           />
         </div>

@@ -3,187 +3,127 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { 
-  ArrowTrendingUpIcon, 
-  FireIcon, 
-  ChartBarIcon,
-  ClockIcon,
   ArrowsRightLeftIcon,
+  ChartBarIcon,
+  FireIcon,
+  SparklesIcon,
 } from "@heroicons/react/24/outline";
 
 export default function AppHomePage() {
-  const stats = [
-    { label: "Total Volume", value: "$12.5M", change: "+12.5%", trend: "up" },
-    { label: "Active Users", value: "1,234", change: "+5.2%", trend: "up" },
-    { label: "Total Swaps", value: "45.6K", change: "+8.1%", trend: "up" },
-    { label: "Buyback Pool", value: "$450K", change: "+15.3%", trend: "up" },
-  ];
-
   const quickActions = [
     { 
-      name: "Quick Swap", 
-      description: "Swap tokens instantly",
+      name: "Swap", 
+      description: "Trade instantly",
       href: "/app/swap", 
       icon: ArrowsRightLeftIcon,
-      color: "from-primary to-emerald-400"
+      gradient: "from-emerald-500 to-cyan-500",
+      emoji: "⚡"
     },
     { 
-      name: "Create DCA", 
-      description: "Dollar-cost averaging",
+      name: "DCA", 
+      description: "Automate purchases",
       href: "/app/dca", 
       icon: ChartBarIcon,
-      color: "from-secondary to-cyan-400"
+      gradient: "from-cyan-500 to-blue-500",
+      emoji: "📊"
     },
     { 
-      name: "Buyback & Burn", 
-      description: "Claim your rewards",
+      name: "Buyback", 
+      description: "Earn & burn",
       href: "/app/buyback", 
       icon: FireIcon,
-      color: "from-amber-500 to-orange-400"
+      gradient: "from-orange-500 to-red-500",
+      emoji: "🔥"
     },
   ];
 
-  const recentActivity = [
-    { type: "swap", token: "SOL → USDC", amount: "100 SOL", time: "2 min ago" },
-    { type: "dca", token: "USDC → SOL", amount: "50 USDC", time: "15 min ago" },
-    { type: "buyback", token: "Claimed", amount: "25 BACK", time: "1 hour ago" },
+  const stats = [
+    { label: "Volume 24h", value: "$2.5M", change: "+12%" },
+    { label: "Trades", value: "1.2K", change: "+8%" },
+    { label: "TVL", value: "$12M", change: "+15%" },
   ];
 
   return (
-    <div className="max-w-7xl mx-auto">
-      {/* Header */}
+    <div className="max-w-4xl mx-auto px-4 space-y-8">
+      {/* Minimal Header */}
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
+        initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
+        className="text-center pt-4"
       >
-        <h1 className="text-4xl font-bold mb-2">
-          Welcome to <span className="text-primary">SwapBack</span>
+        <h1 className="text-2xl sm:text-3xl font-bold text-white/90 mb-2">
+          SwapBack
         </h1>
-        <p className="text-gray-400 text-lg">
-          Your dashboard for decentralized trading on Solana
+        <p className="text-sm text-gray-500">
+          Trade smarter on Solana
         </p>
       </motion.div>
 
-      {/* Stats Grid */}
+      {/* Stats - Horizontal minimal */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
+        className="flex justify-center gap-8 py-4"
       >
-        {stats.map((stat, index) => (
-          <div
-            key={stat.label}
-            className="stat-card"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-400 text-sm">{stat.label}</span>
-              <span className="text-xs text-primary font-mono">{stat.change}</span>
-            </div>
-            <div className="text-2xl font-bold font-mono">{stat.value}</div>
+        {stats.map((stat) => (
+          <div key={stat.label} className="text-center">
+            <div className="text-xs text-gray-500 mb-1">{stat.label}</div>
+            <div className="text-lg font-semibold text-white/90">{stat.value}</div>
+            <div className="text-xs text-emerald-400">{stat.change}</div>
           </div>
         ))}
       </motion.div>
 
-      {/* Quick Actions */}
+      {/* Quick Actions - Card moderne */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="mb-8"
+        className="grid grid-cols-1 sm:grid-cols-3 gap-3"
       >
-        <h2 className="text-2xl font-bold mb-4 flex items-center">
-          <ArrowTrendingUpIcon className="h-6 w-6 mr-2 text-primary" />
-          Quick Actions
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {quickActions.map((action) => {
-            const Icon = action.icon;
-            return (
-              <Link
-                key={action.name}
-                href={action.href}
-                className="group swap-card hover:scale-105 transition-all duration-300"
-              >
-                <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${action.color} flex items-center justify-center mb-3`}>
-                  <Icon className="h-6 w-6 text-white" />
-                </div>
-                <h3 className="text-lg font-bold mb-1 group-hover:text-primary transition-colors">
+        {quickActions.map((action) => (
+          <Link
+            key={action.name}
+            href={action.href}
+            className="group relative"
+          >
+            <motion.div
+              whileHover={{ y: -4 }}
+              whileTap={{ scale: 0.98 }}
+              className="relative overflow-hidden rounded-2xl p-6 bg-white/5 border border-white/10 hover:border-emerald-500/50 transition-all duration-300"
+            >
+              {/* Gradient overlay on hover */}
+              <div className={`absolute inset-0 bg-gradient-to-br ${action.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`} />
+              
+              <div className="relative">
+                {/* Icon */}
+                <div className="text-4xl mb-3">{action.emoji}</div>
+                
+                {/* Text */}
+                <h3 className="text-lg font-bold text-white mb-1">
                   {action.name}
                 </h3>
-                <p className="text-sm text-gray-400">{action.description}</p>
-              </Link>
-            );
-          })}
-        </div>
-      </motion.div>
-
-      {/* Recent Activity */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold flex items-center">
-            <ClockIcon className="h-6 w-6 mr-2 text-primary" />
-            Recent Activity
-          </h2>
-          <Link
-            href="/app/history"
-            className="text-sm text-primary hover:text-primary-light transition-colors"
-          >
-            View all →
-          </Link>
-        </div>
-        <div className="swap-card">
-          <div className="space-y-4">
-            {recentActivity.map((activity, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between py-3 border-b border-primary/10 last:border-0"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className={`
-                    w-10 h-10 rounded-lg flex items-center justify-center
-                    ${activity.type === 'swap' ? 'bg-primary/10 text-primary' : ''}
-                    ${activity.type === 'dca' ? 'bg-secondary/10 text-secondary' : ''}
-                    ${activity.type === 'buyback' ? 'bg-amber-500/10 text-amber-500' : ''}
-                  `}>
-                    {activity.type === 'swap' && <ArrowsRightLeftIcon className="h-5 w-5" />}
-                    {activity.type === 'dca' && <ChartBarIcon className="h-5 w-5" />}
-                    {activity.type === 'buyback' && <FireIcon className="h-5 w-5" />}
-                  </div>
-                  <div>
-                    <div className="font-medium">{activity.token}</div>
-                    <div className="text-sm text-gray-400 font-mono">{activity.amount}</div>
-                  </div>
-                </div>
-                <div className="text-sm text-gray-400">{activity.time}</div>
+                <p className="text-xs text-gray-500">
+                  {action.description}
+                </p>
               </div>
-            ))}
-          </div>
-        </div>
+            </motion.div>
+          </Link>
+        ))}
       </motion.div>
 
-      {/* Command Palette Hint */}
+      {/* Info Card */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        className="mt-8 text-center"
+        transition={{ delay: 0.3 }}
+        className="text-center py-8"
       >
-        <p className="text-sm text-gray-500">
-          💡 Pro tip: Press{" "}
-          <kbd className="px-2 py-1 text-xs font-mono bg-gray-800/50 rounded border border-gray-700">
-            ⌘K
-          </kbd>{" "}
-          or{" "}
-          <kbd className="px-2 py-1 text-xs font-mono bg-gray-800/50 rounded border border-gray-700">
-            Ctrl+K
-          </kbd>{" "}
-          for quick navigation
-        </p>
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+          <SparklesIcon className="w-4 h-4 text-emerald-400" />
+          <span className="text-xs text-emerald-400">All trades are secured by Solana</span>
+        </div>
       </motion.div>
     </div>
   );
