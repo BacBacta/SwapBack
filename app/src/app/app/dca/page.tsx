@@ -8,7 +8,7 @@ const DCAClient = dynamic(() => import("@/components/DCAClient"), { ssr: false }
 
 export default function DCAPage() {
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6 px-4">
       {/* Header épuré */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}

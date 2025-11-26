@@ -22,7 +22,7 @@ import {
 import { Sheet, SheetContent } from "@/components/ui/Sheet";
 
 const mobileNavItems = [
-  { name: "Home", href: "/app", icon: HomeIcon, iconSolid: HomeIconSolid },
+  { name: "Home", href: "/", icon: HomeIcon, iconSolid: HomeIconSolid },
   { name: "Swap", href: "/app/swap", icon: ArrowsRightLeftIcon, iconSolid: ArrowsRightLeftIconSolid },
   { name: "DCA", href: "/app/dca", icon: ChartBarIcon, iconSolid: ChartBarIconSolid },
   { name: "Buyback", href: "/app/buyback", icon: FireIcon, iconSolid: FireIconSolid },

@@ -106,10 +106,10 @@ export const ClientOnlyWallet = () => {
   }
 
   return (
-    <div className="relative flex items-center gap-3">
-      {/* Network Badge */}
+    <div className="relative flex items-center gap-2">
+      {/* Network Badge - Hidden on mobile */}
       {connected && (
-        <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${
+        <div className={`hidden sm:flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${
           isWrongNetwork 
             ? "bg-red-500/20 text-red-400 border border-red-500/50" 
             : network === "devnet"
@@ -128,24 +128,27 @@ export const ClientOnlyWallet = () => {
       {!connected ? (
         <div className="wallet-adapter-button-wrapper">
           <WalletMultiButton 
-            className="!bg-[var(--primary)] hover:!bg-[var(--primary-hover)] !text-black !font-bold !px-4 !py-2 !rounded"
+            className="!bg-[var(--primary)] hover:!bg-[var(--primary-hover)] !text-black !font-bold !px-3 sm:!px-4 !py-2 !rounded !text-xs sm:!text-sm"
           />
         </div>
       ) : (
         <div className="relative">
           <button
             onClick={() => setShowMenu(!showMenu)}
-            className="bg-gray-700 hover:bg-gray-600 text-white font-bold px-4 py-2 rounded flex items-center gap-2"
+            className="bg-gray-700 hover:bg-gray-600 text-white font-bold px-2 sm:px-4 py-2 rounded flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
           >
             {wallet?.adapter.icon && (
-              <img src={wallet.adapter.icon} alt={wallet.adapter.name} className="w-5 h-5" />
+              <img src={wallet.adapter.icon} alt={wallet.adapter.name} className="w-4 h-4 sm:w-5 sm:h-5" />
             )}
-            <span>
+            <span className="hidden xs:inline">
               {publicKey?.toBase58().slice(0, 4)}...{publicKey?.toBase58().slice(-4)}
             </span>
+            <span className="xs:hidden">
+              Wallet
+            </span>
             {balance !== null && (
-              <span className="text-[var(--primary)] text-xs">
-                {balance.toFixed(4)} SOL
+              <span className="text-[var(--primary)] text-xs hidden sm:inline">
+                {balance.toFixed(2)} SOL
               </span>
             )}
           </button>

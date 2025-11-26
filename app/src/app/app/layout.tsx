@@ -29,7 +29,7 @@ export default function AppLayout({
               <div className="w-12 md:w-0" /> {/* Spacer for hamburger */}
               <h1 className="text-lg font-bold hidden md:block">SwapBack</h1>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 overflow-x-visible">
               <ClientOnlyWallet />
             </div>
           </div>

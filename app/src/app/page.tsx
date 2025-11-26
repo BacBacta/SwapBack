@@ -16,9 +16,9 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0C0C0C] via-[#1a1a1a] to-[#0C0C0C] overflow-hidden relative">
+    <div className="min-h-screen bg-gradient-to-br from-[#0C0C0C] via-[#1a1a1a] to-[#0C0C0C] overflow-hidden relative isolate">
       {/* Gradient Mesh Background */}
-      <div className="absolute inset-0 opacity-30">
+      <div className="absolute inset-0 opacity-30 pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#10B981] rounded-full mix-blend-multiply filter blur-3xl animate-blob" />
         <div className="absolute top-0 right-1/4 w-96 h-96 bg-[#06B6D4] rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000" />
         <div className="absolute bottom-0 left-1/3 w-96 h-96 bg-[#10B981] rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000" />
@@ -43,7 +43,7 @@ export default function Home() {
         
         {/* Floating Card 1 - Top */}
         <motion.div
-          className="absolute top-20 right-10 z-0"
+          className="hidden lg:block absolute top-20 right-10 z-0"
           animate={{
             y: [0, -20, 0],
             rotate: [0, 5, 0],
@@ -210,7 +210,7 @@ export default function Home() {
 
         {/* Floating Card 2 - Bottom */}
         <motion.div
-          className="absolute bottom-20 left-10 z-0"
+          className="hidden lg:block absolute bottom-20 left-10 z-0"
           animate={{
             y: [0, 20, 0],
             rotate: [0, -5, 0],

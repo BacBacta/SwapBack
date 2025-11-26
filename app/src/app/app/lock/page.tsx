@@ -47,7 +47,7 @@ export default function LockPage() {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="max-w-4xl mx-auto space-y-8 px-4">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -66,7 +66,7 @@ export default function LockPage() {
         </div>
 
         {/* Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
           {features.map((feature, index) => (
             <motion.div
               key={feature.title}
