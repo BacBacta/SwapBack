@@ -5,6 +5,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { MobileNav } from "@/components/MobileNav";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ClientOnlyWallet } from "@/components/ClientOnlyWallet";
+import { MobileWalletGuide } from "@/hooks/useMobileWalletDetection";
 
 export default function AppLayout({
   children,
@@ -44,6 +45,9 @@ export default function AppLayout({
 
       {/* Bottom Nav Mobile */}
       <BottomNav />
+
+      {/* Mobile Wallet Guide - Shows instructions if no wallet detected */}
+      <MobileWalletGuide />
 
       {/* Command Palette */}
       <CommandPalette />

@@ -52,14 +52,17 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
   }, [network]);
 
   // Configuration des wallets supportés
-  // Supporte explicitement: Phantom, Solflare, Backpack
-  // Autres wallets (Glow, Slope, etc.) auto-détectés via window.solana
+  // Sur mobile, les wallets injectent window.solana
+  // L'adapter les détectera automatiquement
   const wallets = useMemo(
     () => [
+      // Phantom - supporte mobile via deep linking
       new PhantomWalletAdapter(),
+      // Solflare - supporte mobile
       new SolflareWalletAdapter(),
+      // Backpack
       new BackpackWalletAdapter(),
-      // Autres wallets auto-détectés par WalletMultiButton
+      // Les autres wallets mobiles seront auto-détectés via window.solana
     ],
     []
   );
