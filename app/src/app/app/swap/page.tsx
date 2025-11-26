@@ -3,6 +3,8 @@
 import dynamicImport from "next/dynamic";
 import { motion } from "framer-motion";
 import { ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
+import { PullToRefresh } from "@/components/PullToRefresh";
+import { useState } from "react";
 
 export const dynamic = "force-dynamic";
 
@@ -28,31 +30,42 @@ const EnhancedSwapInterface = dynamicImport(
 );
 
 export default function SwapPage() {
-  return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header Minimal */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="text-center"
-      >
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent mb-2">
-          Swap
-        </h1>
-        <p className="text-gray-400 text-sm">
-          Trade tokens with best execution
-        </p>
-      </motion.div>
+  const [refreshKey, setRefreshKey] = useState(0);
 
-      {/* Main Swap Interface */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.1 }}
-      >
-        <EnhancedSwapInterface />
-      </motion.div>
-    </div>
+  const handleRefresh = async () => {
+    // Wait a bit to simulate refresh (triggers re-render)
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    setRefreshKey((prev) => prev + 1);
+  };
+
+  return (
+    <PullToRefresh onRefresh={handleRefresh}>
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Header Minimal */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="text-center"
+        >
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent mb-2">
+            Swap
+          </h1>
+          <p className="text-gray-400 text-sm">
+            Trade tokens with best execution
+          </p>
+        </motion.div>
+
+        {/* Main Swap Interface */}
+        <motion.div
+          key={refreshKey}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+        >
+          <EnhancedSwapInterface />
+        </motion.div>
+      </div>
+    </PullToRefresh>
   );
 }

@@ -22,13 +22,18 @@ import { ORCA_WHIRLPOOL_PROGRAM_ID } from "@/sdk/config/orca-pools";
 import { RAYDIUM_AMM_PROGRAM_ID } from "@/sdk/config/raydium-pools";
 import { getExplorerUrl } from "@/config/constants";
 import { ClientOnlyConnectionStatus } from "./ClientOnlyConnectionStatus";
-import { TokenSelector } from "./TokenSelector";
-import { DistributionBreakdown } from "./DistributionBreakdown";
-import { SwapPreviewModal } from "./SwapPreviewModal";
-import { LoadingProgress } from "./LoadingProgress";
-import { RecentSwapsSidebar } from "./RecentSwapsSidebar";
+
+// Phase 4: Lazy imports for heavy components
+import dynamic from "next/dynamic";
+const TokenSelector = dynamic(() => import("./TokenSelector").then(mod => ({ default: mod.TokenSelector })), { ssr: false });
+const DistributionBreakdown = dynamic(() => import("./DistributionBreakdown").then(mod => ({ default: mod.DistributionBreakdown })), { ssr: false });
+const SwapPreviewModal = dynamic(() => import("./SwapPreviewModal").then(mod => ({ default: mod.SwapPreviewModal })), { ssr: false });
+const LoadingProgress = dynamic(() => import("./LoadingProgress").then(mod => ({ default: mod.LoadingProgress })), { ssr: false });
+const RecentSwapsSidebar = dynamic(() => import("./RecentSwapsSidebar").then(mod => ({ default: mod.RecentSwapsSidebar })), { ssr: false });
+
 import { ClockIcon, ExclamationTriangleIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSwipeable } from "react-swipeable";
 // import { debounce } from "lodash"; // Désactivé - Pas d'auto-fetch
 
 interface RouteStep {
@@ -917,7 +922,7 @@ export function EnhancedSwapInterface() {
                 haptic.medium();
                 setSelectedRouter("swapback");
               }}
-              className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-4 rounded-lg text-sm sm:text-base font-semibold transition-all relative ${
+              className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-4 rounded-lg text-sm sm:text-base font-semibold transition-all relative active:scale-95 min-h-[44px] ${
                 selectedRouter === "swapback"
                   ? "bg-[var(--primary)] text-black"
                   : "bg-gray-900 text-gray-400 hover:bg-gray-800"
@@ -943,7 +948,7 @@ export function EnhancedSwapInterface() {
                 haptic.medium();
                 setSelectedRouter("jupiter");
               }}
-              className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-4 rounded-lg text-sm sm:text-base font-semibold transition-all relative ${
+              className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-4 rounded-lg text-sm sm:text-base font-semibold transition-all relative active:scale-95 min-h-[44px] ${
                 selectedRouter === "jupiter"
                   ? "bg-[var(--secondary)] text-black"
                   : "bg-gray-900 text-gray-400 hover:bg-gray-800"
@@ -983,14 +988,15 @@ export function EnhancedSwapInterface() {
             <div className="flex items-center gap-2 sm:gap-3">
               <input
                 type="number"
+                inputMode="decimal"
                 value={swap.inputAmount || ""}
                 onChange={(e) => handleInputChange(e.target.value)}
                 placeholder="0.00"
-                className="flex-1 bg-transparent text-xl sm:text-2xl font-bold text-white outline-none"
+                className="flex-1 bg-transparent text-xl sm:text-2xl font-bold text-white outline-none min-h-[44px]"
               />
               <button
                 onClick={openInputTokenSelector}
-                className="flex items-center gap-1.5 sm:gap-2 bg-gray-800 hover:bg-gray-700 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 sm:gap-2 bg-gray-800 hover:bg-gray-700 px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg transition-colors active:scale-95 min-h-[44px]"
               >
                 {swap.inputToken ? (
                   <>
@@ -1036,7 +1042,7 @@ export function EnhancedSwapInterface() {
                 key={pct}
                 onClick={() => handleAmountPreset(pct)}
                 disabled={!swap.inputToken?.balance}
-                className={`flex-1 text-[10px] sm:text-xs py-1 sm:py-1.5 rounded-md sm:rounded-lg transition-all font-semibold ${
+                className={`flex-1 text-[10px] sm:text-xs py-2.5 sm:py-1.5 rounded-md sm:rounded-lg transition-all font-semibold active:scale-95 min-h-[44px] sm:min-h-0 ${
                   swap.inputToken?.balance
                     ? 'bg-gray-800 hover:bg-[var(--primary)] hover:text-black text-gray-400 cursor-pointer'
                     : 'bg-gray-900 text-gray-600 cursor-not-allowed opacity-50'
@@ -1049,11 +1055,26 @@ export function EnhancedSwapInterface() {
           </div>
         </div>
 
-        {/* Switch Button */}
+        {/* Switch Button with Swipe Gesture */}
         <div className="flex justify-center -my-2 sm:-my-3 relative z-10">
           <button
-            onClick={switchTokens}
-            className="backdrop-blur-lg bg-[#10B981]/10 border-2 border-[#10B981]/40 hover:border-[#10B981] rounded-lg sm:rounded-xl p-1.5 sm:p-2 transition-all hover:shadow-[0_0_20px_rgba(0,255,0,0.3)]"
+            {...useSwipeable({
+              onSwipedLeft: () => {
+                haptic.medium();
+                switchTokens();
+              },
+              onSwipedRight: () => {
+                haptic.medium();
+                switchTokens();
+              },
+              trackTouch: true,
+              trackMouse: false,
+            })}
+            onClick={() => {
+              haptic.medium();
+              switchTokens();
+            }}
+            className="backdrop-blur-lg bg-[#10B981]/10 border-2 border-[#10B981]/40 hover:border-[#10B981] rounded-lg sm:rounded-xl p-3 sm:p-2 transition-all hover:shadow-[0_0_20px_rgba(0,255,0,0.3)] active:scale-95 min-w-[44px] min-h-[44px]"
           >
             <svg
               className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400"
@@ -1085,14 +1106,15 @@ export function EnhancedSwapInterface() {
             <div className="flex items-center gap-2 sm:gap-3">
               <input
                 type="number"
+                inputMode="decimal"
                 value={swap.outputAmount || ""}
                 readOnly
                 placeholder="0.00"
-                className="flex-1 bg-transparent text-xl sm:text-2xl font-bold text-white outline-none"
+                className="flex-1 bg-transparent text-xl sm:text-2xl font-bold text-white outline-none min-h-[44px]"
               />
               <button
                 onClick={openOutputTokenSelector}
-                className="flex items-center gap-1.5 sm:gap-2 bg-gray-800 hover:bg-gray-700 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 sm:gap-2 bg-gray-800 hover:bg-gray-700 px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg transition-colors active:scale-95 min-h-[44px]"
               >
                 {swap.outputToken ? (
                   <>
@@ -1157,25 +1179,30 @@ export function EnhancedSwapInterface() {
                 <div className="flex flex-wrap gap-1.5 sm:gap-2">
                   <button
                     onClick={() => {
+                      haptic.light();
                       setInputAmount((parseFloat(swap.inputAmount) * 0.9).toString());
                       setRouteError(null);
                     }}
-                    className="text-xs px-2.5 sm:px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg transition-colors"
+                    className="text-xs px-2.5 sm:px-3 py-1.5 min-h-[44px] bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg transition-colors active:scale-95"
                   >
                     Try 10% Less
                   </button>
                   <button
                     onClick={() => {
+                      haptic.light();
                       switchTokens();
                       setRouteError(null);
                     }}
-                    className="text-xs px-2.5 sm:px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg transition-colors"
+                    className="text-xs px-2.5 sm:px-3 py-1.5 min-h-[44px] bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg transition-colors active:scale-95"
                   >
                     Reverse Direction
                   </button>
                   <button
-                    onClick={() => setRouteError(null)}
-                    className="text-xs px-2.5 sm:px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg transition-colors"
+                    onClick={() => {
+                      haptic.light();
+                      setRouteError(null);
+                    }}
+                    className="text-xs px-2.5 sm:px-3 py-1.5 min-h-[44px] bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg transition-colors active:scale-95"
                   >
                     Dismiss
                   </button>
@@ -1217,8 +1244,11 @@ export function EnhancedSwapInterface() {
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <span className="text-[10px] sm:text-xs text-cyan-400">Refreshing in {priceRefreshCountdown}s</span>
                   <button
-                    onClick={handleSearchRoute}
-                    className="p-1 bg-cyan-500/10 hover:bg-cyan-500/20 rounded transition-colors"
+                    onClick={() => {
+                      haptic.light();
+                      handleSearchRoute();
+                    }}
+                    className="p-1 min-w-[44px] min-h-[44px] flex items-center justify-center bg-cyan-500/10 hover:bg-cyan-500/20 rounded transition-colors active:scale-95"
                     title="Refresh now"
                   >
                     <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1391,7 +1421,7 @@ export function EnhancedSwapInterface() {
         <button
           onClick={canExecuteSwap ? handleExecuteSwap : handleSearchRoute}
           disabled={primaryButtonDisabled}
-          className={`w-full py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg transition-all ${primaryButtonClass}`}
+          className={`w-full py-3 sm:py-4 min-h-[56px] rounded-xl font-bold text-base sm:text-lg transition-all active:scale-[0.98] ${primaryButtonClass}`}
           aria-label={
             !connected
               ? "Connect wallet to swap"
@@ -1435,8 +1465,11 @@ export function EnhancedSwapInterface() {
                 Slippage Settings
               </h3>
               <button
-                onClick={() => setShowSlippageModal(false)}
-                className="text-gray-400 hover:text-white text-xl sm:text-2xl"
+                onClick={() => {
+                  haptic.light();
+                  setShowSlippageModal(false);
+                }}
+                className="text-gray-400 hover:text-white text-xl sm:text-2xl min-w-[44px] min-h-[44px] flex items-center justify-center active:scale-95"
               >
                 ✕
               </button>
@@ -1447,8 +1480,11 @@ export function EnhancedSwapInterface() {
               {[0.1, 0.5, 1.0].map((value) => (
                 <button
                   key={value}
-                  onClick={() => handleSlippagePreset(value)}
-                  className={`py-1.5 sm:py-2 rounded-lg font-semibold text-sm sm:text-base transition-all ${
+                  onClick={() => {
+                    haptic.light();
+                    handleSlippagePreset(value);
+                  }}
+                  className={`py-1.5 sm:py-2 min-h-[44px] rounded-lg font-semibold text-sm sm:text-base transition-all active:scale-95 ${
                     swap.slippageTolerance === value
                       ? "bg-[var(--primary)] text-black"
                       : "bg-gray-800 text-gray-300 hover:bg-gray-700"
@@ -1467,14 +1503,18 @@ export function EnhancedSwapInterface() {
               <div className="flex gap-1.5 sm:gap-2">
                 <input
                   type="number"
+                  inputMode="decimal"
                   value={customSlippage}
                   onChange={(e) => setCustomSlippage(e.target.value)}
                   placeholder="0.5"
-                  className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base text-white outline-none focus:border-[var(--primary)]"
+                  className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 sm:px-4 py-1.5 sm:py-2 min-h-[44px] text-sm sm:text-base text-white outline-none focus:border-[var(--primary)]"
                 />
                 <button
-                  onClick={handleCustomSlippage}
-                  className="bg-[var(--primary)] text-black px-4 sm:px-6 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-semibold hover:bg-[var(--primary)]/90"
+                  onClick={() => {
+                    haptic.medium();
+                    handleCustomSlippage();
+                  }}
+                  className="bg-[var(--primary)] text-black px-4 sm:px-6 py-1.5 sm:py-2 min-h-[44px] rounded-lg text-sm sm:text-base font-semibold hover:bg-[var(--primary)]/90 active:scale-95"
                 >
                   Apply
                 </button>
