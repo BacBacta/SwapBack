@@ -40,9 +40,8 @@ export function BottomNav() {
 
   return (
     <>
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0C0C0C]/95 backdrop-blur-xl border-t border-primary/20 pb-safe-or-4">
-        <div className="flex justify-around items-center h-16 px-2">
-          {mobileNavItems.map((item) => {
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0C0C0C]/95 backdrop-blur-xl border-t border-primary/20 pb-safe-or-4">
+        <div className="flex justify-around items-center h-16 px-2">{mobileNavItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = isActive ? item.iconSolid : item.icon;
             

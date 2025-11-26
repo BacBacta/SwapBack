@@ -34,6 +34,7 @@ const RecentSwapsSidebar = dynamic(() => import("./RecentSwapsSidebar").then(mod
 import { ClockIcon, ExclamationTriangleIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSwipeable } from "react-swipeable";
+import { toast } from "sonner";
 // import { debounce } from "lodash"; // Désactivé - Pas d'auto-fetch
 
 interface RouteStep {
@@ -987,12 +988,18 @@ export function EnhancedSwapInterface() {
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
               <input
-                type="number"
+                type="text"
                 inputMode="decimal"
+                pattern="[0-9]*"
                 value={swap.inputAmount || ""}
                 onChange={(e) => handleInputChange(e.target.value)}
                 placeholder="0.00"
-                className="flex-1 bg-transparent text-xl sm:text-2xl font-bold text-white outline-none min-h-[44px]"
+                className="flex-1 bg-transparent font-bold text-white outline-none min-h-[44px] tracking-tight caret-emerald-500 [-webkit-appearance:none]"
+                style={{
+                  fontSize: 'clamp(1.75rem, 6vw, 3rem)',
+                  lineHeight: 1.2,
+                  letterSpacing: '-0.02em'
+                }}
               />
               <button
                 onClick={openInputTokenSelector}
@@ -1105,12 +1112,17 @@ export function EnhancedSwapInterface() {
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
               <input
-                type="number"
+                type="text"
                 inputMode="decimal"
                 value={swap.outputAmount || ""}
                 readOnly
                 placeholder="0.00"
-                className="flex-1 bg-transparent text-xl sm:text-2xl font-bold text-white outline-none min-h-[44px]"
+                className="flex-1 bg-transparent font-bold text-white outline-none min-h-[44px] tracking-tight [-webkit-appearance:none]"
+                style={{
+                  fontSize: 'clamp(1.75rem, 6vw, 3rem)',
+                  lineHeight: 1.2,
+                  letterSpacing: '-0.02em'
+                }}
               />
               <button
                 onClick={openOutputTokenSelector}
@@ -1282,22 +1294,32 @@ export function EnhancedSwapInterface() {
                 </span>
               </div>
               <div className="flex justify-between text-xs sm:text-sm items-center">
-                <span className="text-gray-400">Slippage Tolerance</span>
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  {suggestedSlippage !== null && suggestedSlippage !== swap.slippageTolerance && (
+                <span className="text-gray-400">Slippage</span>
+                <div className="flex items-center gap-1">
+                  {[0.5, 1.0, 2.0].map((value) => (
                     <button
-                      onClick={() => setSlippageTolerance(suggestedSlippage)}
-                      className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded transition-colors"
-                      title="Suggested based on price impact"
+                      key={value}
+                      onClick={() => {
+                        haptic.light();
+                        setSlippageTolerance(value);
+                      }}
+                      className={`px-2 sm:px-2.5 py-1 rounded-md text-xs font-medium transition-all active:scale-95 ${
+                        swap.slippageTolerance === value
+                          ? 'bg-emerald-500 text-black'
+                          : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                      }`}
                     >
-                      Use {suggestedSlippage}%
+                      {value}%
                     </button>
-                  )}
+                  ))}
                   <button
-                    onClick={() => setShowSlippageModal(true)}
-                    className="text-[var(--primary)] hover:text-[var(--primary)]/80"
+                    onClick={() => {
+                      haptic.light();
+                      setShowSlippageModal(true);
+                    }}
+                    className="px-2 sm:px-2.5 py-1 rounded-md text-xs font-medium bg-white/5 text-gray-400 hover:bg-white/10 active:scale-95"
                   >
-                    {swap.slippageTolerance}% ⚙️
+                    Custom
                   </button>
                 </div>
               </div>

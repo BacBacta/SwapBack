@@ -61,10 +61,10 @@ export function MobileNav() {
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      {/* Hamburger Trigger - Mobile only */}
+      {/* Hamburger Trigger - Mobile only (hidden on tablet+) */}
       <SheetTrigger asChild>
         <button 
-          className="lg:hidden fixed top-4 left-4 z-40 
+          className="md:hidden fixed top-4 left-4 z-40 
                      w-12 h-12 bg-emerald-500/10 backdrop-blur-xl
                      border border-emerald-500/30
                      rounded-full flex items-center justify-center

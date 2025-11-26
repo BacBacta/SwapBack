@@ -3,7 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ClientWalletProvider } from "@/components/ClientWalletProvider";
 import { QueryProvider } from "@/components/QueryProvider";
-import { Toaster } from "react-hot-toast";
+import { Toaster } from "sonner";
 import { GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 import { DebugLogPanel } from "@/components/DebugLogPanel";
 import { ConditionalNavbar } from "@/components/ConditionalNavbar";
@@ -73,26 +73,19 @@ export default function RootLayout({
               {/* <WalletConnectionGuide /> */}
               {/* <NetworkStatusIndicator /> */}
               {/* <NetworkInfoModal /> */}
-              <Toaster
-                position="bottom-right"
+              <Toaster 
+                position="top-center"
+                theme="dark"
+                richColors
+                closeButton
                 toastOptions={{
-                  duration: 4000,
                   style: {
-                    background: "#333",
-                    color: "#fff",
+                    background: 'rgba(0, 0, 0, 0.95)',
+                    backdropFilter: 'blur(16px)',
+                    border: '1px solid rgba(16, 185, 129, 0.2)',
+                    color: '#fff',
                   },
-                  success: {
-                    iconTheme: {
-                      primary: "#10b981",
-                      secondary: "#fff",
-                    },
-                  },
-                  error: {
-                    iconTheme: {
-                      primary: "#ef4444",
-                      secondary: "#fff",
-                    },
-                  },
+                  className: 'sonner-toast',
                 }}
               />
               <DebugLogPanel />
