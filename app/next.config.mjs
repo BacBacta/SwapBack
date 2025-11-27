@@ -11,12 +11,23 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   
-  webpack: (config) => {
-    config.resolve.fallback = {
-      fs: false,
-      path: false,
-      os: false,
-    };
+  webpack: (config, { isServer }) => {
+    // Polyfills pour les modules Node.js requis par Solana (côté client uniquement)
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+        os: false,
+        crypto: false,
+        stream: false,
+        http: false,
+        https: false,
+        zlib: false,
+        url: false,
+      };
+    }
+    
     return config;
   },
 };
