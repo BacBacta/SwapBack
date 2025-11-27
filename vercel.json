@@ -1,6 +1,9 @@
 {
-  "buildCommand": "cd app && bash build.sh",
+  "buildCommand": "cd app && npm run build",
   "outputDirectory": "app/.next",
   "installCommand": "cd app && npm install --legacy-peer-deps",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "env": {
+    "NODE_OPTIONS": "--max-old-space-size=4096"
+  }
 }
