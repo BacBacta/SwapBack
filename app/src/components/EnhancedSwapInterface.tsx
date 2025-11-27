@@ -1745,14 +1745,14 @@ export function EnhancedSwapInterface() {
                   />
                 )}
 
-                {false && selectedRouter === "swapback" && mockRouteInfo && (npiUsd > 0 || platformFeeUsd > 0) && (
+                {selectedRouter === "swapback" && routes.selectedRoute && (npiUsd > 0 || platformFeeUsd > 0) && (
                   <DistributionBreakdown
                     npiAmount={npiUsd}
                     platformFee={platformFeeUsd}
                   />
                 )}
 
-                {routes.selectedRoute.venues &&
+                {routes.selectedRoute?.venues &&
                   routes.selectedRoute.venues.length > 0 && (
                     <motion.div 
                       initial={{ opacity: 0, y: 10 }}
@@ -1760,7 +1760,7 @@ export function EnhancedSwapInterface() {
                       className="bg-white/5 border border-white/10 rounded-xl p-4"
                     >
                       <div className="flex items-center justify-between mb-3">
-                        <div className="text-sm font-semibold text-gray-300">Route Path</div>
+                        <div className="text-sm font-semibold text-gray-300">Chemin de routage</div>
                         <div className="text-xs text-gray-500">{routes.selectedRoute.venues.length} hop{routes.selectedRoute.venues.length > 1 ? 's' : ''}</div>
                       </div>
                       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
