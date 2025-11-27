@@ -1164,105 +1164,108 @@ export function EnhancedSwapInterface() {
               )}
             </button>
           </div>
-          <div className="grid gap-3 md:grid-cols-2 mt-4">
-            <div
-              className={`rounded-2xl border ${dealQuality.border} p-4 md:p-5 bg-gradient-to-br ${dealQuality.gradient} text-white/90`}
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <p className="text-xs uppercase tracking-widest text-white/60 font-semibold">
-                    {dealQuality.badge}
-                  </p>
-                  <p className="text-xl font-semibold mt-1 flex items-center gap-2">
-                    <span>{dealQuality.icon}</span>
-                    {dealQuality.label}
-                  </p>
+          {/* Bloc d'info avancé uniquement pour SwapBack, UI plus minimaliste sinon */}
+          {selectedRouter === "swapback" && (
+            <div className="grid gap-3 md:grid-cols-2 mt-4">
+              <div
+                className={`rounded-2xl border ${dealQuality.border} p-4 md:p-5 bg-gradient-to-br ${dealQuality.gradient} text-white/90`}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-widest text-white/60 font-semibold">
+                      {dealQuality.badge}
+                    </p>
+                    <p className="text-xl font-semibold mt-1 flex items-center gap-2">
+                      <span>{dealQuality.icon}</span>
+                      {dealQuality.label}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-3xl font-bold leading-none">
+                      {dealQuality.highlight}
+                    </p>
+                    <p className="text-xs text-white/70 mt-1">
+                      {dealQuality.highlightSuffix}
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-3xl font-bold leading-none">
-                    {dealQuality.highlight}
-                  </p>
-                  <p className="text-xs text-white/70 mt-1">
-                    {dealQuality.highlightSuffix}
-                  </p>
-                </div>
+                <p className="text-sm text-white/80">
+                  {dealQuality.description}
+                </p>
+                {shouldSuggestDealTweak && (
+                  <div className="mt-4 flex items-center justify-between gap-3 text-xs md:text-sm">
+                    <span className="text-white/80">
+                      Astuce rapide : réduisez légèrement votre montant pour améliorer le prix.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleReduceAmount(reduceSuggestionValue)}
+                      className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-semibold transition-colors"
+                    >
+                      -{reduceSuggestionValue}%
+                    </button>
+                  </div>
+                )}
               </div>
-              <p className="text-sm text-white/80">
-                {dealQuality.description}
-              </p>
-              {shouldSuggestDealTweak && (
-                <div className="mt-4 flex items-center justify-between gap-3 text-xs md:text-sm">
-                  <span className="text-white/80">
-                    Astuce rapide : réduisez légèrement votre montant pour améliorer le prix.
-                  </span>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5 flex flex-col gap-4">
+                <div className="flex items-center justify-between text-sm">
+                  <div>
+                    <p className="text-gray-400">Routeur actif</p>
+                    <p className="text-white font-semibold">{aggregatorLabel}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-gray-400">Confiance</p>
+                    <p className="text-emerald-400 font-semibold">{routerConfidenceScore}%</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-sm text-gray-300">
+                  <div className="flex flex-col">
+                    <span className="text-gray-400">Hops</span>
+                    <span className="font-semibold">{routeHopCount || '—'}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-gray-400">Refresh auto</span>
+                    <span className="font-semibold">{routes.isLoading ? '…' : `${priceRefreshCountdown}s`}</span>
+                  </div>
+                  <div className="flex flex-col text-right">
+                    <span className="text-gray-400">Mode</span>
+                    <span className="font-semibold text-emerald-300">{selectedRouter === 'swapback' ? 'Rebates' : 'Market'}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => handleReduceAmount(reduceSuggestionValue)}
-                    className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-semibold transition-colors"
+                    onClick={() => {
+                      if (!routes.isLoading) {
+                        handleSearchRoute();
+                      }
+                    }}
+                    disabled={refreshButtonDisabled}
+                    className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all active:scale-95 border ${
+                      refreshButtonDisabled
+                        ? 'bg-white/5 text-gray-500 border-white/10 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white border-emerald-500/40 shadow-lg shadow-emerald-500/20 hover:from-emerald-600 hover:to-emerald-700'
+                    }`}
                   >
-                    -{reduceSuggestionValue}%
+                    {routes.isLoading ? 'Calcul en cours…' : 'Rafraîchir le devis'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptic.light();
+                      setSelectedRouter(selectedRouter === 'swapback' ? 'jupiter' : 'swapback');
+                    }}
+                    className="px-3 py-2 rounded-xl border border-white/10 text-xs uppercase tracking-wide text-gray-400 hover:text-white hover:border-white/30 transition-colors"
+                  >
+                    {altRouterLabel}
                   </button>
                 </div>
-              )}
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5 flex flex-col gap-4">
-              <div className="flex items-center justify-between text-sm">
-                <div>
-                  <p className="text-gray-400">Routeur actif</p>
-                  <p className="text-white font-semibold">{aggregatorLabel}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-gray-400">Confiance</p>
-                  <p className="text-emerald-400 font-semibold">{routerConfidenceScore}%</p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-sm text-gray-300">
-                <div className="flex flex-col">
-                  <span className="text-gray-400">Hops</span>
-                  <span className="font-semibold">{routeHopCount || '—'}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-gray-400">Refresh auto</span>
-                  <span className="font-semibold">{routes.isLoading ? '…' : `${priceRefreshCountdown}s`}</span>
-                </div>
-                <div className="flex flex-col text-right">
-                  <span className="text-gray-400">Mode</span>
-                  <span className="font-semibold text-emerald-300">{selectedRouter === 'swapback' ? 'Rebates' : 'Market'}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!routes.isLoading) {
-                      handleSearchRoute();
-                    }
-                  }}
-                  disabled={refreshButtonDisabled}
-                  className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all active:scale-95 border ${
-                    refreshButtonDisabled
-                      ? 'bg-white/5 text-gray-500 border-white/10 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white border-emerald-500/40 shadow-lg shadow-emerald-500/20 hover:from-emerald-600 hover:to-emerald-700'
-                  }`}
-                >
-                  {routes.isLoading ? 'Calcul en cours…' : 'Rafraîchir le devis'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptic.light();
-                    setSelectedRouter(selectedRouter === 'swapback' ? 'jupiter' : 'swapback');
-                  }}
-                  className="px-3 py-2 rounded-xl border border-white/10 text-xs uppercase tracking-wide text-gray-400 hover:text-white hover:border-white/30 transition-colors"
-                >
-                  {altRouterLabel}
-                </button>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Input Token */}
@@ -1717,7 +1720,8 @@ export function EnhancedSwapInterface() {
               />
             )}
 
-            {selectedRouter === "swapback" && mockRouteInfo && (npiUsd > 0 || platformFeeUsd > 0) && (
+            {/* Breakdown SwapBack désactivé pour l’instant (caché partout) */}
+            {false && selectedRouter === "swapback" && mockRouteInfo && (npiUsd > 0 || platformFeeUsd > 0) && (
               <DistributionBreakdown
                 npiAmount={npiUsd}
                 platformFee={platformFeeUsd}
