@@ -423,6 +423,9 @@ export function EnhancedSwapInterface() {
 
   const routerConfidenceScore = selectedRouter === "swapback" ? 98 : 95;
 
+  const inputAmount = parseFloat(swap.inputAmount) || 0;
+  const outputAmount = parseFloat(swap.outputAmount) || 0;
+
   const hasQuoteContext =
     hasSearchedRoute &&
     !!swap.inputToken &&
@@ -995,9 +998,6 @@ export function EnhancedSwapInterface() {
   };
 
   // Mock route data for display
-  const inputAmount = parseFloat(swap.inputAmount) || 0;
-  const outputAmount = parseFloat(swap.outputAmount) || 0;
-
   // Mock USD prices (in real app, fetch from price oracle)
   const inputTokenUsdPrice = 1; // Assume $1 per token as mock
   const outputTokenUsdPrice = 1;

@@ -314,20 +314,22 @@ export function TokenSelectorModal({
                         )}
                       </div>
 
-                      {/* Favorite Button */}
-                      <button
+                      {/* Favorite Toggle (non-button to avoid nested buttons) */}
+                      <span
                         onClick={(e) => {
                           e.stopPropagation();
                           toggleFavorite(token.address);
                         }}
-                        className="p-2 hover:bg-white/10 rounded-lg transition-colors active:scale-95"
+                        className="p-2 rounded-lg transition-colors active:scale-95 cursor-pointer hover:bg-white/10 flex items-center justify-center"
+                        role="button"
+                        aria-label={isFavorite ? `Remove ${token.symbol} from favorites` : `Add ${token.symbol} to favorites`}
                       >
                         {isFavorite ? (
                           <StarIconSolid className="w-5 h-5 text-yellow-500" />
                         ) : (
                           <StarIconOutline className="w-5 h-5 text-gray-500" />
                         )}
-                      </button>
+                      </span>
 
                       {/* Selected Indicator */}
                       {isSelected && (
