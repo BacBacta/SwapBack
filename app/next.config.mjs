@@ -26,6 +26,34 @@ const nextConfig = {
         zlib: false,
         url: false,
       };
+      
+      // Optimisation des chunks pour éviter les erreurs de chargement
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          chunks: 'all',
+          cacheGroups: {
+            default: false,
+            vendors: false,
+            // Groupe pour les node_modules
+            vendor: {
+              name: 'vendor',
+              chunks: 'all',
+              test: /node_modules/,
+              priority: 20,
+            },
+            // Groupe pour le code commun
+            common: {
+              name: 'common',
+              minChunks: 2,
+              chunks: 'all',
+              priority: 10,
+              reuseExistingChunk: true,
+              enforce: true,
+            },
+          },
+        },
+      };
     }
     
     return config;
