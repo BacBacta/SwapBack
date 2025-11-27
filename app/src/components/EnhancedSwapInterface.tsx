@@ -1612,7 +1612,8 @@ export function EnhancedSwapInterface() {
             handleTokenSelect(token);
             setShowTokenSelector(false);
           }}
-          side={tokenSelectorType}
+          title={tokenSelectorType === "input" ? "Select Input Token" : "Select Output Token"}
+          selectedToken={tokenSelectorType === "input" ? swap.inputToken?.address : swap.outputToken?.address}
         />
       )}
       
