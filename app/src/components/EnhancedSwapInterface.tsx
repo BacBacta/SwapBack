@@ -422,6 +422,7 @@ export function EnhancedSwapInterface() {
   };
 
   const routerConfidenceScore = selectedRouter === "swapback" ? 98 : 95;
+  const isMinimalLayout = true;
 
   const inputAmount = parseFloat(swap.inputAmount) || 0;
   const outputAmount = parseFloat(swap.outputAmount) || 0;
@@ -1062,6 +1063,13 @@ export function EnhancedSwapInterface() {
     ? inputAmount > swap.inputToken.balance 
     : false;
 
+  const priceImpactColorClass =
+    priceImpact > 5
+      ? "text-red-400"
+      : priceImpact > 1
+        ? "text-yellow-400"
+        : "text-emerald-400";
+
   const primaryButtonDisabled =
     !connected ||
     !swap.inputToken ||
@@ -1165,7 +1173,7 @@ export function EnhancedSwapInterface() {
             </button>
           </div>
           {/* Bloc d'info avancé uniquement pour SwapBack, UI plus minimaliste sinon */}
-          {selectedRouter === "swapback" && (
+          {!isMinimalLayout && selectedRouter === "swapback" && (
             <div className="grid gap-3 md:grid-cols-2 mt-4">
               <div
                 className={`rounded-2xl border ${dealQuality.border} p-4 md:p-5 bg-gradient-to-br ${dealQuality.gradient} text-white/90`}
@@ -1339,24 +1347,25 @@ export function EnhancedSwapInterface() {
               </motion.div>
             )}
           </div>
-          {/* Amount Presets */}
-          <div className="flex gap-2 mt-2">
-            {[25, 50, 75, 100].map((pct) => (
-              <button
-                key={pct}
-                onClick={() => handleAmountPreset(pct)}
-                disabled={!swap.inputToken?.balance}
-                className={`flex-1 text-xs py-2 rounded-lg transition-all font-medium active:scale-95 min-h-[40px] ${
-                  swap.inputToken?.balance
-                    ? 'bg-white/5 hover:bg-emerald-500 hover:text-white text-gray-400 border border-white/10'
-                    : 'bg-white/5 text-gray-600 cursor-not-allowed opacity-50 border border-white/5'
-                }`}
-                title={!swap.inputToken?.balance ? 'Select a token with balance first' : `Set ${pct}% of balance`}
-              >
-                {pct === 100 ? 'MAX' : `${pct}%`}
-              </button>
-            ))}
-          </div>
+          {!isMinimalLayout && (
+            <div className="flex gap-2 mt-2">
+              {[25, 50, 75, 100].map((pct) => (
+                <button
+                  key={pct}
+                  onClick={() => handleAmountPreset(pct)}
+                  disabled={!swap.inputToken?.balance}
+                  className={`flex-1 text-xs py-2 rounded-lg transition-all font-medium active:scale-95 min-h-[40px] ${
+                    swap.inputToken?.balance
+                      ? 'bg-white/5 hover:bg-emerald-500 hover:text-white text-gray-400 border border-white/10'
+                      : 'bg-white/5 text-gray-600 cursor-not-allowed opacity-50 border border-white/5'
+                  }`}
+                  title={!swap.inputToken?.balance ? 'Select a token with balance first' : `Set ${pct}% of balance`}
+                >
+                  {pct === 100 ? 'MAX' : `${pct}%`}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Switch Button */}
@@ -1469,7 +1478,7 @@ export function EnhancedSwapInterface() {
         </div>
 
         {/* Price Impact Alert */}
-        {hasSearchedRoute && routes.selectedRoute && priceImpact > 0 && (
+        {!isMinimalLayout && hasSearchedRoute && routes.selectedRoute && priceImpact > 0 && (
           <div className="mb-4">
             <PriceImpactAlert 
               priceImpact={priceImpact}
@@ -1479,7 +1488,7 @@ export function EnhancedSwapInterface() {
         )}
 
         {/* Loading Progress */}
-        {routes.isLoading && (
+        {!isMinimalLayout && routes.isLoading && (
           <div className="mb-6" role="status" aria-live="polite" aria-label="Searching for best route">
             <LoadingProgress step={loadingStep} progress={loadingProgress} />
           </div>
@@ -1566,229 +1575,239 @@ export function EnhancedSwapInterface() {
               </div>
             )}
 
-            {/* Price Info */}
-            <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-              <div className="flex justify-between items-center mb-3">
-                <span className="text-sm text-gray-400 font-medium">Price Details</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">{priceRefreshCountdown}s</span>
+            {isMinimalLayout ? (
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                <div className="flex justify-between text-sm text-gray-400">
+                  <span>Rate</span>
+                  <span className="text-white font-semibold">
+                    1 {swap.inputToken?.symbol} ≈ {outputAmount > 0 && inputAmount > 0 ? (outputAmount / inputAmount).toFixed(6) : "0"} {swap.outputToken?.symbol}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm text-gray-400 mt-2">
+                  <span>Price Impact</span>
+                  <span className={priceImpactColorClass}>{priceImpact.toFixed(2)}%</span>
+                </div>
+                <div className="flex justify-between text-xs text-gray-500 mt-3">
+                  <span>Refresh</span>
                   <button
                     onClick={() => {
                       haptic.light();
                       handleSearchRoute();
                     }}
-                    className="p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-lg transition-colors active:scale-95"
-                    title="Refresh now"
+                    className="text-emerald-400 hover:text-emerald-300 font-semibold"
                   >
-                    <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
+                    {priceRefreshCountdown}s
                   </button>
                 </div>
               </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Rate</span>
-                  <span className="text-white font-medium">
-                    1 {swap.inputToken?.symbol} ≈{" "}
-                    {outputAmount > 0 && inputAmount > 0
-                      ? (outputAmount / inputAmount).toFixed(6)
-                      : "0"}{" "}
-                    {swap.outputToken?.symbol}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Price Impact</span>
-                  <span
-                    className={
-                      priceImpact > 5
-                        ? "text-red-400"
-                        : priceImpact > 1
-                          ? "text-yellow-400"
-                          : "text-emerald-400"
-                    }
-                  >
-                    {priceImpact.toFixed(2)}%
-                  </span>
-                </div>
-                <div className="flex justify-between items-center pt-2 border-t border-white/10">
-                  <span className="text-gray-400">Slippage</span>
-                  <div className="flex items-center gap-1">
-                    {[0.5, 1.0, 2.0].map((value) => (
+            ) : (
+              <>
+                <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-sm text-gray-400 font-medium">Price Details</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500">{priceRefreshCountdown}s</span>
                       <button
-                        key={value}
                         onClick={() => {
                           haptic.light();
-                          setSlippageTolerance(value);
+                          handleSearchRoute();
                         }}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all active:scale-95 ${
-                          swap.slippageTolerance === value
-                            ? 'bg-emerald-500 text-white'
-                            : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                        }`}
+                        className="p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-lg transition-colors active:scale-95"
+                        title="Refresh now"
                       >
-                        {value}%
+                        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
                       </button>
-                    ))}
-                    <button
-                      onClick={() => {
-                        haptic.light();
-                        setShowSlippageModal(true);
-                      }}
-                      className="px-2.5 py-1 rounded-lg text-xs font-medium bg-white/5 text-gray-400 hover:bg-white/10 active:scale-95"
-                    >
-                      Custom
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* SwapBack Benefits */}
-            {selectedRouter === "swapback" && mockRouteInfo && (
-              <div className="bg-gradient-to-br from-emerald-500/10 to-blue-500/10 border border-emerald-500/20 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">⚡</span>
-                    <div className="text-sm font-semibold text-emerald-400">
-                      SwapBack Savings
                     </div>
                   </div>
-                  <button
-                    onMouseEnter={() => setShowTooltip("npi")}
-                    onMouseLeave={() => setShowTooltip(null)}
-                    className="text-gray-400 hover:text-white text-sm min-w-[24px] min-h-[24px]"
-                    aria-label="What is NPI?"
-                  >
-                    ℹ️
-                  </button>
-                  {showTooltip === "npi" && (
-                    <div className="absolute right-0 top-6 w-64 bg-gray-900 border border-gray-700 rounded-xl p-3 text-xs text-gray-300 z-50 shadow-xl">
-                      <strong>NPI (Net Positive Impact)</strong>: 70% of protocol fees returned as rebates.
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Optimization</span>
-                    <span className="text-emerald-400 font-medium">
-                      +{mockRouteInfo.npi.toFixed(4)} {swap.outputToken?.symbol}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">BACK Rebate</span>
-                    <span className="text-emerald-400 font-medium">
-                      +{mockRouteInfo.rebate.toFixed(4)}{" "}
-                      {swap.outputToken?.symbol}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">BACK Burn</span>
-                    <span className="text-orange-400 font-medium">
-                      {mockRouteInfo.burn.toFixed(4)} BACK 🔥
-                    </span>
-                  </div>
-                  <div className="border-t border-white/10 pt-2 mt-2">
-                    <div className="flex justify-between font-semibold">
-                      <span className="text-white">Total Saved</span>
-                      <span className="text-emerald-400">
-                        +{(mockRouteInfo.npi + mockRouteInfo.rebate).toFixed(4)}{" "}
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Rate</span>
+                      <span className="text-white font-medium">
+                        1 {swap.inputToken?.symbol} ≈{" "}
+                        {outputAmount > 0 && inputAmount > 0
+                          ? (outputAmount / inputAmount).toFixed(6)
+                          : "0"}{" "}
                         {swap.outputToken?.symbol}
                       </span>
                     </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Price Impact</span>
+                      <span className={priceImpactColorClass}>
+                        {priceImpact.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center pt-2 border-t border-white/10">
+                      <span className="text-gray-400">Slippage</span>
+                      <div className="flex items-center gap-1">
+                        {[0.5, 1.0, 2.0].map((value) => (
+                          <button
+                            key={value}
+                            onClick={() => {
+                              haptic.light();
+                              setSlippageTolerance(value);
+                            }}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all active:scale-95 ${
+                              swap.slippageTolerance === value
+                                ? 'bg-emerald-500 text-white'
+                                : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                            }`}
+                          >
+                            {value}%
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => {
+                            haptic.light();
+                            setShowSlippageModal(true);
+                          }}
+                          className="px-2.5 py-1 rounded-lg text-xs font-medium bg-white/5 text-gray-400 hover:bg-white/10 active:scale-95"
+                        >
+                          Custom
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-            
-            {/* Swap Details Expandable - NEW */}
-            {swap.inputToken && swap.outputToken && (
-              <SwapDetailsExpandable
-                inputToken={{
-                  symbol: swap.inputToken.symbol,
-                  amount: swap.inputAmount,
-                  usdPrice: swap.inputToken.usdPrice
-                }}
-                outputToken={{
-                  symbol: swap.outputToken.symbol,
-                  amount: swap.outputAmount,
-                  usdPrice: swap.outputToken.usdPrice
-                }}
-                priceImpact={priceImpact}
-                slippage={swap.slippageTolerance}
-                route={routes.selectedRoute?.venues || []}
-              />
-            )}
 
-            {/* Breakdown SwapBack désactivé pour l’instant (caché partout) */}
-            {false && selectedRouter === "swapback" && mockRouteInfo && (npiUsd > 0 || platformFeeUsd > 0) && (
-              <DistributionBreakdown
-                npiAmount={npiUsd}
-                platformFee={platformFeeUsd}
-              />
-            )}
-
-            {/* Route Visualization */}
-            {routes.selectedRoute.venues &&
-              routes.selectedRoute.venues.length > 0 && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-white/5 border border-white/10 rounded-xl p-4"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="text-sm font-semibold text-gray-300">Route Path</div>
-                    <div className="text-xs text-gray-500">{routes.selectedRoute.venues.length} hop{routes.selectedRoute.venues.length > 1 ? 's' : ''}</div>
-                  </div>
-                  <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                    {/* Start Token */}
-                    <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 rounded-lg flex-shrink-0">
-                      {swap.inputToken?.logoURI && (
-                        <img src={swap.inputToken.logoURI} alt="" className="w-4 h-4 rounded-full" />
-                      )}
-                      <span className="text-sm font-medium text-emerald-400">{swap.inputToken?.symbol}</span>
-                    </div>
-                    
-                    {/* DEX Steps */}
-                    {routes.selectedRoute.venues.map((venue, index) => (
-                      <div key={index} className="flex items-center gap-2 flex-shrink-0">
-                        <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                        <div className="bg-white/5 border border-white/10 px-3 py-2 rounded-lg">
-                          <span className="text-xs text-gray-400 font-medium">{venue}</span>
+                {selectedRouter === "swapback" && mockRouteInfo && (
+                  <div className="bg-gradient-to-br from-emerald-500/10 to-blue-500/10 border border-emerald-500/20 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">⚡</span>
+                        <div className="text-sm font-semibold text-emerald-400">
+                          SwapBack Savings
                         </div>
                       </div>
-                    ))}
-                    
-                    {/* Arrow to End */}
-                    <svg className="w-4 h-4 text-gray-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                    
-                    {/* End Token */}
-                    <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 rounded-lg flex-shrink-0">
-                      {swap.outputToken?.logoURI && (
-                        <img src={swap.outputToken.logoURI} alt="" className="w-4 h-4 rounded-full" />
+                      <button
+                        onMouseEnter={() => setShowTooltip("npi")}
+                        onMouseLeave={() => setShowTooltip(null)}
+                        className="text-gray-400 hover:text-white text-sm min-w-[24px] min-h-[24px]"
+                        aria-label="What is NPI?"
+                      >
+                        ℹ️
+                      </button>
+                      {showTooltip === "npi" && (
+                        <div className="absolute right-0 top-6 w-64 bg-gray-900 border border-gray-700 rounded-xl p-3 text-xs text-gray-300 z-50 shadow-xl">
+                          <strong>NPI (Net Positive Impact)</strong>: 70% of protocol fees returned as rebates.
+                        </div>
                       )}
-                      <span className="text-sm font-medium text-emerald-400">{swap.outputToken?.symbol}</span>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Optimization</span>
+                        <span className="text-emerald-400 font-medium">
+                          +{mockRouteInfo.npi.toFixed(4)} {swap.outputToken?.symbol}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">BACK Rebate</span>
+                        <span className="text-emerald-400 font-medium">
+                          +{mockRouteInfo.rebate.toFixed(4)}{" "}
+                          {swap.outputToken?.symbol}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">BACK Burn</span>
+                        <span className="text-orange-400 font-medium">
+                          {mockRouteInfo.burn.toFixed(4)} BACK 🔥
+                        </span>
+                      </div>
+                      <div className="border-t border-white/10 pt-2 mt-2">
+                        <div className="flex justify-between font-semibold">
+                          <span className="text-white">Total Saved</span>
+                          <span className="text-emerald-400">
+                            +{(mockRouteInfo.npi + mockRouteInfo.rebate).toFixed(4)}{" "}
+                            {swap.outputToken?.symbol}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </motion.div>
-              )}
+                )}
+                
+                {swap.inputToken && swap.outputToken && (
+                  <SwapDetailsExpandable
+                    inputToken={{
+                      symbol: swap.inputToken.symbol,
+                      amount: swap.inputAmount,
+                      usdPrice: swap.inputToken.usdPrice
+                    }}
+                    outputToken={{
+                      symbol: swap.outputToken.symbol,
+                      amount: swap.outputAmount,
+                      usdPrice: swap.outputToken.usdPrice
+                    }}
+                    priceImpact={priceImpact}
+                    slippage={swap.slippageTolerance}
+                    route={routes.selectedRoute?.venues || []}
+                  />
+                )}
+
+                {false && selectedRouter === "swapback" && mockRouteInfo && (npiUsd > 0 || platformFeeUsd > 0) && (
+                  <DistributionBreakdown
+                    npiAmount={npiUsd}
+                    platformFee={platformFeeUsd}
+                  />
+                )}
+
+                {routes.selectedRoute.venues &&
+                  routes.selectedRoute.venues.length > 0 && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-white/5 border border-white/10 rounded-xl p-4"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="text-sm font-semibold text-gray-300">Route Path</div>
+                        <div className="text-xs text-gray-500">{routes.selectedRoute.venues.length} hop{routes.selectedRoute.venues.length > 1 ? 's' : ''}</div>
+                      </div>
+                      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                        <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 rounded-lg flex-shrink-0">
+                          {swap.inputToken?.logoURI && (
+                            <img src={swap.inputToken.logoURI} alt="" className="w-4 h-4 rounded-full" />
+                          )}
+                          <span className="text-sm font-medium text-emerald-400">{swap.inputToken?.symbol}</span>
+                        </div>
+                        {routes.selectedRoute.venues.map((venue, index) => (
+                          <div key={index} className="flex items-center gap-2 flex-shrink-0">
+                            <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                            <div className="bg-white/5 border border-white/10 px-3 py-2 rounded-lg">
+                              <span className="text-xs text-gray-400 font-medium">{venue}</span>
+                            </div>
+                          </div>
+                        ))}
+                        <svg className="w-4 h-4 text-gray-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                        <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 rounded-lg flex-shrink-0">
+                          {swap.outputToken?.logoURI && (
+                            <img src={swap.outputToken.logoURI} alt="" className="w-4 h-4 rounded-full" />
+                          )}
+                          <span className="text-sm font-medium text-emerald-400">{swap.outputToken?.symbol}</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+              </>
+            )}
           </div>
         )}
         
-        {/* Smart Slippage - NEW */}
-        <div className="mb-4">
-          <SmartSlippage
-            value={swap.slippageTolerance}
-            onChange={setSlippageTolerance}
-            tokenPair={swap.inputToken && swap.outputToken ? 
-              `${swap.inputToken.symbol}/${swap.outputToken.symbol}` : undefined
-            }
-          />
-        </div>
+        {!isMinimalLayout && (
+          <div className="mb-4">
+            <SmartSlippage
+              value={swap.slippageTolerance}
+              onChange={setSlippageTolerance}
+              tokenPair={swap.inputToken && swap.outputToken ? 
+                `${swap.inputToken.symbol}/${swap.outputToken.symbol}` : undefined
+              }
+            />
+          </div>
+        )}
 
         {/* Swap Button */}
         <button
