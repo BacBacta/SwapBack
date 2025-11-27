@@ -25,6 +25,8 @@ const nextConfig = {
         https: false,
         zlib: false,
         url: false,
+        buffer: false,
+        process: false,
       };
       
       // Optimisation des chunks pour éviter les erreurs de chargement
