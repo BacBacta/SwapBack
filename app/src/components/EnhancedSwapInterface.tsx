@@ -1545,7 +1545,7 @@ export function EnhancedSwapInterface() {
         )}
 
         {/* Route Info */}
-        {hasSearchedRoute && routes.selectedRoute && !routes.isLoading && (
+        {hasSearchedRoute && routes.selectedRoute && (
           <div className="mb-6 space-y-3">
             {swapSignature && (
               <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex flex-col gap-2" role="status" aria-live="polite">
@@ -1745,7 +1745,7 @@ export function EnhancedSwapInterface() {
                   />
                 )}
 
-                {selectedRouter === "swapback" && routes.selectedRoute && (npiUsd > 0 || platformFeeUsd > 0) && (
+                {selectedRouter === "swapback" && routes.selectedRoute && (
                   <DistributionBreakdown
                     npiAmount={npiUsd}
                     platformFee={platformFeeUsd}
