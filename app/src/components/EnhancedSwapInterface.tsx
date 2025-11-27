@@ -423,6 +423,112 @@ export function EnhancedSwapInterface() {
 
   const routerConfidenceScore = selectedRouter === "swapback" ? 98 : 95;
 
+  const hasQuoteContext =
+    hasSearchedRoute &&
+    !!swap.inputToken &&
+    !!swap.outputToken &&
+    inputAmount > 0;
+
+  type DealQualityDescriptor = {
+    label: string;
+    badge: string;
+    description: string;
+    gradient: string;
+    border: string;
+    highlight: string;
+    highlightSuffix: string;
+    icon: string;
+  };
+
+  const dealQuality: DealQualityDescriptor = (() => {
+    if (!hasQuoteContext) {
+      return {
+        label: "Préparez votre swap",
+        badge: "Inactif",
+        description: "Choisissez vos tokens et lancez une recherche pour obtenir un devis en temps réel.",
+        gradient: "from-white/5 via-white/0 to-white/5",
+        border: "border-white/10",
+        highlight: "--",
+        highlightSuffix: "",
+        icon: "⌛",
+      };
+    }
+
+    if (routes.isLoading) {
+      return {
+        label: "Recherche de route en cours",
+        badge: "Calcul",
+        description: "Nos routeurs comparent les DEXs compatibles pour sécuriser le meilleur prix.",
+        gradient: "from-blue-500/10 via-cyan-500/5 to-emerald-500/10",
+        border: "border-blue-500/30",
+        highlight: "…",
+        highlightSuffix: "",
+        icon: "🔍",
+      };
+    }
+
+    if (priceImpact < 0.5) {
+      return {
+        label: "Taux excellent",
+        badge: "Great",
+        description: "Impact quasi nul, route optimale détectée.",
+        gradient: "from-emerald-500/20 via-emerald-500/5 to-cyan-500/10",
+        border: "border-emerald-500/40",
+        highlight: `${priceImpact.toFixed(2)}%`,
+        highlightSuffix: "impact",
+        icon: "✅",
+      };
+    }
+
+    if (priceImpact < 1.5) {
+      return {
+        label: "Taux solide",
+        badge: "Fair",
+        description: "Route équilibrée. Vous pouvez encore optimiser en ajustant le montant.",
+        gradient: "from-emerald-400/15 via-blue-500/10 to-purple-500/10",
+        border: "border-emerald-400/40",
+        highlight: `${priceImpact.toFixed(2)}%`,
+        highlightSuffix: "impact",
+        icon: "🟢",
+      };
+    }
+
+    if (priceImpact < 3) {
+      return {
+        label: "Surveillez la route",
+        badge: "Watch",
+        description: "L'impact grimpe. Pensez à réduire le montant ou à augmenter la tolérance.",
+        gradient: "from-amber-400/20 via-orange-500/10 to-red-500/10",
+        border: "border-amber-400/40",
+        highlight: `${priceImpact.toFixed(2)}%`,
+        highlightSuffix: "impact",
+        icon: "⚠️",
+      };
+    }
+
+    return {
+      label: "Risque élevé",
+      badge: "Alert",
+      description: "L'impact est important. Splittez votre trade ou changez de route.",
+      gradient: "from-red-500/30 via-orange-500/20 to-amber-500/10",
+      border: "border-red-500/40",
+      highlight: `${priceImpact.toFixed(2)}%`,
+      highlightSuffix: "impact",
+      icon: "🚨",
+    };
+  })();
+
+  const routeHopCount = routes.selectedRoute?.venues?.length ?? 0;
+  const aggregatorLabel = selectedRouter === "swapback" ? "SwapBack Optimizer" : "Jupiter V6";
+  const altRouterLabel = selectedRouter === "swapback" ? "Voir Jupiter" : "Activer SwapBack";
+  const shouldSuggestDealTweak = hasQuoteContext && priceImpact >= 1.5;
+  const reduceSuggestionValue = priceImpact >= 3 ? 25 : 10;
+  const refreshButtonDisabled =
+    !swap.inputToken ||
+    !swap.outputToken ||
+    inputAmount <= 0 ||
+    routes.isLoading;
+
   const getActiveRoutePlan = (): JupiterRoutePlanStep[] | null => {
     if (routes.selectedRoutePlan && routes.selectedRoutePlan.length > 0) {
       return routes.selectedRoutePlan;
@@ -1057,6 +1163,105 @@ export function EnhancedSwapInterface() {
                 <div className="text-xs mt-1 opacity-90">Best Market</div>
               )}
             </button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 mt-4">
+            <div
+              className={`rounded-2xl border ${dealQuality.border} p-4 md:p-5 bg-gradient-to-br ${dealQuality.gradient} text-white/90`}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <p className="text-xs uppercase tracking-widest text-white/60 font-semibold">
+                    {dealQuality.badge}
+                  </p>
+                  <p className="text-xl font-semibold mt-1 flex items-center gap-2">
+                    <span>{dealQuality.icon}</span>
+                    {dealQuality.label}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-3xl font-bold leading-none">
+                    {dealQuality.highlight}
+                  </p>
+                  <p className="text-xs text-white/70 mt-1">
+                    {dealQuality.highlightSuffix}
+                  </p>
+                </div>
+              </div>
+              <p className="text-sm text-white/80">
+                {dealQuality.description}
+              </p>
+              {shouldSuggestDealTweak && (
+                <div className="mt-4 flex items-center justify-between gap-3 text-xs md:text-sm">
+                  <span className="text-white/80">
+                    Astuce rapide : réduisez légèrement votre montant pour améliorer le prix.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleReduceAmount(reduceSuggestionValue)}
+                    className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-semibold transition-colors"
+                  >
+                    -{reduceSuggestionValue}%
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5 flex flex-col gap-4">
+              <div className="flex items-center justify-between text-sm">
+                <div>
+                  <p className="text-gray-400">Routeur actif</p>
+                  <p className="text-white font-semibold">{aggregatorLabel}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-gray-400">Confiance</p>
+                  <p className="text-emerald-400 font-semibold">{routerConfidenceScore}%</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-sm text-gray-300">
+                <div className="flex flex-col">
+                  <span className="text-gray-400">Hops</span>
+                  <span className="font-semibold">{routeHopCount || '—'}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-gray-400">Refresh auto</span>
+                  <span className="font-semibold">{routes.isLoading ? '…' : `${priceRefreshCountdown}s`}</span>
+                </div>
+                <div className="flex flex-col text-right">
+                  <span className="text-gray-400">Mode</span>
+                  <span className="font-semibold text-emerald-300">{selectedRouter === 'swapback' ? 'Rebates' : 'Market'}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!routes.isLoading) {
+                      handleSearchRoute();
+                    }
+                  }}
+                  disabled={refreshButtonDisabled}
+                  className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all active:scale-95 border ${
+                    refreshButtonDisabled
+                      ? 'bg-white/5 text-gray-500 border-white/10 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white border-emerald-500/40 shadow-lg shadow-emerald-500/20 hover:from-emerald-600 hover:to-emerald-700'
+                  }`}
+                >
+                  {routes.isLoading ? 'Calcul en cours…' : 'Rafraîchir le devis'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptic.light();
+                    setSelectedRouter(selectedRouter === 'swapback' ? 'jupiter' : 'swapback');
+                  }}
+                  className="px-3 py-2 rounded-xl border border-white/10 text-xs uppercase tracking-wide text-gray-400 hover:text-white hover:border-white/30 transition-colors"
+                >
+                  {altRouterLabel}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
