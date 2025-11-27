@@ -1,7 +1,7 @@
+"use client";
+
 import dynamicImport from "next/dynamic";
 import { Breadcrumb } from "@/components/BackButton";
-
-export const dynamic = "force-dynamic";
 
 // Lazy load EnhancedSwapInterface to avoid webpack issues on Vercel
 const EnhancedSwapInterface = dynamicImport(
