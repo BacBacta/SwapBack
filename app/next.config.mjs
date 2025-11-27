@@ -1,3 +1,8 @@
+import { createRequire } from 'node:module';
+import webpack from 'webpack';
+
+const require = createRequire(import.meta.url);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -19,15 +24,29 @@ const nextConfig = {
         fs: false,
         path: false,
         os: false,
-        crypto: false,
-        stream: false,
-        http: false,
-        https: false,
-        zlib: false,
-        url: false,
-        buffer: false,
-        process: false,
+        crypto: require.resolve('crypto-browserify'),
+        stream: require.resolve('stream-browserify'),
+        http: require.resolve('stream-http'),
+        https: require.resolve('https-browserify'),
+        zlib: require.resolve('browserify-zlib'),
+        url: require.resolve('url'),
+        buffer: require.resolve('buffer/'),
+        process: require.resolve('process/browser'),
       };
+
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        crypto: require.resolve('crypto-browserify'),
+        stream: require.resolve('stream-browserify'),
+      };
+
+      config.plugins = config.plugins || [];
+      config.plugins.push(
+        new webpack.ProvidePlugin({
+          Buffer: ['buffer', 'Buffer'],
+          process: 'process/browser',
+        })
+      );
       
       // Optimisation des chunks pour éviter les erreurs de chargement
       config.optimization = {
