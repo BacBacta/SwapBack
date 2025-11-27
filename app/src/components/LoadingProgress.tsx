@@ -135,15 +135,3 @@ export function LoadingProgress({ step, progress }: LoadingProgressProps) {
     </div>
   );
 }
-        <motion.span
-          key={progress}
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent"
-        >
-          {Math.round(progress)}%
-        </motion.span>
-      </div>
-    </div>
-  );
-}

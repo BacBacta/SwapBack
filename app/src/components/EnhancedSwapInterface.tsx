@@ -43,6 +43,11 @@ import {
   getAdaptiveFontSize 
 } from "@/utils/formatNumber";
 import { PriceImpactAlert } from "@/components/PriceImpactAlert";
+import { TokenSelectorModal } from "@/components/TokenSelectorModal";
+import { SmartSlippage } from "@/components/SmartSlippage";
+import { SwapDetailsExpandable } from "@/components/SwapDetailsExpandable";
+import { SuccessModal } from "@/components/SuccessModal";
+import { ErrorFeedback, detectErrorType, type ErrorType } from "@/components/ErrorFeedback";
 // import { debounce } from "lodash"; // Désactivé - Pas d'auto-fetch
 
 interface RouteStep {
@@ -284,6 +289,14 @@ export function EnhancedSwapInterface() {
     txSignature?: string;
   }>>([]);
   const [suggestedSlippage, setSuggestedSlippage] = useState<number | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [lastSwapData, setLastSwapData] = useState<{
+    inputToken: { symbol: string; amount: string; logoURI?: string };
+    outputToken: { symbol: string; amount: string; logoURI?: string };
+    explorerUrl: string;
+  } | null>(null);
+  const [errorType, setErrorType] = useState<ErrorType | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // ⚠️ AUTO-FETCH DÉSACTIVÉ pour éviter les boucles infinies
   // User must click "Search Route" manually
@@ -791,6 +804,26 @@ export function EnhancedSwapInterface() {
         setSwapSignature(signature);
         setLoadingProgress(100);
         
+        // Save swap data and show success modal
+        setLastSwapData({
+          inputToken: {
+            symbol: swap.inputToken?.symbol || '',
+            amount: swap.inputAmount,
+            logoURI: swap.inputToken?.logoURI
+          },
+          outputToken: {
+            symbol: swap.outputToken?.symbol || '',
+            amount: swap.outputAmount,
+            logoURI: swap.outputToken?.logoURI
+          },
+          explorerUrl: getExplorerUrl(signature, 'tx')
+        });
+        setShowSuccessModal(true);
+        
+        // Clear error
+        setErrorType(null);
+        setErrorMessage(null);
+        
         // Update swap status to success
         setRecentSwaps(prev => prev.map(s => 
           s.id === tempSwap.id 
@@ -803,6 +836,11 @@ export function EnhancedSwapInterface() {
       const errorMsg = error instanceof Error ? error.message : "Swap échoué";
       setSwapError(errorMsg);
       setLoadingProgress(0);
+      
+      // Detect error type and show intelligent feedback
+      const detectedType = detectErrorType(errorMsg);
+      setErrorType(detectedType);
+      setErrorMessage(errorMsg);
       
       // Update swap status to failed
       setRecentSwaps(prev => prev.map(s => 
@@ -1454,6 +1492,25 @@ export function EnhancedSwapInterface() {
                 </div>
               </div>
             )}
+            
+            {/* Swap Details Expandable - NEW */}
+            {swap.inputToken && swap.outputToken && (
+              <SwapDetailsExpandable
+                inputToken={{
+                  symbol: swap.inputToken.symbol,
+                  amount: swap.inputAmount,
+                  usdPrice: swap.inputToken.usdPrice
+                }}
+                outputToken={{
+                  symbol: swap.outputToken.symbol,
+                  amount: swap.outputAmount,
+                  usdPrice: swap.outputToken.usdPrice
+                }}
+                priceImpact={priceImpact}
+                slippage={swap.slippageTolerance}
+                route={routes.selectedRoute?.venues || []}
+              />
+            )}
 
             {selectedRouter === "swapback" && mockRouteInfo && (npiUsd > 0 || platformFeeUsd > 0) && (
               <DistributionBreakdown
@@ -1512,6 +1569,17 @@ export function EnhancedSwapInterface() {
               )}
           </div>
         )}
+        
+        {/* Smart Slippage - NEW */}
+        <div className="mb-4">
+          <SmartSlippage
+            value={swap.slippageTolerance}
+            onChange={setSlippageTolerance}
+            tokenPair={swap.inputToken && swap.outputToken ? 
+              `${swap.inputToken.symbol}/${swap.outputToken.symbol}` : undefined
+            }
+          />
+        </div>
 
         {/* Swap Button */}
         <button
@@ -1535,92 +1603,16 @@ export function EnhancedSwapInterface() {
         </div>
       </div>
 
-      {/* Slippage Modal */}
-      {showSlippageModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-gray-900 border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-white">
-                Slippage Settings
-              </h3>
-              <button
-                onClick={() => {
-                  haptic.light();
-                  setShowSlippageModal(false);
-                }}
-                className="text-gray-400 hover:text-white text-2xl min-w-[44px] min-h-[44px] flex items-center justify-center active:scale-95 transition-all"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Preset Buttons */}
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              {[0.1, 0.5, 1.0].map((value) => (
-                <button
-                  key={value}
-                  onClick={() => {
-                    haptic.light();
-                    handleSlippagePreset(value);
-                  }}
-                  className={`py-3 min-h-[48px] rounded-xl font-semibold transition-all active:scale-95 ${
-                    swap.slippageTolerance === value
-                      ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                      : "bg-white/5 text-gray-300 hover:bg-white/10 border border-white/10"
-                  }`}
-                >
-                  {value}%
-                </button>
-              ))}
-            </div>
-
-            {/* Custom Input */}
-            <div className="mb-6">
-              <label className="text-sm text-gray-400 mb-2 block font-medium">
-                Custom Slippage
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  value={customSlippage}
-                  onChange={(e) => setCustomSlippage(e.target.value)}
-                  placeholder="0.5"
-                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 min-h-[48px] text-white outline-none focus:border-emerald-500 transition-colors"
-                />
-                <button
-                  onClick={() => {
-                    haptic.medium();
-                    handleCustomSlippage();
-                  }}
-                  className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white px-6 py-3 min-h-[48px] rounded-xl font-semibold active:scale-95 transition-all shadow-lg shadow-emerald-500/20"
-                >
-                  Apply
-                </button>
-              </div>
-            </div>
-
-            {/* Warning */}
-            {parseFloat(customSlippage) > 5 && (
-              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3 text-sm text-yellow-400 flex items-start gap-2">
-                <span className="text-lg flex-shrink-0">⚠️</span>
-                <span>High slippage may result in unfavorable trades</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Token Selector Modal */}
+      {/* Token Selector Modal - NEW */}
       {showTokenSelector && (
-        <TokenSelector
-          selectedToken={
-            tokenSelectorType === "input"
-              ? swap.inputToken?.mint || ""
-              : swap.outputToken?.mint || ""
-          }
-          onSelect={handleTokenSelect}
+        <TokenSelectorModal
+          isOpen={showTokenSelector}
           onClose={() => setShowTokenSelector(false)}
+          onSelect={(token) => {
+            handleTokenSelect(token);
+            setShowTokenSelector(false);
+          }}
+          side={tokenSelectorType}
         />
       )}
       
@@ -1662,6 +1654,54 @@ export function EnhancedSwapInterface() {
           />
         )}
       </AnimatePresence>
+      
+      {/* Success Modal - NEW */}
+      {lastSwapData && (
+        <SuccessModal
+          isOpen={showSuccessModal}
+          onClose={() => {
+            setShowSuccessModal(false);
+            setLastSwapData(null);
+          }}
+          inputToken={lastSwapData.inputToken}
+          outputToken={lastSwapData.outputToken}
+          explorerUrl={lastSwapData.explorerUrl}
+          onNewSwap={() => {
+            setInputAmount("");
+            setSwapSignature(null);
+          }}
+        />
+      )}
+      
+      {/* Error Feedback - NEW */}
+      {errorType && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4">
+          <ErrorFeedback
+            error={errorType}
+            message={errorMessage || undefined}
+            onClose={() => {
+              setErrorType(null);
+              setErrorMessage(null);
+              setSwapError(null);
+            }}
+            onRetry={() => {
+              setErrorType(null);
+              setErrorMessage(null);
+              handleExecuteSwap();
+            }}
+            onAdjustSlippage={() => {
+              setErrorType(null);
+              setErrorMessage(null);
+              setSlippageTolerance(swap.slippageTolerance + 0.5);
+            }}
+            onReduceAmount={() => {
+              setErrorType(null);
+              setErrorMessage(null);
+              handleReduceAmount(20);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
