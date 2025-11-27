@@ -32,8 +32,14 @@ export default function SwapPage() {
             ]} 
           />
         </div>
-        <div className="backdrop-blur-xl bg-[#06B6D4]/5 border-2 border-[#06B6D4]/30 rounded-2xl p-8 shadow-[0_0_30px_rgba(0,255,255,0.2)] transition-all hover:border-[#06B6D4]/50">
-          <EnhancedSwapInterface />
+        <div className="relative group">
+          {/* Animated background glow */}
+          <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 via-cyan-500 to-emerald-500 rounded-2xl blur-xl opacity-20 group-hover:opacity-40 transition-opacity duration-500 animate-gradient-shift"></div>
+          
+          {/* Main card */}
+          <div className="relative backdrop-blur-xl bg-gradient-to-br from-gray-900/95 via-gray-900/90 to-gray-950/95 border-2 border-emerald-500/30 rounded-2xl p-8 shadow-2xl shadow-emerald-500/20 transition-all duration-300 hover:border-emerald-400/50 hover:shadow-emerald-500/30">
+            <EnhancedSwapInterface />
+          </div>
         </div>
       </div>
     </div>

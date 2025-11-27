@@ -159,35 +159,35 @@ export function TokenSelectorModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm"
+        className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4"
         onClick={onClose}
       >
         <motion.div
-          initial={{ y: "100%" }}
-          animate={{ y: 0 }}
-          exit={{ y: "100%" }}
+          initial={{ y: "100%", scale: 0.95 }}
+          animate={{ y: 0, scale: 1 }}
+          exit={{ y: "100%", scale: 0.95 }}
           transition={{ type: "spring", damping: 30, stiffness: 300 }}
-          className="absolute inset-x-0 bottom-0 md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 
-                     md:max-w-lg md:h-[80vh] md:rounded-2xl
-                     h-[95vh] rounded-t-2xl bg-gray-900 border-t md:border border-white/10 
-                     flex flex-col overflow-hidden shadow-2xl"
+          className="relative w-full md:max-w-lg h-[95vh] md:h-[85vh] 
+                     rounded-t-2xl md:rounded-2xl bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950
+                     border-t md:border border-emerald-500/20 md:border-emerald-500/30
+                     flex flex-col overflow-hidden shadow-2xl shadow-emerald-500/10"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex-shrink-0 p-4 border-b border-white/10">
+          <div className="flex-shrink-0 p-4 border-b border-emerald-500/20 bg-gradient-to-r from-emerald-500/5 via-cyan-500/5 to-emerald-500/5 backdrop-blur-xl">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-white">{title}</h2>
+              <h2 className="text-xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent animate-gradient">{title}</h2>
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors active:scale-95"
+                className="p-2 hover:bg-emerald-500/10 rounded-lg transition-all active:scale-90 hover:rotate-90 duration-200 group"
               >
-                <XMarkIcon className="w-6 h-6 text-gray-400" />
+                <XMarkIcon className="w-6 h-6 text-gray-400 group-hover:text-emerald-400 transition-colors" />
               </button>
             </div>
 
             {/* Search Bar */}
-            <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <div className="relative group">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-400 transition-colors duration-200" />
               <input
                 type="text"
                 value={searchQuery}
@@ -196,30 +196,40 @@ export function TokenSelectorModal({
                 autoFocus
                 className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 
                          rounded-xl text-white placeholder-gray-500 
-                         outline-none focus:border-emerald-500 transition-colors"
+                         outline-none focus:border-emerald-500 focus:bg-white/10 focus:shadow-lg focus:shadow-emerald-500/20
+                         transition-all duration-200"
               />
             </div>
           </div>
 
           {/* Filters */}
-          <div className="flex-shrink-0 flex gap-2 px-4 py-3 border-b border-white/10 overflow-x-auto scrollbar-hide">
+          <div className="flex-shrink-0 flex gap-2 px-4 py-3 border-b border-emerald-500/10 overflow-x-auto scrollbar-hide bg-black/20">
             {[
               { id: "all" as FilterType, label: "All", icon: null },
               { id: "favorites" as FilterType, label: "⭐ Favorites", icon: null },
               { id: "stablecoins" as FilterType, label: "💵 Stables", icon: null },
               { id: "blue-chips" as FilterType, label: "🔵 Blue Chips", icon: null },
             ].map((filter) => (
-              <button
+              <motion.button
                 key={filter.id}
+                whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: 1.05 }}
                 onClick={() => setActiveFilter(filter.id)}
-                className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-all active:scale-95 ${
+                className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-all relative overflow-hidden ${
                   activeFilter === filter.id
-                    ? "bg-emerald-500 text-white"
-                    : "bg-white/5 text-gray-400 hover:bg-white/10"
+                    ? "bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg shadow-emerald-500/30"
+                    : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white"
                 }`}
               >
-                {filter.label}
-              </button>
+                {activeFilter === filter.id && (
+                  <motion.div
+                    layoutId="activeFilter"
+                    className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-cyan-500"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+                <span className="relative z-10">{filter.label}</span>
+              </motion.button>
             ))}
           </div>
 
@@ -240,26 +250,31 @@ export function TokenSelectorModal({
                   const isFavorite = favorites.has(token.address);
 
                   return (
-                    <button
+                    <motion.button
                       key={token.address}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      whileHover={{ scale: 1.01, x: 4 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => onSelect(token)}
-                      className={`w-full flex items-center gap-3 p-4 transition-all hover:bg-white/5 active:scale-[0.99] ${
-                        isSelected ? "bg-emerald-500/10 border-l-2 border-emerald-500" : ""
+                      className={`w-full flex items-center gap-3 p-4 transition-all hover:bg-gradient-to-r hover:from-emerald-500/10 hover:to-transparent relative group ${
+                        isSelected ? "bg-gradient-to-r from-emerald-500/20 to-transparent border-l-2 border-emerald-500 shadow-lg shadow-emerald-500/10" : ""
                       }`}
                     >
                       {/* Token Logo */}
-                      <div className="relative flex-shrink-0">
+                      <div className="relative flex-shrink-0 group-hover:scale-110 transition-transform duration-200">
+                        <div className="absolute inset-0 bg-emerald-500/20 rounded-full blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
                         {token.logoURI ? (
                           <img
                             src={token.logoURI}
                             alt={token.symbol}
-                            className="w-12 h-12 rounded-full"
+                            className="w-12 h-12 rounded-full relative z-10 ring-2 ring-transparent group-hover:ring-emerald-500/30 transition-all duration-200"
                             onError={(e) => {
                               e.currentTarget.src = `https://via.placeholder.com/48/1f2937/ffffff?text=${token.symbol[0]}`;
                             }}
                           />
                         ) : (
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-white font-bold text-lg">
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-white font-bold text-lg relative z-10 shadow-lg shadow-emerald-500/30">
                             {token.symbol[0]}
                           </div>
                         )}
@@ -316,9 +331,15 @@ export function TokenSelectorModal({
 
                       {/* Selected Indicator */}
                       {isSelected && (
-                        <CheckCircleIcon className="w-6 h-6 text-emerald-500" />
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: "spring", stiffness: 500, damping: 15 }}
+                        >
+                          <CheckCircleIcon className="w-6 h-6 text-emerald-500 drop-shadow-lg" />
+                        </motion.div>
                       )}
-                    </button>
+                    </motion.button>
                   );
                 })}
               </div>

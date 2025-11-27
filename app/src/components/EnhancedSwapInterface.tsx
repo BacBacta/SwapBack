@@ -1088,7 +1088,7 @@ export function EnhancedSwapInterface() {
               />
               <button
                 onClick={openInputTokenSelector}
-                className="flex items-center gap-2 bg-white/5 hover:bg-white/10 px-4 py-2.5 rounded-xl transition-all active:scale-95 min-h-[48px] border border-white/10"
+                className="flex items-center gap-2 bg-gradient-to-r from-white/5 to-white/10 hover:from-emerald-500/10 hover:to-cyan-500/10 px-4 py-2.5 rounded-xl transition-all active:scale-95 hover:scale-105 min-h-[48px] border border-white/10 hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/20 group"
               >
                 {swap.inputToken ? (
                   <>
@@ -1096,15 +1096,15 @@ export function EnhancedSwapInterface() {
                       <img
                         src={swap.inputToken.logoURI}
                         alt={swap.inputToken.symbol}
-                        className="w-6 h-6 rounded-full"
+                        className="w-6 h-6 rounded-full group-hover:scale-110 transition-transform duration-200 ring-2 ring-transparent group-hover:ring-emerald-500/30"
                       />
                     )}
-                    <span className="font-semibold text-base">
+                    <span className="font-semibold text-base group-hover:text-emerald-400 transition-colors">
                       {swap.inputToken.symbol}
                     </span>
                   </>
                 ) : (
-                  <span className="text-gray-400">Select</span>
+                  <span className="text-gray-400 group-hover:text-emerald-400 transition-colors">Select</span>
                 )}
                 <svg
                   className="w-4 h-4 ml-1"
@@ -1170,10 +1170,10 @@ export function EnhancedSwapInterface() {
               haptic.medium();
               switchTokens();
             }}
-            className="bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl p-3 transition-all active:scale-95 min-w-[48px] min-h-[48px] flex items-center justify-center"
+            className="bg-gradient-to-br from-white/5 to-white/10 border border-white/10 hover:border-emerald-500/50 hover:bg-gradient-to-br hover:from-emerald-500/10 hover:to-cyan-500/10 rounded-xl p-3 transition-all active:scale-95 hover:scale-110 hover:rotate-180 min-w-[48px] min-h-[48px] flex items-center justify-center group hover:shadow-lg hover:shadow-emerald-500/30 duration-300"
           >
             <svg
-              className="w-5 h-5 text-gray-400"
+              className="w-5 h-5 text-gray-400 group-hover:text-emerald-400 transition-colors"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -1215,7 +1215,7 @@ export function EnhancedSwapInterface() {
               />
               <button
                 onClick={openOutputTokenSelector}
-                className="flex items-center gap-2 bg-white/5 hover:bg-white/10 px-4 py-2.5 rounded-xl transition-all active:scale-95 min-h-[48px] border border-white/10"
+                className="flex items-center gap-2 bg-gradient-to-r from-white/5 to-white/10 hover:from-emerald-500/10 hover:to-cyan-500/10 px-4 py-2.5 rounded-xl transition-all active:scale-95 hover:scale-105 min-h-[48px] border border-white/10 hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/20 group"
               >
                 {swap.outputToken ? (
                   <>
@@ -1223,15 +1223,15 @@ export function EnhancedSwapInterface() {
                       <img
                         src={swap.outputToken.logoURI}
                         alt={swap.outputToken.symbol}
-                        className="w-6 h-6 rounded-full"
+                        className="w-6 h-6 rounded-full group-hover:scale-110 transition-transform duration-200 ring-2 ring-transparent group-hover:ring-emerald-500/30"
                       />
                     )}
-                    <span className="font-semibold text-base">
+                    <span className="font-semibold text-base group-hover:text-emerald-400 transition-colors">
                       {swap.outputToken.symbol}
                     </span>
                   </>
                 ) : (
-                  <span className="text-gray-400">Select</span>
+                  <span className="text-gray-400 group-hover:text-emerald-400 transition-colors">Select</span>
                 )}
                 <svg
                   className="w-4 h-4 ml-1"
