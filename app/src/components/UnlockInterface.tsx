@@ -4,6 +4,7 @@ import React, { useState, useMemo } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { createUnlockTokensTransaction } from "@/lib/lockTokens";
 import { useCNFT } from "../hooks/useCNFT";
+import { EarlyUnlockWarningModal } from "./EarlyUnlockWarningModal";
 
 type ExtendedCNFTLevel = "Bronze" | "Silver" | "Gold" | "Platinum" | "Diamond";
 
@@ -28,6 +29,7 @@ export default function UnlockInterface({
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [showEarlyUnlockModal, setShowEarlyUnlockModal] = useState(false);
 
   // Calculate current boost details from lock data
   const boostDetails = useMemo(() => {
@@ -125,36 +127,12 @@ export default function UnlockInterface({
     return Math.round(progress);
   }, [lockData]);
 
-  // Function to unlock tokens
-  const handleUnlock = async () => {
-    if (!publicKey) {
-      setError("Please connect your wallet");
-      return;
-    }
-
-    // Avertissement pour unlock anticipé
-    if (!timeRemaining?.canUnlock) {
-      const penaltyAmount = lockData?.amount 
-        ? Number(lockData.amount) * 0.02  // lockData.amount already in UI units
-        : 0;
-      
-      const confirmEarlyUnlock = window.confirm(
-        `⚠️ EARLY UNLOCK WARNING\n\n` +
-        `You are unlocking before the lock period ends.\n` +
-        `A penalty of 2% will be applied:\n\n` +
-        `• Penalty: ${penaltyAmount.toFixed(2)} BACK (burned 🔥)\n` +
-        `• You will receive: ${(Number(lockData?.amount || 0) - penaltyAmount).toFixed(2)} BACK\n\n` +
-        `Do you want to continue?`
-      );
-      
-      if (!confirmEarlyUnlock) {
-        return;
-      }
-    }
-
+  // Actual unlock execution logic
+  const executeUnlock = async () => {
     setIsUnlocking(true);
     setError(null);
     setSuccess(null);
+    setShowEarlyUnlockModal(false);
 
     try {
       console.log('🔄 [UNLOCK] Starting unlock transaction...');
@@ -310,6 +288,28 @@ export default function UnlockInterface({
     } finally {
       setIsUnlocking(false);
     }
+  };
+
+  // Function to handle unlock button click
+  const handleUnlock = async () => {
+    if (!publicKey) {
+      setError("Please connect your wallet");
+      return;
+    }
+
+    // Show warning modal for early unlock
+    if (!timeRemaining?.canUnlock) {
+      setShowEarlyUnlockModal(true);
+      return;
+    }
+    
+    // Proceed directly if lock period is complete
+    await executeUnlock();
+  };
+
+  // Handle early unlock confirmation from modal
+  const handleEarlyUnlockConfirm = async () => {
+    await executeUnlock();
   };
 
   // Affichage si pas de lock actif
@@ -642,6 +642,17 @@ export default function UnlockInterface({
           </li>
         </ul>
       </div>
+
+      {/* Early Unlock Warning Modal */}
+      <EarlyUnlockWarningModal
+        isOpen={showEarlyUnlockModal}
+        onClose={() => setShowEarlyUnlockModal(false)}
+        onConfirm={handleEarlyUnlockConfirm}
+        lockedAmount={Number(lockData?.amount || 0)}
+        penaltyPercentage={2}
+        timeRemaining={timeRemaining?.display}
+        isLoading={isUnlocking}
+      />
     </div>
   );
 }
