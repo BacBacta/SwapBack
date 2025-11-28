@@ -35,18 +35,22 @@ export function useCNFT() {
   // Load cNFT data from blockchain
   const fetchCNFTData = useCallback(async () => {
     if (!publicKey || !connection) {
+      console.log("🔍 [useCNFT] No publicKey or connection, returning null");
       setCnftData(null);
       setLockData(null);
       return;
     }
 
+    console.log("🔍 [useCNFT] Fetching cNFT data for:", publicKey.toString());
     setIsLoading(true);
     setError(null);
 
     try {
       const account = await fetchUserCNFT(connection, publicKey);
+      console.log("🔍 [useCNFT] fetchUserCNFT returned:", account);
 
       if (!account) {
+        console.log("❌ [useCNFT] No account found, setting exists: false");
         setCnftData({
           exists: false,
           level: null,
@@ -64,6 +68,13 @@ export function useCNFT() {
       }
 
       const lockedAmount = account.amountLocked / LAMPORTS_PER_BACK;
+      console.log("✅ [useCNFT] Account found:", {
+        exists: true,
+        isActive: account.isActive,
+        lockedAmount,
+        lockDuration: account.lockDuration,
+        unlockTime: account.unlockTime,
+      });
 
       setCnftData({
         exists: true,
@@ -85,7 +96,7 @@ export function useCNFT() {
         isActive: account.isActive,
       });
     } catch (err) {
-      console.error('Error fetching cNFT data:', err);
+      console.error('❌ [useCNFT] Error fetching cNFT data:', err);
       setError(err as Error);
       setCnftData(null);
       setLockData(null);
