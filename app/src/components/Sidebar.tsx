@@ -12,6 +12,7 @@ import {
   Cog6ToothIcon,
   LockClosedIcon,
   ChartPieIcon,
+  GiftIcon,
 } from "@heroicons/react/24/outline";
 
 const navigationItems = [
@@ -19,6 +20,7 @@ const navigationItems = [
   { name: "Swap", href: "/app/swap", icon: ArrowsRightLeftIcon },
   { name: "DCA", href: "/app/dca", icon: ChartBarIcon },
   { name: "Lock/Unlock", href: "/app/lock", icon: LockClosedIcon },
+  { name: "My Rebates", href: "/app/rebates", icon: GiftIcon },
   { name: "Buyback", href: "/app/buyback", icon: FireIcon },
   { name: "Analytics", href: "/app/analytics", icon: ChartPieIcon },
   { name: "History", href: "/app/history", icon: ClockIcon },

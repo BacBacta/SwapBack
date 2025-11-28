@@ -11,7 +11,8 @@ import {
   LockClosedIcon,
   EllipsisHorizontalIcon,
   Cog6ToothIcon,
-  ChartPieIcon
+  ChartPieIcon,
+  GiftIcon,
 } from "@heroicons/react/24/outline";
 import {
   HomeIcon as HomeIconSolid,
@@ -30,6 +31,7 @@ const mobileNavItems = [
 
 const moreNavItems = [
   { name: "Lock Tokens", href: "/app/lock", icon: LockClosedIcon },
+  { name: "My Rebates", href: "/app/rebates", icon: GiftIcon },
   { name: "Portfolio", href: "/app/portfolio", icon: ChartPieIcon },
   { name: "Settings", href: "/app/settings", icon: Cog6ToothIcon },
 ];
