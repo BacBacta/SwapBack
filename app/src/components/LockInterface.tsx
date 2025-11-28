@@ -94,6 +94,7 @@ export default function LockInterface({
     level: CNFTLevel;
     boost: number;
     lockDurationDays: number; // Durée originale du lock en jours
+    isActive: boolean; // Lock is currently active
   } | null>(null);
 
   // Calculate level based on duration and CUMULATIVE amount (visual only)
@@ -102,8 +103,8 @@ export default function LockInterface({
     const days = parseInt(duration) || 0;
     const amt = parseFloat(amount) || 0;
     
-    // Si NFT existe, calculer avec le montant CUMULÉ
-    const totalAmount = currentNftData ? currentNftData.amount + amt : amt;
+    // Si NFT existe ET est actif, calculer avec le montant CUMULÉ
+    const totalAmount = (currentNftData && currentNftData.isActive) ? currentNftData.amount + amt : amt;
 
     // Diamond: 100,000+ BACK AND 365+ days
     if (totalAmount >= 100000 && days >= LEVEL_THRESHOLDS.Diamond)
@@ -124,10 +125,11 @@ export default function LockInterface({
     return predictedLevel;
   }, [predictedLevel]);
 
-  // Calculate effective duration (max of selected and existing lock duration)
+  // Calculate effective duration (max of selected and existing ACTIVE lock duration)
   const effectiveDuration = useMemo(() => {
     const days = parseInt(duration) || 0;
-    if (currentNftData && currentNftData.lockDurationDays > days) {
+    // Only consider existing lock duration if the lock is active
+    if (currentNftData && currentNftData.isActive && currentNftData.lockDurationDays > days) {
       return currentNftData.lockDurationDays;
     }
     return days;
@@ -137,8 +139,8 @@ export default function LockInterface({
   const predictedBoost = useMemo(() => {
     const amt = parseFloat(amount) || 0;
     
-    // Si NFT existe, calculer avec le montant CUMULÉ
-    const totalAmount = currentNftData ? currentNftData.amount + amt : amt;
+    // Si NFT existe ET EST ACTIF, calculer avec le montant CUMULÉ
+    const totalAmount = (currentNftData && currentNftData.isActive) ? currentNftData.amount + amt : amt;
     
     return calculateDynamicBoost(totalAmount, effectiveDuration);
   }, [amount, effectiveDuration, currentNftData]);
@@ -147,8 +149,8 @@ export default function LockInterface({
   const boostDetails = useMemo(() => {
     const amt = parseFloat(amount) || 0;
     
-    // Si NFT existe, calculer avec le montant CUMULÉ
-    const totalAmount = currentNftData ? currentNftData.amount + amt : amt;
+    // Si NFT existe ET EST ACTIF, calculer avec le montant CUMULÉ
+    const totalAmount = (currentNftData && currentNftData.isActive) ? currentNftData.amount + amt : amt;
 
     // Amount score: (amount / 10000) * 100, max 1000 BP (10%)
     const amountScoreBps = Math.min((totalAmount / 10000) * 100, 1000);
@@ -333,6 +335,7 @@ export default function LockInterface({
               level,
               boost,
               lockDurationDays,
+              isActive,
             });
 
             console.log("📊 Current NFT data:", {
@@ -845,8 +848,8 @@ export default function LockInterface({
           </button>
         </div>
 
-        {/* Avertissement si durée choisie < durée existante */}
-        {currentNftData && parseInt(duration) < currentNftData.lockDurationDays && (
+        {/* Avertissement si durée choisie < durée existante ET lock actif */}
+        {currentNftData && currentNftData.isActive && parseInt(duration) < currentNftData.lockDurationDays && (
           <div className="mt-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
             <div className="flex items-start gap-2">
               <span className="text-amber-400 text-lg">⚠️</span>
