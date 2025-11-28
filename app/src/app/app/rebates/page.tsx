@@ -151,6 +151,10 @@ export default function MyRebatesPage() {
   }, [publicKey, connection, ROUTER_PROGRAM_ID]);
 
   // Fetch burn data (early unlock penalties)
+  // BACK token has 9 decimals on-chain, but Rust program divides by 1e6 in logs
+  // So we need to divide by 1000 more (1e9 / 1e6 = 1e3)
+  const LOG_CORRECTION_FACTOR = 1000;
+  
   const fetchBurnData = useCallback(async () => {
     if (!publicKey) return;
 
@@ -170,34 +174,34 @@ export default function MyRebatesPage() {
           });
 
           if (tx?.meta?.logMessages) {
-            let burnAmount = 0;
+            let burnAmountFromLog = 0;
             
             for (const log of tx.meta.logMessages) {
               // Pattern 1: "🔥 X BACK brûlés (pénalité 2%)" 
-              // The Rust program already divides by BACK_DECIMALS (1e6) in the log
-              // So the value in the log IS the token amount (e.g., 10000 for 10k tokens)
+              // Rust divides by 1e6, but token has 9 decimals, so value is 1000x too high
               if (log.includes("BACK") && log.includes("brûlés") && log.includes("pénalité")) {
                 const match = log.match(/(\d+)\s*BACK\s*brûlés/);
                 if (match) {
-                  burnAmount = parseInt(match[1]);
-                  console.log("[Rebates] Found burn log:", log, "-> amount:", burnAmount);
+                  burnAmountFromLog = parseInt(match[1]);
+                  console.log("[Rebates] Found burn log:", log, "-> raw:", burnAmountFromLog);
                   break;
                 }
               }
               
               // Pattern 2: "✅ X BACK déverrouillés - Pénalité: Y - Anticipé: true"
-              // Extract Y (the penalty amount, already divided by BACK_DECIMALS in Rust)
               if (log.includes("déverrouillés") && log.includes("Pénalité:")) {
                 const match = log.match(/Pénalité:\s*(\d+)/);
                 if (match) {
-                  burnAmount = parseInt(match[1]);
-                  console.log("[Rebates] Found penalty log:", log, "-> amount:", burnAmount);
+                  burnAmountFromLog = parseInt(match[1]);
+                  console.log("[Rebates] Found penalty log:", log, "-> raw:", burnAmountFromLog);
                   break;
                 }
               }
             }
             
-            // The value from logs is already in tokens (Rust divides by 1e6)
+            // Correct for decimal mismatch: token has 9 decimals, Rust divides by 1e6
+            const burnAmount = burnAmountFromLog / LOG_CORRECTION_FACTOR;
+            
             // Only add if we found a valid burn amount
             if (burnAmount > 0) {
               processedTxs.add(sig.signature);
@@ -207,6 +211,7 @@ export default function MyRebatesPage() {
                 timestamp: sig.blockTime || 0,
                 txSignature: sig.signature,
               });
+              console.log("[Rebates] Corrected burn amount:", burnAmount);
             }
           }
         } catch {
