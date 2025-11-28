@@ -33,28 +33,29 @@ export default function UnlockInterface({
 
   // Calculate current boost details from lock data
   const boostDetails = useMemo(() => {
-    if (!lockData?.amount || !lockData?.unlockTime) {
-      return { amountScore: 0, durationScore: 0, totalBoost: 0 };
+    if (!lockData?.amount || !cnftData?.lockDuration) {
+      return { amountScore: 0, durationScore: 0, totalBoost: 0, durationDays: 0 };
     }
 
     const amount = Number(lockData.amount); // Already converted to UI units by useCNFT
-    const now = Math.floor(Date.now() / 1000);
-    const unlockTimestamp = Number(lockData.unlockTime);
+    
+    // Use the actual lock duration from cnftData (in seconds)
+    const durationDays = cnftData.lockDuration / 86400;
+    
+    console.log('📊 [BOOST DEBUG] amount:', amount, 'durationDays:', durationDays, 'lockDuration (s):', cnftData.lockDuration);
 
-    // Calculate original duration (approximate if we don't have lockTime)
-    // We'll estimate based on common durations: 7, 30, 90, 180, 365 days
-    const timeRemaining = Math.max(0, unlockTimestamp - now);
-    const estimatedTotalDuration =
-      timeRemaining > 0 ? timeRemaining : 30 * 24 * 60 * 60;
-    const durationDays = estimatedTotalDuration / (24 * 60 * 60);
+    // Correct boost formula matching Rust: (amount / 10000) * 100 max 1000BP, (days / 5) * 10 max 1000BP
+    const amountScoreBps = Math.min((amount / 10000) * 100, 1000);
+    const durationScoreBps = Math.min((durationDays / 5) * 10, 1000);
+    const totalBoostBps = Math.min(amountScoreBps + durationScoreBps, 2000);
 
-    // Correct boost formula: (amount / 10000) * 10 max 10%, (days / 5) * 0.2 max 10%
-    const amountScore = Math.min((amount / 10000) * 10, 10);
-    const durationScore = Math.min((durationDays / 5) * 0.2, 10);
-    const totalBoost = Math.min(amountScore + durationScore, 20);
-
-    return { amountScore, durationScore, totalBoost };
-  }, [lockData]);
+    return { 
+      amountScore: amountScoreBps / 100,  // Convert to percentage
+      durationScore: durationScoreBps / 100,
+      totalBoost: totalBoostBps / 100,
+      durationDays: Math.round(durationDays)
+    };
+  }, [lockData, cnftData]);
 
   // Couleur du badge selon le niveau
   const levelColor = useMemo(() => {
@@ -82,7 +83,20 @@ export default function UnlockInterface({
 
     const now = Math.floor(Date.now() / 1000);
     const unlockTimestamp = Number(lockData.unlockTime);
-    const secondsRemaining = unlockTimestamp - now;
+    
+    // Debug: log the values
+    console.log('🕐 [TIME DEBUG] now:', now, new Date(now * 1000).toISOString());
+    console.log('🕐 [TIME DEBUG] unlockTimestamp:', unlockTimestamp, new Date(unlockTimestamp * 1000).toISOString());
+    
+    // Sanity check: if unlockTimestamp seems to be in milliseconds (> year 2100 in seconds), convert it
+    const adjustedUnlockTimestamp = unlockTimestamp > 4102444800 
+      ? Math.floor(unlockTimestamp / 1000) // Convert from ms to seconds
+      : unlockTimestamp;
+    
+    console.log('🕐 [TIME DEBUG] adjustedUnlockTimestamp:', adjustedUnlockTimestamp, new Date(adjustedUnlockTimestamp * 1000).toISOString());
+    
+    const secondsRemaining = adjustedUnlockTimestamp - now;
+    console.log('🕐 [TIME DEBUG] secondsRemaining:', secondsRemaining);
 
     if (secondsRemaining <= 0) {
       return { canUnlock: true, display: "Unlock available!" };
@@ -91,6 +105,8 @@ export default function UnlockInterface({
     const days = Math.floor(secondsRemaining / 86400);
     const hours = Math.floor((secondsRemaining % 86400) / 3600);
     const minutes = Math.floor((secondsRemaining % 3600) / 60);
+
+    console.log('🕐 [TIME DEBUG] days:', days, 'hours:', hours, 'minutes:', minutes);
 
     const displayParts = [];
     if (days > 0) displayParts.push(`${days}j`);
@@ -106,26 +122,30 @@ export default function UnlockInterface({
   // Progression visuelle (pourcentage écoulé)
   // Note: On estime la progression en assumant une durée typique de 30 jours si on ne connaît pas lockTime
   const lockProgress = useMemo(() => {
-    if (!lockData?.unlockTime) return 0;
+    if (!lockData?.unlockTime || !cnftData?.lockDuration) return 0;
 
     const now = Math.floor(Date.now() / 1000);
     const unlockTimestamp = Number(lockData.unlockTime);
+    
+    // Sanity check: if unlockTimestamp seems to be in milliseconds, convert it
+    const adjustedUnlockTimestamp = unlockTimestamp > 4102444800 
+      ? Math.floor(unlockTimestamp / 1000) 
+      : unlockTimestamp;
 
     // Si on a dépassé unlock_time, 100%
-    if (now >= unlockTimestamp) return 100;
+    if (now >= adjustedUnlockTimestamp) return 100;
 
-    // Sinon, on estime basé sur le temps restant
-    // On suppose une durée totale approximative de 30 jours (peut être ajusté)
-    const estimatedTotalDuration = 30 * 24 * 60 * 60; // 30 jours en secondes
-    const timeRemainingSeconds = unlockTimestamp - now;
-    const elapsed = estimatedTotalDuration - timeRemainingSeconds;
+    // Utiliser la vraie durée du lock depuis cnftData
+    const totalDuration = cnftData.lockDuration; // en secondes
+    const timeRemainingSeconds = adjustedUnlockTimestamp - now;
+    const elapsed = totalDuration - timeRemainingSeconds;
 
     const progress = Math.min(
       100,
-      Math.max(0, (elapsed / estimatedTotalDuration) * 100)
+      Math.max(0, (elapsed / totalDuration) * 100)
     );
     return Math.round(progress);
-  }, [lockData]);
+  }, [lockData, cnftData]);
 
   // Actual unlock execution logic
   const executeUnlock = async () => {
@@ -378,6 +398,12 @@ export default function UnlockInterface({
                 ? Number(lockData.amount).toLocaleString() // Already in UI units
                 : "0"}{" "}
               <span className="text-primary">$BACK</span>
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-gray-400 font-medium">Lock Duration</span>
+            <span className="text-[var(--primary)] font-bold">
+              {boostDetails.durationDays} days
             </span>
           </div>
           <div className="flex justify-between items-center">
