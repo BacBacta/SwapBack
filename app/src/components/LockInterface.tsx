@@ -93,6 +93,7 @@ export default function LockInterface({
     unlockTime: number;
     level: CNFTLevel;
     boost: number;
+    lockDurationDays: number; // Durée originale du lock en jours
   } | null>(null);
 
   // Calculate level based on duration and CUMULATIVE amount (visual only)
@@ -123,35 +124,42 @@ export default function LockInterface({
     return predictedLevel;
   }, [predictedLevel]);
 
-  // Calculate boost based on CUMULATIVE amount AND duration (DYNAMIC)
+  // Calculate effective duration (max of selected and existing lock duration)
+  const effectiveDuration = useMemo(() => {
+    const days = parseInt(duration) || 0;
+    if (currentNftData && currentNftData.lockDurationDays > days) {
+      return currentNftData.lockDurationDays;
+    }
+    return days;
+  }, [duration, currentNftData]);
+
+  // Calculate boost based on CUMULATIVE amount AND effective duration (DYNAMIC)
   const predictedBoost = useMemo(() => {
     const amt = parseFloat(amount) || 0;
-    const days = parseInt(duration) || 0;
     
     // Si NFT existe, calculer avec le montant CUMULÉ
     const totalAmount = currentNftData ? currentNftData.amount + amt : amt;
     
-    return calculateDynamicBoost(totalAmount, days);
-  }, [amount, duration, currentNftData]);
+    return calculateDynamicBoost(totalAmount, effectiveDuration);
+  }, [amount, effectiveDuration, currentNftData]);
 
   // Détails du calcul du boost pour affichage
   const boostDetails = useMemo(() => {
     const amt = parseFloat(amount) || 0;
-    const days = parseInt(duration) || 0;
     
     // Si NFT existe, calculer avec le montant CUMULÉ
     const totalAmount = currentNftData ? currentNftData.amount + amt : amt;
 
     // Amount score: (amount / 10000) * 100, max 1000 BP (10%)
     const amountScoreBps = Math.min((totalAmount / 10000) * 100, 1000);
-    // Duration score: (days / 5) * 10, max 1000 BP (10%)
-    const durationScoreBps = Math.min((days / 5) * 10, 1000);
+    // Duration score: use effective duration, (days / 5) * 10, max 1000 BP (10%)
+    const durationScoreBps = Math.min((effectiveDuration / 5) * 10, 1000);
 
     return { 
       amountScore: amountScoreBps / 100,  // Convert to percentage
       durationScore: durationScoreBps / 100 
     };
-  }, [amount, duration, currentNftData]);
+  }, [amount, effectiveDuration, currentNftData]);
 
   // Couleur du badge selon le niveau (utilise le niveau réel du NFT si disponible)
   const levelColor = useMemo(() => {
@@ -312,12 +320,14 @@ export default function LockInterface({
             ];
             const level = levelNames[Math.min(levelByte, 4)] || "Bronze";
             const boost = boostBps / 100; // Convertir basis points en pourcentage
+            const lockDurationDays = Math.round(lockDuration / 86400); // Convertir en jours
 
             setCurrentNftData({
               amount: amountLocked,
               unlockTime,
               level,
               boost,
+              lockDurationDays,
             });
 
             console.log("📊 Current NFT data:", {
@@ -545,8 +555,13 @@ export default function LockInterface({
       }
       console.log("✅ [LOCK DEBUG] Transaction confirmed!");
 
+      // Calculer la durée effective (max entre nouvelle durée et durée existante)
+      const effectiveDuration = currentNftData 
+        ? Math.max(days, currentNftData.lockDurationDays) 
+        : days;
+      
       setSuccess(
-        `✅ Lock successful! ${amt} BACK locked for ${days} days. Signature: ${signature.slice(0, 8)}...`
+        `✅ Lock successful! ${amt} BACK locked for ${effectiveDuration} days. Signature: ${signature.slice(0, 8)}...`
       );
       setAmount("");
 
@@ -617,12 +632,14 @@ export default function LockInterface({
             ];
             const level = levelNames[Math.min(levelByte, 4)] || "Bronze";
             const boost = boostBps / 100;
+            const lockDurationDays = Math.round(lockDuration / 86400);
 
             setCurrentNftData({
               amount: amountLocked,
               unlockTime,
               level,
               boost,
+              lockDurationDays,
             });
 
             console.log("🔄 NFT data refreshed after lock:", {
@@ -822,6 +839,23 @@ export default function LockInterface({
             180j
           </button>
         </div>
+
+        {/* Avertissement si durée choisie < durée existante */}
+        {currentNftData && parseInt(duration) < currentNftData.lockDurationDays && (
+          <div className="mt-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+            <div className="flex items-start gap-2">
+              <span className="text-amber-400 text-lg">⚠️</span>
+              <div>
+                <p className="text-amber-300 text-sm font-medium">
+                  Duration will remain at {currentNftData.lockDurationDays} days
+                </p>
+                <p className="text-amber-200/70 text-xs mt-1">
+                  You have an existing lock of {currentNftData.lockDurationDays} days. Adding tokens cannot reduce the lock duration. Your effective lock will be {currentNftData.lockDurationDays} days.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Tier and boost preview - ENHANCED with calculation details */}
