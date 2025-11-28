@@ -1166,8 +1166,8 @@ export function EnhancedSwapInterface() {
               </div>
             </button>
           </div>
-          {/* Bloc d'info avancé uniquement pour SwapBack, UI plus minimaliste sinon */}
-          {!isMinimalLayout && selectedRouter === "swapback" && (
+          {/* Bloc d'info avancé désactivé */}
+          {false && !isMinimalLayout && selectedRouter === "swapback" && (
             <div className="grid gap-3 md:grid-cols-2 mt-4">
               <div
                 className={`rounded-2xl border ${dealQuality.border} p-4 md:p-5 bg-gradient-to-br ${dealQuality.gradient} text-white/90`}
