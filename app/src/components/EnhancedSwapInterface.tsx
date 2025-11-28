@@ -1108,7 +1108,7 @@ export function EnhancedSwapInterface() {
   return (
     <div className="max-w-4xl mx-auto flex flex-col lg:flex-row gap-4">
       {/* Main Swap Card */}
-      <div className="flex-1 max-w-lg bg-white/5 border border-white/10 rounded-xl p-3 md:p-4 transition-all hover:bg-white/[0.07]">
+      <div className="flex-1 w-full lg:max-w-lg bg-white/5 border border-white/10 rounded-xl p-3 md:p-4 transition-all hover:bg-white/[0.07] overflow-hidden">
         {/* Header */}
         <div className="mb-3">
           <div className="flex items-center justify-between mb-2">
@@ -1272,7 +1272,7 @@ export function EnhancedSwapInterface() {
 
         {/* Input Token */}
         <div className="mb-1">
-          <div className="bg-white/5 border border-white/10 rounded-xl p-3 hover:bg-white/[0.07] transition-colors">
+          <div className="bg-white/5 border border-white/10 rounded-xl p-3 hover:bg-white/[0.07] transition-colors overflow-hidden">
             <div className="flex justify-between mb-2">
               <label className="text-sm text-gray-400 font-medium">You Pay</label>
               {swap.inputToken?.balance && (
@@ -1281,7 +1281,7 @@ export function EnhancedSwapInterface() {
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <input
                 type="text"
                 inputMode="decimal"
@@ -1289,7 +1289,7 @@ export function EnhancedSwapInterface() {
                 value={displayInputAmount}
                 onChange={(e) => handleInputChange(e.target.value)}
                 placeholder="0.00"
-                className="flex-1 bg-transparent font-bold text-white outline-none min-h-[44px] tracking-tight caret-emerald-500 [-webkit-appearance:none] transition-all"
+                className="flex-1 min-w-0 bg-transparent font-bold text-white outline-none min-h-[44px] tracking-tight caret-emerald-500 [-webkit-appearance:none] transition-all"
                 style={{
                   fontSize: getAdaptiveFontSize(displayInputAmount.length),
                   lineHeight: 1.2,
@@ -1298,7 +1298,7 @@ export function EnhancedSwapInterface() {
               />
               <button
                 onClick={openInputTokenSelector}
-                className="flex items-center gap-2 bg-gradient-to-r from-white/5 to-white/10 hover:from-emerald-500/10 hover:to-cyan-500/10 px-4 py-2.5 rounded-xl transition-all active:scale-95 hover:scale-105 min-h-[48px] border border-white/10 hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/20 group"
+                className="flex-shrink-0 flex items-center gap-2 bg-gradient-to-r from-white/5 to-white/10 hover:from-emerald-500/10 hover:to-cyan-500/10 px-3 py-2 rounded-xl transition-all active:scale-95 hover:scale-105 min-h-[44px] border border-white/10 hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/20 group"
               >
                 {swap.inputToken ? (
                   <>
@@ -1401,7 +1401,7 @@ export function EnhancedSwapInterface() {
 
         {/* Output Token */}
         <div className="mb-3">
-          <div className="bg-white/5 border border-white/10 rounded-xl p-3 hover:bg-white/[0.07] transition-colors">
+          <div className="bg-white/5 border border-white/10 rounded-xl p-3 hover:bg-white/[0.07] transition-colors overflow-hidden">
             <div className="flex justify-between mb-1">
               <label className="text-sm text-gray-400 font-medium">You Receive</label>
               {swap.outputToken?.balance && (
@@ -1410,14 +1410,14 @@ export function EnhancedSwapInterface() {
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <input
                 type="text"
                 inputMode="decimal"
                 value={displayOutputAmount}
                 readOnly
                 placeholder="0.00"
-                className="flex-1 bg-transparent font-bold text-white outline-none min-h-[44px] tracking-tight [-webkit-appearance:none] transition-all"
+                className="flex-1 min-w-0 bg-transparent font-bold text-white outline-none min-h-[44px] tracking-tight [-webkit-appearance:none] transition-all"
                 style={{
                   fontSize: getAdaptiveFontSize(displayOutputAmount.length),
                   lineHeight: 1.2,
@@ -1426,7 +1426,7 @@ export function EnhancedSwapInterface() {
               />
               <button
                 onClick={openOutputTokenSelector}
-                className="flex items-center gap-2 bg-gradient-to-r from-white/5 to-white/10 hover:from-emerald-500/10 hover:to-cyan-500/10 px-4 py-2.5 rounded-xl transition-all active:scale-95 hover:scale-105 min-h-[48px] border border-white/10 hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/20 group"
+                className="flex-shrink-0 flex items-center gap-2 bg-gradient-to-r from-white/5 to-white/10 hover:from-emerald-500/10 hover:to-cyan-500/10 px-3 py-2 rounded-xl transition-all active:scale-95 hover:scale-105 min-h-[44px] border border-white/10 hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/20 group"
               >
                 {swap.outputToken ? (
                   <>
