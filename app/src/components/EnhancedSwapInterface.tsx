@@ -1745,13 +1745,6 @@ export function EnhancedSwapInterface() {
                   />
                 )}
 
-                {selectedRouter === "swapback" && routes.selectedRoute && (
-                  <DistributionBreakdown
-                    npiAmount={npiUsd}
-                    platformFee={platformFeeUsd}
-                  />
-                )}
-
                 {routes.selectedRoute?.venues &&
                   routes.selectedRoute.venues.length > 0 && (
                     <motion.div 
