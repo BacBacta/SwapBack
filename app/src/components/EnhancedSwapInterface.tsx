@@ -792,6 +792,18 @@ export function EnhancedSwapInterface() {
       setSwapError("Client router non initialisé. Veuillez recharger la page.");
       return;
     }
+    
+    // Check if mock mode - can't execute real swaps
+    if (routes.isMock) {
+      setSwapError("Mode simulation actif (devnet). Les swaps réels ne sont pas disponibles. Connectez-vous au mainnet pour exécuter des swaps.");
+      return;
+    }
+    
+    // Check if Jupiter CPI is available for execution
+    if (!routes.jupiterCpi) {
+      setSwapError("Route Jupiter non disponible. Veuillez relancer la recherche de route avec un wallet connecté.");
+      return;
+    }
 
     const amountInLamports = toLamports(
       swap.inputAmount,
@@ -821,49 +833,34 @@ export function EnhancedSwapInterface() {
       minOutLamports = new BN(1);
     }
 
-    let remainingAccountsBuilder: ((params: {
-      derived: DerivedSwapAccounts;
-    }) => AccountMeta[]) | null = null;
     let staticRemainingAccounts: AccountMeta[] | null = null;
     let jupiterRoutePayload: JupiterRouteParams | null = null;
 
-    if (routes.jupiterCpi) {
-      try {
-        staticRemainingAccounts = routes.jupiterCpi.accounts.map((meta) => ({
-          pubkey: new PublicKey(meta.pubkey),
-          isWritable: meta.isWritable,
-          isSigner: meta.isSigner,
-        }));
+    // Jupiter CPI is guaranteed to exist at this point (checked above)
+    try {
+      staticRemainingAccounts = routes.jupiterCpi!.accounts.map((meta) => ({
+        pubkey: new PublicKey(meta.pubkey),
+        isWritable: meta.isWritable,
+        isSigner: meta.isSigner,
+      }));
 
-        if (!staticRemainingAccounts.length) {
-          throw new Error("Liste de comptes Jupiter vide.");
-        }
+      if (!staticRemainingAccounts.length) {
+        throw new Error("Liste de comptes Jupiter vide.");
+      }
 
-        jupiterRoutePayload = {
-          expectedInputAmount: new BN(routes.jupiterCpi.expectedInputAmount),
-          swapInstruction: decodeBase64ToUint8Array(
-            routes.jupiterCpi.swapInstruction
-          ),
-        };
-      } catch (error) {
-        setSwapError(
-          error instanceof Error
-            ? error.message
-            : "Impossible de préparer l'instruction Jupiter."
-        );
-        return;
-      }
-    } else {
-      try {
-        remainingAccountsBuilder = await createRemainingAccountsBuilder();
-      } catch (error) {
-        setSwapError(
-          error instanceof Error
-            ? error.message
-            : "Impossible de préparer les comptes DEX."
-        );
-        return;
-      }
+      jupiterRoutePayload = {
+        expectedInputAmount: new BN(routes.jupiterCpi!.expectedInputAmount),
+        swapInstruction: decodeBase64ToUint8Array(
+          routes.jupiterCpi!.swapInstruction
+        ),
+      };
+    } catch (error) {
+      setSwapError(
+        error instanceof Error
+          ? error.message
+          : "Impossible de préparer l'instruction Jupiter."
+      );
+      return;
     }
 
     setSwapError(null);
@@ -895,14 +892,6 @@ export function EnhancedSwapInterface() {
         minOut: minOutLamports,
         slippageBps,
         remainingAccounts: staticRemainingAccounts ?? undefined,
-        buildRemainingAccounts:
-          staticRemainingAccounts === null
-            ? async ({ derived }) => {
-                return remainingAccountsBuilder
-                  ? remainingAccountsBuilder({ derived })
-                  : [];
-              }
-            : undefined,
         jupiterRoute: jupiterRoutePayload,
       });
 
@@ -1479,6 +1468,25 @@ export function EnhancedSwapInterface() {
               onReduceAmount={() => handleReduceAmount(10)}
             />
           </div>
+        )}
+
+        {/* Mock Mode Warning */}
+        {routes.isMock && hasSearchedRoute && routes.selectedRoute && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3"
+          >
+            <div className="flex items-start gap-2">
+              <ExclamationTriangleIcon className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
+              <div className="text-xs text-yellow-300">
+                <span className="font-semibold">Mode Simulation (Devnet)</span>
+                <p className="mt-1 text-yellow-400/80">
+                  Les prix affichés sont simulés. Connectez-vous au mainnet pour exécuter de vrais swaps.
+                </p>
+              </div>
+            </div>
+          </motion.div>
         )}
 
         {/* Loading Progress */}

@@ -60,7 +60,8 @@ export interface RouteState {
   routes: RouteCandidate[];
   selectedRoute: RouteCandidate | null;
   selectedRoutePlan: JupiterRoutePlanStep[] | null;
-  jupiterCpi: JupiterCpiState;
+  jupiterCpi: JupiterCpiPayload | null;
+  isMock: boolean; // Indicates if using mock data (devnet/test)
   isLoading: boolean;
   error: string | null;
 }
@@ -140,6 +141,7 @@ const initialRouteState: RouteState = {
   selectedRoute: null,
   selectedRoutePlan: null,
   jupiterCpi: null,
+  isMock: false,
   isLoading: false,
   error: null,
 };
@@ -224,6 +226,7 @@ export const useSwapStore = create<SwapStore>()(
               isLoading: true,
               error: null,
               jupiterCpi: null,
+              isMock: false,
             },
           }));
 
@@ -300,6 +303,7 @@ export const useSwapStore = create<SwapStore>()(
                   selectedRoute: route,
                   selectedRoutePlan: routePlan,
                   jupiterCpi: data.jupiterCpi ?? null,
+                  isMock: data.mock === true,
                   isLoading: false,
                 },
               }));
@@ -315,6 +319,7 @@ export const useSwapStore = create<SwapStore>()(
                 error: error instanceof Error ? error.message : "Unknown error",
                 selectedRoutePlan: null,
                 jupiterCpi: null,
+                isMock: false,
               },
             }));
           }
@@ -339,6 +344,7 @@ export const useSwapStore = create<SwapStore>()(
               selectedRoute: null,
               selectedRoutePlan: null,
               jupiterCpi: null,
+              isMock: false,
             },
           })),
 
