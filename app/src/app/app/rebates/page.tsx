@@ -151,9 +151,6 @@ export default function MyRebatesPage() {
   }, [publicKey, connection, ROUTER_PROGRAM_ID]);
 
   // Fetch burn data (early unlock penalties)
-  // BACK token has 6 decimals (1_000_000 = 1 BACK)
-  const BACK_DECIMALS = 1_000_000;
-  
   const fetchBurnData = useCallback(async () => {
     if (!publicKey) return;
 
@@ -173,39 +170,35 @@ export default function MyRebatesPage() {
           });
 
           if (tx?.meta?.logMessages) {
-            let burnAmountRaw = 0;
-            let isDivided = false; // Track if log value is already in tokens
+            let burnAmount = 0;
             
             for (const log of tx.meta.logMessages) {
               // Pattern 1: "🔥 X BACK brûlés (pénalité 2%)" 
-              // Check if this is from updated program (value already divided)
+              // The Rust program already divides by BACK_DECIMALS (1e6) in the log
+              // So the value in the log IS the token amount (e.g., 10000 for 10k tokens)
               if (log.includes("BACK") && log.includes("brûlés") && log.includes("pénalité")) {
                 const match = log.match(/(\d+)\s*BACK\s*brûlés/);
                 if (match) {
-                  burnAmountRaw = parseInt(match[1]);
-                  // If value is small (< 1M), it's likely already in tokens
-                  // If value is large (>= 1M), it's likely in lamports
-                  isDivided = burnAmountRaw < 1_000_000;
+                  burnAmount = parseInt(match[1]);
+                  console.log("[Rebates] Found burn log:", log, "-> amount:", burnAmount);
                   break;
                 }
               }
               
               // Pattern 2: "✅ X BACK déverrouillés - Pénalité: Y - Anticipé: true"
+              // Extract Y (the penalty amount, already divided by BACK_DECIMALS in Rust)
               if (log.includes("déverrouillés") && log.includes("Pénalité:")) {
                 const match = log.match(/Pénalité:\s*(\d+)/);
                 if (match) {
-                  burnAmountRaw = parseInt(match[1]);
-                  // Same heuristic
-                  isDivided = burnAmountRaw < 1_000_000;
+                  burnAmount = parseInt(match[1]);
+                  console.log("[Rebates] Found penalty log:", log, "-> amount:", burnAmount);
                   break;
                 }
               }
             }
             
-            // Convert to tokens if needed
-            const burnAmount = isDivided ? burnAmountRaw : burnAmountRaw / BACK_DECIMALS;
-            
-            // Only add if we found a valid burn amount and haven't processed this tx
+            // The value from logs is already in tokens (Rust divides by 1e6)
+            // Only add if we found a valid burn amount
             if (burnAmount > 0) {
               processedTxs.add(sig.signature);
               totalBurned += burnAmount;
@@ -221,6 +214,7 @@ export default function MyRebatesPage() {
         }
       }
 
+      console.log("[Rebates] Total burned:", totalBurned, "events:", burnEvents.length);
       setBurnData({ totalBurned, burnEvents });
     } catch (err) {
       console.error("Error fetching burn data:", err);
