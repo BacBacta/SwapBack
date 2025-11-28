@@ -167,14 +167,13 @@ export default function MyRebatesPage() {
           });
 
           if (tx?.meta?.logMessages) {
-            const burnLog = tx.meta.logMessages.find(
-              (log) => log.includes("early_unlock") || log.includes("penalty") || log.includes("burned")
-            );
-            if (burnLog) {
-              const match = burnLog.match(/(\d+)/);
-              if (match) {
-                const amount = parseInt(match[1]) / 1e9;
-                if (amount > 0 && amount < 1e9) {
+            // Look for the specific burn log format: "🔥 X BACK brûlés (pénalité 2%)"
+            for (const log of tx.meta.logMessages) {
+              // Match: "🔥 10000 BACK brûlés" - this is the penalty amount
+              const burnMatch = log.match(/🔥\s*(\d+)\s*BACK\s*brûlés/);
+              if (burnMatch) {
+                const amount = parseInt(burnMatch[1]);
+                if (amount > 0) {
                   totalBurned += amount;
                   burnEvents.push({
                     amount,
@@ -182,6 +181,22 @@ export default function MyRebatesPage() {
                     txSignature: sig.signature,
                   });
                 }
+                break; // Found the burn log, no need to continue
+              }
+              
+              // Alternative format: look for "Pénalité: X" in unlock logs
+              const penaltyMatch = log.match(/Pénalité:\s*(\d+)/);
+              if (penaltyMatch) {
+                const amount = parseInt(penaltyMatch[1]);
+                if (amount > 0) {
+                  totalBurned += amount;
+                  burnEvents.push({
+                    amount,
+                    timestamp: sig.blockTime || 0,
+                    txSignature: sig.signature,
+                  });
+                }
+                break;
               }
             }
           }
