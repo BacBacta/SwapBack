@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 import { LockClosedIcon, LockOpenIcon, SparklesIcon, ClockIcon, TrophyIcon } from "@heroicons/react/24/outline";
@@ -10,6 +10,15 @@ const UnlockInterface = dynamic(() => import("@/components/UnlockInterface"), { 
 
 export default function LockPage() {
   const [activeTab, setActiveTab] = useState<"lock" | "unlock">("lock");
+  // Key to force refresh when switching tabs
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Force refresh when switching to unlock tab
+  const handleTabChange = useCallback((tab: "lock" | "unlock") => {
+    setActiveTab(tab);
+    // Increment key to force component remount and data refresh
+    setRefreshKey(prev => prev + 1);
+  }, []);
 
   const tabs = [
     {
@@ -105,7 +114,7 @@ export default function LockPage() {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as "lock" | "unlock")}
+                  onClick={() => handleTabChange(tab.id as "lock" | "unlock")}
                   className="relative flex-1 group"
                 >
                   {/* Active Background */}
@@ -164,7 +173,7 @@ export default function LockPage() {
           transition={{ duration: 0.4, type: "spring", bounce: 0.2 }}
           className="backdrop-blur-xl bg-[#0C0C0C]/40 border border-emerald-500/20 rounded-2xl p-8 shadow-[0_0_50px_rgba(16,185,129,0.15)]"
         >
-          {activeTab === "lock" ? <LockInterface /> : <UnlockInterface />}
+          {activeTab === "lock" ? <LockInterface key={`lock-${refreshKey}`} /> : <UnlockInterface key={`unlock-${refreshKey}`} />}
         </motion.div>
       </AnimatePresence>
     </div>
