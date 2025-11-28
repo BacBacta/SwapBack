@@ -1106,9 +1106,9 @@ export function EnhancedSwapInterface() {
           : "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-blue-500/20";
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-4xl mx-auto flex flex-col lg:flex-row gap-4">
       {/* Main Swap Card */}
-      <div className="bg-white/5 border border-white/10 rounded-xl p-3 md:p-4 transition-all hover:bg-white/[0.07]">
+      <div className="flex-1 max-w-lg bg-white/5 border border-white/10 rounded-xl p-3 md:p-4 transition-all hover:bg-white/[0.07]">
         {/* Header */}
         <div className="mb-3">
           <div className="flex items-center justify-between mb-2">
@@ -1664,121 +1664,6 @@ export function EnhancedSwapInterface() {
                     </div>
                   </div>
                 </div>
-
-                {selectedRouter === "swapback" && mockRouteInfo && (
-                  <div className="bg-gradient-to-br from-emerald-500/10 to-blue-500/10 border border-emerald-500/20 rounded-xl p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">⚡</span>
-                        <div className="text-sm font-semibold text-emerald-400">
-                          SwapBack Savings
-                        </div>
-                      </div>
-                      <button
-                        onMouseEnter={() => setShowTooltip("npi")}
-                        onMouseLeave={() => setShowTooltip(null)}
-                        className="text-gray-400 hover:text-white text-sm min-w-[24px] min-h-[24px]"
-                        aria-label="What is NPI?"
-                      >
-                        ℹ️
-                      </button>
-                      {showTooltip === "npi" && (
-                        <div className="absolute right-0 top-6 w-64 bg-gray-900 border border-gray-700 rounded-xl p-3 text-xs text-gray-300 z-50 shadow-xl">
-                          <strong>NPI (Net Positive Impact)</strong>: 70% of protocol fees returned as rebates.
-                        </div>
-                      )}
-                    </div>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Optimization</span>
-                        <span className="text-emerald-400 font-medium">
-                          +{mockRouteInfo.npi.toFixed(4)} {swap.outputToken?.symbol}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">BACK Rebate</span>
-                        <span className="text-emerald-400 font-medium">
-                          +{mockRouteInfo.rebate.toFixed(4)}{" "}
-                          {swap.outputToken?.symbol}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">BACK Burn</span>
-                        <span className="text-orange-400 font-medium">
-                          {mockRouteInfo.burn.toFixed(4)} BACK 🔥
-                        </span>
-                      </div>
-                      <div className="border-t border-white/10 pt-2 mt-2">
-                        <div className="flex justify-between font-semibold">
-                          <span className="text-white">Total Saved</span>
-                          <span className="text-emerald-400">
-                            +{(mockRouteInfo.npi + mockRouteInfo.rebate).toFixed(4)}{" "}
-                            {swap.outputToken?.symbol}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                {swap.inputToken && swap.outputToken && (
-                  <SwapDetailsExpandable
-                    inputToken={{
-                      symbol: swap.inputToken.symbol,
-                      amount: swap.inputAmount,
-                      usdPrice: swap.inputToken.usdPrice
-                    }}
-                    outputToken={{
-                      symbol: swap.outputToken.symbol,
-                      amount: swap.outputAmount,
-                      usdPrice: swap.outputToken.usdPrice
-                    }}
-                    priceImpact={priceImpact}
-                    slippage={swap.slippageTolerance}
-                    route={routes.selectedRoute?.venues || []}
-                  />
-                )}
-
-                {routes.selectedRoute?.venues &&
-                  routes.selectedRoute.venues.length > 0 && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-white/5 border border-white/10 rounded-xl p-4"
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="text-sm font-semibold text-gray-300">Chemin de routage</div>
-                        <div className="text-xs text-gray-500">{routes.selectedRoute.venues.length} hop{routes.selectedRoute.venues.length > 1 ? 's' : ''}</div>
-                      </div>
-                      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                        <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 rounded-lg flex-shrink-0">
-                          {swap.inputToken?.logoURI && (
-                            <img src={swap.inputToken.logoURI} alt="" className="w-4 h-4 rounded-full" />
-                          )}
-                          <span className="text-sm font-medium text-emerald-400">{swap.inputToken?.symbol}</span>
-                        </div>
-                        {routes.selectedRoute.venues.map((venue, index) => (
-                          <div key={index} className="flex items-center gap-2 flex-shrink-0">
-                            <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                            <div className="bg-white/5 border border-white/10 px-3 py-2 rounded-lg">
-                              <span className="text-xs text-gray-400 font-medium">{venue}</span>
-                            </div>
-                          </div>
-                        ))}
-                        <svg className="w-4 h-4 text-gray-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                        <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 rounded-lg flex-shrink-0">
-                          {swap.outputToken?.logoURI && (
-                            <img src={swap.outputToken.logoURI} alt="" className="w-4 h-4 rounded-full" />
-                          )}
-                          <span className="text-sm font-medium text-emerald-400">{swap.outputToken?.symbol}</span>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
               </>
             )}
           </div>
@@ -1817,6 +1702,91 @@ export function EnhancedSwapInterface() {
           )}
         </div>
       </div>
+
+      {/* Side Panel - Route Details */}
+      <AnimatePresence>
+        {hasSearchedRoute && routes.selectedRoute && (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={{ duration: 0.2 }}
+            className="w-full lg:w-72 space-y-3"
+          >
+            {/* SwapBack Savings */}
+            {selectedRouter === "swapback" && mockRouteInfo && (
+              <div className="bg-gradient-to-br from-emerald-500/10 to-blue-500/10 border border-emerald-500/20 rounded-xl p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-base">⚡</span>
+                  <div className="text-xs font-semibold text-emerald-400">SwapBack Savings</div>
+                </div>
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Optimization</span>
+                    <span className="text-emerald-400 font-medium">+{mockRouteInfo.npi.toFixed(4)} {swap.outputToken?.symbol}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">BACK Rebate</span>
+                    <span className="text-emerald-400 font-medium">+{mockRouteInfo.rebate.toFixed(4)} {swap.outputToken?.symbol}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">BACK Burn</span>
+                    <span className="text-orange-400 font-medium">{mockRouteInfo.burn.toFixed(4)} BACK 🔥</span>
+                  </div>
+                  <div className="border-t border-white/10 pt-1.5 mt-1.5">
+                    <div className="flex justify-between font-semibold">
+                      <span className="text-white text-xs">Total Saved</span>
+                      <span className="text-emerald-400">+{(mockRouteInfo.npi + mockRouteInfo.rebate).toFixed(4)} {swap.outputToken?.symbol}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Chemin de routage */}
+            {routes.selectedRoute?.venues && routes.selectedRoute.venues.length > 0 && (
+              <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-semibold text-gray-300">Chemin de routage</div>
+                  <div className="text-[10px] text-gray-500">{routes.selectedRoute.venues.length} hop{routes.selectedRoute.venues.length > 1 ? 's' : ''}</div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  {/* Input token */}
+                  <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-2 py-1.5 rounded-lg">
+                    {swap.inputToken?.logoURI && (
+                      <img src={swap.inputToken.logoURI} alt="" className="w-4 h-4 rounded-full" />
+                    )}
+                    <span className="text-xs font-medium text-emerald-400">{swap.inputToken?.symbol}</span>
+                  </div>
+                  {/* Venues */}
+                  {routes.selectedRoute.venues.map((venue, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <svg className="w-3 h-3 text-gray-600 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                      </svg>
+                      <div className="flex-1 bg-white/5 border border-white/10 px-2 py-1 rounded text-[10px] text-gray-400 font-medium">
+                        {venue}
+                      </div>
+                    </div>
+                  ))}
+                  {/* Output token */}
+                  <div className="flex items-center gap-2">
+                    <svg className="w-3 h-3 text-gray-600 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                    </svg>
+                    <div className="flex-1 flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-2 py-1.5 rounded-lg">
+                      {swap.outputToken?.logoURI && (
+                        <img src={swap.outputToken.logoURI} alt="" className="w-4 h-4 rounded-full" />
+                      )}
+                      <span className="text-xs font-medium text-emerald-400">{swap.outputToken?.symbol}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Token Selector Modal - NEW */}
       {showTokenSelector && (
