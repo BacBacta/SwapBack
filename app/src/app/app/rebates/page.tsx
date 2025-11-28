@@ -151,6 +151,9 @@ export default function MyRebatesPage() {
   }, [publicKey, connection, ROUTER_PROGRAM_ID]);
 
   // Fetch burn data (early unlock penalties)
+  // BACK token has 6 decimals (1_000_000 = 1 BACK)
+  const BACK_DECIMALS = 1_000_000;
+  
   const fetchBurnData = useCallback(async () => {
     if (!publicKey) return;
 
@@ -170,29 +173,37 @@ export default function MyRebatesPage() {
           });
 
           if (tx?.meta?.logMessages) {
-            let burnAmount = 0;
+            let burnAmountRaw = 0;
+            let isDivided = false; // Track if log value is already in tokens
             
             for (const log of tx.meta.logMessages) {
-              // Pattern 1: "🔥 X BACK brûlés (pénalité 2%)" - penalty amount already divided
-              // The emoji might be encoded differently, so we look for "BACK" and "brûlés"
+              // Pattern 1: "🔥 X BACK brûlés (pénalité 2%)" 
+              // Check if this is from updated program (value already divided)
               if (log.includes("BACK") && log.includes("brûlés") && log.includes("pénalité")) {
                 const match = log.match(/(\d+)\s*BACK\s*brûlés/);
                 if (match) {
-                  burnAmount = parseInt(match[1]);
-                  break; // Found the penalty log, use this value
+                  burnAmountRaw = parseInt(match[1]);
+                  // If value is small (< 1M), it's likely already in tokens
+                  // If value is large (>= 1M), it's likely in lamports
+                  isDivided = burnAmountRaw < 1_000_000;
+                  break;
                 }
               }
               
               // Pattern 2: "✅ X BACK déverrouillés - Pénalité: Y - Anticipé: true"
-              // Extract Y (the penalty), not X (the unlocked amount)
               if (log.includes("déverrouillés") && log.includes("Pénalité:")) {
                 const match = log.match(/Pénalité:\s*(\d+)/);
                 if (match) {
-                  burnAmount = parseInt(match[1]);
-                  break; // Found the penalty in the unlock log
+                  burnAmountRaw = parseInt(match[1]);
+                  // Same heuristic
+                  isDivided = burnAmountRaw < 1_000_000;
+                  break;
                 }
               }
             }
+            
+            // Convert to tokens if needed
+            const burnAmount = isDivided ? burnAmountRaw : burnAmountRaw / BACK_DECIMALS;
             
             // Only add if we found a valid burn amount and haven't processed this tx
             if (burnAmount > 0) {
