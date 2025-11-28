@@ -332,8 +332,8 @@ export default function UnlockInterface({
     await executeUnlock();
   };
 
-  // Affichage si pas de lock actif
-  if (isCNFTLoading) {
+  // Affichage du loader pendant le chargement initial OU si cnftData est null (avant le premier fetch)
+  if (isCNFTLoading || cnftData === null) {
     return (
       <div className="bg-gray-800 rounded-lg p-6 max-w-lg mx-auto">
         <div className="flex items-center justify-center py-12">
@@ -361,18 +361,20 @@ export default function UnlockInterface({
     );
   }
 
-  // Debug: log all conditions
-  console.log("🔍 [UnlockInterface] Checking conditions:");
-  console.log("  - cnftData:", cnftData);
-  console.log("  - cnftData?.exists:", cnftData?.exists);
-  console.log("  - cnftData?.isActive:", cnftData?.isActive);
-  console.log("  - lockData:", lockData);
+  // Debug: log all conditions (only when cnftData is loaded)
+  if (cnftData) {
+    console.log("🔍 [UnlockInterface] Checking conditions:");
+    console.log("  - cnftData:", cnftData);
+    console.log("  - cnftData?.exists:", cnftData?.exists);
+    console.log("  - cnftData?.isActive:", cnftData?.isActive);
+    console.log("  - lockData:", lockData);
+  }
 
-  if (!cnftData || !cnftData.exists || !cnftData.isActive || !lockData) {
+  // Show "No Active Lock" only when data is loaded and shows no active lock
+  if (cnftData && (!cnftData.exists || !cnftData.isActive || !lockData)) {
     console.log("❌ [UnlockInterface] Showing 'No Active Lock' because:");
-    if (!cnftData) console.log("  - cnftData is null/undefined");
-    if (cnftData && !cnftData.exists) console.log("  - cnftData.exists is false");
-    if (cnftData && !cnftData.isActive) console.log("  - cnftData.isActive is false");
+    if (!cnftData.exists) console.log("  - cnftData.exists is false");
+    if (!cnftData.isActive) console.log("  - cnftData.isActive is false");
     if (!lockData) console.log("  - lockData is null/undefined");
     
     return (
