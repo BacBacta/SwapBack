@@ -251,13 +251,18 @@ export default function LockInterface({
       try {
         const CNFT_PROGRAM_ID = new PublicKey(
           process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID ||
-            "AaN2BwpGWbvDo7NHfpyC6zGYxsbg2xtcikToW9xYy4Xq"
+            "EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP"
         );
+
+        console.log("🔍 [LockInterface] CNFT_PROGRAM_ID:", CNFT_PROGRAM_ID.toString());
+        console.log("🔍 [LockInterface] User pubkey:", publicKey.toString());
 
         const [userLockPda] = PublicKey.findProgramAddressSync(
           [Buffer.from("user_lock"), publicKey.toBuffer()],
           CNFT_PROGRAM_ID
         );
+
+        console.log("🔍 [LockInterface] Calculated PDA:", userLockPda.toString());
 
         const accountInfo = await connection.getAccountInfo(userLockPda);
 
@@ -591,7 +596,7 @@ export default function LockInterface({
           // Rafraîchir les données du NFT
           const CNFT_PROGRAM_ID = new PublicKey(
             process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID ||
-              "AaN2BwpGWbvDo7NHfpyC6zGYxsbg2xtcikToW9xYy4Xq"
+              "EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP"
           );
 
           const [userNftPda] = PublicKey.findProgramAddressSync(

@@ -13,9 +13,11 @@ let _cnftProgramId: PublicKey | null = null;
 function getCnftProgramId(): PublicKey {
   if (!_cnftProgramId) {
     const envId = process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID;
+    // Use the correct production program ID as fallback
     _cnftProgramId = new PublicKey(
-      envId || "AaN2BwpGWbvDo7NHfpyC6zGYxsbg2xtcikToW9xYy4Xq"
+      envId || "EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP"
     );
+    console.log("🔧 [cnft.ts] CNFT_PROGRAM_ID initialized:", _cnftProgramId.toString(), "from env:", !!envId);
   }
   return _cnftProgramId;
 }
@@ -262,15 +264,22 @@ export async function fetchUserCNFT(
   connection: Connection,
   userPubkey: PublicKey
 ): Promise<CNFTData | null> {
+  const programId = getCnftProgramId();
   const [userNftPDA] = getUserNftPDA(userPubkey);
+
+  console.log("🔍 [fetchUserCNFT] Program ID:", programId.toString());
+  console.log("🔍 [fetchUserCNFT] User PDA:", userNftPDA.toString());
+  console.log("🔍 [fetchUserCNFT] User pubkey:", userPubkey.toString());
 
   try {
     const accountInfo = await connection.getAccountInfo(userNftPDA);
 
     if (!accountInfo) {
-      console.log("No cNFT found for user:", userPubkey.toString());
+      console.log("❌ [fetchUserCNFT] No cNFT found for user:", userPubkey.toString());
       return null;
     }
+
+    console.log("✅ [fetchUserCNFT] Account found, data length:", accountInfo.data.length);
 
     const data = accountInfo.data;
 

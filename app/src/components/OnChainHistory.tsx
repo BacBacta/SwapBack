@@ -173,7 +173,7 @@ export default function OnChainHistory() {
       "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA": "Token Program",
       "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL": "Associated Token",
       "ComputeBudget111111111111111111111111111111": "Compute Budget",
-      [process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "AaN2BwpGWbvDo7NHfpyC6zGYxsbg2xtcikToW9xYy4Xq"]: "SwapBack cNFT",
+      [process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP"]: "SwapBack cNFT",
       [process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || "H3Wz4RrhtMNPJf7e3ztGPuMkA7XsQcjvSpzEbPnb6hPL"]: "SwapBack Buyback",
     };
     
