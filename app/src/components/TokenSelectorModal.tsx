@@ -6,6 +6,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   MagnifyingGlassIcon, 
@@ -151,9 +152,16 @@ export function TokenSelectorModal({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  // State for portal mount
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
-  return (
+  if (!isOpen || !mounted) return null;
+
+  const modalContent = (
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
@@ -161,6 +169,7 @@ export function TokenSelectorModal({
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4"
         onClick={onClose}
+        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
       >
         <motion.div
           initial={{ y: "100%", scale: 0.95 }}
@@ -364,4 +373,7 @@ export function TokenSelectorModal({
       </motion.div>
     </AnimatePresence>
   );
+
+  // Render modal in portal to escape any parent positioning context
+  return createPortal(modalContent, document.body);
 }
