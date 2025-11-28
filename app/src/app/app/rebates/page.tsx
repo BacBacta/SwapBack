@@ -159,45 +159,50 @@ export default function MyRebatesPage() {
       
       let totalBurned = 0;
       const burnEvents: { amount: number; timestamp: number; txSignature: string }[] = [];
+      const processedTxs = new Set<string>(); // Avoid duplicates
 
       for (const sig of signatures.slice(0, 20)) {
+        if (processedTxs.has(sig.signature)) continue;
+        
         try {
           const tx = await connection.getParsedTransaction(sig.signature, {
             maxSupportedTransactionVersion: 0,
           });
 
           if (tx?.meta?.logMessages) {
-            // Look for the specific burn log format: "🔥 X BACK brûlés (pénalité 2%)"
+            let burnAmount = 0;
+            
             for (const log of tx.meta.logMessages) {
-              // Match: "🔥 10000 BACK brûlés" - this is the penalty amount
-              const burnMatch = log.match(/🔥\s*(\d+)\s*BACK\s*brûlés/);
-              if (burnMatch) {
-                const amount = parseInt(burnMatch[1]);
-                if (amount > 0) {
-                  totalBurned += amount;
-                  burnEvents.push({
-                    amount,
-                    timestamp: sig.blockTime || 0,
-                    txSignature: sig.signature,
-                  });
+              // Pattern 1: "🔥 X BACK brûlés (pénalité 2%)" - penalty amount already divided
+              // The emoji might be encoded differently, so we look for "BACK" and "brûlés"
+              if (log.includes("BACK") && log.includes("brûlés") && log.includes("pénalité")) {
+                const match = log.match(/(\d+)\s*BACK\s*brûlés/);
+                if (match) {
+                  burnAmount = parseInt(match[1]);
+                  break; // Found the penalty log, use this value
                 }
-                break; // Found the burn log, no need to continue
               }
               
-              // Alternative format: look for "Pénalité: X" in unlock logs
-              const penaltyMatch = log.match(/Pénalité:\s*(\d+)/);
-              if (penaltyMatch) {
-                const amount = parseInt(penaltyMatch[1]);
-                if (amount > 0) {
-                  totalBurned += amount;
-                  burnEvents.push({
-                    amount,
-                    timestamp: sig.blockTime || 0,
-                    txSignature: sig.signature,
-                  });
+              // Pattern 2: "✅ X BACK déverrouillés - Pénalité: Y - Anticipé: true"
+              // Extract Y (the penalty), not X (the unlocked amount)
+              if (log.includes("déverrouillés") && log.includes("Pénalité:")) {
+                const match = log.match(/Pénalité:\s*(\d+)/);
+                if (match) {
+                  burnAmount = parseInt(match[1]);
+                  break; // Found the penalty in the unlock log
                 }
-                break;
               }
+            }
+            
+            // Only add if we found a valid burn amount and haven't processed this tx
+            if (burnAmount > 0) {
+              processedTxs.add(sig.signature);
+              totalBurned += burnAmount;
+              burnEvents.push({
+                amount: burnAmount,
+                timestamp: sig.blockTime || 0,
+                txSignature: sig.signature,
+              });
             }
           }
         } catch {
