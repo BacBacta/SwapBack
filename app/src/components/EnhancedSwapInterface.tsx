@@ -422,7 +422,7 @@ export function EnhancedSwapInterface() {
   };
 
   const routerConfidenceScore = selectedRouter === "swapback" ? 98 : 95;
-  const isMinimalLayout = true;
+  const isMinimalLayout = false; // Show full details including routes and NPI
 
   const inputAmount = parseFloat(swap.inputAmount) || 0;
   const outputAmount = parseFloat(swap.outputAmount) || 0;
