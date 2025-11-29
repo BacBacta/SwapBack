@@ -1021,6 +1021,9 @@ export function EnhancedSwapInterface() {
     decimals: number;
     logoURI?: string;
   }) => {
+    console.log('📝 [handleTokenSelect] Starting with token:', token);
+    console.log('📝 [handleTokenSelect] tokenSelectorType:', tokenSelectorType);
+    
     // Fetch real balance from blockchain
     const balance = await fetchTokenBalance(token.address, token.decimals);
     console.log(`🎯 [EnhancedSwap] Selected ${token.symbol}, balance: ${balance}`);
@@ -1034,12 +1037,17 @@ export function EnhancedSwapInterface() {
       logoURI: token.logoURI,
       balance: balance,
     };
+    
+    console.log('📝 [handleTokenSelect] storeToken:', storeToken);
 
     if (tokenSelectorType === "input") {
+      console.log('📝 [handleTokenSelect] Setting INPUT token');
       setInputToken(storeToken);
     } else {
+      console.log('📝 [handleTokenSelect] Setting OUTPUT token');
       setOutputToken(storeToken);
     }
+    console.log('📝 [handleTokenSelect] Closing modal');
     setShowTokenSelector(false);
   };
 
@@ -1857,9 +1865,10 @@ export function EnhancedSwapInterface() {
         <TokenSelectorModal
           isOpen={showTokenSelector}
           onClose={() => setShowTokenSelector(false)}
-          onSelect={(token) => {
-            handleTokenSelect(token);
-            setShowTokenSelector(false);
+          onSelect={async (token) => {
+            console.log('🔵 [TokenSelector] Token selected:', token.symbol, token.address);
+            await handleTokenSelect(token);
+            console.log('🟢 [TokenSelector] handleTokenSelect completed');
           }}
           title={tokenSelectorType === "input" ? "Select Input Token" : "Select Output Token"}
           selectedToken={tokenSelectorType === "input" ? swap.inputToken?.mint : swap.outputToken?.mint}
