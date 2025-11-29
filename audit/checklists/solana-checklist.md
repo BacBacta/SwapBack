@@ -30,7 +30,7 @@
 
 ### Overflow/Underflow
 
-- [ ] All arithmetic uses checked_* or saturating_* operations
+- [ ] All arithmetic uses `checked_*` or `saturating_*` operations
 - [ ] Token amounts handle decimals correctly
 - [ ] Large number calculations verified
 
