@@ -40,6 +40,8 @@ export const useTokenData = (tokenMint: string) => {
           const solBalance = lamports / 1e9;
           console.log(`✅ SOL balance: ${solBalance.toFixed(6)} SOL`);
           setBalance(solBalance);
+          setLoading(false);
+          return; // Important: exit early for native SOL
         } else {
           // SPL Token or Token-2022
           const mintPubkey = new PublicKey(tokenMint);
