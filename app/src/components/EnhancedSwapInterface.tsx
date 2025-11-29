@@ -236,6 +236,7 @@ function decodeBase64ToUint8Array(data: string): Uint8Array {
 
 export function EnhancedSwapInterface() {
   const { connected, publicKey } = useWallet();
+  const { connection } = useConnection();
   const { swapWithRouter } = useSwapRouter();
   const haptic = useHaptic();
 
