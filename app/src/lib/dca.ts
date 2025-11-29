@@ -3,9 +3,11 @@
  * 
  * This module provides functions to interact with the SwapBack Router DCA functionality
  * including creating plans, executing swaps, and managing DCA orders on-chain.
+ * 
+ * Phase 2: Real Jupiter integration for DCA swap execution
  */
 
-import { Connection, PublicKey, SystemProgram } from '@solana/web3.js';
+import { Connection, PublicKey, SystemProgram, VersionedTransaction } from '@solana/web3.js';
 import { AnchorProvider, BN, Idl } from '@coral-xyz/anchor';
 import { bnToNumberWithFallback, lamportsToUiSafe } from '@/lib/bnUtils';
 import { 
@@ -15,6 +17,8 @@ import {
   createAssociatedTokenAccountInstruction,
   getAccount
 } from '@solana/spl-token';
+import { getJupiterService } from '@/lib/jupiter';
+import { logger } from '@/lib/logger';
 
 import { validateEnv } from "./validateEnv";
 import routerIdl from "@/idl/swapback_router.json";
@@ -611,29 +615,49 @@ export async function fetchUserDcaPlans(
 }
 
 /**
- * Execute a DCA swap for a given plan
+ * Execute a DCA swap for a given plan using Jupiter for real swaps
+ * 
+ * Phase 2 Implementation:
+ * 1. Get quote from Jupiter
+ * 2. Build swap transaction
+ * 3. Execute the swap
+ * 4. Update the DCA plan state on-chain
  */
 export async function executeDcaSwapTransaction(
   connection: Connection,
   provider: AnchorProvider,
   userPublicKey: PublicKey,
   planPda: PublicKey,
-  dcaPlan: DcaPlan
-): Promise<string> {
+  dcaPlan: DcaPlan,
+  signTransaction: (tx: VersionedTransaction) => Promise<VersionedTransaction>
+): Promise<{ signature: string; amountReceived: number }> {
   const ROUTER_PROGRAM_ID = getRouterProgramId();
   if (!ROUTER_PROGRAM_ID) {
     throw new Error('❌ NEXT_PUBLIC_ROUTER_PROGRAM_ID is not configured. Define it in Vercel or .env');
   }
 
-  const idl = getRouterIdl();
-  const program = createProgramWithProvider(idl, ROUTER_PROGRAM_ID, provider);
-  
-  const [statePda] = getRouterStatePDA();
-  
-  // Determine token programs
+  logger.info('DCA', 'Starting DCA swap execution', {
+    planPda: planPda.toBase58(),
+    tokenIn: dcaPlan.tokenIn.toBase58(),
+    tokenOut: dcaPlan.tokenOut.toBase58(),
+    amountPerSwap: dcaPlan.amountPerSwap.toString(),
+    executedSwaps: dcaPlan.executedSwaps,
+    totalSwaps: dcaPlan.totalSwaps
+  });
+
+  // Get Jupiter service
+  const jupiter = getJupiterService(connection);
+
+  // Check Jupiter health
+  const isHealthy = await jupiter.healthCheck();
+  if (!isHealthy) {
+    throw new Error('Jupiter API is not available. Please try again later.');
+  }
+
+  // Determine token programs for ATA creation
   const tokenInProgram = dcaPlan.tokenIn.equals(BACK_MINT) ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
   const tokenOutProgram = dcaPlan.tokenOut.equals(BACK_MINT) ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
-  
+
   // Get user's token accounts
   const userTokenIn = await getAssociatedTokenAddress(
     dcaPlan.tokenIn,
@@ -648,86 +672,120 @@ export async function executeDcaSwapTransaction(
     false,
     tokenOutProgram
   );
-  
-  console.log('🔍 Checking token accounts:', {
+
+  logger.info('DCA', 'Token accounts', {
     userTokenIn: userTokenIn.toBase58(),
-    userTokenOut: userTokenOut.toBase58(),
+    userTokenOut: userTokenOut.toBase58()
   });
-  
-  // Check if ATAs exist and create them if needed
-  const preInstructions = [];
-  
-  try {
-    await getAccount(connection, userTokenIn, 'confirmed', tokenInProgram);
-    console.log('✅ user_token_in exists');
-  } catch (error) {
-    console.log('⚠️  user_token_in does not exist, creating...');
-    preInstructions.push(
-      createAssociatedTokenAccountInstruction(
-        userPublicKey, // payer
-        userTokenIn, // ata
-        userPublicKey, // owner
-        dcaPlan.tokenIn, // mint
-        tokenInProgram
-      )
-    );
-  }
-  
+
+  // Check if output ATA exists, create if needed
   try {
     await getAccount(connection, userTokenOut, 'confirmed', tokenOutProgram);
-    console.log('✅ user_token_out exists');
-  } catch (error) {
-    console.log('⚠️  user_token_out does not exist, creating...');
-    preInstructions.push(
+    logger.info('DCA', 'Output token account exists');
+  } catch {
+    logger.info('DCA', 'Creating output token account...');
+    // Create ATA in a separate transaction first
+    const { Transaction } = await import('@solana/web3.js');
+    const createAtaTx = new Transaction().add(
       createAssociatedTokenAccountInstruction(
-        userPublicKey, // payer
-        userTokenOut, // ata
-        userPublicKey, // owner
-        dcaPlan.tokenOut, // mint
+        userPublicKey,
+        userTokenOut,
+        userPublicKey,
+        dcaPlan.tokenOut,
         tokenOutProgram
       )
     );
+    
+    const { blockhash } = await connection.getLatestBlockhash();
+    createAtaTx.recentBlockhash = blockhash;
+    createAtaTx.feePayer = userPublicKey;
+    
+    // Note: This requires a separate signing mechanism for legacy transactions
+    // For now, we'll let Jupiter handle the ATA creation with wrapAndUnwrapSol
   }
-  
-  console.log('🔄 Executing DCA swap:', {
-    planPda: planPda.toBase58(),
-    executedSwaps: dcaPlan.executedSwaps,
-    totalSwaps: dcaPlan.totalSwaps,
-    preInstructions: preInstructions.length,
+
+  // Convert BN to number for Jupiter
+  const amountIn = bnToNumberWithFallback(dcaPlan.amountPerSwap, 0);
+  const minOut = bnToNumberWithFallback(dcaPlan.minOutPerSwap, 0);
+
+  // Calculate slippage based on minOut
+  // slippageBps = ((amountIn - minOut) / amountIn) * 10000
+  // But we need to estimate based on price, so use a safe default
+  const slippageBps = 100; // 1% default, minOutPerSwap provides additional protection
+
+  logger.info('DCA', 'Executing Jupiter swap', {
+    inputMint: dcaPlan.tokenIn.toBase58(),
+    outputMint: dcaPlan.tokenOut.toBase58(),
+    amount: amountIn,
+    minOut,
+    slippageBps
   });
-  
-  // Build transaction
-  interface ExecuteDcaSwapMethods {
-    executeDcaSwap: () => {
-      accounts: (accounts: Record<string, unknown>) => {
-        preInstructions?: (instructions: any[]) => { rpc: () => Promise<string> };
-        rpc: () => Promise<string>;
-      };
-    };
-  }
-  
-  const txBuilder = (program.methods as unknown as ExecuteDcaSwapMethods)
-    .executeDcaSwap()
-    .accounts({
-      dcaPlan: planPda,
-      state: statePda,
-      userTokenIn,
-      userTokenOut,
-      user: userPublicKey,
-      executor: provider.wallet.publicKey,
-      tokenProgram: TOKEN_PROGRAM_ID,
-      systemProgram: SystemProgram.programId,
+
+  try {
+    // Execute swap via Jupiter
+    const swapResult = await jupiter.executeSwap(
+      dcaPlan.tokenIn.toBase58(),
+      dcaPlan.tokenOut.toBase58(),
+      amountIn,
+      userPublicKey.toBase58(),
+      signTransaction,
+      { slippageBps }
+    );
+
+    // Verify minimum output
+    if (swapResult.outputAmount < minOut) {
+      throw new Error(
+        `Slippage exceeded: received ${swapResult.outputAmount}, expected at least ${minOut}`
+      );
+    }
+
+    logger.info('DCA', 'Jupiter swap completed', {
+      signature: swapResult.signature,
+      inputAmount: swapResult.inputAmount,
+      outputAmount: swapResult.outputAmount,
+      priceImpact: swapResult.priceImpact,
+      route: swapResult.route.join(' → ')
     });
-  
-  // Add pre-instructions if needed
-  let signature: string;
-  if (preInstructions.length > 0) {
-    signature = await (txBuilder as any).preInstructions(preInstructions).rpc();
-  } else {
-    signature = await txBuilder.rpc();
+
+    // Now update the DCA plan state on-chain
+    const idl = getRouterIdl();
+    const program = createProgramWithProvider(idl, ROUTER_PROGRAM_ID, provider);
+    const [statePda] = getRouterStatePDA();
+
+    interface ExecuteDcaSwapMethods {
+      executeDcaSwap: () => {
+        accounts: (accounts: Record<string, unknown>) => {
+          rpc: () => Promise<string>;
+        };
+      };
+    }
+
+    // Update plan state on-chain
+    const updateSignature = await (program.methods as unknown as ExecuteDcaSwapMethods)
+      .executeDcaSwap()
+      .accounts({
+        dcaPlan: planPda,
+        state: statePda,
+        userTokenIn,
+        userTokenOut,
+        user: userPublicKey,
+        executor: provider.wallet.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+
+    logger.info('DCA', 'DCA plan state updated', { updateSignature });
+
+    return {
+      signature: swapResult.signature,
+      amountReceived: swapResult.outputAmount
+    };
+
+  } catch (error) {
+    logger.error('DCA', 'DCA swap execution failed', error);
+    throw error;
   }
-  
-  console.log('✅ DCA swap executed:', signature);
   
   return signature;
 }

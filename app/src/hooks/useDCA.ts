@@ -183,7 +183,7 @@ export function useCreateDcaPlan() {
 }
 
 /**
- * Hook to execute a DCA swap
+ * Hook to execute a DCA swap using Jupiter for real swaps
  */
 export function useExecuteDcaSwap() {
   const { connection } = useConnection();
@@ -202,26 +202,29 @@ export function useExecuteDcaSwap() {
         { commitment: 'confirmed' }
       );
 
-      console.log('🔄 Executing DCA swap:', planPda.toBase58());
+      console.log('🔄 Executing DCA swap via Jupiter:', planPda.toBase58());
 
-      const signature = await executeDcaSwapTransaction(
+      // Pass signTransaction for Jupiter versioned transaction signing
+      const result = await executeDcaSwapTransaction(
         connection,
         provider,
         wallet.publicKey,
         planPda,
-        dcaPlan
+        dcaPlan,
+        wallet.signTransaction
       );
 
-      // Wait for confirmation
-      await connection.confirmTransaction(signature, 'confirmed');
-
       return {
-        signature,
-        explorerUrl: getExplorerTxUrl(signature),
+        signature: result.signature,
+        amountReceived: result.amountReceived,
+        explorerUrl: getExplorerTxUrl(result.signature),
       };
     },
-    onSuccess: () => {
-      toast.success('DCA swap executed successfully!', { duration: 5000 });
+    onSuccess: (data) => {
+      toast.success(
+        `DCA swap executed! Received: ${(data.amountReceived / 1e6).toFixed(4)} tokens`, 
+        { duration: 5000 }
+      );
 
       // Invalidate queries to refresh plans
       queryClient.invalidateQueries({ queryKey: ['dca-plans'] });
