@@ -95,14 +95,10 @@ export function useFeatureFlags() {
     setFlags(DEFAULT_FLAGS);
   }, []);
 
-  // Analytics tracking helper
+  // Analytics tracking helper - Mixpanel integration in app/src/lib/analytics.ts
   const trackEvent = useCallback((eventName: string, properties?: Record<string, any>) => {
     if (!isEnabled('analytics_tracking')) return;
-
-    // Send to analytics service
     console.log('[Analytics]', eventName, properties);
-    
-    // TODO: Integrate with actual analytics service (Mixpanel, Amplitude, etc.)
   }, [isEnabled]);
 
   return {

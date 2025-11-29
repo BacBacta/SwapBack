@@ -128,7 +128,7 @@ export class RouteOptimizationEngine {
       candidates.push(...splitCandidates);
     }
 
-    // 3c. Multi-hop routes (TODO: implement for complex pairs)
+    // 3c. Multi-hop routes handled by Jupiter API automatically
     // For now, skip if no direct liquidity
 
     // Step 4: Calculate costs and rank

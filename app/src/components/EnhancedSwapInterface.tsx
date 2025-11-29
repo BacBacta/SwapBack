@@ -592,8 +592,7 @@ export function EnhancedSwapInterface() {
   const fetchOrcaDexAccounts = async (
     descriptor: DexStepDescriptor
   ): Promise<OrcaDexAccounts> => {
-    // TODO: Implement client-side account resolution
-    // For now, throw an error to indicate this feature is not available
+    // Direct Orca routing not supported - use Jupiter API which aggregates Orca pools
     throw new Error(
       `La résolution des comptes Orca pour ${descriptor.label} nécessite un backend. Veuillez utiliser Jupiter API ou une route alternative.`
     );
@@ -602,8 +601,7 @@ export function EnhancedSwapInterface() {
   const fetchRaydiumDexAccounts = async (
     descriptor: DexStepDescriptor
   ): Promise<RaydiumDexAccounts> => {
-    // TODO: Implement client-side account resolution
-    // For now, throw an error to indicate this feature is not available
+    // Direct Raydium routing not supported - use Jupiter API which aggregates Raydium pools
     throw new Error(
       `La résolution des comptes Raydium pour ${descriptor.label} nécessite un backend. Veuillez utiliser Jupiter API ou une route alternative.`
     );

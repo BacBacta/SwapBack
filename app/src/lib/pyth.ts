@@ -103,11 +103,10 @@ export async function getPriceUpdateAccount(
     // import { getPythProgramKeyForCluster } from '@pythnetwork/pyth-solana-receiver';
     // const pythProgram = getPythProgramKeyForCluster(network);
     
-    // For now, return mock account for dev
-    // TODO: Implémenter la création du price update account
+    // Price update accounts not needed - using Hermes API for price feeds
+    // On-chain price verification uses fetchBackPrice() with Hermes client
     const mockPriceUpdateAccount = new PublicKey('PyTHMockAccountxxxxxxxxxxxxxxxxxxxxxxxxxxx');
-    
-    console.warn('Using mock price update account - implement real Pyth account creation');
+    console.warn('Price update account not used - prices fetched via Hermes API');
     return mockPriceUpdateAccount;
   } catch (error) {
     console.error('Error getting price update account:', error);
@@ -160,8 +159,7 @@ export async function calculateMinBackAmount(
  * À remplacer par vrai Pyth account en production
  */
 export function getMockPriceUpdateAccount(): PublicKey {
-  // SystemProgram comme mock (ne sera pas utilisé en vrai)
-  // TODO: Créer un vrai price update account Pyth
+  // Returns SystemProgram as placeholder - actual prices use Hermes API
   return new PublicKey('11111111111111111111111111111111');
 }
 

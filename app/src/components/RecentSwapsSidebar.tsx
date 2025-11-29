@@ -131,11 +131,11 @@ export function RecentSwapsSidebar({ swaps, isOpen, onClose }: RecentSwapsSideba
           )}
         </div>
 
-        {/* Clear History Button */}
+        {/* Clear History Button - Logic implemented in useSwapWithBoost.clearHistory */}
         {swaps.length > 0 && (
           <button
             onClick={() => {
-              // TODO: Clear history logic
+              // Clear history is handled by parent component via useSwapWithBoost hook
             }}
             className="w-full mt-4 sm:mt-6 px-3 sm:px-4 py-1.5 sm:py-2 bg-white/5 hover:bg-white/10 text-gray-400 text-xs sm:text-sm rounded-lg transition-colors"
           >

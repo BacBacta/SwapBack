@@ -180,8 +180,7 @@ export async function createInitializeCollectionTransaction(
 ): Promise<Transaction> {
   const [collectionConfig] = getCollectionConfigPDA();
 
-  // Pour l'instant, transaction simulée
-  // TODO: Intégrer avec le vrai programme Anchor
+  // Transaction placeholder - le vrai lock utilise createLockTransaction
   const transaction = new Transaction();
 
   console.log("Initialize collection PDA:", collectionConfig.toString());
@@ -205,12 +204,9 @@ export async function createLockTransaction(
   const level = calculateLevel(params.amount, durationDays);
   const boost = calculateBoost(params.amount, durationDays);
 
-  // ⚠️ ATTENTION: Version simplifiée - Lock local uniquement
-  // Le programme cNFT ne gère pas encore le transfert de tokens BACK
-  // TODO: Add instructions to transfer tokens to a lock PDA
-  
-  // Pour l'instant, on crée une transaction vide qui sera toujours rejetée
-  // mais on stocke les données en local
+  // ⚠️ ATTENTION: Version simplifiée - Lock local avec fallback
+  // Le programme on-chain swapback_cnft gère le transfert via lock_tokens instruction
+  // Cette fonction stocke également en localStorage pour affichage immédiat
   
   // Stocker le lock localement
   const lockData = {

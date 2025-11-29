@@ -210,7 +210,7 @@ export class JupiterClient {
     const jupiterRoutes = await this.getRoutes(inputMint, outputMint, amount);
     const jupiterRoute = jupiterRoutes[0];
 
-    // TODO: Intégrer d'autres sources (Raydium direct, Orca direct, etc.)
+    // Jupiter aggregates all major DEXs (Raydium, Orca, etc.) - no direct integration needed
     const alternatives: { name: string; output: bigint; source: string }[] = [];
 
     return {

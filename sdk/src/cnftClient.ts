@@ -65,9 +65,10 @@ export class CnftClient {
     _amountLocked: number,
     _lockDuration: number
   ): Promise<string> {
-    // TODO: Implémenter avec les vraies instructions Bubblegum
+    // Not implemented - swapback_cnft uses PDA-based locks, not Bubblegum cNFTs
+    // Use lock_tokens instruction instead for token locking with boost
     throw new Error(
-      "mintLevelNft nécessite l'implémentation complète des comptes Bubblegum"
+      "mintLevelNft non utilisé - utilisez lock_tokens du programme swapback_cnft"
     );
   }
 
