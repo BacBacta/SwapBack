@@ -8,6 +8,12 @@ import { EarlyUnlockWarningModal } from "./EarlyUnlockWarningModal";
 
 type ExtendedCNFTLevel = "Bronze" | "Silver" | "Gold" | "Platinum" | "Diamond";
 
+// Interface for Solana/Anchor transaction errors
+interface SolanaTransactionError extends Error {
+  logs?: string[];
+  error?: unknown;
+}
+
 interface UnlockInterfaceProps {
   onUnlockSuccess?: () => void;
 }
@@ -277,15 +283,15 @@ export default function UnlockInterface({
       console.error("❌ [UNLOCK] Error values:", Object.values(err as object));
       
       // Essayer d'accéder aux propriétés spécifiques des erreurs Solana
-      const anyErr = err as any;
-      if (anyErr.logs) {
-        console.error("❌ [UNLOCK] Transaction logs:", anyErr.logs);
+      const solanaErr = err as SolanaTransactionError;
+      if (solanaErr.logs) {
+        console.error("❌ [UNLOCK] Transaction logs:", solanaErr.logs);
       }
-      if (anyErr.message) {
-        console.error("❌ [UNLOCK] Direct message:", anyErr.message);
+      if (solanaErr.message) {
+        console.error("❌ [UNLOCK] Direct message:", solanaErr.message);
       }
-      if (anyErr.error) {
-        console.error("❌ [UNLOCK] Nested error:", anyErr.error);
+      if (solanaErr.error) {
+        console.error("❌ [UNLOCK] Nested error:", solanaErr.error);
       }
       
       // Extraire le message d'erreur le plus utile

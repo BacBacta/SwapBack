@@ -143,9 +143,10 @@ export default function ClaimBuyback() {
         sharePercent,
         isEligible: true,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error fetching claimable rewards:", err);
-      setError(err.message || "Failed to fetch rewards");
+      const errorMessage = err instanceof Error ? err.message : "Failed to fetch rewards";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -169,9 +170,10 @@ export default function ClaimBuyback() {
       setTimeout(() => {
         fetchClaimableRewards();
       }, 3000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error claiming rewards:", err);
-      setError(err.message || "Failed to claim rewards");
+      const errorMessage = err instanceof Error ? err.message : "Failed to claim rewards";
+      setError(errorMessage);
     } finally {
       setClaiming(false);
     }

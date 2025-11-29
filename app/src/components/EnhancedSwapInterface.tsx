@@ -347,7 +347,10 @@ export function EnhancedSwapInterface() {
         if (prev <= 1) {
           // Auto-refresh route
           if (swap.inputToken && swap.outputToken && parseFloat(swap.inputAmount) > 0) {
-            fetchRoutes({ userPublicKey: publicKey?.toBase58() ?? null }).catch(() => {});
+            fetchRoutes({ userPublicKey: publicKey?.toBase58() ?? null }).catch((err) => {
+              // Silent catch for auto-refresh - errors handled in UI via routes state
+              console.debug('[Auto-refresh] Route fetch failed:', err);
+            });
           }
           return 10;
         }
