@@ -1,99 +1,105 @@
 # Frontend Security Checklist
 
-## Wallet Integration
-
-### Connection Security
-- [ ] Wallet adapter properly configured
-- [ ] Connection state managed correctly
-- [ ] Disconnect handling implemented
-- [ ] Multiple wallet support tested
-
-### Transaction Signing
-- [ ] User confirms all transactions
-- [ ] Transaction preview before signing
-- [ ] Error handling for rejected transactions
-- [ ] Timeout handling
-
-### Address Validation
-- [ ] Public key format validated
-- [ ] User addresses not confused with program addresses
-
 ## Input Validation
 
-### Amount Inputs
-- [ ] Decimal places limited appropriately
-- [ ] Maximum values enforced
-- [ ] Negative values prevented
-- [ ] Empty/zero handling
+### User Input Sanitization
 
-### Address Inputs
-- [ ] Format validation
-- [ ] Length validation
-- [ ] Character set validation
+- [ ] All user inputs sanitized
+- [ ] XSS prevention in place
+- [ ] SQL injection prevention (if applicable)
 
-### General Inputs
-- [ ] XSS prevention (sanitization)
-- [ ] Path traversal prevention
+### Form Validation
 
-## State Management
+- [ ] Client-side validation present
+- [ ] Server-side validation as backup
+- [ ] Error messages don't leak info
 
-### React State
-- [ ] No sensitive data in component state
-- [ ] Proper cleanup on unmount
-- [ ] Race condition prevention
-- [ ] Optimistic updates handle failures
+### URL Parameter Handling
 
-### Global State (Zustand)
-- [ ] State persistence security
-- [ ] No sensitive data in persisted state
-- [ ] State reset on logout/disconnect
+- [ ] Query params validated
+- [ ] No sensitive data in URLs
+- [ ] Proper encoding/decoding
 
-### Local Storage
-- [ ] No private keys stored
-- [ ] Sensitive data encrypted
-- [ ] Expiration implemented
+## Authentication & Authorization
+
+### Wallet Connection
+
+- [ ] Wallet adapter properly configured
+- [ ] Connection state handled correctly
+- [ ] Disconnection cleanup works
+
+### Session Management
+
+- [ ] No sensitive data in localStorage
+- [ ] Session timeout implemented
+- [ ] Proper logout cleanup
+
+## Data Protection
+
+### Sensitive Data Handling
+
+- [ ] Private keys never exposed
+- [ ] Seed phrases never stored
+- [ ] API keys in environment variables
+
+### State Management
+
+- [ ] No sensitive data in global state
+- [ ] Proper data cleanup on unmount
+- [ ] No data leaks between sessions
 
 ## API Security
 
-### RPC Calls
-- [ ] Rate limiting awareness
-- [ ] Error handling for RPC failures
-- [ ] Fallback RPC endpoints
-- [ ] Request validation
+### Request Handling
 
-### External APIs
 - [ ] HTTPS only
-- [ ] API key protection
-- [ ] Response validation
-- [ ] Timeout handling
+- [ ] Proper CORS configuration
+- [ ] Rate limiting considered
+
+### Response Handling
+
+- [ ] Error responses don't leak info
+- [ ] Proper timeout handling
+- [ ] Retry logic with backoff
+
+## Transaction Security
+
+### Transaction Display
+
+- [ ] Clear transaction preview
+- [ ] Amount verification shown
+- [ ] Recipient address verified
+
+### Signing Process
+
+- [ ] User confirmation required
+- [ ] Transaction simulation shown
+- [ ] Clear error handling
 
 ## Error Handling
 
-### User-Facing Errors
-- [ ] No sensitive data exposed
-- [ ] Meaningful error messages
-- [ ] Recovery options provided
+### User Feedback
 
-### Silent Failures
-- [ ] Critical operations never fail silently
-- [ ] Fallbacks documented
+- [ ] Clear error messages
+- [ ] No stack traces to users
+- [ ] Proper logging
 
-## Dependencies
+### Recovery
 
-### npm Packages
-- [ ] Regular security audits (npm audit)
-- [ ] Pinned versions for critical packages
-- [ ] No deprecated packages
-- [ ] License compliance
+- [ ] Graceful degradation
+- [ ] Retry mechanisms
+- [ ] Fallback options
 
-## Build & Deploy
+## Performance Security
 
-### Environment Variables
-- [ ] No secrets in frontend code
-- [ ] NEXT_PUBLIC_ prefix understood
-- [ ] Different configs for dev/prod
+### Resource Loading
 
-### Build Process
-- [ ] Source maps disabled in production
-- [ ] Console.logs removed
-- [ ] Debug code removed
+- [ ] Content integrity checks
+- [ ] Secure CDN usage
+- [ ] No mixed content
+
+### Third-party Code
+
+- [ ] Dependencies audited
+- [ ] No vulnerable packages
+- [ ] Minimal external code
