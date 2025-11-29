@@ -68,3 +68,8 @@ Thumbs.db
 !app/public/idl/*.json
 Cargo.lock
 .vercel
+
+# Test artifacts
+app/playwright-report/
+app/test-results/
+app/logs/

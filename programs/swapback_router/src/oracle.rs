@@ -44,11 +44,11 @@ pub fn read_price(oracle_account: &AccountInfo, clock: &Clock) -> Result<OracleO
     match try_read_pyth(oracle_account, clock) {
         Ok(observation) => {
             msg!("✅ Pyth oracle used as fallback");
-            return Ok(observation);
+            Ok(observation)
         }
         Err(e) => {
             msg!("❌ Both oracles failed - Pyth error: {:?}", e);
-            return err!(ErrorCode::InvalidOraclePrice);
+            err!(ErrorCode::InvalidOraclePrice)
         }
     }
 }

@@ -1744,7 +1744,7 @@ pub mod swap_toc_processor {
         let slice_min_out = total_min_out / twap_slices as u64;
 
         for _ in 0..twap_slices {
-            process_single_swap(&ctx, slice_amount, slice_min_out)?;
+            process_single_swap(ctx, slice_amount, slice_min_out)?;
         }
 
         Ok(())

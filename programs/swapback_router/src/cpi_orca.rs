@@ -71,7 +71,7 @@ pub fn swap(
         })
         .collect();
 
-    let accounts: Vec<AccountInfo> = account_slice.iter().cloned().collect();
+    let accounts: Vec<AccountInfo> = account_slice.to_vec();
 
     let instruction = Instruction {
         program_id: ORCA_WHIRLPOOL_PROGRAM_ID,

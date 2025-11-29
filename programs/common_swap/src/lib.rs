@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::Token;
 
 // Program ID generated locally for deployment
 declare_id!("EtqKmwUHhaBJbmDzb3BrMf2iZ4RyGYPos9U78Xjpe3Ug");
@@ -158,7 +157,7 @@ pub mod common_swap {
 
         // Distribute remainder
         let remainder = (WEIGHT_PRECISION % venue_count as u64) as u8;
-        if remainder > 0 && weights.len() > 0 {
+        if remainder > 0 && !weights.is_empty() {
             weights[0] += remainder;
         }
 
