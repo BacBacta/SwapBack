@@ -307,7 +307,9 @@ export async function fetchUserCNFT(
     const mintTime = Number(data.readBigInt64LE(offset));
     offset += 8;
 
-    const isActive = data.readUInt8(offset) === 1;
+    // Fix: Use !== 0 instead of === 1 to match LockInterface behavior
+    // Rust bool can be any non-zero value for true
+    const isActive = data.readUInt8(offset) !== 0;
     offset += 1;
 
     const bump = data.readUInt8(offset);
