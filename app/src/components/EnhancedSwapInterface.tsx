@@ -9,7 +9,7 @@ import { useState, useEffect } from "react";
 import { BN } from "@coral-xyz/anchor";
 import { AccountMeta, PublicKey } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useSwapStore } from "@/store/swapStore";
 import { useSwapWebSocket } from "@/hooks/useSwapWebSocket";
 import { useHaptic } from "@/hooks/useHaptic";
@@ -962,13 +962,69 @@ export function EnhancedSwapInterface() {
     setShowTokenSelector(true);
   };
 
-  const handleTokenSelect = (token: {
+  // Fetch token balance from blockchain
+  const fetchTokenBalance = async (mintAddress: string, decimals: number): Promise<number> => {
+    if (!publicKey || !connection) return 0;
+    
+    try {
+      // Native SOL
+      if (mintAddress === "So11111111111111111111111111111111111111112") {
+        const lamports = await connection.getBalance(publicKey);
+        const balance = lamports / 1e9;
+        console.log(`✅ [EnhancedSwap] SOL balance: ${balance}`);
+        return balance;
+      }
+      
+      // SPL Token
+      const { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID } = await import("@solana/spl-token");
+      const mintPubkey = new PublicKey(mintAddress);
+      
+      // Try standard token program first
+      try {
+        const ata = await getAssociatedTokenAddress(mintPubkey, publicKey, false, TOKEN_PROGRAM_ID);
+        const accountInfo = await connection.getAccountInfo(ata);
+        if (accountInfo && accountInfo.data.length >= 72) {
+          const amount = accountInfo.data.readBigUInt64LE(64);
+          const balance = Number(amount) / Math.pow(10, decimals);
+          console.log(`✅ [EnhancedSwap] Token ${mintAddress.substring(0,8)}... balance: ${balance}`);
+          return balance;
+        }
+      } catch (e) {
+        console.log(`⚠️ [EnhancedSwap] SPL token not found, trying Token-2022...`);
+      }
+      
+      // Try Token-2022
+      try {
+        const ata = await getAssociatedTokenAddress(mintPubkey, publicKey, false, TOKEN_2022_PROGRAM_ID);
+        const accountInfo = await connection.getAccountInfo(ata);
+        if (accountInfo && accountInfo.data.length >= 72) {
+          const amount = accountInfo.data.readBigUInt64LE(64);
+          const balance = Number(amount) / Math.pow(10, decimals);
+          console.log(`✅ [EnhancedSwap] Token-2022 ${mintAddress.substring(0,8)}... balance: ${balance}`);
+          return balance;
+        }
+      } catch (e) {
+        console.log(`⚠️ [EnhancedSwap] Token-2022 not found either`);
+      }
+      
+      return 0;
+    } catch (error) {
+      console.error(`❌ [EnhancedSwap] Error fetching balance:`, error);
+      return 0;
+    }
+  };
+
+  const handleTokenSelect = async (token: {
     address: string;
     symbol: string;
     name: string;
     decimals: number;
     logoURI?: string;
   }) => {
+    // Fetch real balance from blockchain
+    const balance = await fetchTokenBalance(token.address, token.decimals);
+    console.log(`🎯 [EnhancedSwap] Selected ${token.symbol}, balance: ${balance}`);
+    
     // Convert TokenSelector format to swapStore format
     const storeToken = {
       mint: token.address,
@@ -976,7 +1032,7 @@ export function EnhancedSwapInterface() {
       name: token.name,
       decimals: token.decimals,
       logoURI: token.logoURI,
-      balance: 0, // Will be updated by websocket
+      balance: balance,
     };
 
     if (tokenSelectorType === "input") {
