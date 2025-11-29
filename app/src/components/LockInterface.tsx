@@ -563,8 +563,8 @@ export default function LockInterface({
       }
       console.log("✅ [LOCK DEBUG] Transaction confirmed!");
 
-      // Calculer la durée effective (max entre nouvelle durée et durée existante)
-      const effectiveDuration = currentNftData 
+      // Calculer la durée effective (max entre nouvelle durée et durée existante ACTIVE seulement)
+      const effectiveDuration = (currentNftData && currentNftData.isActive)
         ? Math.max(days, currentNftData.lockDurationDays) 
         : days;
       
