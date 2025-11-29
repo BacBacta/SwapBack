@@ -2,161 +2,308 @@
  * 🎯 Hook React pour le Système de Boost SwapBack
  *
  * Ce hook fournit toutes les fonctionnalités du système de boost:
- * - Lecture du boost utilisateur
+ * - Lecture du boost utilisateur (on-chain)
  * - Lock de tokens
  * - Swap avec rebate boosté
- * - Distribution de buyback
+ * - Distribution NPI (le buyback est 100% burn)
  *
+ * PHASE 1 IMPLEMENTATION - Connexion on-chain réelle
+ * 
  * @author SwapBack Team
- * @date October 26, 2025
+ * @date November 29, 2025 - Phase 1 Implementation
  */
 
 "use client";
 
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import { PublicKey, SystemProgram, Transaction, TransactionInstruction } from "@solana/web3.js";
 import { useState, useEffect, useCallback } from "react";
-import * as anchor from "@coral-xyz/anchor";
-import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { BN } from "@coral-xyz/anchor";
+import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from "@solana/spl-token";
+import { logger } from "@/lib/logger";
 
-// Types
-export interface UserNftData {
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export type LockLevel = "rookie" | "holder" | "believer" | "diamond";
+
+export interface UserLockData {
   user: PublicKey;
-  level: "bronze" | "silver" | "gold" | "platinum" | "diamond";
-  amountLocked: BN;
-  lockDuration: BN;
-  boost: number; // Basis points (0-10000)
-  mintTime: BN;
+  level: LockLevel;
+  amountLocked: number;  // En lamports
+  lockDuration: number;  // En secondes
+  boost: number;         // Basis points (0-10000)
+  lockTime: number;      // Unix timestamp
   isActive: boolean;
+  bump: number;
 }
 
 export interface GlobalStateData {
   authority: PublicKey;
-  totalCommunityBoost: BN;
-  activeLocksCount: BN;
-  totalValueLocked: BN;
+  totalCommunityBoost: number;
+  activeLocksCount: number;
+  totalValueLocked: number;
 }
 
 export interface LockParams {
-  amount: number; // En tokens (sera converti en lamports)
-  durationDays: number;
+  amount: number;        // En tokens (sera converti en lamports)
+  durationDays: number;  // Durée en jours
 }
 
-export interface ClaimBuybackParams {
-  maxTokens: number; // Montant max de tokens à recevoir
-}
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
 
-// Configuration des Program IDs (à mettre à jour après déploiement)
-// Utilise les Program IDs depuis les variables d'environnement avec résolution paresseuse
-function getProgramIds() {
-  return {
-    swapback_cnft: new PublicKey(
-      process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP"
-    ),
-    swapback_router: new PublicKey(
-      process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh"
-    ),
-    swapback_buyback: new PublicKey(
-      process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || "746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6"
-    ),
-  };
-}
+// Program IDs depuis les variables d'environnement
+const CNFT_PROGRAM_ID = new PublicKey(
+  process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP"
+);
+
+// Seeds pour les PDAs
+const GLOBAL_STATE_SEED = "global_state";
+const USER_LOCK_SEED = "user_lock";
+const LOCK_VAULT_SEED = "lock_vault";
+
+// Instruction discriminators (SHA256 hash des noms d'instruction)
+// Ces valeurs doivent correspondre au programme Rust
+const LOCK_TOKENS_DISCRIMINATOR = Buffer.from([21, 19, 208, 43, 237, 62, 255, 87]);
+const UNLOCK_TOKENS_DISCRIMINATOR = Buffer.from([118, 103, 168, 247, 178, 4, 219, 87]);
+
+// Token mint (configurable)
+const LOCK_TOKEN_MINT = new PublicKey(
+  process.env.NEXT_PUBLIC_LOCK_TOKEN_MINT || "So11111111111111111111111111111111111111112" // SOL par défaut
+);
+
+// ============================================================================
+// HOOK PRINCIPAL
+// ============================================================================
 
 export function useBoostSystem() {
   const { connection } = useConnection();
-  const { publicKey, sendTransaction } = useWallet();
+  const { publicKey, signTransaction, sendTransaction } = useWallet();
 
-  const [userNft, setUserNft] = useState<UserNftData | null>(null);
+  const [userLock, setUserLock] = useState<UserLockData | null>(null);
   const [globalState, setGlobalState] = useState<GlobalStateData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Créer le provider Anchor
-  const getProvider = useCallback(() => {
-    if (!publicKey) return null;
+  // ==========================================================================
+  // PDA DERIVATION
+  // ==========================================================================
 
-    // Mock wallet pour read-only operations
-    const wallet = {
-      publicKey,
-      signTransaction: async (tx: Transaction) => tx,
-      signAllTransactions: async (txs: Transaction[]) => txs,
+  const derivePDAs = useCallback((userPubkey?: PublicKey) => {
+    const [globalStatePda, globalStateBump] = PublicKey.findProgramAddressSync(
+      [Buffer.from(GLOBAL_STATE_SEED)],
+      CNFT_PROGRAM_ID
+    );
+
+    let userLockPda: PublicKey | null = null;
+    let userLockBump: number = 0;
+
+    if (userPubkey) {
+      const [pda, bump] = PublicKey.findProgramAddressSync(
+        [Buffer.from(USER_LOCK_SEED), userPubkey.toBuffer()],
+        CNFT_PROGRAM_ID
+      );
+      userLockPda = pda;
+      userLockBump = bump;
+    }
+
+    const [lockVaultPda, lockVaultBump] = PublicKey.findProgramAddressSync(
+      [Buffer.from(LOCK_VAULT_SEED)],
+      CNFT_PROGRAM_ID
+    );
+
+    return {
+      globalState: globalStatePda,
+      globalStateBump,
+      userLock: userLockPda,
+      userLockBump,
+      lockVault: lockVaultPda,
+      lockVaultBump,
     };
+  }, []);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return new AnchorProvider(connection, wallet as any, {
-      commitment: "confirmed",
-    });
-  }, [connection, publicKey]);
+  // ==========================================================================
+  // DATA PARSING
+  // ==========================================================================
 
-  // Récupérer les données du NFT utilisateur
-  const fetchUserNft = useCallback(async () => {
+  /**
+   * Parse la structure UserLock depuis les données on-chain
+   * Structure Rust:
+   * - discriminator: 8 bytes
+   * - user: 32 bytes (Pubkey)
+   * - level: 1 byte (enum)
+   * - amount_locked: 8 bytes (u64)
+   * - lock_duration: 8 bytes (i64)
+   * - boost: 2 bytes (u16)
+   * - lock_time: 8 bytes (i64)
+   * - is_active: 1 byte (bool)
+   * - bump: 1 byte (u8)
+   */
+  const parseUserLock = useCallback((data: Buffer): UserLockData => {
+    const DISCRIMINATOR_SIZE = 8;
+    let offset = DISCRIMINATOR_SIZE;
+
+    const user = new PublicKey(data.subarray(offset, offset + 32));
+    offset += 32;
+
+    const levelByte = data.readUInt8(offset);
+    offset += 1;
+    
+    const levelMap: Record<number, LockLevel> = {
+      0: "rookie",
+      1: "holder",
+      2: "believer",
+      3: "diamond"
+    };
+    const level = levelMap[levelByte] || "rookie";
+
+    const amountLocked = Number(data.readBigUInt64LE(offset));
+    offset += 8;
+
+    const lockDuration = Number(data.readBigInt64LE(offset));
+    offset += 8;
+
+    const boost = data.readUInt16LE(offset);
+    offset += 2;
+
+    const lockTime = Number(data.readBigInt64LE(offset));
+    offset += 8;
+
+    const isActive = data.readUInt8(offset) === 1;
+    offset += 1;
+
+    const bump = data.readUInt8(offset);
+
+    return {
+      user,
+      level,
+      amountLocked,
+      lockDuration,
+      boost,
+      lockTime,
+      isActive,
+      bump
+    };
+  }, []);
+
+  /**
+   * Parse la structure GlobalState depuis les données on-chain
+   * Structure Rust (approximative):
+   * - discriminator: 8 bytes
+   * - authority: 32 bytes
+   * - wallets: 5 x 32 = 160 bytes (Wallets struct with 5 pubkeys)
+   * - total_community_boost: 8 bytes (u64)
+   * - active_locks_count: 8 bytes (u64)
+   * - total_value_locked: 8 bytes (u64)
+   */
+  const parseGlobalState = useCallback((data: Buffer): GlobalStateData => {
+    const DISCRIMINATOR_SIZE = 8;
+    let offset = DISCRIMINATOR_SIZE;
+
+    const authority = new PublicKey(data.subarray(offset, offset + 32));
+    offset += 32;
+
+    // Skip wallets (5 pubkeys)
+    offset += 160;
+
+    const totalCommunityBoost = Number(data.readBigUInt64LE(offset));
+    offset += 8;
+
+    const activeLocksCount = Number(data.readBigUInt64LE(offset));
+    offset += 8;
+
+    const totalValueLocked = Number(data.readBigUInt64LE(offset));
+
+    return {
+      authority,
+      totalCommunityBoost,
+      activeLocksCount,
+      totalValueLocked
+    };
+  }, []);
+
+  // ==========================================================================
+  // DATA FETCHING
+  // ==========================================================================
+
+  /**
+   * Récupère les données UserLock de l'utilisateur connecté
+   */
+  const fetchUserLock = useCallback(async () => {
     if (!publicKey) {
-      setUserNft(null);
+      setUserLock(null);
       return;
     }
 
-    setLoading(true);
-    setError(null);
-
     try {
-      // TODO: Implémenter avec IDL chargé dynamiquement
-      // Pour l'instant, on désactive cette fonctionnalité en production
-      console.warn("fetchUserNft not implemented yet - needs IDL loading");
-      setUserNft(null);
-    } catch (err: unknown) {
-      // NFT n'existe pas encore (première fois)
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      setError(errorMessage || "Erreur lors de la récupération du NFT");
-      console.error("Erreur fetchUserNft:", err);
-    } finally {
-      setLoading(false);
+      const { userLock: userLockPda } = derivePDAs(publicKey);
+      if (!userLockPda) return;
+
+      const accountInfo = await connection.getAccountInfo(userLockPda);
+      
+      if (!accountInfo) {
+        logger.info("useBoostSystem", "No user lock found for wallet", { 
+          wallet: publicKey.toString() 
+        });
+        setUserLock(null);
+        return;
+      }
+
+      const parsedData = parseUserLock(accountInfo.data);
+      logger.info("useBoostSystem", "User lock fetched successfully", {
+        boost: parsedData.boost,
+        isActive: parsedData.isActive,
+        level: parsedData.level
+      });
+      
+      setUserLock(parsedData);
+    } catch (err) {
+      logger.error("useBoostSystem", "Error fetching user lock", err);
+      setUserLock(null);
     }
+  }, [publicKey, connection, derivePDAs, parseUserLock]);
 
-    /* CODE DÉSACTIVÉ - À réactiver avec IDL chargé dynamiquement
-    // const provider = getProvider();
-    // if (!provider) throw new Error("Provider not available");
-    // const cnftProgram = new Program(cnftIdl, getProgramIds().swapback_cnft, provider);
-    // const [userNftPda] = PublicKey.findProgramAddressSync(
-    //   [Buffer.from("user_nft"), publicKey.toBuffer()],
-    //   getProgramIds().swapback_cnft
-    // );
-    // const nftData = await cnftProgram.account.userNft.fetch(userNftPda);
-    // const formattedData: UserNftData = {
-    //   user: nftData.user,
-    //   level: getLevelName(nftData.level),
-    //   amountLocked: nftData.amountLocked,
-    //   lockDuration: nftData.lockDuration,
-    //   boost: nftData.boost,
-    //   mintTime: nftData.mintTime,
-    //   isActive: nftData.isActive,
-    // };
-    // setUserNft(formattedData);
-    */
-  }, [publicKey]);
-
-  // Récupérer le GlobalState
+  /**
+   * Récupère les données GlobalState du programme
+   */
   const fetchGlobalState = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
     try {
-      // TODO: Implémenter avec IDL chargé dynamiquement
-      console.warn("fetchGlobalState not implemented yet - needs IDL loading");
-      setGlobalState(null);
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      setError(errorMessage || "Erreur lors de la récupération du GlobalState");
-      console.error("Erreur fetchGlobalState:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      const { globalState: globalStatePda } = derivePDAs();
+      
+      const accountInfo = await connection.getAccountInfo(globalStatePda);
+      
+      if (!accountInfo) {
+        logger.warn("useBoostSystem", "Global state not found - program may not be initialized");
+        setGlobalState(null);
+        return;
+      }
 
-  // Lock des tokens
+      const parsedData = parseGlobalState(accountInfo.data);
+      logger.info("useBoostSystem", "Global state fetched successfully", {
+        totalCommunityBoost: parsedData.totalCommunityBoost,
+        activeLocksCount: parsedData.activeLocksCount
+      });
+      
+      setGlobalState(parsedData);
+    } catch (err) {
+      logger.error("useBoostSystem", "Error fetching global state", err);
+      setGlobalState(null);
+    }
+  }, [connection, derivePDAs, parseGlobalState]);
+
+  // ==========================================================================
+  // ACTIONS
+  // ==========================================================================
+
+  /**
+   * Lock des tokens pour obtenir du boost
+   */
   const lockTokens = useCallback(
-    async ({ amount, durationDays }: LockParams) => {
-      if (!publicKey || !sendTransaction) {
+    async ({ amount, durationDays }: LockParams): Promise<string> => {
+      if (!publicKey || !signTransaction) {
         throw new Error("Wallet non connecté");
       }
 
@@ -164,276 +311,315 @@ export function useBoostSystem() {
       setError(null);
 
       try {
-        const provider = getProvider();
-        if (!provider) throw new Error("Provider not available");
+        const { globalState: globalStatePda, userLock: userLockPda, lockVault } = derivePDAs(publicKey);
+        
+        if (!userLockPda) {
+          throw new Error("Cannot derive user lock PDA");
+        }
 
-        const cnftProgram = anchor.workspace.SwapbackCnft as Program;
+        // Convertir amount en lamports (9 decimals)
+        const amountLamports = new BN(amount * 1e9);
+        // Convertir durée en secondes
+        const durationSeconds = new BN(durationDays * 86400);
 
-        // Convertir les paramètres
-        const amountLocked = new BN(amount * 1e9); // 9 decimals
-        const lockDuration = new BN(durationDays * 86400); // Secondes
-
-        // Dériver les PDAs
-        const programIds = getProgramIds();
-        const [globalStatePda] = PublicKey.findProgramAddressSync(
-          [Buffer.from("global_state")],
-          programIds.swapback_cnft
+        // Get user's token account
+        const userTokenAccount = await getAssociatedTokenAddress(
+          LOCK_TOKEN_MINT,
+          publicKey
         );
 
-        const [collectionConfigPda] = PublicKey.findProgramAddressSync(
-          [Buffer.from("collection_config")],
-          programIds.swapback_cnft
-        );
+        // Build instruction data
+        // Format: discriminator (8) + amount (8) + duration (8)
+        const instructionData = Buffer.alloc(24);
+        LOCK_TOKENS_DISCRIMINATOR.copy(instructionData, 0);
+        instructionData.writeBigUInt64LE(BigInt(amountLamports.toString()), 8);
+        instructionData.writeBigInt64LE(BigInt(durationSeconds.toString()), 16);
 
-        const [userNftPda] = PublicKey.findProgramAddressSync(
-          [Buffer.from("user_nft"), publicKey.toBuffer()],
-          programIds.swapback_cnft
-        );
+        // Build instruction
+        const lockInstruction = new TransactionInstruction({
+          programId: CNFT_PROGRAM_ID,
+          keys: [
+            { pubkey: globalStatePda, isSigner: false, isWritable: true },
+            { pubkey: userLockPda, isSigner: false, isWritable: true },
+            { pubkey: userTokenAccount, isSigner: false, isWritable: true },
+            { pubkey: lockVault, isSigner: false, isWritable: true },
+            { pubkey: publicKey, isSigner: true, isWritable: true },
+            { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+            { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+          ],
+          data: instructionData
+        });
 
-        // Créer la transaction
-        const tx = await cnftProgram.methods
-          .mintLevelNft(amountLocked, lockDuration)
-          .accounts({
-            collectionConfig: collectionConfigPda,
-            globalState: globalStatePda,
-            userNft: userNftPda,
-            user: publicKey,
-            systemProgram: SystemProgram.programId,
-          })
-          .transaction();
+        const transaction = new Transaction().add(lockInstruction);
+        
+        // Get recent blockhash
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+        transaction.feePayer = publicKey;
 
-        // Envoyer la transaction
-        const signature = await sendTransaction(tx, connection);
+        // Sign and send
+        const signedTx = await signTransaction(transaction);
+        const signature = await connection.sendRawTransaction(signedTx.serialize());
 
-        // Attendre la confirmation
-        await connection.confirmTransaction(signature, "confirmed");
+        // Confirm
+        await connection.confirmTransaction({
+          signature,
+          blockhash,
+          lastValidBlockHeight
+        });
 
-        console.log("✅ Lock réussi! Signature:", signature);
+        logger.info("useBoostSystem", "Lock successful", { signature, amount, durationDays });
 
-        // Rafraîchir les données
-        await fetchUserNft();
-        await fetchGlobalState();
+        // Refresh data
+        await Promise.all([fetchUserLock(), fetchGlobalState()]);
 
         return signature;
-      } catch (err: unknown) {
+      } catch (err) {
         const errorMsg = err instanceof Error ? err.message : "Erreur lors du lock";
         setError(errorMsg);
-        console.error("Erreur lockTokens:", err);
+        logger.error("useBoostSystem", "Lock failed", err);
         throw new Error(errorMsg);
       } finally {
         setLoading(false);
       }
     },
-    [
-      publicKey,
-      sendTransaction,
-      connection,
-      getProvider,
-      fetchUserNft,
-      fetchGlobalState,
-    ]
+    [publicKey, signTransaction, connection, derivePDAs, fetchUserLock, fetchGlobalState]
   );
 
-  // Unlock des tokens
-  const unlockTokens = useCallback(async () => {
-    if (!publicKey || !sendTransaction) {
+  /**
+   * Unlock des tokens (après la période de lock)
+   */
+  const unlockTokens = useCallback(async (): Promise<string> => {
+    if (!publicKey || !signTransaction) {
       throw new Error("Wallet non connecté");
+    }
+
+    if (!userLock || !userLock.isActive) {
+      throw new Error("Aucun lock actif trouvé");
+    }
+
+    // Check if lock period has ended
+    const now = Math.floor(Date.now() / 1000);
+    const unlockTime = userLock.lockTime + userLock.lockDuration;
+    if (now < unlockTime) {
+      const remainingDays = Math.ceil((unlockTime - now) / 86400);
+      throw new Error(`Lock expire dans ${remainingDays} jours`);
     }
 
     setLoading(true);
     setError(null);
 
     try {
-      const provider = getProvider();
-      if (!provider) throw new Error("Provider not available");
+      const { globalState: globalStatePda, userLock: userLockPda, lockVault } = derivePDAs(publicKey);
+      
+      if (!userLockPda) {
+        throw new Error("Cannot derive user lock PDA");
+      }
 
-      const cnftProgram = anchor.workspace.SwapbackCnft as Program;
-
-      const programIds = getProgramIds();
-      const [globalStatePda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("global_state")],
-        programIds.swapback_cnft
+      // Get user's token account
+      const userTokenAccount = await getAssociatedTokenAddress(
+        LOCK_TOKEN_MINT,
+        publicKey
       );
 
-      const [userNftPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("user_nft"), publicKey.toBuffer()],
-        programIds.swapback_cnft
-      );
+      // Build instruction
+      const unlockInstruction = new TransactionInstruction({
+        programId: CNFT_PROGRAM_ID,
+        keys: [
+          { pubkey: globalStatePda, isSigner: false, isWritable: true },
+          { pubkey: userLockPda, isSigner: false, isWritable: true },
+          { pubkey: userTokenAccount, isSigner: false, isWritable: true },
+          { pubkey: lockVault, isSigner: false, isWritable: true },
+          { pubkey: publicKey, isSigner: true, isWritable: true },
+          { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+        ],
+        data: UNLOCK_TOKENS_DISCRIMINATOR
+      });
 
-      const tx = await cnftProgram.methods
-        .updateNftStatus(false) // false = désactiver
-        .accounts({
-          userNft: userNftPda,
-          globalState: globalStatePda,
-          user: publicKey,
-        })
-        .transaction();
+      const transaction = new Transaction().add(unlockInstruction);
+      
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = publicKey;
 
-      const signature = await sendTransaction(tx, connection);
-      await connection.confirmTransaction(signature, "confirmed");
+      const signedTx = await signTransaction(transaction);
+      const signature = await connection.sendRawTransaction(signedTx.serialize());
 
-      console.log("✅ Unlock réussi! Signature:", signature);
+      await connection.confirmTransaction({
+        signature,
+        blockhash,
+        lastValidBlockHeight
+      });
 
-      await fetchUserNft();
-      await fetchGlobalState();
+      logger.info("useBoostSystem", "Unlock successful", { signature });
+
+      // Refresh data
+      await Promise.all([fetchUserLock(), fetchGlobalState()]);
 
       return signature;
-    } catch (err: unknown) {
+    } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Erreur lors du unlock";
       setError(errorMsg);
-      console.error("Erreur unlockTokens:", err);
+      logger.error("useBoostSystem", "Unlock failed", err);
       throw new Error(errorMsg);
     } finally {
       setLoading(false);
     }
-  }, [
-    publicKey,
-    sendTransaction,
-    connection,
-    getProvider,
-    fetchUserNft,
-    fetchGlobalState,
-  ]);
+  }, [publicKey, signTransaction, connection, userLock, derivePDAs, fetchUserLock, fetchGlobalState]);
 
-  // Claim des buybacks
-  const claimBuyback = useCallback(
-    async ({ maxTokens }: ClaimBuybackParams) => {
-      if (!publicKey || !sendTransaction) {
-        throw new Error("Wallet non connecté");
-      }
+  // ==========================================================================
+  // UTILITY FUNCTIONS
+  // ==========================================================================
 
-      setLoading(true);
-      setError(null);
-
-      try {
-        const provider = getProvider();
-        if (!provider) throw new Error("Provider not available");
-
-        const buybackProgram = anchor.workspace.SwapbackBuyback as Program;
-
-        const maxTokensBN = new BN(maxTokens * 1e9);
-
-        const programIds = getProgramIds();
-        const [buybackStatePda] = PublicKey.findProgramAddressSync(
-          [Buffer.from("buyback_state")],
-          programIds.swapback_buyback
-        );
-
-        const [globalStatePda] = PublicKey.findProgramAddressSync(
-          [Buffer.from("global_state")],
-          programIds.swapback_cnft
-        );
-
-        const [userNftPda] = PublicKey.findProgramAddressSync(
-          [Buffer.from("user_nft"), publicKey.toBuffer()],
-          programIds.swapback_cnft
-        );
-
-        // Note: backVault et userBackAccount doivent être fournis
-        // Ces comptes doivent être créés/récupérés au préalable
-
-        const tx = await buybackProgram.methods
-          .distributeBuyback(maxTokensBN)
-          .accounts({
-            buybackState: buybackStatePda,
-            globalState: globalStatePda,
-            userNft: userNftPda,
-            // backVault: backVaultPda,
-            // userBackAccount: userBackAccountPda,
-            user: publicKey,
-            tokenProgram: TOKEN_PROGRAM_ID,
-          })
-          .transaction();
-
-        const signature = await sendTransaction(tx, connection);
-        await connection.confirmTransaction(signature, "confirmed");
-
-        console.log("✅ Claim buyback réussi! Signature:", signature);
-
-        return signature;
-      } catch (err: unknown) {
-        const errorMsg = err instanceof Error ? err.message : "Erreur lors du claim";
-        setError(errorMsg);
-        console.error("Erreur claimBuyback:", err);
-        throw new Error(errorMsg);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [publicKey, sendTransaction, connection, getProvider]
-  );
-
-  // Calculer le rebate boosté
+  /**
+   * Calculer le rebate boosté
+   */
   const calculateBoostedRebate = useCallback(
     (baseRebate: number): number => {
-      if (!userNft || !userNft.isActive) {
+      if (!userLock || !userLock.isActive) {
         return baseRebate;
       }
 
-      const boost = userNft.boost; // Basis points
-      const multiplier = (10_000 + boost) / 10_000;
-      return baseRebate * multiplier;
+      // boost est en basis points (ex: 500 = 5%)
+      const boostMultiplier = (10_000 + userLock.boost) / 10_000;
+      return baseRebate * boostMultiplier;
     },
-    [userNft]
+    [userLock]
   );
 
-  // Calculer la part de buyback estimée
-  const calculateBuybackShare = useCallback(
-    (totalBuyback: number): number => {
-      if (!userNft || !globalState || !userNft.isActive) {
+  /**
+   * Calculer la part de NPI estimée
+   * Note: Le buyback est maintenant 100% burn, 
+   * les NPI sont distribués séparément
+   */
+  const calculateNpiShare = useCallback(
+    (totalNpiPool: number): number => {
+      if (!userLock || !globalState || !userLock.isActive) {
         return 0;
       }
 
-      const distributable = totalBuyback * 0.5; // 50% distribué
-      const userBoost = userNft.boost;
-      const totalBoost = globalState.totalCommunityBoost.toNumber();
+      if (globalState.totalCommunityBoost === 0) {
+        return 0;
+      }
 
-      if (totalBoost === 0) return 0;
-
-      return (distributable * userBoost) / totalBoost;
+      // Part proportionnelle au boost
+      return (totalNpiPool * userLock.boost) / globalState.totalCommunityBoost;
     },
-    [userNft, globalState]
+    [userLock, globalState]
   );
 
-  // Charger les données au montage
+  /**
+   * Obtenir le temps restant avant unlock
+   */
+  const getRemainingLockTime = useCallback((): number => {
+    if (!userLock || !userLock.isActive) {
+      return 0;
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const unlockTime = userLock.lockTime + userLock.lockDuration;
+    return Math.max(0, unlockTime - now);
+  }, [userLock]);
+
+  /**
+   * Vérifier si le lock est déverrouillable
+   */
+  const canUnlock = useCallback((): boolean => {
+    return getRemainingLockTime() === 0 && userLock?.isActive === true;
+  }, [getRemainingLockTime, userLock]);
+
+  // ==========================================================================
+  // EFFECTS
+  // ==========================================================================
+
+  // Charger les données au montage et quand le wallet change
   useEffect(() => {
     if (publicKey) {
-      fetchUserNft();
-      fetchGlobalState();
+      setLoading(true);
+      Promise.all([fetchUserLock(), fetchGlobalState()])
+        .finally(() => setLoading(false));
+    } else {
+      setUserLock(null);
     }
-  }, [publicKey, fetchUserNft, fetchGlobalState]);
+  }, [publicKey, fetchUserLock, fetchGlobalState]);
+
+  // ==========================================================================
+  // RETURN
+  // ==========================================================================
 
   return {
-    // Données
-    userNft,
+    // Data
+    userLock,
     globalState,
     loading,
     error,
 
+    // Derived state
+    hasActiveLock: userLock?.isActive ?? false,
+    userBoost: userLock?.boost ?? 0,
+    totalCommunityBoost: globalState?.totalCommunityBoost ?? 0,
+    remainingLockTime: getRemainingLockTime(),
+    canUnlock: canUnlock(),
+
     // Actions
     lockTokens,
     unlockTokens,
-    claimBuyback,
 
-    // Utilitaires
+    // Utilities
     calculateBoostedRebate,
-    calculateBuybackShare,
-    refreshData: () => {
-      fetchUserNft();
-      fetchGlobalState();
-    },
+    calculateNpiShare,
+    getRemainingLockTime,
+
+    // Refresh
+    refreshData: useCallback(() => {
+      return Promise.all([fetchUserLock(), fetchGlobalState()]);
+    }, [fetchUserLock, fetchGlobalState]),
   };
 }
 
-// Helper function pour convertir le niveau
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function getLevelName(
-  level: { bronze?: boolean; silver?: boolean; gold?: boolean; platinum?: boolean; diamond?: boolean }
-): "bronze" | "silver" | "gold" | "platinum" | "diamond" {
-  if (level.bronze) return "bronze";
-  if (level.silver) return "silver";
-  if (level.gold) return "gold";
-  if (level.platinum) return "platinum";
-  if (level.diamond) return "diamond";
-  return "bronze";
+// Helper pour formater la durée restante
+export function formatRemainingTime(seconds: number): string {
+  if (seconds <= 0) return "Déverrouillable";
+  
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  
+  if (days > 0) {
+    return `${days}j ${hours}h`;
+  }
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
+}
+
+// Helper pour formater le niveau
+export function formatLockLevel(level: LockLevel): string {
+  const levelNames: Record<LockLevel, string> = {
+    rookie: "🥉 Rookie",
+    holder: "🥈 Holder",
+    believer: "🥇 Believer",
+    diamond: "💎 Diamond"
+  };
+  return levelNames[level] || level;
+}
+
+// Helper pour calculer le boost attendu
+export function calculateExpectedBoost(amountUsd: number, durationDays: number): number {
+  // Formule: boost = (amount_weight * duration_weight) / 100
+  // amount_weight: basé sur le niveau
+  // duration_weight: basé sur la durée (30/90/180/365 jours)
+  
+  let amountWeight = 100; // Rookie
+  if (amountUsd >= 10000) amountWeight = 400; // Diamond
+  else if (amountUsd >= 1000) amountWeight = 300; // Believer
+  else if (amountUsd >= 100) amountWeight = 200; // Holder
+  
+  let durationWeight = 100; // 30 days
+  if (durationDays >= 365) durationWeight = 400;
+  else if (durationDays >= 180) durationWeight = 300;
+  else if (durationDays >= 90) durationWeight = 200;
+  
+  return Math.floor((amountWeight * durationWeight) / 100);
 }
