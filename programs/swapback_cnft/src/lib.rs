@@ -125,7 +125,10 @@ pub mod swapback_cnft {
         );
 
         // Vérifier si c'est un nouveau lock ou un ajout
-        let is_new_lock = user_lock.user == Pubkey::default();
+        // Un lock est "nouveau" si:
+        // - Le compte n'a jamais été utilisé (user == default), OU
+        // - Le lock précédent a été déverrouillé (is_active == false)
+        let is_new_lock = user_lock.user == Pubkey::default() || !user_lock.is_active;
 
         // Calculer le nouveau montant total
         let new_total_amount = if is_new_lock {
