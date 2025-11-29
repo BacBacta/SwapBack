@@ -919,7 +919,7 @@ export function EnhancedSwapInterface() {
             amount: swap.outputAmount,
             logoURI: swap.outputToken?.logoURI
           },
-          explorerUrl: getExplorerUrl(signature, 'tx')
+          explorerUrl: getExplorerUrl('tx', signature)
         });
         setShowSuccessModal(true);
         

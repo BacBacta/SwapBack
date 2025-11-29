@@ -37,6 +37,9 @@ export interface ErrorFeedbackProps {
   onSwitchNetwork?: () => void;
 }
 
+// Type for action onClick handlers
+type ErrorActionHandler = 'onRetry' | 'onAdjustSlippage' | 'onReduceAmount' | 'onSwitchNetwork' | 'onClose';
+
 interface ErrorConfig {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
@@ -45,7 +48,7 @@ interface ErrorConfig {
   bgColor: string;
   actions: Array<{
     label: string;
-    onClick: keyof Pick<ErrorFeedbackProps, 'onRetry' | 'onAdjustSlippage' | 'onReduceAmount' | 'onSwitchNetwork'>;
+    onClick: ErrorActionHandler;
     variant: 'primary' | 'secondary';
   }>;
 }
@@ -155,7 +158,7 @@ export function ErrorFeedback({
   const config = ERROR_CONFIGS[error];
   const Icon = config.icon;
 
-  const handleAction = (actionKey: keyof Pick<ErrorFeedbackProps, 'onRetry' | 'onAdjustSlippage' | 'onReduceAmount' | 'onSwitchNetwork' | 'onClose'>) => {
+  const handleAction = (actionKey: ErrorActionHandler) => {
     const actionMap = {
       onRetry,
       onAdjustSlippage,
