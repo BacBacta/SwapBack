@@ -8,24 +8,31 @@ import { TOKEN_DECIMALS } from "@/config/constants";
 
 export const useTokenData = (tokenMint: string) => {
   const { connection } = useConnection();
-  const { publicKey } = useWallet();
+  const { publicKey, connected } = useWallet();
 
   const [balance, setBalance] = useState<number>(0);
   const [usdPrice, setUsdPrice] = useState<number>(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start as loading
 
   // Debug: log the tokenMint on mount/change
   useEffect(() => {
-    console.log(`🎯 useTokenData mounted/updated with tokenMint: "${tokenMint}"`);
-  }, [tokenMint]);
+    console.log(`🎯 useTokenData: tokenMint="${tokenMint}", connected=${connected}, publicKey=${publicKey?.toString()?.substring(0,8) || 'null'}`);
+  }, [tokenMint, connected, publicKey]);
 
     // Récupérer le solde du token
   useEffect(() => {
     const fetchBalance = async () => {
-      if (!connection || !publicKey || !tokenMint) {
-        console.warn("⚠️ useTokenData: Missing requirements", { 
+      // Check wallet connected status
+      if (!connected || !publicKey) {
+        console.warn("⚠️ useTokenData: Wallet not connected", { connected, hasPublicKey: !!publicKey });
+        setBalance(0);
+        setLoading(false);
+        return;
+      }
+      
+      if (!connection || !tokenMint) {
+        console.warn("⚠️ useTokenData: Missing connection or tokenMint", { 
           hasConnection: !!connection, 
-          hasPublicKey: !!publicKey, 
           tokenMint 
         });
         setBalance(0);
@@ -33,7 +40,7 @@ export const useTokenData = (tokenMint: string) => {
         return;
       }
 
-      console.log(`🔍 useTokenData: Fetching balance for mint="${tokenMint}"`);
+      console.log(`🔍 useTokenData: Fetching balance for mint="${tokenMint}" wallet="${publicKey.toString().substring(0,8)}..."`);
       console.log(`🔍 Is SOL? ${tokenMint === "So11111111111111111111111111111111111111112"}`);
       setLoading(true);
 
@@ -119,7 +126,7 @@ export const useTokenData = (tokenMint: string) => {
     // Rafraîchir toutes les 10 secondes
     const interval = setInterval(fetchBalance, 10000);
     return () => clearInterval(interval);
-  }, [connection, publicKey, tokenMint]);
+  }, [connection, publicKey, tokenMint, connected]);
 
   // Récupérer le prix USD
   useEffect(() => {
