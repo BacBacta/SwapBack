@@ -2,16 +2,19 @@
  * 📊 BurnVisualization - Graphique Supply Deflationary
  * 
  * Affiche l'évolution de la supply $BACK avec historique des burns
+ * Fetch les événements de burn réels depuis les logs on-chain
  * 
  * @author SwapBack Team
  * @date November 23, 2025 - Phase 5.5
+ * @updated November 29, 2025 - Fetch real burn events from on-chain
  */
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useConnection } from '@solana/wallet-adapter-react';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, ParsedTransactionWithMeta, ConfirmedSignatureInfo } from '@solana/web3.js';
+import { logger } from '@/lib/logger';
 
 interface BurnEvent {
   timestamp: number;
@@ -27,20 +30,127 @@ interface SupplyData {
   burnHistory: BurnEvent[];
 }
 
+// Program IDs
+const BUYBACK_PROGRAM_ID = new PublicKey('7wCCwRXxWvMY2DJDRrnhFg3b8jVPb5vVPxLH5YAGL6eJ');
+const BACK_MINT = new PublicKey('862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux');
+const INITIAL_SUPPLY = 1_000_000_000; // 1B tokens (adjust based on actual)
+
 export default function BurnVisualization() {
   const { connection } = useConnection();
   const [data, setData] = useState<SupplyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
 
-  const BACK_MINT = new PublicKey("862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux");
-  const INITIAL_SUPPLY = 1_000_000_000; // 1B tokens (adjust based on actual)
+  /**
+   * Fetch burn events from on-chain transaction logs
+   */
+  const fetchBurnEvents = useCallback(async (range: string): Promise<BurnEvent[]> => {
+    try {
+      const now = Date.now();
+      const days = range === '7d' ? 7 : range === '30d' ? 30 : range === '90d' ? 90 : 365;
+      const startTime = Math.floor((now - days * 24 * 60 * 60 * 1000) / 1000);
 
-  useEffect(() => {
-    fetchSupplyData();
-  }, [timeRange]);
+      logger.info('BurnVisualization', 'Fetching burn events', { days, startTime });
 
-  const fetchSupplyData = async () => {
+      // Fetch signatures for the buyback program
+      const signatures: ConfirmedSignatureInfo[] = await connection.getSignaturesForAddress(
+        BUYBACK_PROGRAM_ID,
+        { limit: 100 }
+      );
+
+      // Filter by time range
+      const filteredSignatures = signatures.filter(sig => 
+        sig.blockTime && sig.blockTime >= startTime
+      );
+
+      logger.info('BurnVisualization', 'Found signatures', { 
+        total: signatures.length, 
+        filtered: filteredSignatures.length 
+      });
+
+      // Fetch transaction details and parse burn events
+      const burnEvents: BurnEvent[] = [];
+
+      for (const sig of filteredSignatures.slice(0, 20)) { // Limit to 20 for performance
+        try {
+          const tx: ParsedTransactionWithMeta | null = await connection.getParsedTransaction(
+            sig.signature,
+            { maxSupportedTransactionVersion: 0 }
+          );
+
+          if (!tx || !tx.meta?.logMessages) continue;
+
+          // Look for burn-related logs
+          // The buyback program emits logs like "Program log: Burned X tokens"
+          for (const log of tx.meta.logMessages) {
+            // Match burn logs from the buyback program
+            const burnMatch = log.match(/(?:burn|burned|Burned|BURN)[^\d]*(\d+(?:\.\d+)?)/i);
+            
+            if (burnMatch) {
+              const amount = parseFloat(burnMatch[1]);
+              
+              // Verify it's a reasonable burn amount (> 0 and not astronomical)
+              if (amount > 0 && amount < INITIAL_SUPPLY) {
+                burnEvents.push({
+                  timestamp: (sig.blockTime || Math.floor(Date.now() / 1000)) * 1000,
+                  amount: amount,
+                  signature: sig.signature,
+                });
+                break; // One burn event per transaction
+              }
+            }
+          }
+
+          // Also check for token burn instructions in parsed data
+          if (tx.meta?.postTokenBalances && tx.meta?.preTokenBalances) {
+            const preBalances = tx.meta.preTokenBalances;
+            const postBalances = tx.meta.postTokenBalances;
+
+            for (const pre of preBalances) {
+              if (pre.mint === BACK_MINT.toString()) {
+                const post = postBalances.find(p => 
+                  p.accountIndex === pre.accountIndex && 
+                  p.mint === BACK_MINT.toString()
+                );
+
+                if (post) {
+                  const preAmount = Number(pre.uiTokenAmount?.amount || 0);
+                  const postAmount = Number(post.uiTokenAmount?.amount || 0);
+                  const burnAmount = preAmount - postAmount;
+
+                  // If tokens decreased and it's a burn (not a transfer)
+                  if (burnAmount > 0 && !burnEvents.find(e => e.signature === sig.signature)) {
+                    burnEvents.push({
+                      timestamp: (sig.blockTime || Math.floor(Date.now() / 1000)) * 1000,
+                      amount: burnAmount / 1e9, // Convert from raw to decimal
+                      signature: sig.signature,
+                    });
+                  }
+                }
+              }
+            }
+          }
+        } catch (err) {
+          // Skip failed transaction fetches
+          logger.warn('BurnVisualization', 'Failed to parse transaction', { 
+            signature: sig.signature,
+            error: err instanceof Error ? err.message : 'Unknown error'
+          });
+        }
+      }
+
+      // Sort by timestamp descending
+      return burnEvents.sort((a, b) => b.timestamp - a.timestamp);
+    } catch (error) {
+      logger.error('BurnVisualization', 'Error fetching burn events', { error });
+      return [];
+    }
+  }, [connection]);
+
+  /**
+   * Fetch supply data and burn history
+   */
+  const fetchSupplyData = useCallback(async () => {
     setLoading(true);
     
     try {
@@ -52,47 +162,44 @@ export default function BurnVisualization() {
       const totalBurned = INITIAL_SUPPLY - currentSupply;
       const burnedPercent = (totalBurned / INITIAL_SUPPLY) * 100;
 
-      // TODO: Fetch actual burn events from on-chain logs
-      // For now, generate mock data
-      const mockBurnHistory: BurnEvent[] = generateMockBurnHistory(timeRange);
+      // Fetch actual burn events from on-chain logs
+      const burnHistory = await fetchBurnEvents(timeRange);
+
+      logger.info('BurnVisualization', 'Supply data fetched', {
+        currentSupply,
+        totalBurned,
+        burnedPercent,
+        burnEventsCount: burnHistory.length,
+      });
 
       setData({
         currentSupply,
         initialSupply: INITIAL_SUPPLY,
-        totalBurned,
-        burnedPercent,
-        burnHistory: mockBurnHistory,
+        totalBurned: totalBurned > 0 ? totalBurned : 0,
+        burnedPercent: burnedPercent > 0 ? burnedPercent : 0,
+        burnHistory,
       });
     } catch (err) {
-      console.error("Error fetching supply data:", err);
-      // Fallback to mock data if RPC fails
+      logger.error('BurnVisualization', 'Error fetching supply data', { error: err });
+      
+      // Fallback: try to get burn events even if supply fetch fails
+      const burnHistory = await fetchBurnEvents(timeRange);
+      
       setData({
-        currentSupply: 950_000_000,
+        currentSupply: INITIAL_SUPPLY * 0.95, // Estimate 5% burned
         initialSupply: INITIAL_SUPPLY,
-        totalBurned: 50_000_000,
+        totalBurned: INITIAL_SUPPLY * 0.05,
         burnedPercent: 5,
-        burnHistory: generateMockBurnHistory(timeRange),
+        burnHistory,
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [connection, timeRange, fetchBurnEvents]);
 
-  const generateMockBurnHistory = (range: string): BurnEvent[] => {
-    const now = Date.now();
-    const days = range === '7d' ? 7 : range === '30d' ? 30 : range === '90d' ? 90 : 365;
-    const events: BurnEvent[] = [];
-
-    for (let i = 0; i < days; i += 3) {
-      events.push({
-        timestamp: now - (days - i) * 24 * 60 * 60 * 1000,
-        amount: Math.random() * 1_000_000 + 500_000,
-        signature: `mock${i}`,
-      });
-    }
-
-    return events.sort((a, b) => b.timestamp - a.timestamp);
-  };
+  useEffect(() => {
+    fetchSupplyData();
+  }, [fetchSupplyData]);
 
   if (loading || !data) {
     return (

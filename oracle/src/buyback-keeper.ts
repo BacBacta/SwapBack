@@ -49,8 +49,123 @@ let consecutiveFailures = 0;
 let circuitBreakerActive = false;
 let lastSuccessfulBuyback: Date | null = null;
 
+// ==== MONITORING CONFIGURATION ====
+interface MonitoringConfig {
+  discordWebhookUrl?: string;
+  slackWebhookUrl?: string;
+  telegramBotToken?: string;
+  telegramChatId?: string;
+  enableConsoleLog: boolean;
+}
+
+const MONITORING_CONFIG: MonitoringConfig = {
+  discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL,
+  slackWebhookUrl: process.env.SLACK_WEBHOOK_URL,
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN,
+  telegramChatId: process.env.TELEGRAM_CHAT_ID,
+  enableConsoleLog: true,
+};
+
+// ==== MONITORING SERVICE ====
+async function sendDiscordAlert(message: string, level: 'INFO' | 'WARN' | 'ERROR'): Promise<void> {
+  if (!MONITORING_CONFIG.discordWebhookUrl) return;
+
+  const colors = {
+    INFO: 0x00ff00, // Green
+    WARN: 0xffff00, // Yellow
+    ERROR: 0xff0000, // Red
+  };
+
+  const emojis = {
+    INFO: '✅',
+    WARN: '⚠️',
+    ERROR: '❌',
+  };
+
+  try {
+    await axios.post(MONITORING_CONFIG.discordWebhookUrl, {
+      embeds: [{
+        title: `${emojis[level]} SwapBack Buyback Keeper - ${level}`,
+        description: message,
+        color: colors[level],
+        timestamp: new Date().toISOString(),
+        footer: { text: 'SwapBack Monitoring' },
+      }],
+    }, { timeout: 5000 });
+  } catch (err) {
+    console.error('Failed to send Discord alert:', err);
+  }
+}
+
+async function sendSlackAlert(message: string, level: 'INFO' | 'WARN' | 'ERROR'): Promise<void> {
+  if (!MONITORING_CONFIG.slackWebhookUrl) return;
+
+  const emojis = {
+    INFO: ':white_check_mark:',
+    WARN: ':warning:',
+    ERROR: ':x:',
+  };
+
+  try {
+    await axios.post(MONITORING_CONFIG.slackWebhookUrl, {
+      text: `${emojis[level]} *SwapBack Buyback Keeper - ${level}*\n${message}`,
+      attachments: [{
+        color: level === 'ERROR' ? 'danger' : level === 'WARN' ? 'warning' : 'good',
+        ts: Math.floor(Date.now() / 1000),
+      }],
+    }, { timeout: 5000 });
+  } catch (err) {
+    console.error('Failed to send Slack alert:', err);
+  }
+}
+
+async function sendTelegramAlert(message: string, level: 'INFO' | 'WARN' | 'ERROR'): Promise<void> {
+  if (!MONITORING_CONFIG.telegramBotToken || !MONITORING_CONFIG.telegramChatId) return;
+
+  const emojis = {
+    INFO: '✅',
+    WARN: '⚠️',
+    ERROR: '❌',
+  };
+
+  try {
+    const telegramUrl = `https://api.telegram.org/bot${MONITORING_CONFIG.telegramBotToken}/sendMessage`;
+    await axios.post(telegramUrl, {
+      chat_id: MONITORING_CONFIG.telegramChatId,
+      text: `${emojis[level]} *SwapBack Buyback Keeper*\n\`${level}\`: ${message}`,
+      parse_mode: 'Markdown',
+    }, { timeout: 5000 });
+  } catch (err) {
+    console.error('Failed to send Telegram alert:', err);
+  }
+}
+
+async function sendMonitoringAlert(level: 'INFO' | 'WARN' | 'ERROR', message: string, data?: any): Promise<void> {
+  const fullMessage = data 
+    ? `${message}\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``
+    : message;
+
+  // Send to all configured monitoring channels in parallel
+  const alerts: Promise<void>[] = [];
+
+  if (MONITORING_CONFIG.discordWebhookUrl) {
+    alerts.push(sendDiscordAlert(fullMessage, level));
+  }
+
+  if (MONITORING_CONFIG.slackWebhookUrl) {
+    alerts.push(sendSlackAlert(fullMessage, level));
+  }
+
+  if (MONITORING_CONFIG.telegramBotToken) {
+    alerts.push(sendTelegramAlert(fullMessage, level));
+  }
+
+  // Wait for all alerts to be sent (don't fail if some fail)
+  await Promise.allSettled(alerts);
+}
+
 // ==== HELPERS ====
-function log(level: 'INFO' | 'WARN' | 'ERROR', message: string, data?: any) {
+async function log(level: 'INFO' | 'WARN' | 'ERROR', message: string, data?: any) {
   const timestamp = new Date().toISOString();
   const logEntry = {
     timestamp,
@@ -59,9 +174,23 @@ function log(level: 'INFO' | 'WARN' | 'ERROR', message: string, data?: any) {
     ...(data && { data }),
   };
   
-  console.log(JSON.stringify(logEntry));
+  // Console logging
+  if (MONITORING_CONFIG.enableConsoleLog) {
+    console.log(JSON.stringify(logEntry));
+  }
   
-  // TODO: Send to monitoring service (Datadog, Grafana, etc.)
+  // Send to monitoring services for WARN and ERROR levels
+  // Also send INFO for important events (buyback execution, circuit breaker)
+  const isImportantInfo = level === 'INFO' && (
+    message.includes('Buyback completed') ||
+    message.includes('Circuit breaker') ||
+    message.includes('Keeper started') ||
+    message.includes('Threshold met')
+  );
+
+  if (level === 'ERROR' || level === 'WARN' || isImportantInfo) {
+    await sendMonitoringAlert(level, message, data);
+  }
 }
 
 async function sleep(ms: number) {
