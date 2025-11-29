@@ -87,11 +87,25 @@ export const SwapInterface = () => {
   }, [tokenAddresses]);
 
   // Memoize mint addresses to avoid hook re-triggers
-  const inputMintAddress = useMemo(() => getTokenMint(inputToken), [getTokenMint, inputToken]);
-  const outputMintAddress = useMemo(() => getTokenMint(outputToken), [getTokenMint, outputToken]);
+  const inputMintAddress = useMemo(() => {
+    const mint = getTokenMint(inputToken);
+    console.log(`🎯 [SwapInterface] inputToken="${inputToken}" -> inputMintAddress="${mint}"`);
+    return mint;
+  }, [getTokenMint, inputToken]);
+  
+  const outputMintAddress = useMemo(() => {
+    const mint = getTokenMint(outputToken);
+    console.log(`🎯 [SwapInterface] outputToken="${outputToken}" -> outputMintAddress="${mint}"`);
+    return mint;
+  }, [getTokenMint, outputToken]);
 
   const inputTokenData = useTokenData(inputMintAddress);
   const outputTokenData = useTokenData(outputMintAddress);
+  
+  // Debug: log balance changes
+  useEffect(() => {
+    console.log(`💰 [SwapInterface] inputTokenData.balance = ${inputTokenData.balance}, loading = ${inputTokenData.loading}`);
+  }, [inputTokenData.balance, inputTokenData.loading]);
 
   // Fetch real quote from Jupiter API
   const fetchRealQuote = useCallback(async () => {

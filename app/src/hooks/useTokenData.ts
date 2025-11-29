@@ -14,6 +14,11 @@ export const useTokenData = (tokenMint: string) => {
   const [usdPrice, setUsdPrice] = useState<number>(0);
   const [loading, setLoading] = useState(false);
 
+  // Debug: log the tokenMint on mount/change
+  useEffect(() => {
+    console.log(`🎯 useTokenData mounted/updated with tokenMint: "${tokenMint}"`);
+  }, [tokenMint]);
+
     // Récupérer le solde du token
   useEffect(() => {
     const fetchBalance = async () => {
@@ -28,7 +33,8 @@ export const useTokenData = (tokenMint: string) => {
         return;
       }
 
-      console.log(`🔍 useTokenData: Fetching balance for ${tokenMint.substring(0, 8)}...`);
+      console.log(`🔍 useTokenData: Fetching balance for mint="${tokenMint}"`);
+      console.log(`🔍 Is SOL? ${tokenMint === "So11111111111111111111111111111111111111112"}`);
       setLoading(true);
 
       try {
