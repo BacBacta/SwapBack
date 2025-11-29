@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { ArrowDownUp, Settings, TrendingUp, Zap, Info, ChevronDown } from "lucide-react";
 import { useTokenData } from "../hooks/useTokenData";
@@ -64,37 +64,34 @@ export const SwapInterface = () => {
   const [showPriceImpactModal, setShowPriceImpactModal] = useState(false);
   const [buybackDeposit, setBuybackDeposit] = useState<BuybackDepositResult | null>(null);
 
-  // Lazy load token addresses to avoid module-level env access
-  let _tokenAddresses: { [key: string]: string } | null = null;
-  function getTokenAddresses(): { [key: string]: string } {
-    if (!_tokenAddresses) {
-      _tokenAddresses = {
-        SOL: "So11111111111111111111111111111111111111112",
-        BACK: process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
-        USDC: process.env.NEXT_PUBLIC_USDC_MINT || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-        BONK: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
-        USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-        JUP: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
-        JTO: "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr",
-        mSOL: "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
-      };
-    }
-    return _tokenAddresses;
-  }
+  // Token addresses mapping - stable reference
+  const tokenAddresses = useMemo(() => ({
+    SOL: "So11111111111111111111111111111111111111112",
+    BACK: process.env.NEXT_PUBLIC_BACK_MINT || "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux",
+    USDC: process.env.NEXT_PUBLIC_USDC_MINT || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    BONK: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+    USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+    JUP: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+    JTO: "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr",
+    mSOL: "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+  }), []);
 
-  // Helper function to get token mint address
-  // Si le token est déjà une adresse mint (commence par lettre/chiffre de 32-44 chars), l'utiliser directement
-  const getTokenMint = (token: string): string => {
+  // Helper function to get token mint address - memoized
+  const getTokenMint = useCallback((token: string): string => {
     // Si c'est déjà une adresse valide Solana (32-44 chars base58)
     if (token.length >= 32 && token.length <= 44 && /^[1-9A-HJ-NP-Za-km-z]+$/.test(token)) {
       return token;
     }
     // Sinon chercher dans notre mapping
-    return getTokenAddresses()[token] || token;
-  };
+    return tokenAddresses[token as keyof typeof tokenAddresses] || token;
+  }, [tokenAddresses]);
 
-  const inputTokenData = useTokenData(getTokenMint(inputToken));
-  const outputTokenData = useTokenData(getTokenMint(outputToken));
+  // Memoize mint addresses to avoid hook re-triggers
+  const inputMintAddress = useMemo(() => getTokenMint(inputToken), [getTokenMint, inputToken]);
+  const outputMintAddress = useMemo(() => getTokenMint(outputToken), [getTokenMint, outputToken]);
+
+  const inputTokenData = useTokenData(inputMintAddress);
+  const outputTokenData = useTokenData(outputMintAddress);
 
   // Fetch real quote from Jupiter API
   const fetchRealQuote = useCallback(async () => {
