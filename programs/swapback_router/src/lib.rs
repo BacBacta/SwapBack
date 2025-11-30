@@ -21,6 +21,10 @@ mod getrandom_stub;
 pub use error::SwapbackError;
 pub use state::{DcaPlan, RouterConfig, RouterState, UserRebate};
 
+// Internal use
+use slippage::{DynamicSlippageInputs, calculate_dynamic_slippage_bps, min_out_from_expected};
+use routing::{VenueAllocation, parse_venue_scores, adjust_weights_with_scores, MIN_QUALITY_SCORE_DEFAULT};
+
 // Program ID - Deployed on devnet (Nov 12, 2025)
 declare_id!("9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh");
 
@@ -863,6 +867,14 @@ pub struct SwapArgs {
     pub primary_oracle_account: Pubkey,  // Primary oracle account for price validation
     pub fallback_oracle_account: Option<Pubkey>, // Optional fallback oracle account
     pub jupiter_route: Option<JupiterRouteParams>,
+    /// Jupiter instruction data for CPI replay (provided by keeper/SDK)
+    pub jupiter_swap_ix_data: Option<Vec<u8>>,
+    /// Liquidity estimate provided by off-chain services
+    pub liquidity_estimate: Option<u64>,
+    /// Volatility estimate in BPS (0..=5000, where 100 = 1%)
+    pub volatility_bps: Option<u16>,
+    /// Minimum venue quality score threshold (excludes venues below this)
+    pub min_venue_score: Option<u16>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -1138,6 +1150,8 @@ pub enum ErrorCode {
     JupiterNoInputSpent,
     #[msg("Jupiter swap spent more than expected")]
     JupiterSpentTooHigh,
+    #[msg("Invalid liquidity estimate (must be > 0)")]
+    InvalidLiquidityEstimate,
 }
 
 pub mod create_plan_processor {
@@ -1795,6 +1809,37 @@ pub mod swap_toc_processor {
             .ok_or(ErrorCode::SlippageExceeded)? as u64;
 
         Ok(min_out)
+    }
+
+    /// Calculate effective slippage using dynamic inputs if available
+    /// Falls back to user-provided slippage_tolerance if dynamic slippage is disabled
+    fn effective_slippage_bps(args: &SwapArgs, dynamic_enabled: bool, fallback_user_bps: u16) -> Result<u16> {
+        if !dynamic_enabled {
+            return Ok(fallback_user_bps);
+        }
+        let liquidity = args.liquidity_estimate.ok_or(error!(ErrorCode::InvalidLiquidityEstimate))?;
+        require!(liquidity > 0, ErrorCode::InvalidLiquidityEstimate);
+        let vol = args.volatility_bps.unwrap_or(0);
+        Ok(calculate_dynamic_slippage_bps(DynamicSlippageInputs {
+            amount_in: args.amount_in,
+            liquidity_est: liquidity,
+            volatility_bps: vol,
+            base_bps: 50,
+            min_bps: 10,
+            max_bps: 800,
+        }))
+    }
+
+    /// Adjust venue weights based on VenueScore accounts in remaining_accounts
+    /// Excludes venues below min_venue_score threshold
+    fn maybe_adjust_plan_weights<'info>(
+        remaining_accounts: &[AccountInfo<'info>],
+        venues: &mut Vec<VenueAllocation>,
+        min_venue_score: Option<u16>,
+    ) {
+        let scores = parse_venue_scores(remaining_accounts);
+        let min_score = min_venue_score.unwrap_or(MIN_QUALITY_SCORE_DEFAULT);
+        adjust_weights_with_scores(venues, &scores, min_score);
     }
 
     /// Execute a single swap via Jupiter CPI
