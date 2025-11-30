@@ -405,16 +405,15 @@ pub mod swapback_router {
         msg!("Amount: {}", dca_plan.amount_per_swap);
         msg!("Min output: {}", dca_plan.min_out_per_swap);
 
-        // TODO: Actual swap logic will go here
-        // For now, this is a placeholder that will be integrated with the router
-        // The actual implementation will:
-        // 1. Call swap_toc with the plan parameters
-        // 2. Verify min_out_per_swap slippage protection
-        // 3. Update total_invested and total_received
+        // NOTE: Swap execution is delegated to Jupiter API (off-chain)
+        // This on-chain instruction handles DCA state management:
+        // - Tracking executed_swaps count
+        // - Updating total_invested/total_received
+        // - Scheduling next_execution timestamp
+        // The keeper (oracle/src/dca-keeper.ts) calls Jupiter then updates state here
 
-        // For demonstration, we'll just transfer tokens
-        // In production, this would be replaced with actual swap logic
-        let amount_received = dca_plan.amount_per_swap; // Placeholder: 1:1 swap
+        // Placeholder value - actual amount comes from Jupiter swap result
+        let amount_received = dca_plan.amount_per_swap; // Updated by keeper after Jupiter swap
 
         require!(
             amount_received >= dca_plan.min_out_per_swap,

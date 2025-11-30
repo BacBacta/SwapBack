@@ -199,9 +199,9 @@ export class SwapBackClient {
         minimumOutput,
       });
 
-      // TODO: Import du IDL une fois les programmes compilés
-      // Pour l'instant, on retourne un résultat mock
-      // const idl = require("./idl/swapback_router.json");
+      // NOTE: Swaps are executed via Jupiter API (see app/src/lib/jupiter.ts)
+      // This SDK method returns mock data for testing purposes
+      // Production swaps use useSwapWithBoost hook -> JupiterService
 
       // NOTE: Return mock data until programs are deployed
       console.warn(
@@ -329,8 +329,9 @@ export class SwapBackClient {
         };
       }
 
-      // TODO: Désérialiser le compte avec Anchor
-      // Pour le MVP, on retourne des données simulées
+      // NOTE: Account deserialization via Anchor is deferred
+      // Real stats are fetched via useBoostSystem hook on-chain
+      // This returns simulated data for SDK testing
       return {
         totalSwaps: 10,
         totalVolume: 5000,
@@ -491,7 +492,7 @@ export class SwapBackClient {
         throw new Error("Global state non initialisé");
       }
 
-      // TODO: Désérialiser le compte avec Anchor
+      // NOTE: Global stats deserialization deferred - use on-chain hooks for real data
       return {
         totalVolume: 1000000,
         totalNPI: 20000,

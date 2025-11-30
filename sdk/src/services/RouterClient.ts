@@ -65,8 +65,9 @@ export class RouterClient {
    * Execute a swap using the router program
    */
   async executeSwap(params: ExecuteSwapParams): Promise<string> {
-    // For now, use Jupiter service as the implementation
-    // TODO: Replace with actual router program calls when IDL is available
+    // NOTE: Swaps are executed via Jupiter V6 API (app/src/lib/jupiter.ts)
+    // The router program handles rebates/DCA state, not swap execution
+    // See useSwapWithBoost.ts for production implementation
 
     if (params.useBundle && this.jitoService) {
       // Use bundle service for MEV protection

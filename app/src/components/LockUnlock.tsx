@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnection } from "@solana/wallet-adapter-react";
 import { useCNFT } from "../hooks/useCNFT";
-import { calculateLevel, calculateBoost } from "../lib/cnft";
+import { calculateLevel, calculateBoost, createLockTransaction } from "../lib/cnft";
 import { addLockTransaction, addUnlockTransaction } from "./TransactionHistory";
 
 export const LockUnlock = () => {
-  const { connected, publicKey } = useWallet();
+  const { connected, publicKey, sendTransaction, wallet } = useWallet();
+  const { connection } = useConnection();
   const { cnftData, levelName } = useCNFT();
   const [lockAmount, setLockAmount] = useState("");
   const [lockDuration, setLockDuration] = useState("30");
@@ -40,26 +42,23 @@ export const LockUnlock = () => {
         wallet: publicKey.toString(),
       });
 
-      // TODO: Décommenter quand le programme sera déployé
-      // const durationSeconds = durationDays * 24 * 60 * 60;
-      // const transaction = await createLockTransaction(connection, wallet, {
-      //   amount,
-      //   duration: durationSeconds,
-      // });
-      // const signature = await sendTransaction(transaction, connection);
-      // const latestBlockhash = await connection.getLatestBlockhash();
-      // await connection.confirmTransaction({signature, ...latestBlockhash}, "confirmed");
+      // Programme swapback_cnft déployé: EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP
+      // createLockTransaction gère le lock avec fallback localStorage
+      const durationSeconds = durationDays * 24 * 60 * 60;
+      const { transaction } = await createLockTransaction(connection, wallet, {
+        amount,
+        duration: durationSeconds,
+      });
+      
+      const signature = await sendTransaction(transaction, connection);
+      const latestBlockhash = await connection.getLatestBlockhash();
+      await connection.confirmTransaction({signature, ...latestBlockhash}, "confirmed");
 
-      // Pour l'instant, simulons le comportement
-      console.log("⚠️ Programme non encore déployé - simulation activée");
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Générer une signature simulée
-      const mockSignature = `sim${Date.now()}${Math.random().toString(36).substring(2, 15)}`;
+      console.log("✅ Lock transaction confirmed:", signature);
 
       // Ajouter à l'historique des transactions
       addLockTransaction(publicKey.toString(), {
-        signature: mockSignature,
+        signature: signature,
         inputAmount: amount,
         lockDuration: durationDays,
         lockLevel: level,

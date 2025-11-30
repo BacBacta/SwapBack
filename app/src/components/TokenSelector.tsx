@@ -130,7 +130,7 @@ export const TokenSelector = ({
         symbol: "BACK",
         name: "SwapBack Token",
         decimals: 9,
-        logoURI: "https://swapback.xyz/logo.png", // TODO: Add proper logo
+        logoURI: "/back-token-logo.png", // Local asset in public/
         verified: true,
         trending: process.env.NEXT_PUBLIC_SOLANA_NETWORK === "devnet",
       });
