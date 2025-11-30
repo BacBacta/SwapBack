@@ -164,6 +164,44 @@ fn normalize_amount(amount: u64, from_decimals: u8, to_decimals: u8) -> u64 {
     }
 }
 
+/// Entrées pour slippage dynamique (tout en BPS/valeurs entières pour éviter floating fragile on-chain).
+#[derive(Clone, Copy, Debug)]
+pub struct DynamicSlippageInputs {
+    pub amount_in: u64,
+    /// Estimation de liquidité (ex: TVL, ou profondeur utile) fournie par keeper/off-chain.
+    pub liquidity_est: u64,
+    /// Volatilité estimée en BPS (ex: 0..=5000). 100 = 1%.
+    pub volatility_bps: u16,
+    /// Slippage de base en BPS (par défaut 50 = 0.5%).
+    pub base_bps: u16,
+    /// Minimum et maximum hard bounds.
+    pub min_bps: u16,
+    pub max_bps: u16,
+}
+
+/// Calcule un slippage effectif (BPS) :
+/// - augmente avec le ratio amount/liquidité
+/// - augmente avec volatility_bps
+/// - borné entre min_bps et max_bps
+pub fn calculate_dynamic_slippage_bps(i: DynamicSlippageInputs) -> u16 {
+    let liquidity = i.liquidity_est.max(1);
+    let ratio_bps = ((i.amount_in as u128).saturating_mul(10_000u128) / (liquidity as u128))
+        .min(u128::from(u16::MAX)) as u16;
+    // Impact = ratio_bps / 4 (adoucit), + volatility/2
+    let amount_impact = ratio_bps / 4;
+    let vol_impact = i.volatility_bps / 2;
+    let raw = i.base_bps
+        .saturating_add(amount_impact)
+        .saturating_add(vol_impact);
+    raw.clamp(i.min_bps, i.max_bps)
+}
+
+/// Applique slippage (BPS) à un expected_out → min_out.
+pub fn min_out_from_expected(expected_out: u64, slippage_bps: u16) -> u64 {
+    let keep_bps = 10_000u128.saturating_sub(slippage_bps as u128);
+    ((expected_out as u128).saturating_mul(keep_bps) / 10_000u128) as u64
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -229,5 +267,26 @@ mod tests {
         );
         assert_eq!(result.size_component, 100); // Safety margin
         assert_eq!(result.slippage_bps, 150); // 50 + 100
+    }
+
+    #[test]
+    fn slippage_bounded() {
+        let bps = calculate_dynamic_slippage_bps(DynamicSlippageInputs {
+            amount_in: 1_000_000,
+            liquidity_est: 10_000_000,
+            volatility_bps: 200,
+            base_bps: 50,
+            min_bps: 10,
+            max_bps: 800,
+        });
+        assert!(bps >= 10 && bps <= 800);
+    }
+
+    #[test]
+    fn min_out_decreases_with_slippage() {
+        let e = 1_000_000u64;
+        let m1 = min_out_from_expected(e, 50);
+        let m2 = min_out_from_expected(e, 200);
+        assert!(m2 < m1);
     }
 }
