@@ -19,7 +19,7 @@ import path from "path";
 const BUYBACK_PROGRAM_ID = new PublicKey("EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf");
 
 // Token mints (à mettre à jour avec les vrais mints)
-const BACK_MINT = new PublicKey("11111111111111111111111111111111"); // TODO: Remplacer avec le vrai mint $BACK
+const BACK_MINT = new PublicKey("862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"); // $BACK Token-2022 mint
 const USDC_MINT = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"); // USDC devnet
 
 async function main() {

@@ -29,7 +29,7 @@ const BUYBACK_PROGRAM_ID = new PublicKey('46UWFYdksvkGhTPy9cTSJGa3d5nqzpY766rtJe
 // Token Mints
 const SOL_MINT = new PublicKey('So11111111111111111111111111111111111111112');
 const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
-const BACK_MINT = new PublicKey('BACKXUZXr8nNWKN4WJMpPBGbYZVq8H6ow4rMWR2o5s2c'); // TODO: Replace
+const BACK_MINT = new PublicKey('862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux'); // $BACK Token-2022 mint
 
 // Test configuration
 const RPC_URL = process.env.RPC_URL || 'https://api.devnet.solana.com';

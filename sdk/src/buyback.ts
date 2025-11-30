@@ -25,7 +25,7 @@ export const JUPITER_PROGRAM_ID = new PublicKey('JUP6LkbZbjS1jKKwapdHNy74zcZ3tLU
 
 // Mints
 export const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
-export const BACK_MINT = new PublicKey('BACKXUZXr8nNWKN4WJMpPBGbYZVq8H6ow4rMWR2o5s2c'); // TODO: Replace with actual $BACK mint
+export const BACK_MINT = new PublicKey('862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux'); // $BACK Token-2022 mint
 
 /**
  * Structure de l'état du buyback on-chain
