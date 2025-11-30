@@ -1,5 +1,26 @@
 # SwapBack Keeper Services
 
+## Keeper / Off-chain Builder - Quick Summary
+
+### Objectif
+Le keeper prépare:
+- la route Jupiter (swap instruction data + ordered accounts)
+- les estimations (liquidity_estimate, volatility_bps)
+- et fournit si nécessaire les comptes VenueScore en remaining_accounts
+
+### Pattern recommandé
+1) User signe une transaction qui appelle le programme swapback_router `swap_toc`
+2) `swap_toc` rejoue l'instruction Jupiter via CPI
+3) Le programme calcule les deltas sur les ATA user pour obtenir `amount_out` réel
+
+### Required inputs
+- `jupiter_swap_ix_data`: bytes de l'instruction swap Jupiter
+- `remaining_accounts`: comptes requis par Jupiter (dans l'ordre)
+- `liquidity_estimate`: estimation liquidité (u64, >0)
+- `volatility_bps`: volatilité en BPS (u16)
+
+---
+
 ## Overview
 
 SwapBack uses keeper services (off-chain bots) to orchestrate:
