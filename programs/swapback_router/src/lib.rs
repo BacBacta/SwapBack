@@ -1132,6 +1132,12 @@ pub enum ErrorCode {
     InvalidTokenAccountOwner,
     #[msg("Swap amount exceeds maximum allowed")]
     SwapAmountExceedsMaximum,
+    #[msg("Jupiter CPI call failed")]
+    JupiterCpiFailed,
+    #[msg("Jupiter swap did not spend any input tokens")]
+    JupiterNoInputSpent,
+    #[msg("Jupiter swap spent more than expected")]
+    JupiterSpentTooHigh,
 }
 
 pub mod create_plan_processor {

@@ -4,6 +4,7 @@ use anchor_lang::solana_program::{
     program,
 };
 use anchor_spl::token::TokenAccount as SplTokenAccount;
+use solana_program::program::invoke_signed;
 
 use crate::{ErrorCode, JupiterRouteParams, SwapToC, JUPITER_PROGRAM_ID};
 
@@ -85,4 +86,75 @@ pub fn swap(
     require!(amount_out >= min_out, ErrorCode::SlippageExceeded);
 
     Ok(amount_out)
+}
+
+/// Helper: read token amount from AccountInfo using anchor_spl TokenAccount
+fn token_amount(ai: &AccountInfo) -> Result<u64> {
+    let data = ai.try_borrow_data()?;
+    let mut data_slice: &[u8] = &data;
+    let acc = SplTokenAccount::try_deserialize(&mut data_slice)
+        .map_err(|_| error!(ErrorCode::InvalidTokenAccount))?;
+    Ok(acc.amount)
+}
+
+/// Exécute un swap Jupiter via CPI en rejouant l'instruction (data + remaining_accounts),
+/// puis calcule `amount_out` via delta de la token account de destination.
+///
+/// - `jupiter_program` : le programme Jupiter Swap/Router (AccountInfo)
+/// - `remaining_accounts` : tous les comptes requis par l'instruction Jupiter (dans le bon ordre)
+/// - `user_source_ata` / `user_dest_ata` : token accounts à mesurer (delta)
+/// - `swap_ix_data` : bytes de l'instruction Jupiter (fourni par keeper/SDK)
+/// - `signer_seeds` : seeds si ton programme doit signer (souvent vide [] si user signe)
+pub fn swap_with_balance_deltas<'info>(
+    jupiter_program: &AccountInfo<'info>,
+    remaining_accounts: &[AccountInfo<'info>],
+    user_source_ata: &AccountInfo<'info>,
+    user_dest_ata: &AccountInfo<'info>,
+    amount_in: u64,
+    min_out: u64,
+    swap_ix_data: &[u8],
+    signer_seeds: &[&[&[u8]]],
+) -> Result<u64> {
+    // Snapshot balances
+    let pre_in = token_amount(user_source_ata)?;
+    let pre_out = token_amount(user_dest_ata)?;
+
+    // CPI: build metas from remaining accounts (Jupiter expects exact ordering)
+    let metas: Vec<AccountMeta> = remaining_accounts
+        .iter()
+        .map(|ai| AccountMeta {
+            pubkey: *ai.key,
+            is_signer: ai.is_signer,
+            is_writable: ai.is_writable,
+        })
+        .collect();
+
+    let ix = Instruction {
+        program_id: *jupiter_program.key,
+        accounts: metas,
+        data: swap_ix_data.to_vec(),
+    };
+
+    // Execute Jupiter swap
+    // NOTE: amount_in/min_out sont généralement encodés dans swap_ix_data; on garde quand même les checks post-delta.
+    invoke_signed(&ix, remaining_accounts, signer_seeds)
+        .map_err(|_| error!(ErrorCode::JupiterCpiFailed))?;
+
+    // Snapshot balances post
+    let post_in = token_amount(user_source_ata)?;
+    let post_out = token_amount(user_dest_ata)?;
+
+    // Deltas
+    let spent_in = pre_in.saturating_sub(post_in);
+    let received_out = post_out.saturating_sub(pre_out);
+
+    require!(spent_in > 0, ErrorCode::JupiterNoInputSpent);
+    // Optionnel: si spender_in diffère trop de amount_in attendu, rejeter
+    require!(
+        spent_in <= amount_in.saturating_add(5), // marge anti-arrondi
+        ErrorCode::JupiterSpentTooHigh
+    );
+    require!(received_out >= min_out, ErrorCode::SlippageExceeded);
+
+    Ok(received_out)
 }
