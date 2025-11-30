@@ -8,6 +8,7 @@ pub mod error;
 pub mod instructions;
 mod oracle;
 pub mod oracle_cache;
+pub mod routing;
 pub mod slippage;
 pub mod state;
 pub mod venue_scoring;
