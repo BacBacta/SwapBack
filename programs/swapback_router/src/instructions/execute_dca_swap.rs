@@ -1,5 +1,6 @@
 use crate::error::SwapbackError;
 use crate::state::{DcaPlan, RouterState};
+use crate::ErrorCode;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
 
@@ -75,7 +76,7 @@ pub struct DcaSwapExecuted {
     pub timestamp: i64,
 }
 
-pub fn handler(ctx: Context<ExecuteDcaSwap>, args: ExecuteDcaSwapArgs) -> Result<()> {
+pub fn handler<'info>(ctx: Context<'_, '_, '_, 'info, ExecuteDcaSwap<'info>>, args: ExecuteDcaSwapArgs) -> Result<()> {
     let dca_plan = &mut ctx.accounts.dca_plan;
     let clock = Clock::get()?;
 
@@ -107,71 +108,43 @@ pub fn handler(ctx: Context<ExecuteDcaSwap>, args: ExecuteDcaSwapArgs) -> Result
     msg!("Amount in: {}", dca_plan.amount_per_swap);
     msg!("Min output: {}", dca_plan.min_out_per_swap);
 
-    // Record balance before swap for verification
-    let balance_before = ctx.accounts.user_token_out.amount;
+    let amount_in = dca_plan.amount_per_swap;
+    let min_out = dca_plan.min_out_per_swap;
 
-    // Execute Jupiter swap via CPI if instruction data provided
-    if !args.jupiter_instruction.is_empty() {
-        let remaining_accounts = ctx.remaining_accounts;
-        
-        // Build account metas for Jupiter CPI
-        let account_metas: Vec<AccountMeta> = remaining_accounts
-            .iter()
-            .map(|acc| {
-                if acc.is_writable {
-                    AccountMeta::new(*acc.key, acc.is_signer)
-                } else {
-                    AccountMeta::new_readonly(*acc.key, acc.is_signer)
-                }
-            })
-            .collect();
-
-        let instruction = anchor_lang::solana_program::instruction::Instruction {
-            program_id: crate::JUPITER_PROGRAM_ID,
-            accounts: account_metas,
-            data: args.jupiter_instruction.clone(),
-        };
-
-        anchor_lang::solana_program::program::invoke(
-            &instruction,
-            remaining_accounts,
-        ).map_err(|_| SwapbackError::SwapExecutionFailed)?;
-    }
-
-    // Reload token account to get actual received amount
-    ctx.accounts.user_token_out.reload()?;
-    let balance_after = ctx.accounts.user_token_out.amount;
-    
-    // Calculate actual amount received
-    let amount_received = balance_after
-        .checked_sub(balance_before)
-        .ok_or(SwapbackError::MathOverflow)?;
-
-    // If no Jupiter CPI was executed (keeper reports amount), use reported value
-    // This allows flexibility for keepers that execute Jupiter externally
-    let final_amount = if amount_received > 0 {
-        amount_received
+    // Execute Jupiter swap via CPI using swap_with_balance_deltas
+    // This handles pre/post balance measurement and slippage check
+    let amount_out = if !args.jupiter_instruction.is_empty() {
+        crate::cpi_jupiter::swap_with_balance_deltas(
+            &ctx.accounts.jupiter_program.to_account_info(),
+            ctx.remaining_accounts,
+            &ctx.accounts.user_token_in.to_account_info(),
+            &ctx.accounts.user_token_out.to_account_info(),
+            amount_in,
+            min_out,
+            &args.jupiter_instruction,
+            &[], // No seeds needed - user signs externally or keeper executes
+        ).map_err(|e| {
+            msg!("Jupiter CPI failed: {:?}", e);
+            SwapbackError::SwapExecutionFailed
+        })?
     } else {
+        // Fallback: use keeper-reported amount if no Jupiter instruction
+        require!(args.amount_received >= min_out, SwapbackError::SlippageExceeded);
         args.amount_received
     };
 
-    // Verify slippage protection
-    require!(
-        final_amount >= dca_plan.min_out_per_swap,
-        SwapbackError::SlippageExceeded
-    );
-
     // Calculate actual slippage for metrics
-    let slippage_bps = if dca_plan.amount_per_swap > 0 && final_amount < dca_plan.amount_per_swap {
-        ((dca_plan.amount_per_swap - final_amount) as u128 * 10_000 / dca_plan.amount_per_swap as u128) as u16
+    let slippage_bps = if amount_in > 0 && amount_out < amount_in {
+        ((amount_in - amount_out) as u128 * 10_000 / amount_in as u128) as u16
     } else {
         0
     };
 
     // Update plan state
+    let dca_plan = &mut ctx.accounts.dca_plan;
     dca_plan.executed_swaps += 1;
-    dca_plan.total_invested += dca_plan.amount_per_swap;
-    dca_plan.total_received += final_amount;
+    dca_plan.total_invested += amount_in;
+    dca_plan.total_received += amount_out;
     dca_plan.next_execution = dca_plan.calculate_next_execution();
 
     // If all swaps completed, mark as inactive
@@ -185,8 +158,8 @@ pub fn handler(ctx: Context<ExecuteDcaSwap>, args: ExecuteDcaSwapArgs) -> Result
         plan_id: dca_plan.plan_id,
         user: dca_plan.user,
         swap_number: dca_plan.executed_swaps as u64,
-        amount_in: dca_plan.amount_per_swap,
-        amount_out: final_amount,
+        amount_in,
+        amount_out,
         slippage_bps,
         timestamp: clock.unix_timestamp,
     });
@@ -196,7 +169,7 @@ pub fn handler(ctx: Context<ExecuteDcaSwap>, args: ExecuteDcaSwapArgs) -> Result
         dca_plan.executed_swaps,
         dca_plan.total_swaps
     );
-    msg!("Amount received: {}", final_amount);
+    msg!("Amount received: {}", amount_out);
     msg!("Next execution: {}", dca_plan.next_execution);
     msg!("Total invested: {}", dca_plan.total_invested);
     msg!("Total received: {}", dca_plan.total_received);
