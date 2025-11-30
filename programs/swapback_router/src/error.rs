@@ -41,4 +41,14 @@ pub enum SwapbackError {
     AlreadyPaused,
     #[msg("DCA plan is already active")]
     AlreadyActive,
+
+    // Swap Execution Errors
+    #[msg("Swap execution failed")]
+    SwapExecutionFailed,
+    #[msg("Invalid token account")]
+    InvalidTokenAccount,
+    #[msg("Unauthorized")]
+    Unauthorized,
+    #[msg("Math overflow")]
+    MathOverflow,
 }

@@ -567,13 +567,20 @@ pub mod swapback_router {
         Ok(())
     }
 
-    pub fn initialize_oracle_cache(ctx: Context<InitializeOracleCache>) -> Result<()> {
+    pub fn initialize_oracle_cache(
+        ctx: Context<InitializeOracleCache>,
+        token_in: Pubkey,
+        token_out: Pubkey,
+    ) -> Result<()> {
         let cache = &mut ctx.accounts.oracle_cache;
-        cache.token_pair = [Pubkey::default(), Pubkey::default()]; // Placeholder
+        cache.token_pair = [token_in, token_out];
         cache.cached_price = 0;
         cache.cached_at = 0;
         cache.cache_duration = 5; // 5 seconds default
+        cache.volatility_bps = 50; // Default 0.5% volatility
         cache.bump = ctx.bumps.oracle_cache;
+        
+        msg!("📈 Oracle cache initialized for {}/{}", token_in, token_out);
         Ok(())
     }
 
@@ -1030,6 +1037,19 @@ pub struct BuyburnDeposit {
 }
 
 #[event]
+pub struct TwapSlicesRequired {
+    pub user: Pubkey,
+    pub total_amount: u64,
+    pub slice_amount: u64,
+    pub slice_min_out: u64,
+    pub remaining_slices: u8,
+    pub interval_seconds: i64,
+    pub first_slice_executed: bool,
+    pub first_slice_output: u64,
+    pub timestamp: i64,
+}
+
+#[event]
 pub struct RewardsClaimed {
     pub user: Pubkey,
     pub amount: u64,
@@ -1177,21 +1197,40 @@ pub mod swap_toc_processor {
             }
         }
 
-        // --- Phase 2: Dynamic Slippage ---
-        if ctx.accounts.state.dynamic_slippage_enabled {
-             // Simplified dynamic slippage
-             let default_volatility = 50u16; 
-             let pool_tvl_estimate = 1_000_000_000_000u64;
-             
-             if let Ok(dynamic_slippage) = crate::slippage::calculate_dynamic_slippage(
-                 &ctx.accounts.primary_oracle.key(),
-                 args.amount_in,
-                 pool_tvl_estimate,
-                 default_volatility
-             ) {
-                 msg!("Dynamic Slippage calculated: {} bps", dynamic_slippage);
-             }
-        }
+        // --- Dynamic Slippage Calculation ---
+        // Uses real TVL estimation from remaining accounts when available
+        let slippage_bps_effective = if ctx.accounts.state.dynamic_slippage_enabled {
+            // Estimate pool TVL from remaining accounts (Jupiter/Raydium pool data)
+            let pool_tvl = crate::slippage::estimate_pool_tvl_from_accounts(
+                ctx.remaining_accounts,
+                6, // Assume USDC decimals for token_a
+                6, // Assume USDC decimals for token_b (adjust based on actual tokens)
+            );
+            
+            // Get volatility from oracle cache or use default
+            let volatility_bps = ctx.accounts.oracle_cache
+                .as_ref()
+                .map(|c| c.volatility_bps)
+                .unwrap_or(50u16);
+            
+            let result = crate::slippage::calculate_dynamic_slippage_with_breakdown(
+                args.amount_in,
+                pool_tvl,
+                volatility_bps,
+                None,
+            );
+            
+            msg!("📊 Dynamic Slippage: {} bps (base={}, size={}, vol={})",
+                result.slippage_bps,
+                result.base_component,
+                result.size_component,
+                result.volatility_component
+            );
+            
+            Some(result.slippage_bps)
+        } else {
+            None
+        };
 
         if ctx.accounts.primary_oracle.key() != args.primary_oracle_account {
             return err!(ErrorCode::InvalidOraclePrice);
@@ -1223,7 +1262,19 @@ pub mod swap_toc_processor {
         )?;
         let expected_out = calculate_expected_output(args.amount_in, oracle_observation.price)?;
 
-        let min_out = if let Some(slippage_tolerance) = args.slippage_tolerance {
+        // Calculate min_out: Use dynamic slippage if enabled, else user-provided tolerance
+        let min_out = if let Some(dynamic_slippage) = slippage_bps_effective {
+            // Dynamic slippage takes precedence when enabled
+            let dynamic_min = calculate_min_output_with_slippage(expected_out, dynamic_slippage)?;
+            
+            // Use the more conservative (higher) min_out between dynamic and user-specified
+            if let Some(user_slippage) = args.slippage_tolerance {
+                let user_min = calculate_min_output_with_slippage(expected_out, user_slippage)?;
+                dynamic_min.max(user_min)
+            } else {
+                dynamic_min.max(args.min_out)
+            }
+        } else if let Some(slippage_tolerance) = args.slippage_tolerance {
             calculate_min_output_with_slippage(expected_out, slippage_tolerance)?
         } else {
             args.min_out
@@ -1231,19 +1282,40 @@ pub mod swap_toc_processor {
 
         if let Some(twap_slices) = args.twap_slices {
             if twap_slices > 1 {
-                return process_twap_swap(&ctx, args, min_out, twap_slices, &clock);
+                return process_twap_swap(&mut ctx, args.clone(), min_out, twap_slices, &clock);
             }
         }
 
-        process_single_swap(&ctx, args.amount_in, min_out)?;
+        // Execute real swap via Jupiter or configured DEX
+        let start_time = clock.unix_timestamp;
+        let amount_out = process_single_swap(
+            &mut ctx,
+            args.amount_in,
+            min_out,
+            args.jupiter_route.as_ref(),
+        )?;
 
-        // --- Phase 2: Update Venue Score ---
+        // Calculate actual metrics for VenueScore
+        let end_time = Clock::get()?.unix_timestamp;
+        let latency_ms = ((end_time - start_time) * 1000).max(1) as u32;
+        
+        // Calculate actual slippage: (expected - actual) / expected * 10000
+        let actual_slippage_bps = if expected_out > 0 && amount_out < expected_out {
+            ((expected_out - amount_out) as u128 * 10_000 / expected_out as u128) as u16
+        } else {
+            0
+        };
+        
+        // Calculate NPI (Net Positive Impact) = amount_out - min_out (if positive)
+        let npi = if amount_out > min_out {
+            (amount_out - min_out) as i64
+        } else {
+            0
+        };
+
+        // Update Venue Score with real metrics
         if let Some(venue_score) = &mut ctx.accounts.venue_score {
-            // Mock stats for now as process_single_swap is mocked
-            let latency = 100; 
-            let slippage_bps = 10;
-            let npi = 0;
-            venue_score.update_stats(args.amount_in, npi, latency, slippage_bps, &clock);
+            venue_score.update_stats(args.amount_in, npi, latency_ms, actual_slippage_bps, &clock);
         }
 
         Ok(())
@@ -1718,22 +1790,152 @@ pub mod swap_toc_processor {
         Ok(min_out)
     }
 
-    fn process_single_swap(_ctx: &Context<SwapToC>, amount_in: u64, min_out: u64) -> Result<()> {
-        let amount_out = amount_in;
+    /// Execute a single swap via Jupiter CPI
+    /// This is the core swap function that delegates to the Jupiter aggregator
+    fn process_single_swap(
+        ctx: &mut Context<SwapToC>,
+        amount_in: u64,
+        min_out: u64,
+        jupiter_route: Option<&JupiterRouteParams>,
+    ) -> Result<u64> {
+        // Require Jupiter route for single swaps
+        let route = jupiter_route.ok_or(ErrorCode::MissingJupiterRoute)?;
+        
+        // Validate route parameters match swap request
+        require_eq!(
+            route.expected_input_amount,
+            amount_in,
+            ErrorCode::InvalidJupiterRoute
+        );
 
-        if amount_out < min_out {
-            return err!(ErrorCode::SlippageExceeded);
+        // Get remaining accounts for Jupiter CPI
+        let remaining_accounts = ctx.remaining_accounts;
+        require!(
+            remaining_accounts.len() >= cpi_jupiter::JUPITER_SWAP_ACCOUNT_COUNT.min(1),
+            ErrorCode::DexExecutionFailed
+        );
+
+        // Execute Jupiter swap via CPI
+        let amount_out = cpi_jupiter::swap(
+            ctx,
+            remaining_accounts,
+            amount_in,
+            min_out,
+            route,
+        )?;
+
+        emit!(VenueExecuted {
+            venue: JUPITER_PROGRAM_ID,
+            amount_in,
+            amount_out,
+            success: true,
+            fallback_used: false,
+        });
+
+        // Calculate and distribute fees/rebates
+        let user_boost = ctx.accounts.user_nft
+            .as_ref()
+            .filter(|nft| nft.is_active)
+            .map(|nft| nft.boost)
+            .unwrap_or(0);
+
+        // Platform fee calculation
+        let platform_fee = calculate_fee(amount_out, PLATFORM_FEE_BPS)?;
+        let treasury_fee = calculate_fee(platform_fee, ctx.accounts.state.treasury_from_fees_bps)?;
+        let buyburn_fee = calculate_fee(platform_fee, ctx.accounts.state.buyburn_from_fees_bps)?;
+
+        let net_amount = amount_out.saturating_sub(platform_fee);
+        
+        // NPI (routing profit) calculation
+        let routing_profit = if net_amount > min_out {
+            net_amount.saturating_sub(min_out)
+        } else {
+            0
+        };
+
+        // Rebate calculation with boost
+        if routing_profit > 0 {
+            let base_rebate = calculate_fee(routing_profit, ctx.accounts.state.rebate_percentage)?;
+            let treasury_from_npi = calculate_fee(routing_profit, ctx.accounts.state.treasury_percentage)?;
+            let boost_allocation = calculate_fee(routing_profit, ctx.accounts.state.boost_vault_percentage)?;
+            
+            let boost_amount = if user_boost > 0 {
+                calculate_fee(base_rebate, user_boost)?
+            } else {
+                0
+            };
+            let boost_paid = boost_amount.min(boost_allocation);
+            let total_rebate = base_rebate.saturating_add(boost_paid);
+
+            // Pay rebate to user
+            pay_rebate_to_user_with_amount(ctx, routing_profit, user_boost, total_rebate)?;
+
+            // Update state totals
+            let state = &mut ctx.accounts.state;
+            state.total_treasury_from_npi = state.total_treasury_from_npi.saturating_add(treasury_from_npi);
+            state.total_boost_vault = state.total_boost_vault.saturating_add(boost_allocation.saturating_sub(boost_paid));
+
+            let now = Clock::get()?.unix_timestamp;
+            emit!(NPIDistributed {
+                user: ctx.accounts.user.key(),
+                total_npi: routing_profit,
+                to_rebate: total_rebate,
+                to_treasury: treasury_from_npi,
+                to_boost_vault: boost_allocation.saturating_sub(boost_paid),
+                boost_paid,
+                timestamp: now,
+            });
         }
 
-        Ok(())
+        // Update fee totals
+        let state = &mut ctx.accounts.state;
+        state.total_treasury_from_fees = state.total_treasury_from_fees.saturating_add(treasury_fee);
+        state.total_buyburn = state.total_buyburn.saturating_add(buyburn_fee);
+
+        emit!(FeesAllocated {
+            swap_amount: amount_out,
+            platform_fee,
+            to_treasury: treasury_fee,
+            to_buyburn: buyburn_fee,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        // Deposit to buyback if configured
+        if buyburn_fee > 0 
+            && ctx.accounts.buyback_program.is_some()
+            && ctx.accounts.buyback_usdc_vault.is_some()
+            && ctx.accounts.buyback_state.is_some()
+        {
+            deposit_to_buyback(ctx, buyburn_fee)?;
+        }
+
+        emit!(SwapCompleted {
+            user: ctx.accounts.user.key(),
+            amount_in,
+            amount_out,
+            platform_fee,
+            routing_profit,
+            buyburn_deposit: buyburn_fee,
+            user_boost,
+            rebate_amount: if routing_profit > 0 {
+                calculate_fee(routing_profit, ctx.accounts.state.rebate_percentage).unwrap_or(0)
+            } else {
+                0
+            },
+        });
+
+        Ok(amount_out)
     }
 
+    /// Process TWAP swap - emits event for keeper orchestration
+    /// TWAP swaps are split into multiple transactions by the keeper service
+    /// This avoids compute budget issues and allows for time-weighted execution
     fn process_twap_swap(
-        ctx: &Context<SwapToC>,
+        ctx: &mut Context<SwapToC>,
         args: SwapArgs,
         total_min_out: u64,
         twap_slices: u8,
-        _clock: &Clock,
+        clock: &Clock,
     ) -> Result<()> {
         let slice_amount = args.amount_in / twap_slices as u64;
         if slice_amount == 0 {
@@ -1741,10 +1943,30 @@ pub mod swap_toc_processor {
         }
 
         let slice_min_out = total_min_out / twap_slices as u64;
+        
+        // For TWAP, execute first slice immediately, emit event for keeper to handle rest
+        let amount_out = process_single_swap(
+            ctx,
+            slice_amount,
+            slice_min_out,
+            args.jupiter_route.as_ref(),
+        )?;
 
-        for _ in 0..twap_slices {
-            process_single_swap(ctx, slice_amount, slice_min_out)?;
-        }
+        // Emit TWAP hint for keeper to schedule remaining slices
+        emit!(TwapSlicesRequired {
+            user: ctx.accounts.user.key(),
+            total_amount: args.amount_in,
+            slice_amount,
+            slice_min_out,
+            remaining_slices: twap_slices - 1,
+            interval_seconds: 60, // 1 minute between slices
+            first_slice_executed: true,
+            first_slice_output: amount_out,
+            timestamp: clock.unix_timestamp,
+        });
+
+        msg!("🕐 TWAP: Executed slice 1/{}, remaining {} slices scheduled for keeper", 
+            twap_slices, twap_slices - 1);
 
         Ok(())
     }
