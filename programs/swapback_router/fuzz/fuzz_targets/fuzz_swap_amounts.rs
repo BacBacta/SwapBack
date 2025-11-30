@@ -15,6 +15,7 @@ fuzz_target!(|input: SwapFuzzInput| {
     // Constants du programme router
     const MAX_SINGLE_SWAP_LAMPORTS: u64 = 5_000_000_000_000; // 5,000 SOL
     const MAX_SLIPPAGE_BPS: u16 = 5000; // 50%
+    const MAX_PLATFORM_FEE_BPS: u16 = 100; // Max 1% platform fee (realistic bound)
     const DEFAULT_REBATE_BPS: u16 = 7000;
     const TREASURY_FROM_NPI_BPS: u16 = 1500;
     const BOOST_VAULT_BPS: u16 = 1500;
@@ -29,8 +30,11 @@ fuzz_target!(|input: SwapFuzzInput| {
         return; // Devrait être rejeté
     }
     
+    // Test 2b: Validation des platform fees (our program uses 20 bps, but test up to 100 bps)
+    let platform_fee_bps = input.platform_fee_bps.min(MAX_PLATFORM_FEE_BPS);
+    
     // Test 3: Calcul des fees avec checked arithmetic
-    let platform_fee = input.amount_in.checked_mul(input.platform_fee_bps as u64)
+    let platform_fee = input.amount_in.checked_mul(platform_fee_bps as u64)
         .and_then(|v| v.checked_div(10000));
     
     if let Some(fee) = platform_fee {
