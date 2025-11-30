@@ -51,4 +51,18 @@ pub enum SwapbackError {
     Unauthorized,
     #[msg("Math overflow")]
     MathOverflow,
+
+    // Jupiter CPI Errors
+    #[msg("Missing Jupiter route / instruction data for CPI swap")]
+    MissingJupiterRoute,
+    #[msg("Jupiter CPI failed")]
+    JupiterCpiFailed,
+    #[msg("Jupiter CPI: input not spent (delta=0)")]
+    JupiterNoInputSpent,
+    #[msg("Jupiter CPI: spent input too high vs expected")]
+    JupiterSpentTooHigh,
+    #[msg("Slippage exceeded (amount_out < min_out)")]
+    SlippageExceededCpi,
+    #[msg("Invalid liquidity estimate (must be > 0)")]
+    InvalidLiquidityEstimate,
 }
