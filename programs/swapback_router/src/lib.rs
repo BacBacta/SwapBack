@@ -249,7 +249,7 @@ pub mod swapback_router {
         create_plan_processor::process_create_plan(ctx, plan_id, plan_data)
     }
 
-    pub fn swap_toc(ctx: Context<SwapToC>, args: SwapArgs) -> Result<()> {
+    pub fn swap_toc<'info>(ctx: Context<'_, '_, '_, 'info, SwapToC<'info>>, args: SwapArgs) -> Result<()> {
         swap_toc_processor::process_swap_toc(ctx, args)
     }
 
@@ -1193,7 +1193,7 @@ pub mod swap_toc_processor {
     use crate::cpi_orca;
     use crate::oracle::{self, OracleObservation};
 
-    pub fn process_swap_toc(mut ctx: Context<SwapToC>, args: SwapArgs) -> Result<()> {
+    pub fn process_swap_toc<'info>(mut ctx: Context<'_, '_, '_, 'info, SwapToC<'info>>, args: SwapArgs) -> Result<()> {
         // ✅ SECURITY: Validate input parameters
         require!(args.amount_in > 0, ErrorCode::InvalidAmount);
         require!(args.min_out > 0, ErrorCode::InvalidAmount);
@@ -1842,10 +1842,11 @@ pub mod swap_toc_processor {
         adjust_weights_with_scores(venues, &scores, min_score);
     }
 
-    /// Execute a single swap via Jupiter CPI
+    /// Execute a single swap via Jupiter CPI using delta-based amount calculation.
     /// This is the core swap function that delegates to the Jupiter aggregator
-    fn process_single_swap(
-        ctx: &mut Context<SwapToC>,
+    /// and measures actual token balance changes for accurate amount_out.
+    fn process_single_swap<'info>(
+        ctx: &mut Context<'_, '_, '_, 'info, SwapToC<'info>>,
         amount_in: u64,
         min_out: u64,
         jupiter_route: Option<&JupiterRouteParams>,
@@ -1867,13 +1868,27 @@ pub mod swap_toc_processor {
             ErrorCode::DexExecutionFailed
         );
 
-        // Execute Jupiter swap via CPI
-        let amount_out = cpi_jupiter::swap(
-            ctx,
+        // Find Jupiter program in remaining accounts (first account must be Jupiter)
+        let jupiter_program = remaining_accounts
+            .first()
+            .ok_or(ErrorCode::DexExecutionFailed)?;
+        require_keys_eq!(
+            *jupiter_program.key,
+            JUPITER_PROGRAM_ID,
+            ErrorCode::DexExecutionFailed
+        );
+
+        // Execute Jupiter swap via CPI with delta-based amount tracking
+        // This measures actual balance changes for accurate amount_out
+        let amount_out = cpi_jupiter::swap_with_balance_deltas(
+            jupiter_program,
             remaining_accounts,
+            &ctx.accounts.user_token_account_a.to_account_info(),
+            &ctx.accounts.user_token_account_b.to_account_info(),
             amount_in,
             min_out,
-            route,
+            &route.swap_instruction,
+            &[], // No signer seeds needed - user signs directly
         )?;
 
         emit!(VenueExecuted {
@@ -1982,8 +1997,8 @@ pub mod swap_toc_processor {
     /// Process TWAP swap - emits event for keeper orchestration
     /// TWAP swaps are split into multiple transactions by the keeper service
     /// This avoids compute budget issues and allows for time-weighted execution
-    fn process_twap_swap(
-        ctx: &mut Context<SwapToC>,
+    fn process_twap_swap<'info>(
+        ctx: &mut Context<'_, '_, '_, 'info, SwapToC<'info>>,
         args: SwapArgs,
         total_min_out: u64,
         twap_slices: u8,
