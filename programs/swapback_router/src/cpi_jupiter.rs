@@ -32,16 +32,32 @@ pub fn swap(
         ErrorCode::InvalidJupiterRoute
     );
 
-    let filtered_accounts: Vec<AccountInfo> = account_slice
+    // Count valid accounts first to pre-allocate
+    let valid_count = account_slice
         .iter()
-        .filter(|account| account.key != &ACCOUNT_PADDING_SENTINEL)
-        .cloned()
-        .collect();
+        .filter(|a| a.key != &ACCOUNT_PADDING_SENTINEL)
+        .count();
 
     require!(
-        filtered_accounts.len() >= JUPITER_MIN_ACCOUNT_COUNT,
+        valid_count >= JUPITER_MIN_ACCOUNT_COUNT,
         ErrorCode::DexExecutionFailed
     );
+
+    // Pre-allocate with exact capacity
+    let mut filtered_accounts: Vec<AccountInfo> = Vec::with_capacity(valid_count);
+    let mut metas: Vec<AccountMeta> = Vec::with_capacity(valid_count);
+
+    for account in account_slice.iter() {
+        if account.key != &ACCOUNT_PADDING_SENTINEL {
+            metas.push(AccountMeta {
+                pubkey: *account.key,
+                is_signer: account.is_signer,
+                is_writable: account.is_writable,
+            });
+            filtered_accounts.push(account.clone());
+        }
+    }
+
     require_keys_eq!(
         *filtered_accounts
             .first()
@@ -53,15 +69,6 @@ pub fn swap(
 
     let destination_account_info = ctx.accounts.user_token_account_b.to_account_info();
     let amount_before = ctx.accounts.user_token_account_b.amount;
-
-    let metas: Vec<AccountMeta> = filtered_accounts
-        .iter()
-        .map(|info| AccountMeta {
-            pubkey: *info.key,
-            is_signer: info.is_signer,
-            is_writable: info.is_writable,
-        })
-        .collect();
 
     let instruction = Instruction {
         program_id: JUPITER_PROGRAM_ID,
@@ -119,15 +126,16 @@ pub fn swap_with_balance_deltas<'info>(
     let pre_in = token_amount(user_source_ata)?;
     let pre_out = token_amount(user_dest_ata)?;
 
-    // CPI: build metas from remaining accounts (Jupiter expects exact ordering)
-    let metas: Vec<AccountMeta> = remaining_accounts
-        .iter()
-        .map(|ai| AccountMeta {
+    // CPI: build metas from remaining accounts with pre-allocation
+    let account_count = remaining_accounts.len();
+    let mut metas: Vec<AccountMeta> = Vec::with_capacity(account_count);
+    for ai in remaining_accounts.iter() {
+        metas.push(AccountMeta {
             pubkey: *ai.key,
             is_signer: ai.is_signer,
             is_writable: ai.is_writable,
-        })
-        .collect();
+        });
+    }
 
     let ix = Instruction {
         program_id: *jupiter_program.key,
