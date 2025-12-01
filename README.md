@@ -304,6 +304,65 @@ Le système de verrouillage utilise des **compressed NFTs (cNFTs)** pour représ
 - 📊 **Progression** : Gamification claire des niveaux utilisateur
 - ⚡ **Efficacité** : Stockage compressé pour scalabilité Solana
 
+## 🛠️ Keeper Tooling (offline)
+
+Le projet inclut des outils offline pour préparer les paramètres de swap (keeper helpers).
+
+### Installation
+
+```bash
+npm install
+```
+
+### Scripts disponibles
+
+| Script | Description |
+|--------|-------------|
+| `prepare-mock-route.ts` | Génère un JSON de route mock (SPL token transfer) |
+| `validate-remaining-accounts.ts` | Valide un fichier keeper_route.json |
+| `prepare-dynamic-plan.ts` | Génère un plan de routing dynamique |
+| `prepare-slippage-inputs.ts` | Génère les inputs de slippage dynamique |
+
+### Exemples d'utilisation
+
+```bash
+# Préparer une route mock
+npx tsx scripts/prepare-mock-route.ts \
+  --from <source_ata> \
+  --to <dest_ata> \
+  --authority <user_pubkey> \
+  --amount 1000000000
+
+# Préparer un plan de routing
+npx tsx scripts/prepare-dynamic-plan.ts \
+  --venues Jupiter:7000 Orca:3000
+
+# Préparer les inputs de slippage
+npx tsx scripts/prepare-slippage-inputs.ts \
+  --liquidity 1000000000 \
+  --volatility-bps 125
+```
+
+### Gate de vérification
+
+```bash
+./scripts/verify-docs-and-scripts.sh
+```
+
+Ce script vérifie :
+- La présence des fichiers de documentation requis
+- Les sections obligatoires dans chaque doc
+- L'exécution correcte des scripts offline
+- La conformité des outputs JSON aux schémas
+
+### Documentation
+
+- [docs/KEEPER.md](docs/KEEPER.md) - Rôle du keeper et construction des transactions
+- [docs/CPI_ACCOUNTS.md](docs/CPI_ACCOUNTS.md) - Ordre des comptes pour CPI Jupiter
+- [docs/ROUTING.md](docs/ROUTING.md) - Plan dynamique et poids des venues
+- [docs/SLIPPAGE.md](docs/SLIPPAGE.md) - Calcul du slippage dynamique
+- [docs/EXAMPLES.md](docs/EXAMPLES.md) - Exemples de commandes
+
 ## 🗺️ Roadmap
 
 ### Phase 1 : MVP (Semaines 1-6)
