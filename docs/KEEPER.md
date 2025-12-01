@@ -1,522 +1,191 @@
-# SwapBack Keeper Services
-
-## Keeper / Off-chain Builder - Quick Summary
-
-### Objectif
-Le keeper prépare:
-- la route Jupiter (swap instruction data + ordered accounts)
-- les estimations (liquidity_estimate, volatility_bps)
-- et fournit si nécessaire les comptes VenueScore en remaining_accounts
-
-### Pattern recommandé
-1) User signe une transaction qui appelle le programme swapback_router `swap_toc`
-2) `swap_toc` rejoue l'instruction Jupiter via CPI
-3) Le programme calcule les deltas sur les ATA user pour obtenir `amount_out` réel
-
-### Required inputs
-- `jupiter_swap_ix_data`: bytes de l'instruction swap Jupiter
-- `remaining_accounts`: comptes requis par Jupiter (dans l'ordre)
-- `liquidity_estimate`: estimation liquidité (u64, >0)
-- `volatility_bps`: volatilité en BPS (u16)
-
----
+# Keeper Documentation
 
 ## Overview
 
-SwapBack uses keeper services (off-chain bots) to orchestrate:
-- **DCA Plan Execution**: Execute scheduled DCA swaps
-- **TWAP Slice Scheduling**: Execute time-weighted swaps
-- **Buyback Execution**: Execute buy & burn operations
-- **Monitoring**: Track system health and send alerts
+The **keeper** is an off-chain service responsible for preparing and submitting swap transactions to the SwapBack router program. It acts as an intermediary between users/DCA plans and the on-chain execution.
 
-## Architecture
+### What the keeper does:
+- Fetches optimal routes from Jupiter (or other DEX aggregators)
+- Prepares `jupiter_swap_ix_data` (serialized instruction bytes)
+- Builds the ordered `remaining_accounts` array for CPI
+- Estimates `liquidity_estimate` and `volatility_bps` for dynamic slippage
+- Constructs and signs transactions for `swap_toc` or `execute_dca_swap`
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Keeper Services                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
-│  │  DCA Keeper  │  │ TWAP Keeper  │  │  Buyback     │          │
-│  │              │  │              │  │  Keeper      │          │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘          │
-│         │                 │                 │                   │
-│         ▼                 ▼                 ▼                   │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                    Jupiter V6 API                        │   │
-│  │              https://quote-api.jup.ag/v6                 │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│         │                 │                 │                   │
-│         ▼                 ▼                 ▼                   │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │               Solana RPC (Transaction Submission)        │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
+### What the keeper does NOT do:
+- **No custody**: The keeper never holds user funds
+- **No signing authority over user tokens**: Users sign their own transactions
+- **No on-chain state modification**: Only prepares transaction parameters
 
-## DCA Keeper (`oracle/src/dca-keeper.ts`)
+---
 
-### Purpose
-Execute scheduled DCA swaps when `next_execution` timestamp is reached.
+## Transaction building
 
-### Flow
+### `swap_toc` instruction
 
-```
-1. Poll active DCA plans every 30 seconds
-2. Filter plans where: is_active && !is_completed && next_execution <= now
-3. For each ready plan:
-   a. Get Jupiter quote for amount_per_swap
-   b. Build swap instruction
-   c. Execute execute_dca_swap with Jupiter route
-   d. Log results and update metrics
-```
-
-### Implementation
+The `swap_toc` instruction executes a single swap with the following parameters:
 
 ```typescript
-import { Connection, PublicKey, Transaction } from '@solana/web3.js';
-import { Program } from '@coral-xyz/anchor';
-import { createJupiterApiClient } from '@jup-ag/api';
-
-interface DcaPlan {
-  user: PublicKey;
-  planId: number[];
-  tokenIn: PublicKey;
-  tokenOut: PublicKey;
-  amountPerSwap: bigint;
-  minOutPerSwap: bigint;
-  nextExecution: bigint;
-  isActive: boolean;
-  executedSwaps: bigint;
-  totalSwaps: bigint;
-}
-
-class DcaKeeper {
-  private connection: Connection;
-  private program: Program;
-  private jupiter: ReturnType<typeof createJupiterApiClient>;
-  private executorKeypair: Keypair;
-
-  async pollAndExecute() {
-    // 1. Fetch all active DCA plans
-    const plans = await this.program.account.dcaPlan.all([
-      { memcmp: { offset: 8 + 32 + 32, bytes: bs58.encode([1]) } } // is_active = true
-    ]);
-
-    const now = Math.floor(Date.now() / 1000);
-    const readyPlans = plans.filter(p => 
-      p.account.isActive && 
-      !p.account.isCompleted() &&
-      Number(p.account.nextExecution) <= now
-    );
-
-    for (const plan of readyPlans) {
-      await this.executeDcaSwap(plan);
-    }
-  }
-
-  async executeDcaSwap(plan: { publicKey: PublicKey; account: DcaPlan }) {
-    try {
-      // 2. Get Jupiter quote
-      const quote = await this.jupiter.quoteGet({
-        inputMint: plan.account.tokenIn.toString(),
-        outputMint: plan.account.tokenOut.toString(),
-        amount: Number(plan.account.amountPerSwap),
-        slippageBps: 100, // 1% slippage for DCA
-      });
-
-      // 3. Get swap instruction
-      const { swapInstruction, addressLookupTableAccounts } = 
-        await this.jupiter.swapInstructionsPost({
-          quoteResponse: quote,
-          userPublicKey: plan.account.user.toString(),
-        });
-
-      // 4. Build and send transaction
-      const args = {
-        jupiterInstruction: Buffer.from(swapInstruction.data),
-        expectedInput: plan.account.amountPerSwap,
-        amountReceived: BigInt(quote.outAmount), // For validation
-      };
-
-      const tx = await this.program.methods
-        .executeDcaSwap(args)
-        .accounts({
-          dcaPlan: plan.publicKey,
-          state: this.routerState,
-          userTokenIn: await this.getUserTokenAccount(plan.account.user, plan.account.tokenIn),
-          userTokenOut: await this.getUserTokenAccount(plan.account.user, plan.account.tokenOut),
-          user: plan.account.user,
-          executor: this.executorKeypair.publicKey,
-          jupiterProgram: JUPITER_PROGRAM_ID,
-          tokenProgram: TOKEN_PROGRAM_ID,
-          systemProgram: SystemProgram.programId,
-        })
-        .remainingAccounts(swapInstruction.accounts.map(a => ({
-          pubkey: new PublicKey(a.pubkey),
-          isWritable: a.isWritable,
-          isSigner: a.isSigner,
-        })))
-        .signers([this.executorKeypair])
-        .rpc();
-
-      console.log(`✅ DCA swap executed: ${tx}`);
-      await this.notifySuccess(plan, quote.outAmount);
-
-    } catch (error) {
-      console.error(`❌ DCA swap failed for plan ${plan.publicKey}:`, error);
-      await this.notifyFailure(plan, error);
-    }
-  }
+interface SwapArgs {
+  amount_in: u64;
+  min_out: u64;
+  slippage_tolerance?: u16;        // Optional, in basis points (50 = 0.5%)
+  twap_slices?: u8;                // Optional TWAP slices
+  use_dynamic_plan: boolean;
+  plan_account?: Pubkey;
+  use_bundle: boolean;
+  primary_oracle_account: Pubkey;
+  fallback_oracle_account?: Pubkey;
+  jupiter_route?: JupiterRouteParams;
+  jupiter_swap_ix_data?: Vec<u8>;  // Serialized Jupiter instruction
+  liquidity_estimate?: u64;        // Pool TVL estimate
+  volatility_bps?: u16;            // Volatility 0..5000
+  min_venue_score?: u16;           // Exclude venues below this score
 }
 ```
 
-### Configuration
+**Transaction structure:**
+```
+swap_toc {
+  accounts: [
+    user (signer),
+    user_token_account_a (mut),
+    user_token_account_b (mut),
+    state,
+    config,
+    token_a_mint,
+    token_b_mint,
+    user_rebate (mut),
+    rebate_vault (mut),
+    token_program,
+    system_program,
+  ],
+  remaining_accounts: [
+    jupiter_program,
+    ...jupiter_route_accounts  // In exact order from Jupiter API
+  ],
+  args: SwapArgs
+}
+```
+
+### `execute_dca_swap` instruction
+
+For DCA plans, the keeper monitors active plans and triggers execution when ready:
+
+```
+execute_dca_swap {
+  accounts: [
+    dca_plan (mut),
+    user_token_in (mut),
+    user_token_out (mut),
+    token_program,
+  ],
+  remaining_accounts: [
+    jupiter_program,
+    ...jupiter_route_accounts
+  ]
+}
+```
+
+---
+
+## Inputs
+
+### `jupiter_swap_ix_data`
+
+The serialized instruction data from Jupiter's swap/route API. This is obtained by:
+
+1. Calling Jupiter's `/quote` endpoint
+2. Calling Jupiter's `/swap` endpoint with the quote
+3. Extracting `swapTransaction` and deserializing the instruction data
 
 ```typescript
-const DCA_KEEPER_CONFIG = {
-  pollIntervalMs: 30_000,        // Check every 30 seconds
-  maxRetries: 3,                 // Retry failed swaps
-  retryDelayMs: 5_000,          // Wait between retries
-  slippageBps: 100,             // 1% default slippage
-  priorityFeeMicroLamports: 100_000, // Priority fee for inclusion
-};
+// Example: Extract Jupiter ix data
+const quoteResponse = await fetch(`https://quote-api.jup.ag/v6/quote?...`);
+const swapResponse = await fetch('https://quote-api.jup.ag/v6/swap', {
+  method: 'POST',
+  body: JSON.stringify({ quoteResponse, userPublicKey: user.toBase58() })
+});
+const { swapTransaction } = await swapResponse.json();
+// Deserialize and extract instruction data
 ```
 
-## TWAP Keeper
+**For offline/mock testing:** See [scripts/prepare-mock-route.ts](../scripts/prepare-mock-route.ts)
 
-### Purpose
-Execute remaining TWAP slices after the first slice is executed on-chain.
+### `remaining_accounts`
 
-### Event Listening
+The array of account metas required by the Jupiter instruction, in exact order. See [CPI_ACCOUNTS.md](./CPI_ACCOUNTS.md) for details.
 
-Listen for `TwapSlicesRequired` events:
+### `liquidity_estimate` and `volatility_bps`
 
-```typescript
-interface TwapSlicesRequired {
-  user: PublicKey;
-  totalAmount: bigint;
-  sliceAmount: bigint;
-  sliceMinOut: bigint;
-  remainingSlices: number;
-  intervalSeconds: bigint;
-  firstSliceExecuted: boolean;
-  firstSliceOutput: bigint;
-  timestamp: bigint;
-}
+For dynamic slippage calculation:
 
-class TwapKeeper {
-  async onTwapSlicesRequired(event: TwapSlicesRequired) {
-    const { user, sliceAmount, sliceMinOut, remainingSlices, intervalSeconds } = event;
-    
-    // Schedule remaining slices
-    for (let i = 0; i < remainingSlices; i++) {
-      const executeAt = Date.now() + (i + 1) * Number(intervalSeconds) * 1000;
-      
-      this.scheduler.schedule(executeAt, async () => {
-        await this.executeSlice(user, sliceAmount, sliceMinOut, i + 2);
-      });
-    }
-  }
+| Parameter | Type | Range | Description |
+|-----------|------|-------|-------------|
+| `liquidity_estimate` | u64 | >= 1 | Pool TVL in smallest units |
+| `volatility_bps` | u16 | 0..5000 | Market volatility (100 = 1%) |
 
-  async executeSlice(user: PublicKey, amount: bigint, minOut: bigint, sliceNumber: number) {
-    // Similar to DCA execution
-    const quote = await this.jupiter.quoteGet({
-      inputMint: this.tokenIn.toString(),
-      outputMint: this.tokenOut.toString(),
-      amount: Number(amount),
-      slippageBps: 50,
-    });
+See [SLIPPAGE.md](./SLIPPAGE.md) for calculation details.
 
-    // Execute swap...
-    console.log(`🕐 TWAP slice ${sliceNumber} executed`);
-  }
-}
-```
+---
 
-## Buyback Keeper (`oracle/src/buyback-keeper.ts`)
+## Determinism & safety
 
-### Purpose
-Execute buy & burn operations when threshold is reached.
+### Limits and clamping
 
-### Configuration
+- **Slippage**: Always clamped to `[30, 500]` bps (0.3% - 5%)
+- **Weights**: Sum renormalized to exactly 10,000 bps
+- **Amount splits**: Last bucket corrected to ensure sum = `amount_in`
 
-```typescript
-const BUYBACK_CONFIG = {
-  minUsdcThreshold: 1000_000_000, // 1000 USDC minimum
-  checkIntervalMs: 300_000,       // Check every 5 minutes
-  targetToken: BACK_MINT,
-  slippageBps: 100,
-  burnAddress: 'burnBack111111111111111111111111111111111111',
-};
-```
+### Replay protection
 
-### Flow
+- Each swap modifies on-chain state (user rebate, plan execution count)
+- Transaction signatures are unique per blockhash
+- DCA plans track `next_execution` timestamp
 
-```
-1. Check buyback vault balance every 5 minutes
-2. If balance >= threshold:
-   a. Get Jupiter quote for USDC → BACK
-   b. Execute swap
-   c. Burn received BACK tokens
-   d. Send notification
-```
+### Risk considerations
 
-## Monitoring & Alerts
+1. **Stale routes**: Jupiter routes expire. The keeper should fetch fresh routes close to execution.
+2. **Slippage attacks**: Always provide realistic `min_out` based on current prices.
+3. **Account ordering**: Incorrect account order causes CPI failure.
+4. **Venue exclusion**: Low-score venues (< `min_venue_score`) are excluded from routing.
 
-### Webhook Integration
+---
 
-```typescript
-interface AlertConfig {
-  discord?: string;    // Discord webhook URL
-  slack?: string;      // Slack webhook URL
-  telegram?: {
-    botToken: string;
-    chatId: string;
-  };
-}
+## Examples
 
-class KeeperMonitor {
-  async sendAlert(level: 'info' | 'warn' | 'error', message: string, data?: any) {
-    const payload = {
-      level,
-      message,
-      timestamp: new Date().toISOString(),
-      data,
-    };
-
-    if (this.config.discord) {
-      await this.sendDiscordAlert(payload);
-    }
-    if (this.config.slack) {
-      await this.sendSlackAlert(payload);
-    }
-    if (this.config.telegram) {
-      await this.sendTelegramAlert(payload);
-    }
-  }
-
-  private async sendDiscordAlert(payload: AlertPayload) {
-    const color = { info: 0x00ff00, warn: 0xffff00, error: 0xff0000 }[payload.level];
-    
-    await fetch(this.config.discord!, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        embeds: [{
-          title: `SwapBack Keeper - ${payload.level.toUpperCase()}`,
-          description: payload.message,
-          color,
-          fields: payload.data ? [
-            { name: 'Details', value: JSON.stringify(payload.data, null, 2) }
-          ] : [],
-          timestamp: payload.timestamp,
-        }],
-      }),
-    });
-  }
-}
-```
-
-### Health Metrics
-
-```typescript
-interface KeeperMetrics {
-  dcaSwapsExecuted: number;
-  dcaSwapsFailed: number;
-  twapSlicesExecuted: number;
-  buybacksExecuted: number;
-  totalVolumeProcessed: bigint;
-  averageLatencyMs: number;
-  lastHeartbeat: Date;
-}
-
-class MetricsCollector {
-  private metrics: KeeperMetrics = {
-    dcaSwapsExecuted: 0,
-    dcaSwapsFailed: 0,
-    twapSlicesExecuted: 0,
-    buybacksExecuted: 0,
-    totalVolumeProcessed: 0n,
-    averageLatencyMs: 0,
-    lastHeartbeat: new Date(),
-  };
-
-  recordDcaExecution(success: boolean, volume: bigint, latencyMs: number) {
-    if (success) {
-      this.metrics.dcaSwapsExecuted++;
-      this.metrics.totalVolumeProcessed += volume;
-    } else {
-      this.metrics.dcaSwapsFailed++;
-    }
-    this.updateAverageLatency(latencyMs);
-  }
-
-  getHealthStatus(): 'healthy' | 'degraded' | 'unhealthy' {
-    const failureRate = this.metrics.dcaSwapsFailed / 
-      (this.metrics.dcaSwapsExecuted + this.metrics.dcaSwapsFailed);
-    
-    if (failureRate > 0.2) return 'unhealthy';
-    if (failureRate > 0.05) return 'degraded';
-    return 'healthy';
-  }
-}
-```
-
-## Transaction Construction
-
-### Priority Fees
-
-```typescript
-import { ComputeBudgetProgram } from '@solana/web3.js';
-
-function addPriorityFee(transaction: Transaction, microLamports: number) {
-  transaction.add(
-    ComputeBudgetProgram.setComputeUnitPrice({
-      microLamports,
-    }),
-    ComputeBudgetProgram.setComputeUnitLimit({
-      units: 400_000, // Adjust based on instruction complexity
-    })
-  );
-}
-```
-
-### Versioned Transactions
-
-```typescript
-import { 
-  VersionedTransaction, 
-  TransactionMessage,
-  AddressLookupTableAccount,
-} from '@solana/web3.js';
-
-async function buildVersionedTransaction(
-  instructions: TransactionInstruction[],
-  payer: PublicKey,
-  lookupTables: AddressLookupTableAccount[],
-) {
-  const blockhash = await connection.getLatestBlockhash();
-  
-  const message = new TransactionMessage({
-    payerKey: payer,
-    recentBlockhash: blockhash.blockhash,
-    instructions,
-  }).compileToV0Message(lookupTables);
-
-  return new VersionedTransaction(message);
-}
-```
-
-## Deployment
-
-### Environment Variables
-
+### Prepare a mock route (offline)
 ```bash
-# RPC Configuration
-SOLANA_RPC_URL=https://api.devnet.solana.com
-COMMITMENT=confirmed
-
-# Keeper Wallet
-KEEPER_PRIVATE_KEY=<base58-encoded-private-key>
-
-# Program IDs
-ROUTER_PROGRAM_ID=9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh
-BUYBACK_PROGRAM_ID=7wCCwRXxWvMY2DJDRrnhFg3b8jVPb5vVPxLH5YAGL6eJ
-
-# Alert Configuration
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
-SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
-TELEGRAM_BOT_TOKEN=<bot-token>
-TELEGRAM_CHAT_ID=<chat-id>
-
-# Keeper Config
-DCA_POLL_INTERVAL_MS=30000
-BUYBACK_CHECK_INTERVAL_MS=300000
-PRIORITY_FEE_MICRO_LAMPORTS=100000
+npx tsx scripts/prepare-mock-route.ts \
+  --from <source_ata> \
+  --to <dest_ata> \
+  --authority <user_pubkey> \
+  --amount 1000000000
 ```
 
-### Docker Deployment
-
-```dockerfile
-FROM node:20-alpine
-
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --production
-COPY dist/ ./dist/
-
-ENV NODE_ENV=production
-CMD ["node", "dist/keeper.js"]
+### Prepare dynamic plan
+```bash
+npx tsx scripts/prepare-dynamic-plan.ts \
+  --venues Jupiter:7000 Orca:3000 \
+  --mode renormalize
 ```
 
-### Systemd Service
-
-```ini
-[Unit]
-Description=SwapBack Keeper Service
-After=network.target
-
-[Service]
-Type=simple
-User=swapback
-WorkingDirectory=/opt/swapback-keeper
-ExecStart=/usr/bin/node dist/keeper.js
-Restart=always
-RestartSec=10
-Environment=NODE_ENV=production
-
-[Install]
-WantedBy=multi-user.target
+### Prepare slippage inputs
+```bash
+npx tsx scripts/prepare-slippage-inputs.ts \
+  --liquidity 1000000000 \
+  --volatility-bps 125 \
+  --base-bps 50 \
+  --min-bps 30 \
+  --max-bps 500
 ```
 
-## Error Handling
-
-### Retry Strategy
-
-```typescript
-async function withRetry<T>(
-  operation: () => Promise<T>,
-  maxRetries: number = 3,
-  delayMs: number = 1000,
-): Promise<T> {
-  let lastError: Error | undefined;
-  
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await operation();
-    } catch (error) {
-      lastError = error as Error;
-      
-      // Don't retry on certain errors
-      if (error.message?.includes('insufficient funds')) {
-        throw error;
-      }
-      
-      console.warn(`Attempt ${i + 1} failed, retrying in ${delayMs}ms...`);
-      await sleep(delayMs * (i + 1)); // Exponential backoff
-    }
-  }
-  
-  throw lastError;
-}
+### Validate remaining accounts
+```bash
+npx tsx scripts/validate-remaining-accounts.ts \
+  --file tmp/keeper_route.json
 ```
 
-### Common Errors
-
-| Error | Cause | Resolution |
-|-------|-------|------------|
-| `SlippageExceeded` | Price moved too much | Increase slippage or retry |
-| `InsufficientBalance` | User lacks tokens | Skip this execution |
-| `NotReadyForExecution` | Time not reached | Wait for next_execution |
-| `PlanExpired` | DCA plan expired | Mark as completed |
-| `TransactionExpiredBlockheightExceeded` | RPC lag | Retry with fresh blockhash |
-
-## Security Considerations
-
-1. **Keeper Wallet**: Use a separate wallet with limited funds
-2. **Rate Limiting**: Implement rate limits to prevent abuse
-3. **Input Validation**: Validate all parameters before execution
-4. **Monitoring**: Alert on unusual patterns
-5. **Access Control**: Keeper can only execute, not modify plans
+### Run full verification
+```bash
+./scripts/verify-docs-and-scripts.sh
+```

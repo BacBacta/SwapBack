@@ -1,228 +1,168 @@
-# SwapBack Router - Architecture & Routing
+# Routing Documentation
 
-## Overview
+## Dynamic plan structure
 
-The SwapBack Router (`swapback_router`) is the core swap execution engine that handles:
-- **Real swap execution** via CPI to Jupiter, Raydium, and Orca
-- **Dynamic slippage** calculation based on pool liquidity and volatility
-- **NPI (Net Positive Impact)** distribution with rebates
-- **Venue scoring** for route optimization
-- **DCA (Dollar Cost Averaging)** plans with keeper orchestration
-- **TWAP (Time-Weighted Average Price)** execution
+A **dynamic plan** defines how swap amounts are distributed across multiple venues (DEXes).
 
-## Program IDs (Devnet)
-
-| Program | ID |
-|---------|-----|
-| SwapBack Router | `9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh` |
-| SwapBack cNFT | `EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP` |
-| SwapBack Buyback | `7wCCwRXxWvMY2DJDRrnhFg3b8jVPb5vVPxLH5YAGL6eJ` |
-| Jupiter | `JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4` |
-| Orca Whirlpool | `whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc` |
-| Raydium AMM | `675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8` |
-
-## Swap Execution Flow
-
-### 1. Simple Swap (`swap_toc`)
-
-```
-User → Frontend → Jupiter API (quote) → SwapBack Router → Jupiter CPI → User receives tokens
-                                              ↓
-                                    Fees/Rebates distributed
-```
-
-**Steps:**
-1. User initiates swap via frontend (app)
-2. Frontend calls Jupiter V6 API to get optimal route + `swapInstruction`
-3. Frontend builds transaction with `swap_toc` instruction including `JupiterRouteParams`
-4. Router validates parameters, executes Jupiter CPI
-5. Router calculates and distributes:
-   - Platform fees (0.2%): 85% treasury, 15% buy & burn
-   - NPI (routing profit): 70% rebates, 15% treasury, 15% boost vault
-
-### 2. DCA Swap (`execute_dca_swap`)
-
-```
-User creates plan → Keeper monitors → Keeper calls Jupiter API → Keeper executes instruction
-                         ↓
-              On execution time reached
-```
-
-**See [KEEPER.md](./KEEPER.md) for keeper implementation details.**
-
-### 3. TWAP Execution
-
-TWAP swaps are split into multiple slices executed over time:
-
-1. First slice executes immediately
-2. `TwapSlicesRequired` event is emitted
-3. Keeper schedules remaining slices
-4. Each slice is a separate transaction
-
-## Dynamic Slippage
-
-The router calculates dynamic slippage based on:
-
-### Components
-
-| Component | Calculation | Impact |
-|-----------|-------------|--------|
-| Base | Fixed 50 bps (0.5%) | Minimum protection |
-| Size | `(swap_size / pool_tvl) * 10000 - 100` | Larger swaps = more slippage |
-| Volatility | `oracle_volatility_bps / 10` | High volatility = more slippage |
-
-### Configuration
+### VenueAllocation
 
 ```rust
-pub struct SlippageConfig {
-    pub base_slippage_bps: u16,     // Default: 50 (0.5%)
-    pub max_slippage_bps: u16,      // Default: 500 (5%)
-    pub size_threshold_bps: u16,    // Default: 100 (1% of pool)
-    pub volatility_divisor: u16,    // Default: 10
+pub struct VenueAllocation {
+    pub venue_type: VenueType,  // Jupiter, Orca, Raydium, etc.
+    pub weight_bps: u16,        // Weight in basis points (0-10000)
 }
 ```
 
-### TVL Estimation
+### Constraints
 
-Pool TVL is estimated from remaining accounts:
-- Raydium AMM: Vault accounts at indices 4 and 5
-- Falls back to 1M USDC estimate if unknown
+| Rule | Description |
+|------|-------------|
+| Sum = 10,000 | All `weight_bps` must sum to exactly 10,000 |
+| Per-venue range | Each `weight_bps` ∈ [0, 10000] |
+| Non-empty | At least one venue must have weight > 0 |
 
-## Fee Structure
+### Example
 
-### Platform Fees (0.2% of swap amount)
-
-```
-Platform Fee (20 bps)
-    ├── 85% → Protocol Treasury
-    └── 15% → Buy & Burn BACK token
-```
-
-### NPI Distribution (Routing Profit)
-
-When swap output > min_out, the difference is NPI:
-
-```
-NPI (Routing Profit)
-    ├── 70% → User Rebate (+ boost from cNFT lock)
-    ├── 15% → Protocol Treasury
-    └── 15% → Boost Vault (for lock rewards)
+```json
+{
+  "venues": [
+    { "venue_type": "Jupiter", "weight_bps": 7000 },
+    { "venue_type": "Orca", "weight_bps": 3000 }
+  ]
+}
 ```
 
-## Venue Scoring
+This splits the swap: 70% via Jupiter, 30% via Orca.
 
-Each DEX venue is scored based on:
+---
 
-| Metric | Weight | Calculation |
-|--------|--------|-------------|
-| NPI Score | 40% | `npi_ratio * 1000 * 4000` |
-| Latency Score | 30% | `(100 / avg_latency_ms) * 3000` |
-| Slippage Score | 30% | `(10000 - avg_slippage_bps) * 0.3` |
+## VenueScore integration
 
-Scores are updated after each swap via `VenueScore.update_stats()`.
+If `min_venue_score` is provided, the router adjusts weights based on venue quality scores.
 
-## CPI Modules
+### VenueScore account
 
-### Jupiter (`cpi_jupiter.rs`)
-
-Executes swaps via Jupiter aggregator:
-- Replays fully-built instruction from frontend
-- Validates input amount matches expected
-- Returns actual amount received
-
-### Orca (`cpi_orca.rs`)
-
-Direct Whirlpool swap:
-- Builds swap instruction with sqrt_price_limit
-- Handles both a_to_b and b_to_a directions
-- 11 accounts required
-
-### Raydium (`cpi_raydium.rs`)
-
-AMM swap via Raydium:
-- Determines base_in direction from vault mints
-- 17 accounts required
-- Uses instruction opcodes 9 (base_in) or 11 (quote_in)
-
-## Events
-
-| Event | Purpose |
-|-------|---------|
-| `SwapCompleted` | Main swap success event with all metrics |
-| `VenueExecuted` | Per-venue execution result |
-| `NPIDistributed` | NPI allocation breakdown |
-| `FeesAllocated` | Platform fee distribution |
-| `TwapSlicesRequired` | TWAP keeper scheduling hint |
-| `DcaSwapExecuted` | DCA swap completion |
-| `BuyburnDeposit` | Buy & burn deposit confirmation |
-
-## Security Considerations
-
-### Input Validation
-- Amount must be > 0 and <= MAX_SINGLE_SWAP_LAMPORTS (5k SOL)
-- Slippage tolerance capped at 10% (1000 bps)
-- Token accounts must be owned by signer
-
-### Oracle Security
-- Dual oracle support with divergence check (max 2%)
-- Staleness check (max 5 minutes)
-- Oracle cache with configurable TTL
-
-### Anti-Whale Protection
-- Maximum single swap limit
-- Dynamic slippage increases for large swaps
-
-## Account Structures
-
-### Key PDAs
-
-| Account | Seeds | Purpose |
-|---------|-------|---------|
-| RouterState | `["router_state"]` | Global protocol state |
-| UserRebate | `["user_rebate", user]` | User's unclaimed rebates |
-| DcaPlan | `["dca_plan", user, plan_id]` | DCA plan state |
-| OracleCache | `["oracle_cache", oracle]` | Cached oracle prices |
-| VenueScore | `["venue_score", state]` | Venue performance metrics |
-
-## Usage Example
-
-```typescript
-import { Connection, PublicKey } from '@solana/web3.js';
-import { createJupiterApiClient } from '@jup-ag/api';
-
-// 1. Get Jupiter quote
-const jupiter = createJupiterApiClient();
-const quote = await jupiter.quoteGet({
-  inputMint: 'So11111111111111111111111111111111111111112', // SOL
-  outputMint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
-  amount: 1_000_000_000, // 1 SOL
-  slippageBps: 50,
-});
-
-// 2. Get swap instruction
-const { swapInstruction } = await jupiter.swapInstructionsPost({
-  quoteResponse: quote,
-  userPublicKey: wallet.publicKey.toString(),
-});
-
-// 3. Build SwapBack router instruction
-const swapArgs = {
-  amount_in: 1_000_000_000,
-  min_out: quote.otherAmountThreshold,
-  slippage_tolerance: 50,
-  use_dynamic_plan: false,
-  use_bundle: false,
-  primary_oracle_account: ORACLE_PUBKEY,
-  jupiter_route: {
-    swap_instruction: swapInstruction.data,
-    expected_input_amount: 1_000_000_000,
-  },
-};
-
-// 4. Execute via SwapBack
-const tx = await program.methods
-  .swapToc(swapArgs)
-  .accounts({...})
-  .remainingAccounts(swapInstruction.accounts)
-  .rpc();
+```rust
+pub struct VenueScore {
+    pub venue_type: VenueType,
+    pub quality_score: u16,      // 0..10000
+    pub latency_score: u16,
+    pub slippage_score: u16,
+    pub volume_7d: u64,
+    pub last_updated: i64,
+}
 ```
+
+### Score-based adjustment
+
+```rust
+pub fn adjust_weights_with_scores(
+    venues: &mut Vec<VenueAllocation>,
+    scores: &BTreeMap<VenueType, u16>,
+    min_score: u16,
+) {
+    for v in venues.iter_mut() {
+        let s = scores.get(&v.venue_type).copied().unwrap_or(10_000);
+        if s < min_score {
+            v.weight_bps = 0;  // Exclude low-score venue
+            continue;
+        }
+        // Scale weight by score
+        let scaled = (v.weight_bps as u32) * (s as u32) / 10_000;
+        v.weight_bps = scaled.min(10_000) as u16;
+    }
+    renormalize_weights(venues);  // Ensure sum = 10,000
+}
+```
+
+### Exclusion logic
+
+| Venue Score | min_venue_score | Result |
+|-------------|-----------------|--------|
+| 9000 | 2500 | Included (scaled) |
+| 2000 | 2500 | **Excluded** |
+| 5000 | 2500 | Included (scaled) |
+
+Default `min_venue_score`: **2500** (25%)
+
+---
+
+## Fallback behavior
+
+When a venue fails or is excluded, the plan may use fallback logic:
+
+### Fallback triggers
+
+1. **Venue exclusion**: Score below threshold
+2. **CPI failure**: DEX instruction reverts
+3. **Slippage exceeded**: Output below `min_out`
+
+### Fallback strategy
+
+```rust
+pub struct FallbackPlan {
+    pub venues: Vec<VenueWeight>,  // Alternative venue distribution
+    pub min_out: u64,              // Minimum acceptable output
+}
+```
+
+Currently, fallback is handled by:
+1. Renormalizing remaining venues (excluded venues get weight=0)
+2. Retrying with adjusted weights
+3. Failing if no venues remain or all fail
+
+### Example fallback flow
+
+```
+Original: Jupiter(7000), Orca(3000)
+↓ Orca fails (score < min)
+Adjusted: Jupiter(10000)
+↓ Execute with 100% Jupiter
+```
+
+---
+
+## Min-out semantics
+
+### Global min_out
+
+The `min_out` in `SwapArgs` is the **total minimum output** across all venues:
+
+```rust
+pub struct SwapArgs {
+    pub amount_in: u64,
+    pub min_out: u64,  // Total minimum, not per-venue
+    // ...
+}
+```
+
+### Per-venue min_out
+
+When splitting across venues, `min_out` is distributed proportionally:
+
+```rust
+// From math.rs
+pub fn split_min_out_by_weights(min_out: u64, weights: &[u16]) -> Result<Vec<u64>> {
+    split_amount_by_weights(min_out, weights)
+}
+```
+
+### Calculation
+
+```
+total_amount_in = 1,000,000
+weights = [7000, 3000]  // 70%, 30%
+min_out = 950,000
+
+Per-venue min_out:
+  Jupiter: 950,000 * 7000 / 10000 = 665,000
+  Orca:    950,000 * 3000 / 10000 = 285,000
+```
+
+### Invariant
+
+```
+sum(per_venue_min_out) == global_min_out
+```
+
+The last bucket is adjusted to ensure exact sum.
