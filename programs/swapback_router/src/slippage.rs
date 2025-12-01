@@ -206,6 +206,10 @@ pub fn min_out_from_expected(expected_out: u64, slippage_bps: u16) -> u64 {
 mod tests {
     use super::*;
 
+    // =========================================================================
+    // LEGACY SLIPPAGE TESTS (calculate_dynamic_slippage_with_breakdown)
+    // =========================================================================
+
     #[test]
     fn test_base_slippage() {
         let result = calculate_dynamic_slippage_with_breakdown(
@@ -269,6 +273,10 @@ mod tests {
         assert_eq!(result.slippage_bps, 150); // 50 + 100
     }
 
+    // =========================================================================
+    // DYNAMIC SLIPPAGE (calculate_dynamic_slippage_bps) - BOUNDS TESTS
+    // =========================================================================
+
     #[test]
     fn slippage_bounded() {
         let bps = calculate_dynamic_slippage_bps(DynamicSlippageInputs {
@@ -283,10 +291,255 @@ mod tests {
     }
 
     #[test]
+    fn slippage_always_within_bounds_small() {
+        let bps = calculate_dynamic_slippage_bps(DynamicSlippageInputs {
+            amount_in: 1,
+            liquidity_est: u64::MAX,
+            volatility_bps: 0,
+            base_bps: 50,
+            min_bps: 10,
+            max_bps: 800,
+        });
+        assert!(bps >= 10 && bps <= 800, "Small trade should be >= min_bps");
+    }
+
+    #[test]
+    fn slippage_always_within_bounds_large() {
+        let bps = calculate_dynamic_slippage_bps(DynamicSlippageInputs {
+            amount_in: u64::MAX / 2,
+            liquidity_est: 1,
+            volatility_bps: 5000,
+            base_bps: 50,
+            min_bps: 10,
+            max_bps: 800,
+        });
+        assert!(bps >= 10 && bps <= 800, "Large trade should be capped at max_bps");
+    }
+
+    #[test]
+    fn slippage_clamped_to_min() {
+        let bps = calculate_dynamic_slippage_bps(DynamicSlippageInputs {
+            amount_in: 100,
+            liquidity_est: 1_000_000_000_000,
+            volatility_bps: 0,
+            base_bps: 5, // Very low base
+            min_bps: 50,
+            max_bps: 800,
+        });
+        assert_eq!(bps, 50, "Should clamp to min_bps when raw < min");
+    }
+
+    #[test]
+    fn slippage_clamped_to_max() {
+        let bps = calculate_dynamic_slippage_bps(DynamicSlippageInputs {
+            amount_in: 1_000_000_000,
+            liquidity_est: 100,
+            volatility_bps: 5000,
+            base_bps: 500,
+            min_bps: 10,
+            max_bps: 200,
+        });
+        assert_eq!(bps, 200, "Should clamp to max_bps when raw > max");
+    }
+
+    // =========================================================================
+    // MONOTONICITY TESTS
+    // =========================================================================
+
+    #[test]
+    fn slippage_monotonic_amount_in() {
+        // Slippage should increase (or stay same) as amount_in increases
+        let base_inputs = DynamicSlippageInputs {
+            amount_in: 0,
+            liquidity_est: 10_000_000,
+            volatility_bps: 100,
+            base_bps: 50,
+            min_bps: 10,
+            max_bps: 1000,
+        };
+
+        let amounts = [100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000];
+        let mut prev_bps = 0u16;
+
+        for amount in amounts {
+            let bps = calculate_dynamic_slippage_bps(DynamicSlippageInputs {
+                amount_in: amount,
+                ..base_inputs
+            });
+            assert!(bps >= prev_bps, "Slippage should be monotonically increasing with amount_in");
+            prev_bps = bps;
+        }
+    }
+
+    #[test]
+    fn slippage_monotonic_liquidity_decreases() {
+        // Slippage should decrease (or stay same) as liquidity increases
+        // Note: Due to clamping, very high slippage values may be capped
+        let base_inputs = DynamicSlippageInputs {
+            amount_in: 1_000_000,
+            liquidity_est: 0,
+            volatility_bps: 100,
+            base_bps: 50,
+            min_bps: 10,
+            max_bps: 1000,
+        };
+
+        // Test with increasing liquidity - slippage should decrease or stay same
+        let liquidities = [100_000_000u64, 1_000_000_000, 10_000_000_000, 100_000_000_000, 1_000_000_000_000];
+        let mut prev_bps = u16::MAX;
+
+        for liquidity in liquidities {
+            let bps = calculate_dynamic_slippage_bps(DynamicSlippageInputs {
+                liquidity_est: liquidity,
+                ..base_inputs
+            });
+            assert!(bps <= prev_bps, "Slippage should decrease or stay same as liquidity increases: prev={}, current={}", prev_bps, bps);
+            prev_bps = bps;
+        }
+    }
+
+    #[test]
+    fn slippage_monotonic_volatility() {
+        // Slippage should increase (or stay same) as volatility increases
+        let base_inputs = DynamicSlippageInputs {
+            amount_in: 1_000_000,
+            liquidity_est: 100_000_000,
+            volatility_bps: 0,
+            base_bps: 50,
+            min_bps: 10,
+            max_bps: 2000,
+        };
+
+        let volatilities = [0u16, 50, 100, 200, 500, 1000];
+        let mut prev_bps = 0u16;
+
+        for vol in volatilities {
+            let bps = calculate_dynamic_slippage_bps(DynamicSlippageInputs {
+                volatility_bps: vol,
+                ..base_inputs
+            });
+            assert!(bps >= prev_bps, "Slippage should increase with volatility");
+            prev_bps = bps;
+        }
+    }
+
+    // =========================================================================
+    // MIN_OUT CONVERSION TESTS
+    // =========================================================================
+
+    #[test]
     fn min_out_decreases_with_slippage() {
         let e = 1_000_000u64;
         let m1 = min_out_from_expected(e, 50);
         let m2 = min_out_from_expected(e, 200);
         assert!(m2 < m1);
+    }
+
+    #[test]
+    fn min_out_exact_50bps() {
+        // expected_out=1_000_000, slippage=50 => 995_000
+        let result = min_out_from_expected(1_000_000, 50);
+        assert_eq!(result, 995_000);
+    }
+
+    #[test]
+    fn min_out_exact_200bps() {
+        // expected_out=1_000_000, slippage=200 => 980_000
+        let result = min_out_from_expected(1_000_000, 200);
+        assert_eq!(result, 980_000);
+    }
+
+    #[test]
+    fn min_out_zero_slippage() {
+        let result = min_out_from_expected(1_000_000, 0);
+        assert_eq!(result, 1_000_000);
+    }
+
+    #[test]
+    fn min_out_full_slippage() {
+        let result = min_out_from_expected(1_000_000, 10_000);
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn min_out_high_value_no_overflow() {
+        let high = u64::MAX / 2;
+        let result = min_out_from_expected(high, 100);
+        // Should be approximately 99% of high
+        // Use u128 to avoid overflow in assertion
+        let expected_min = (high as u128) * 98 / 100;
+        let expected_max = high as u128;
+        assert!((result as u128) > expected_min);
+        assert!((result as u128) < expected_max);
+    }
+
+    // =========================================================================
+    // EDGE CASES
+    // =========================================================================
+
+    #[test]
+    fn slippage_zero_amount() {
+        let bps = calculate_dynamic_slippage_bps(DynamicSlippageInputs {
+            amount_in: 0,
+            liquidity_est: 1_000_000,
+            volatility_bps: 100,
+            base_bps: 50,
+            min_bps: 10,
+            max_bps: 800,
+        });
+        // With zero amount, only base + volatility apply
+        assert!(bps >= 10 && bps <= 800);
+    }
+
+    #[test]
+    fn slippage_handles_very_low_liquidity() {
+        let bps = calculate_dynamic_slippage_bps(DynamicSlippageInputs {
+            amount_in: 1_000_000,
+            liquidity_est: 1, // Near-zero liquidity (uses max(1))
+            volatility_bps: 0,
+            base_bps: 50,
+            min_bps: 10,
+            max_bps: 500,
+        });
+        assert_eq!(bps, 500, "Should cap at max when liquidity is very low");
+    }
+
+    #[test]
+    fn slippage_deterministic() {
+        let inputs = DynamicSlippageInputs {
+            amount_in: 1_000_000,
+            liquidity_est: 50_000_000,
+            volatility_bps: 150,
+            base_bps: 50,
+            min_bps: 10,
+            max_bps: 800,
+        };
+        let bps1 = calculate_dynamic_slippage_bps(inputs);
+        let bps2 = calculate_dynamic_slippage_bps(inputs);
+        assert_eq!(bps1, bps2, "Same inputs should produce same output");
+    }
+
+    // =========================================================================
+    // NORMALIZE AMOUNT TESTS
+    // =========================================================================
+
+    #[test]
+    fn normalize_same_decimals() {
+        let result = normalize_amount(1_000_000, 6, 6);
+        assert_eq!(result, 1_000_000);
+    }
+
+    #[test]
+    fn normalize_more_to_less() {
+        // 9 decimals to 6 decimals: divide by 1000
+        let result = normalize_amount(1_000_000_000, 9, 6);
+        assert_eq!(result, 1_000_000);
+    }
+
+    #[test]
+    fn normalize_less_to_more() {
+        // 6 decimals to 9 decimals: multiply by 1000
+        let result = normalize_amount(1_000_000, 6, 9);
+        assert_eq!(result, 1_000_000_000);
     }
 }
