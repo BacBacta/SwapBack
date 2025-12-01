@@ -3,9 +3,11 @@
 
 #[cfg(test)]
 mod proptest_tests {
+    use crate::math::{bps_of, renormalize_weights_to_10000, split_amount_by_weights};
+    use crate::slippage::{
+        calculate_dynamic_slippage_bps, min_out_from_expected, DynamicSlippageInputs,
+    };
     use proptest::prelude::*;
-    use crate::slippage::{calculate_dynamic_slippage_bps, DynamicSlippageInputs, min_out_from_expected};
-    use crate::math::{split_amount_by_weights, bps_of, renormalize_weights_to_10000};
 
     // =========================================================================
     // SLIPPAGE PROPERTY TESTS
@@ -26,7 +28,7 @@ mod proptest_tests {
         ) {
             let actual_min = min_bps.min(max_bps);
             let actual_max = min_bps.max(max_bps);
-            
+
             let bps = calculate_dynamic_slippage_bps(DynamicSlippageInputs {
                 amount_in,
                 liquidity_est: liquidity,
@@ -35,7 +37,7 @@ mod proptest_tests {
                 min_bps: actual_min,
                 max_bps: actual_max,
             });
-            
+
             prop_assert!(bps >= actual_min, "Slippage {} < min {}", bps, actual_min);
             prop_assert!(bps <= actual_max, "Slippage {} > max {}", bps, actual_max);
         }
@@ -56,10 +58,10 @@ mod proptest_tests {
                 min_bps: 10,
                 max_bps: 1000,
             };
-            
+
             let bps1 = calculate_dynamic_slippage_bps(DynamicSlippageInputs { amount_in: amount1, ..inputs });
             let bps2 = calculate_dynamic_slippage_bps(DynamicSlippageInputs { amount_in: amount2, ..inputs });
-            
+
             if amount1 <= amount2 {
                 prop_assert!(bps1 <= bps2, "amount1 <= amount2 but bps1 {} > bps2 {}", bps1, bps2);
             } else {
@@ -83,10 +85,10 @@ mod proptest_tests {
                 min_bps: 10,
                 max_bps: 1000,
             };
-            
+
             let bps1 = calculate_dynamic_slippage_bps(DynamicSlippageInputs { liquidity_est: liquidity1, ..inputs });
             let bps2 = calculate_dynamic_slippage_bps(DynamicSlippageInputs { liquidity_est: liquidity2, ..inputs });
-            
+
             if liquidity1 <= liquidity2 {
                 prop_assert!(bps1 >= bps2, "liquidity1 <= liquidity2 but bps1 {} < bps2 {}", bps1, bps2);
             } else {
@@ -108,7 +110,7 @@ mod proptest_tests {
             let actual_min = min_bps.min(max_bps);
             let actual_max = min_bps.max(max_bps);
             let liquidity_safe = liquidity.max(1); // Avoid div by zero in formula
-            
+
             let _ = calculate_dynamic_slippage_bps(DynamicSlippageInputs {
                 amount_in,
                 liquidity_est: liquidity_safe,
@@ -146,7 +148,7 @@ mod proptest_tests {
         ) {
             let m1 = min_out_from_expected(expected_out, slippage1);
             let m2 = min_out_from_expected(expected_out, slippage2);
-            
+
             if slippage1 <= slippage2 {
                 prop_assert!(m1 >= m2);
             } else {
@@ -174,7 +176,7 @@ mod proptest_tests {
             if weights.is_empty() {
                 return Ok(());
             }
-            
+
             let parts = split_amount_by_weights(amount, &weights).unwrap();
             let sum: u64 = parts.iter().sum();
             prop_assert_eq!(sum, amount, "Sum of parts must equal input amount");
@@ -242,7 +244,7 @@ mod proptest_tests {
         ) {
             let mut weights: Vec<u16> = vec![w1, w2, w3];
             renormalize_weights_to_10000(&mut weights);
-            
+
             if !weights.is_empty() {
                 let sum: u32 = weights.iter().map(|&w| w as u32).sum();
                 prop_assert_eq!(sum, 10000, "Sum after renormalize should be 10000");
@@ -258,10 +260,10 @@ mod proptest_tests {
             let original = vec![w1, w2];
             let mut once = original.clone();
             renormalize_weights_to_10000(&mut once);
-            
+
             let mut twice = once.clone();
             renormalize_weights_to_10000(&mut twice);
-            
+
             prop_assert_eq!(once, twice, "Renormalize should be idempotent");
         }
 
@@ -274,7 +276,7 @@ mod proptest_tests {
         ) {
             let mut weights = vec![w1, w2, w3];
             renormalize_weights_to_10000(&mut weights);
-            
+
             for &w in &weights {
                 prop_assert!(w <= 10000, "Weight {} > 10000", w);
             }

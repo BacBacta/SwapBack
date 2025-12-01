@@ -16,9 +16,9 @@ pub struct SlippageConfig {
 impl Default for SlippageConfig {
     fn default() -> Self {
         Self {
-            base_slippage_bps: 50,      // 0.5%
-            max_slippage_bps: 500,      // 5%
-            size_threshold_bps: 100,    // 1% of pool
+            base_slippage_bps: 50,   // 0.5%
+            max_slippage_bps: 500,   // 5%
+            size_threshold_bps: 100, // 1% of pool
             volatility_divisor: 10,
         }
     }
@@ -38,13 +38,13 @@ pub struct SlippageResult {
 }
 
 /// Calculate dynamic slippage based on multiple factors
-/// 
+///
 /// # Arguments
 /// * `swap_amount` - Amount being swapped
 /// * `pool_tvl` - Total value locked in the pool (liquidity)
 /// * `volatility_bps` - Current market volatility from oracle (in bps)
 /// * `config` - Optional configuration (uses default if None)
-/// 
+///
 /// # Returns
 /// * `SlippageResult` with breakdown of slippage components
 pub fn calculate_dynamic_slippage_with_breakdown(
@@ -54,36 +54,36 @@ pub fn calculate_dynamic_slippage_with_breakdown(
     config: Option<SlippageConfig>,
 ) -> SlippageResult {
     let cfg = config.unwrap_or_default();
-    
+
     let base_component = cfg.base_slippage_bps;
-    
+
     // Size impact: Additional slippage when swap is > threshold % of pool
     let size_component = if pool_tvl > 0 {
         // Calculate size ratio in bps (swap / tvl * 10000)
         let size_ratio_bps = ((swap_amount as u128)
             .saturating_mul(10_000)
             .saturating_div(pool_tvl as u128)) as u16;
-        
+
         // Add slippage for each bps above threshold
         size_ratio_bps.saturating_sub(cfg.size_threshold_bps)
     } else {
         // Unknown TVL: add 100 bps safety margin
         100
     };
-    
+
     // Volatility impact: Higher volatility = higher slippage
     let volatility_component = if cfg.volatility_divisor > 0 {
         volatility_bps / cfg.volatility_divisor
     } else {
         0
     };
-    
+
     // Sum components and cap
     let total = (base_component as u32)
         .saturating_add(size_component as u32)
         .saturating_add(volatility_component as u32)
         .min(cfg.max_slippage_bps as u32) as u16;
-    
+
     SlippageResult {
         slippage_bps: total,
         base_component,
@@ -99,12 +99,8 @@ pub fn calculate_dynamic_slippage(
     pool_tvl: u64,
     volatility_bps: u16,
 ) -> Result<u16> {
-    let result = calculate_dynamic_slippage_with_breakdown(
-        swap_amount,
-        pool_tvl,
-        volatility_bps,
-        None,
-    );
+    let result =
+        calculate_dynamic_slippage_with_breakdown(swap_amount, pool_tvl, volatility_bps, None);
     Ok(result.slippage_bps)
 }
 
@@ -117,27 +113,22 @@ pub fn estimate_pool_tvl_from_accounts(
 ) -> u64 {
     // Default estimate if we can't determine
     let default_tvl = 1_000_000_000_000u64; // 1M USDC equivalent
-    
+
     // Try to read pool reserves from known account layouts
     // Raydium AMM: vault accounts at indices 4 and 5
     if accounts.len() >= 6 {
-        if let (Ok(data_a), Ok(data_b)) = (
-            accounts[4].try_borrow_data(),
-            accounts[5].try_borrow_data(),
-        ) {
+        if let (Ok(data_a), Ok(data_b)) =
+            (accounts[4].try_borrow_data(), accounts[5].try_borrow_data())
+        {
             // SPL Token account layout: amount at offset 64
             if data_a.len() >= 72 && data_b.len() >= 72 {
-                let amount_a = u64::from_le_bytes(
-                    data_a[64..72].try_into().unwrap_or([0u8; 8])
-                );
-                let amount_b = u64::from_le_bytes(
-                    data_b[64..72].try_into().unwrap_or([0u8; 8])
-                );
-                
+                let amount_a = u64::from_le_bytes(data_a[64..72].try_into().unwrap_or([0u8; 8]));
+                let amount_b = u64::from_le_bytes(data_b[64..72].try_into().unwrap_or([0u8; 8]));
+
                 // Normalize to 6 decimals (USDC standard)
                 let normalized_a = normalize_amount(amount_a, token_a_decimals, 6);
                 let normalized_b = normalize_amount(amount_b, token_b_decimals, 6);
-                
+
                 // TVL = 2 * sqrt(a * b) approximation for AMM pools
                 // Simplified: just sum both sides
                 let tvl = normalized_a.saturating_add(normalized_b);
@@ -147,7 +138,7 @@ pub fn estimate_pool_tvl_from_accounts(
             }
         }
     }
-    
+
     default_tvl
 }
 
@@ -190,7 +181,8 @@ pub fn calculate_dynamic_slippage_bps(i: DynamicSlippageInputs) -> u16 {
     // Impact = ratio_bps / 4 (adoucit), + volatility/2
     let amount_impact = ratio_bps / 4;
     let vol_impact = i.volatility_bps / 2;
-    let raw = i.base_bps
+    let raw = i
+        .base_bps
         .saturating_add(amount_impact)
         .saturating_add(vol_impact);
     raw.clamp(i.min_bps, i.max_bps)
@@ -213,9 +205,9 @@ mod tests {
     #[test]
     fn test_base_slippage() {
         let result = calculate_dynamic_slippage_with_breakdown(
-            1_000_000, // 1 USDC
+            1_000_000,         // 1 USDC
             1_000_000_000_000, // 1M TVL
-            0, // No volatility
+            0,                 // No volatility
             None,
         );
         assert_eq!(result.slippage_bps, 50); // Just base
@@ -227,7 +219,7 @@ mod tests {
     #[test]
     fn test_large_swap_adds_slippage() {
         let result = calculate_dynamic_slippage_with_breakdown(
-            50_000_000_000, // 50k USDC (5% of pool)
+            50_000_000_000,    // 50k USDC (5% of pool)
             1_000_000_000_000, // 1M TVL
             0,
             None,
@@ -264,10 +256,8 @@ mod tests {
     #[test]
     fn test_zero_tvl_adds_safety_margin() {
         let result = calculate_dynamic_slippage_with_breakdown(
-            1_000_000,
-            0, // Unknown TVL
-            0,
-            None,
+            1_000_000, 0, // Unknown TVL
+            0, None,
         );
         assert_eq!(result.size_component, 100); // Safety margin
         assert_eq!(result.slippage_bps, 150); // 50 + 100
@@ -313,7 +303,10 @@ mod tests {
             min_bps: 10,
             max_bps: 800,
         });
-        assert!(bps >= 10 && bps <= 800, "Large trade should be capped at max_bps");
+        assert!(
+            bps >= 10 && bps <= 800,
+            "Large trade should be capped at max_bps"
+        );
     }
 
     #[test]
@@ -366,7 +359,10 @@ mod tests {
                 amount_in: amount,
                 ..base_inputs
             });
-            assert!(bps >= prev_bps, "Slippage should be monotonically increasing with amount_in");
+            assert!(
+                bps >= prev_bps,
+                "Slippage should be monotonically increasing with amount_in"
+            );
             prev_bps = bps;
         }
     }
@@ -385,7 +381,13 @@ mod tests {
         };
 
         // Test with increasing liquidity - slippage should decrease or stay same
-        let liquidities = [100_000_000u64, 1_000_000_000, 10_000_000_000, 100_000_000_000, 1_000_000_000_000];
+        let liquidities = [
+            100_000_000u64,
+            1_000_000_000,
+            10_000_000_000,
+            100_000_000_000,
+            1_000_000_000_000,
+        ];
         let mut prev_bps = u16::MAX;
 
         for liquidity in liquidities {
@@ -393,7 +395,12 @@ mod tests {
                 liquidity_est: liquidity,
                 ..base_inputs
             });
-            assert!(bps <= prev_bps, "Slippage should decrease or stay same as liquidity increases: prev={}, current={}", prev_bps, bps);
+            assert!(
+                bps <= prev_bps,
+                "Slippage should decrease or stay same as liquidity increases: prev={}, current={}",
+                prev_bps,
+                bps
+            );
             prev_bps = bps;
         }
     }

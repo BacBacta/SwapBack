@@ -74,20 +74,17 @@ pub mod swapback_buyback {
 
     /// Initie un buyback (autorisation uniquement)
     /// Le keeper Jupiter exécutera le swap off-chain
-    pub fn initiate_buyback(
-        ctx: Context<InitiateBuyback>,
-        max_usdc_amount: u64,
-    ) -> Result<()> {
+    pub fn initiate_buyback(ctx: Context<InitiateBuyback>, max_usdc_amount: u64) -> Result<()> {
         let buyback_state = &ctx.accounts.buyback_state;
 
         // === VALIDATIONS CPI DE SÉCURITÉ (FIX H2) ===
-        
+
         // 1. Vérifier que usdc_vault appartient bien au buyback_state
         require!(
             ctx.accounts.usdc_vault.owner == buyback_state.key(),
             ErrorCode::InvalidVaultOwner
         );
-        
+
         // 2. Vérifier que le mint du vault est correct
         require!(
             ctx.accounts.usdc_vault.mint == ctx.accounts.buyback_state.usdc_vault,
@@ -146,7 +143,7 @@ pub mod swapback_buyback {
             back_received > 0 && usdc_spent > 0,
             ErrorCode::InvalidSwapAmounts
         );
-        
+
         // Vérifier que le vault a bien reçu les tokens BACK
         require!(
             ctx.accounts.back_vault.amount >= back_received,
@@ -162,11 +159,8 @@ pub mod swapback_buyback {
         let price_ratio = back_received
             .checked_div(usdc_spent.max(1))
             .ok_or(ErrorCode::MathOverflow)?;
-        
-        require!(
-            price_ratio < 1_000_000,
-            ErrorCode::SuspiciousPriceRatio
-        );
+
+        require!(price_ratio < 1_000_000, ErrorCode::SuspiciousPriceRatio);
 
         // Mise à jour des statistiques
         buyback_state.total_usdc_spent = buyback_state
@@ -767,13 +761,14 @@ mod tests {
         // Test ratio de prix normal: 100 BACK pour 1 USDC = ratio de 100
         let back_received = 100_000_000u64; // 100 BACK (6 decimals)
         let usdc_spent = 1_000_000u64; // 1 USDC (6 decimals)
-        
-        let price_ratio = back_received
-            .checked_div(usdc_spent.max(1))
-            .unwrap();
-        
+
+        let price_ratio = back_received.checked_div(usdc_spent.max(1)).unwrap();
+
         assert_eq!(price_ratio, 100, "Ratio should be 100");
-        assert!(price_ratio < 1_000_000, "Normal ratio should pass validation");
+        assert!(
+            price_ratio < 1_000_000,
+            "Normal ratio should pass validation"
+        );
     }
 
     #[test]
@@ -781,11 +776,9 @@ mod tests {
         // Test ratio limite: 999,999 BACK pour 1 USDC
         let back_received = 999_999_000_000u64; // 999,999 BACK
         let usdc_spent = 1_000_000u64; // 1 USDC
-        
-        let price_ratio = back_received
-            .checked_div(usdc_spent.max(1))
-            .unwrap();
-        
+
+        let price_ratio = back_received.checked_div(usdc_spent.max(1)).unwrap();
+
         assert_eq!(price_ratio, 999_999, "Ratio should be 999,999");
         assert!(price_ratio < 1_000_000, "Edge case should pass validation");
     }
@@ -796,11 +789,9 @@ mod tests {
         // Test ratio suspicieux: 1,000,000 BACK pour 1 USDC (devrait échouer)
         let back_received = 1_000_000_000_000u64; // 1M BACK
         let usdc_spent = 1_000_000u64; // 1 USDC
-        
-        let price_ratio = back_received
-            .checked_div(usdc_spent.max(1))
-            .unwrap();
-        
+
+        let price_ratio = back_received.checked_div(usdc_spent.max(1)).unwrap();
+
         assert_eq!(price_ratio, 1_000_000, "Ratio is exactly at limit");
         assert!(price_ratio < 1_000_000, "Should fail: ratio too high!");
     }
@@ -811,11 +802,9 @@ mod tests {
         // Test ratio astronomique trouvé par fuzzing: 4.3 trillion
         let back_received = 1_374_463_201_999_060_992u64;
         let usdc_spent = 320_017_162u64;
-        
-        let price_ratio = back_received
-            .checked_div(usdc_spent.max(1))
-            .unwrap();
-        
+
+        let price_ratio = back_received.checked_div(usdc_spent.max(1)).unwrap();
+
         assert!(price_ratio >= 1_000_000, "Astronomical ratio");
         assert!(price_ratio < 1_000_000, "Should fail: fuzzing found this!");
     }

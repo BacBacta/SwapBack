@@ -125,10 +125,10 @@ fn try_read_pyth(oracle_account: &AccountInfo, clock: &Clock) -> Result<OracleOb
     let price_data = oracle_account
         .try_borrow_data()
         .map_err(|_| error!(ErrorCode::InvalidOraclePrice))?;
-    
+
     let price_account = pyth_sdk_solana::state::load_price_account::<32, ()>(&price_data)
         .map_err(|_| error!(ErrorCode::InvalidOraclePrice))?;
-    
+
     let price_key = oracle_account.key();
     let price_feed = price_account.to_price_feed(&price_key);
     drop(price_data);
@@ -144,7 +144,7 @@ fn try_read_pyth(oracle_account: &AccountInfo, clock: &Clock) -> Result<OracleOb
 
     let price_scaled = normalize_decimal(price.price as i128, price.expo)
         .ok_or_else(|| error!(ErrorCode::InvalidOraclePrice))?;
-    
+
     if price_scaled == 0 {
         return err!(ErrorCode::InvalidOraclePrice);
     }

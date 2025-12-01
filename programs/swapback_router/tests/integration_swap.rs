@@ -14,24 +14,24 @@ mod tests {
         const PLATFORM_FEE_BPS: u64 = 20;
         const PLATFORM_FEE_TREASURY_BPS: u64 = 8500;
         const PLATFORM_FEE_BUYBURN_BPS: u64 = 1500;
-        
+
         let amount = 1_000_000_000u64; // 1 USDC (6 decimals)
-        
+
         // 1. Calculate platform fee
         let platform_fee = amount * PLATFORM_FEE_BPS / 10_000;
         assert_eq!(platform_fee, 2_000_000); // 0.2% = 2 USDC
-        
+
         // 2. Split to treasury
         let treasury_amount = platform_fee * PLATFORM_FEE_TREASURY_BPS / 10_000;
         assert_eq!(treasury_amount, 1_700_000); // 85%
-        
+
         // 3. Split to buy & burn
         let buyburn_amount = platform_fee * PLATFORM_FEE_BUYBURN_BPS / 10_000;
         assert_eq!(buyburn_amount, 300_000); // 15%
-        
+
         // 4. Verify sum
         assert_eq!(treasury_amount + buyburn_amount, platform_fee);
-        
+
         // 5. Verify remaining after fee
         let after_fee = amount - platform_fee;
         assert_eq!(after_fee, 998_000_000);
@@ -43,22 +43,22 @@ mod tests {
         const DEFAULT_REBATE_BPS: u64 = 7000;
         const TREASURY_FROM_NPI_BPS: u64 = 1500;
         const BOOST_VAULT_BPS: u64 = 1500;
-        
+
         // Simulated NPI (positive price improvement)
         let npi_amount = 5_000_000u64; // 5 USDC worth
-        
+
         // 1. User rebate
         let rebate = npi_amount * DEFAULT_REBATE_BPS / 10_000;
         assert_eq!(rebate, 3_500_000); // 70% to user
-        
+
         // 2. Treasury share
         let treasury_share = npi_amount * TREASURY_FROM_NPI_BPS / 10_000;
         assert_eq!(treasury_share, 750_000); // 15% to treasury
-        
+
         // 3. Boost vault share
         let boost_share = npi_amount * BOOST_VAULT_BPS / 10_000;
         assert_eq!(boost_share, 750_000); // 15% to boost
-        
+
         // 4. Verify sum
         assert_eq!(rebate + treasury_share + boost_share, npi_amount);
     }
@@ -79,17 +79,17 @@ mod tests {
         impl SlippageConfig {
             fn calculate(&self, amount: u64, volatility_bps: u16, estimated_tvl: u64) -> u16 {
                 let mut slippage = self.base_bps;
-                
+
                 // Add volatility premium
                 let volatility_premium = volatility_bps / self.volatility_divisor.max(1);
                 slippage = slippage.saturating_add(volatility_premium);
-                
+
                 // Add price impact for large orders
                 if estimated_tvl > 0 && amount > self.impact_threshold {
                     let impact = ((amount - self.impact_threshold) * 10 / estimated_tvl) as u16;
                     slippage = slippage.saturating_add(impact.min(100));
                 }
-                
+
                 slippage.min(self.max_bps)
             }
         }
@@ -103,8 +103,8 @@ mod tests {
 
         // Normal market conditions
         let normal_slippage = config.calculate(
-            1_000_000_000,  // 1k USDC
-            100,            // 1% volatility
+            1_000_000_000,       // 1k USDC
+            100,                 // 1% volatility
             100_000_000_000_000, // 100M TVL
         );
         assert_eq!(normal_slippage, 75); // 50 base + 25 volatility
@@ -112,7 +112,7 @@ mod tests {
         // High volatility
         let volatile_slippage = config.calculate(
             1_000_000_000,
-            400,            // 4% volatility
+            400, // 4% volatility
             100_000_000_000_000,
         );
         assert_eq!(volatile_slippage, 150); // 50 + 100
@@ -173,7 +173,7 @@ mod tests {
         for i in 0..10 {
             assert!(!dca.is_complete());
             assert_eq!(dca.remaining_slices(), 10 - i);
-            
+
             let slice_amount = dca.execute_slice();
             assert_eq!(slice_amount, 1_000_000_000);
             total_executed += slice_amount;
@@ -182,7 +182,7 @@ mod tests {
         assert!(dca.is_complete());
         assert_eq!(dca.remaining_slices(), 0);
         assert_eq!(total_executed, dca.total_amount);
-        
+
         // Extra execution returns 0
         assert_eq!(dca.execute_slice(), 0);
     }
@@ -202,7 +202,7 @@ mod tests {
     fn test_twap_event_generation() {
         let current_time = 1700000000i64;
         let swap_id = [1u8; 32];
-        
+
         // TWAP with 5 slices, first already executed
         let event = TwapSlicesRequired {
             swap_id,
@@ -214,7 +214,7 @@ mod tests {
 
         assert_eq!(event.remaining_slices, 4);
         assert_eq!(event.next_execution_at, 1700000300);
-        
+
         // Verify keeper would schedule correctly
         let expected_schedule = vec![
             current_time + 300,  // Slice 2
@@ -222,7 +222,7 @@ mod tests {
             current_time + 900,  // Slice 4
             current_time + 1200, // Slice 5
         ];
-        
+
         for (i, &expected_time) in expected_schedule.iter().enumerate() {
             let slice_time = event.next_execution_at + (i as i64 * event.interval_seconds as i64);
             assert_eq!(slice_time, expected_time);
@@ -246,10 +246,13 @@ mod tests {
             self.total_swaps += 1;
             self.total_volume += volume;
             self.total_npi += npi;
-            
+
             if old_count > 0 {
-                self.avg_latency_ms = ((self.avg_latency_ms as u64 * old_count + latency as u64) / self.total_swaps) as u32;
-                self.avg_slippage_bps = ((self.avg_slippage_bps as u64 * old_count + slippage as u64) / self.total_swaps) as u16;
+                self.avg_latency_ms = ((self.avg_latency_ms as u64 * old_count + latency as u64)
+                    / self.total_swaps) as u32;
+                self.avg_slippage_bps = ((self.avg_slippage_bps as u64 * old_count
+                    + slippage as u64)
+                    / self.total_swaps) as u16;
             } else {
                 self.avg_latency_ms = latency;
                 self.avg_slippage_bps = slippage;
@@ -260,23 +263,23 @@ mod tests {
     #[test]
     fn test_venue_score_accumulation_over_many_swaps() {
         let mut venue = MockVenueScore::default();
-        
+
         // Simulate 100 swaps with varying metrics
         for i in 0..100u64 {
             let volume = 1_000_000 + (i * 10_000); // Increasing volume
-            let npi = (i as i64 * 100) - 5000;     // Varies from -5000 to +4900
-            let latency = 100 + (i % 50) as u32;   // 100-149ms
-            let slippage = 10 + (i % 20) as u16;   // 10-29 bps
-            
+            let npi = (i as i64 * 100) - 5000; // Varies from -5000 to +4900
+            let latency = 100 + (i % 50) as u32; // 100-149ms
+            let slippage = 10 + (i % 20) as u16; // 10-29 bps
+
             venue.update(volume, npi, latency, slippage);
         }
 
         assert_eq!(venue.total_swaps, 100);
         assert!(venue.total_volume > 100_000_000); // Sum of all volumes
-        
+
         // Average latency should be around 124
         assert!(venue.avg_latency_ms >= 100 && venue.avg_latency_ms <= 150);
-        
+
         // Average slippage should be around 19
         assert!(venue.avg_slippage_bps >= 10 && venue.avg_slippage_bps <= 30);
     }
@@ -299,9 +302,24 @@ mod tests {
     #[test]
     fn test_route_selection() {
         let routes = vec![
-            MockRoute { venue: "Jupiter", expected_output: 1_000_100, latency_ms: 80, slippage_bps: 10 },
-            MockRoute { venue: "Orca", expected_output: 1_000_050, latency_ms: 60, slippage_bps: 15 },
-            MockRoute { venue: "Raydium", expected_output: 999_900, latency_ms: 100, slippage_bps: 20 },
+            MockRoute {
+                venue: "Jupiter",
+                expected_output: 1_000_100,
+                latency_ms: 80,
+                slippage_bps: 10,
+            },
+            MockRoute {
+                venue: "Orca",
+                expected_output: 1_000_050,
+                latency_ms: 60,
+                slippage_bps: 15,
+            },
+            MockRoute {
+                venue: "Raydium",
+                expected_output: 999_900,
+                latency_ms: 100,
+                slippage_bps: 20,
+            },
         ];
 
         let best = select_best_route(&routes, 1_000_000).unwrap();
@@ -314,11 +332,11 @@ mod tests {
     #[test]
     fn test_fee_calculation_no_overflow_max_u64() {
         const PLATFORM_FEE_BPS: u64 = 20;
-        
+
         // Max u64 would overflow if not handled
         let max_safe = u64::MAX / 10_000;
         let fee = max_safe * PLATFORM_FEE_BPS / 10_000;
-        
+
         // Should not panic
         assert!(fee > 0);
     }
@@ -329,7 +347,7 @@ mod tests {
         let large_amount = u64::MAX - 1000;
         let addition = large_amount.saturating_add(2000);
         assert_eq!(addition, u64::MAX);
-        
+
         let small_amount = 1000u64;
         let subtraction = small_amount.saturating_sub(2000);
         assert_eq!(subtraction, 0);

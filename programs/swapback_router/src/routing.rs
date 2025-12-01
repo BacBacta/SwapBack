@@ -18,9 +18,7 @@ pub struct VenueAllocation {
 
 /// Parse des comptes `VenueScore` présents dans remaining_accounts.
 /// Attendu: le keeper ou l'appelant fournit des comptes VenueScore (PDA) en remaining_accounts.
-pub fn parse_venue_scores<'info>(
-    remaining: &[AccountInfo<'info>],
-) -> BTreeMap<VenueType, u16> {
+pub fn parse_venue_scores<'info>(remaining: &[AccountInfo<'info>]) -> BTreeMap<VenueType, u16> {
     let mut map = BTreeMap::new();
     for ai in remaining {
         let data = ai.try_borrow_data();
@@ -101,8 +99,14 @@ mod tests {
     #[test]
     fn weights_renormalize_to_10000() {
         let mut v = vec![
-            VenueAllocation { venue_type: VenueType::Jupiter, weight_bps: 6000 },
-            VenueAllocation { venue_type: VenueType::Orca, weight_bps: 4000 },
+            VenueAllocation {
+                venue_type: VenueType::Jupiter,
+                weight_bps: 6000,
+            },
+            VenueAllocation {
+                venue_type: VenueType::Orca,
+                weight_bps: 4000,
+            },
         ];
         renormalize_weights(&mut v);
         let sum: u32 = v.iter().map(|x| x.weight_bps as u32).sum();
@@ -112,8 +116,14 @@ mod tests {
     #[test]
     fn adjust_excludes_low_scores() {
         let mut v = vec![
-            VenueAllocation { venue_type: VenueType::Jupiter, weight_bps: 5000 },
-            VenueAllocation { venue_type: VenueType::Orca, weight_bps: 5000 },
+            VenueAllocation {
+                venue_type: VenueType::Jupiter,
+                weight_bps: 5000,
+            },
+            VenueAllocation {
+                venue_type: VenueType::Orca,
+                weight_bps: 5000,
+            },
         ];
         let mut scores = BTreeMap::new();
         scores.insert(VenueType::Jupiter, 2000);
@@ -130,9 +140,10 @@ mod tests {
 
     #[test]
     fn renormalize_single_venue() {
-        let mut v = vec![
-            VenueAllocation { venue_type: VenueType::Jupiter, weight_bps: 5000 },
-        ];
+        let mut v = vec![VenueAllocation {
+            venue_type: VenueType::Jupiter,
+            weight_bps: 5000,
+        }];
         renormalize_weights(&mut v);
         assert_eq!(v[0].weight_bps, 10_000);
     }
@@ -140,9 +151,18 @@ mod tests {
     #[test]
     fn renormalize_three_venues() {
         let mut v = vec![
-            VenueAllocation { venue_type: VenueType::Jupiter, weight_bps: 3000 },
-            VenueAllocation { venue_type: VenueType::Orca, weight_bps: 3000 },
-            VenueAllocation { venue_type: VenueType::Raydium, weight_bps: 4000 },
+            VenueAllocation {
+                venue_type: VenueType::Jupiter,
+                weight_bps: 3000,
+            },
+            VenueAllocation {
+                venue_type: VenueType::Orca,
+                weight_bps: 3000,
+            },
+            VenueAllocation {
+                venue_type: VenueType::Raydium,
+                weight_bps: 4000,
+            },
         ];
         renormalize_weights(&mut v);
         let sum: u32 = v.iter().map(|x| x.weight_bps as u32).sum();
@@ -152,8 +172,14 @@ mod tests {
     #[test]
     fn renormalize_unequal_weights() {
         let mut v = vec![
-            VenueAllocation { venue_type: VenueType::Jupiter, weight_bps: 1000 },
-            VenueAllocation { venue_type: VenueType::Orca, weight_bps: 9000 },
+            VenueAllocation {
+                venue_type: VenueType::Jupiter,
+                weight_bps: 1000,
+            },
+            VenueAllocation {
+                venue_type: VenueType::Orca,
+                weight_bps: 9000,
+            },
         ];
         renormalize_weights(&mut v);
         let sum: u32 = v.iter().map(|x| x.weight_bps as u32).sum();
@@ -163,9 +189,18 @@ mod tests {
     #[test]
     fn renormalize_removes_zeros() {
         let mut v = vec![
-            VenueAllocation { venue_type: VenueType::Jupiter, weight_bps: 5000 },
-            VenueAllocation { venue_type: VenueType::Orca, weight_bps: 0 },
-            VenueAllocation { venue_type: VenueType::Raydium, weight_bps: 5000 },
+            VenueAllocation {
+                venue_type: VenueType::Jupiter,
+                weight_bps: 5000,
+            },
+            VenueAllocation {
+                venue_type: VenueType::Orca,
+                weight_bps: 0,
+            },
+            VenueAllocation {
+                venue_type: VenueType::Raydium,
+                weight_bps: 5000,
+            },
         ];
         renormalize_weights(&mut v);
         assert_eq!(v.len(), 2, "Zero-weight venue should be removed");
@@ -183,8 +218,14 @@ mod tests {
     #[test]
     fn renormalize_all_zeros() {
         let mut v = vec![
-            VenueAllocation { venue_type: VenueType::Jupiter, weight_bps: 0 },
-            VenueAllocation { venue_type: VenueType::Orca, weight_bps: 0 },
+            VenueAllocation {
+                venue_type: VenueType::Jupiter,
+                weight_bps: 0,
+            },
+            VenueAllocation {
+                venue_type: VenueType::Orca,
+                weight_bps: 0,
+            },
         ];
         renormalize_weights(&mut v);
         assert!(v.is_empty(), "All-zero venues should result in empty");
@@ -197,22 +238,37 @@ mod tests {
     #[test]
     fn adjust_excludes_all_below_threshold() {
         let mut v = vec![
-            VenueAllocation { venue_type: VenueType::Jupiter, weight_bps: 5000 },
-            VenueAllocation { venue_type: VenueType::Orca, weight_bps: 5000 },
+            VenueAllocation {
+                venue_type: VenueType::Jupiter,
+                weight_bps: 5000,
+            },
+            VenueAllocation {
+                venue_type: VenueType::Orca,
+                weight_bps: 5000,
+            },
         ];
         let mut scores = BTreeMap::new();
         scores.insert(VenueType::Jupiter, 1000);
         scores.insert(VenueType::Orca, 2000);
         adjust_weights_with_scores(&mut v, &scores, 2500);
         // Both are below threshold, all excluded
-        assert!(v.is_empty(), "All venues below threshold should be excluded");
+        assert!(
+            v.is_empty(),
+            "All venues below threshold should be excluded"
+        );
     }
 
     #[test]
     fn adjust_keeps_above_threshold() {
         let mut v = vec![
-            VenueAllocation { venue_type: VenueType::Jupiter, weight_bps: 5000 },
-            VenueAllocation { venue_type: VenueType::Orca, weight_bps: 5000 },
+            VenueAllocation {
+                venue_type: VenueType::Jupiter,
+                weight_bps: 5000,
+            },
+            VenueAllocation {
+                venue_type: VenueType::Orca,
+                weight_bps: 5000,
+            },
         ];
         let mut scores = BTreeMap::new();
         scores.insert(VenueType::Jupiter, 8000);
@@ -226,8 +282,14 @@ mod tests {
     #[test]
     fn adjust_missing_score_uses_default_10000() {
         let mut v = vec![
-            VenueAllocation { venue_type: VenueType::Jupiter, weight_bps: 5000 },
-            VenueAllocation { venue_type: VenueType::Orca, weight_bps: 5000 },
+            VenueAllocation {
+                venue_type: VenueType::Jupiter,
+                weight_bps: 5000,
+            },
+            VenueAllocation {
+                venue_type: VenueType::Orca,
+                weight_bps: 5000,
+            },
         ];
         let scores = BTreeMap::new(); // No scores provided
         adjust_weights_with_scores(&mut v, &scores, 2500);
@@ -244,14 +306,20 @@ mod tests {
     #[test]
     fn adjust_scales_by_score() {
         let mut v = vec![
-            VenueAllocation { venue_type: VenueType::Jupiter, weight_bps: 5000 },
-            VenueAllocation { venue_type: VenueType::Orca, weight_bps: 5000 },
+            VenueAllocation {
+                venue_type: VenueType::Jupiter,
+                weight_bps: 5000,
+            },
+            VenueAllocation {
+                venue_type: VenueType::Orca,
+                weight_bps: 5000,
+            },
         ];
         let mut scores = BTreeMap::new();
         scores.insert(VenueType::Jupiter, 5000); // 50% quality
-        scores.insert(VenueType::Orca, 10_000);  // 100% quality
+        scores.insert(VenueType::Orca, 10_000); // 100% quality
         adjust_weights_with_scores(&mut v, &scores, 0); // No threshold
-        
+
         // Jupiter: 5000 * 5000 / 10000 = 2500
         // Orca: 5000 * 10000 / 10000 = 5000
         // Before renorm: Jupiter=2500, Orca=5000
@@ -266,11 +334,22 @@ mod tests {
 
     #[test]
     fn adjust_is_deterministic() {
-        let create_venues = || vec![
-            VenueAllocation { venue_type: VenueType::Jupiter, weight_bps: 4000 },
-            VenueAllocation { venue_type: VenueType::Orca, weight_bps: 3000 },
-            VenueAllocation { venue_type: VenueType::Raydium, weight_bps: 3000 },
-        ];
+        let create_venues = || {
+            vec![
+                VenueAllocation {
+                    venue_type: VenueType::Jupiter,
+                    weight_bps: 4000,
+                },
+                VenueAllocation {
+                    venue_type: VenueType::Orca,
+                    weight_bps: 3000,
+                },
+                VenueAllocation {
+                    venue_type: VenueType::Raydium,
+                    weight_bps: 3000,
+                },
+            ]
+        };
         let mut scores = BTreeMap::new();
         scores.insert(VenueType::Jupiter, 8000);
         scores.insert(VenueType::Orca, 6000);
@@ -278,7 +357,7 @@ mod tests {
 
         let mut v1 = create_venues();
         let mut v2 = create_venues();
-        
+
         adjust_weights_with_scores(&mut v1, &scores, 2500);
         adjust_weights_with_scores(&mut v2, &scores, 2500);
 
@@ -287,15 +366,26 @@ mod tests {
 
     #[test]
     fn renormalize_is_deterministic() {
-        let create_venues = || vec![
-            VenueAllocation { venue_type: VenueType::Jupiter, weight_bps: 3333 },
-            VenueAllocation { venue_type: VenueType::Orca, weight_bps: 3333 },
-            VenueAllocation { venue_type: VenueType::Raydium, weight_bps: 3334 },
-        ];
+        let create_venues = || {
+            vec![
+                VenueAllocation {
+                    venue_type: VenueType::Jupiter,
+                    weight_bps: 3333,
+                },
+                VenueAllocation {
+                    venue_type: VenueType::Orca,
+                    weight_bps: 3333,
+                },
+                VenueAllocation {
+                    venue_type: VenueType::Raydium,
+                    weight_bps: 3334,
+                },
+            ]
+        };
 
         let mut v1 = create_venues();
         let mut v2 = create_venues();
-        
+
         renormalize_weights(&mut v1);
         renormalize_weights(&mut v2);
 
@@ -309,19 +399,25 @@ mod tests {
     #[test]
     fn no_scores_weights_unchanged() {
         let mut v = vec![
-            VenueAllocation { venue_type: VenueType::Jupiter, weight_bps: 6000 },
-            VenueAllocation { venue_type: VenueType::Orca, weight_bps: 4000 },
+            VenueAllocation {
+                venue_type: VenueType::Jupiter,
+                weight_bps: 6000,
+            },
+            VenueAllocation {
+                venue_type: VenueType::Orca,
+                weight_bps: 4000,
+            },
         ];
         let original = v.clone();
         let scores = BTreeMap::new(); // Empty scores
-        
+
         adjust_weights_with_scores(&mut v, &scores, 2500);
-        
+
         // With no scores, default is 10_000 (100%), so weights scaled by 100%
         // After renormalize, should still sum to 10_000
         let sum: u32 = v.iter().map(|x| x.weight_bps as u32).sum();
         assert_eq!(sum, 10_000);
-        
+
         // Proportions should be preserved
         assert_eq!(v.len(), original.len());
     }
@@ -333,12 +429,18 @@ mod tests {
     #[test]
     fn adjust_with_threshold_equal_to_score() {
         let mut v = vec![
-            VenueAllocation { venue_type: VenueType::Jupiter, weight_bps: 5000 },
-            VenueAllocation { venue_type: VenueType::Orca, weight_bps: 5000 },
+            VenueAllocation {
+                venue_type: VenueType::Jupiter,
+                weight_bps: 5000,
+            },
+            VenueAllocation {
+                venue_type: VenueType::Orca,
+                weight_bps: 5000,
+            },
         ];
         let mut scores = BTreeMap::new();
         scores.insert(VenueType::Jupiter, 2500); // Exactly at threshold
-        scores.insert(VenueType::Orca, 2500);    // Exactly at threshold
+        scores.insert(VenueType::Orca, 2500); // Exactly at threshold
         adjust_weights_with_scores(&mut v, &scores, 2500);
         // Score = threshold means it's NOT below threshold, so kept
         assert_eq!(v.len(), 2);
@@ -347,18 +449,24 @@ mod tests {
     #[test]
     fn adjust_with_zero_threshold() {
         let mut v = vec![
-            VenueAllocation { venue_type: VenueType::Jupiter, weight_bps: 5000 },
-            VenueAllocation { venue_type: VenueType::Orca, weight_bps: 5000 },
+            VenueAllocation {
+                venue_type: VenueType::Jupiter,
+                weight_bps: 5000,
+            },
+            VenueAllocation {
+                venue_type: VenueType::Orca,
+                weight_bps: 5000,
+            },
         ];
         let mut scores = BTreeMap::new();
         scores.insert(VenueType::Jupiter, 1); // Very low but > 0
         scores.insert(VenueType::Orca, 1);
         adjust_weights_with_scores(&mut v, &scores, 0); // Zero threshold
-        // Both should be kept since score (1) >= threshold (0)
-        // However, weights are scaled by score: 5000 * 1 / 10000 = 0
-        // Both get weight 0, then removed by renormalize
-        // This is expected behavior - very low scores effectively exclude venues
-        // The test should verify this behavior
+                                                        // Both should be kept since score (1) >= threshold (0)
+                                                        // However, weights are scaled by score: 5000 * 1 / 10000 = 0
+                                                        // Both get weight 0, then removed by renormalize
+                                                        // This is expected behavior - very low scores effectively exclude venues
+                                                        // The test should verify this behavior
         let sum: u32 = v.iter().map(|x| x.weight_bps as u32).sum();
         // Either both are removed (len=0) or if somehow kept, sum should be 10000
         assert!(v.is_empty() || sum == 10000);
@@ -367,14 +475,20 @@ mod tests {
     #[test]
     fn adjust_with_max_threshold() {
         let mut v = vec![
-            VenueAllocation { venue_type: VenueType::Jupiter, weight_bps: 5000 },
-            VenueAllocation { venue_type: VenueType::Orca, weight_bps: 5000 },
+            VenueAllocation {
+                venue_type: VenueType::Jupiter,
+                weight_bps: 5000,
+            },
+            VenueAllocation {
+                venue_type: VenueType::Orca,
+                weight_bps: 5000,
+            },
         ];
         let mut scores = BTreeMap::new();
         scores.insert(VenueType::Jupiter, 9999);
         scores.insert(VenueType::Orca, 9999);
         adjust_weights_with_scores(&mut v, &scores, 10_000); // Max threshold
-        // Both below 10_000 threshold
+                                                             // Both below 10_000 threshold
         assert!(v.is_empty());
     }
 }

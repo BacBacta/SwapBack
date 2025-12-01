@@ -10,7 +10,7 @@ pub fn split_amount_by_weights(amount_in: u64, weights: &[u16]) -> Result<Vec<u6
     if weights.is_empty() {
         return Ok(vec![]);
     }
-    
+
     let weight_sum: u32 = weights.iter().map(|w| *w as u32).sum();
     if weight_sum == 0 {
         return Ok(vec![0; weights.len()]);
@@ -26,9 +26,8 @@ pub fn split_amount_by_weights(amount_in: u64, weights: &[u16]) -> Result<Vec<u6
             parts.push(part);
         } else {
             // Standard calculation: amount_in * weight / weight_sum
-            let part = ((amount_in as u128)
-                .saturating_mul(w as u128)
-                / (weight_sum as u128)) as u64;
+            let part =
+                ((amount_in as u128).saturating_mul(w as u128) / (weight_sum as u128)) as u64;
             parts.push(part);
             acc = acc.saturating_add(part);
         }
@@ -63,7 +62,7 @@ pub fn renormalize_weights_to_10000(weights: &mut Vec<u16>) {
     if sum == 0 {
         return;
     }
-    
+
     let mut acc: u32 = 0;
     for i in 0..weights.len() {
         if i == weights.len() - 1 {
@@ -270,7 +269,10 @@ mod tests {
     fn renormalize_all_zeros() {
         let mut weights = vec![0u16, 0u16, 0u16];
         renormalize_weights_to_10000(&mut weights);
-        assert!(weights.is_empty(), "All-zero weights should result in empty");
+        assert!(
+            weights.is_empty(),
+            "All-zero weights should result in empty"
+        );
     }
 
     #[test]

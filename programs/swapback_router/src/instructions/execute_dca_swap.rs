@@ -1,6 +1,5 @@
 use crate::error::SwapbackError;
 use crate::state::{DcaPlan, RouterState};
-use crate::ErrorCode;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
 
@@ -76,7 +75,10 @@ pub struct DcaSwapExecuted {
     pub timestamp: i64,
 }
 
-pub fn handler<'info>(ctx: Context<'_, '_, '_, 'info, ExecuteDcaSwap<'info>>, args: ExecuteDcaSwapArgs) -> Result<()> {
+pub fn handler<'info>(
+    ctx: Context<'_, '_, '_, 'info, ExecuteDcaSwap<'info>>,
+    args: ExecuteDcaSwapArgs,
+) -> Result<()> {
     let dca_plan = &mut ctx.accounts.dca_plan;
     let clock = Clock::get()?;
 
@@ -123,13 +125,17 @@ pub fn handler<'info>(ctx: Context<'_, '_, '_, 'info, ExecuteDcaSwap<'info>>, ar
             min_out,
             &args.jupiter_instruction,
             &[], // No seeds needed - user signs externally or keeper executes
-        ).map_err(|e| {
+        )
+        .map_err(|e| {
             msg!("Jupiter CPI failed: {:?}", e);
             SwapbackError::SwapExecutionFailed
         })?
     } else {
         // Fallback: use keeper-reported amount if no Jupiter instruction
-        require!(args.amount_received >= min_out, SwapbackError::SlippageExceeded);
+        require!(
+            args.amount_received >= min_out,
+            SwapbackError::SlippageExceeded
+        );
         args.amount_received
     };
 

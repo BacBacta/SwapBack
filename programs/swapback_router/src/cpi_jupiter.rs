@@ -164,14 +164,14 @@ mod tests {
 
     /// Test that delta-based enforcement logic catches edge cases.
     /// These tests verify the require! checks without actual CPI calls.
-    
+
     #[test]
     fn test_delta_enforcement_zero_spent_fails() {
         // Scenario: Jupiter CPI returns but no tokens were spent (pre_in == post_in)
         let pre_in = 1000u64;
         let post_in = 1000u64; // No change
         let spent_in = pre_in.saturating_sub(post_in);
-        
+
         // This should fail: spent_in == 0
         assert_eq!(spent_in, 0);
         // In swap_with_balance_deltas, this triggers: require!(spent_in > 0, JupiterNoInputSpent)
@@ -182,7 +182,7 @@ mod tests {
         // Scenario: Jupiter spent more than expected (malicious/buggy)
         let amount_in = 1000u64;
         let spent_in = 1010u64; // Spent 10 more than expected
-        
+
         // Check: spent_in <= amount_in + 5 (rounding margin)
         let is_valid = spent_in <= amount_in.saturating_add(5);
         assert!(!is_valid, "Should fail when spent exceeds amount_in + 5");
@@ -193,7 +193,7 @@ mod tests {
         // Scenario: Jupiter spent slightly more due to rounding (acceptable)
         let amount_in = 1000u64;
         let spent_in = 1003u64; // Within 5 margin
-        
+
         let is_valid = spent_in <= amount_in.saturating_add(5);
         assert!(is_valid, "Should pass when spent is within margin");
     }
@@ -203,7 +203,7 @@ mod tests {
         // Scenario: Slippage exceeded - received less than minimum
         let min_out = 950u64;
         let received_out = 940u64; // 10 less than min_out
-        
+
         let passes_slippage = received_out >= min_out;
         assert!(!passes_slippage, "Should fail slippage check");
     }
@@ -213,7 +213,7 @@ mod tests {
         // Scenario: Received exactly min_out (should pass)
         let min_out = 950u64;
         let received_out = 950u64;
-        
+
         let passes_slippage = received_out >= min_out;
         assert!(passes_slippage, "Should pass when received == min_out");
     }
@@ -223,10 +223,10 @@ mod tests {
         // Scenario: Received more than min_out (positive slippage = NPI)
         let min_out = 950u64;
         let received_out = 1020u64;
-        
+
         let passes_slippage = received_out >= min_out;
         assert!(passes_slippage, "Should pass with positive slippage");
-        
+
         let npi = received_out.saturating_sub(min_out);
         assert_eq!(npi, 70, "NPI should be 70");
     }
@@ -238,10 +238,10 @@ mod tests {
         let post_in = 9_000u64;
         let pre_out = 500u64;
         let post_out = 1_470u64;
-        
+
         let spent_in = pre_in.saturating_sub(post_in);
         let received_out = post_out.saturating_sub(pre_out);
-        
+
         assert_eq!(spent_in, 1000, "Should have spent 1000");
         assert_eq!(received_out, 970, "Should have received 970");
     }
@@ -251,7 +251,7 @@ mod tests {
         // Edge case: post balance somehow higher than pre (saturating_sub protects)
         let pre_in = 1000u64;
         let post_in = 1500u64; // Impossible in normal operation
-        
+
         let spent_in = pre_in.saturating_sub(post_in);
         assert_eq!(spent_in, 0, "saturating_sub should return 0, not underflow");
     }
@@ -261,16 +261,16 @@ mod tests {
         // Complete valid swap scenario
         let amount_in = 1000u64;
         let min_out = 900u64;
-        
+
         // Simulated deltas
         let spent_in = 1000u64;
         let received_out = 980u64;
-        
+
         // All checks
         let check1 = spent_in > 0;
         let check2 = spent_in <= amount_in.saturating_add(5);
         let check3 = received_out >= min_out;
-        
+
         assert!(check1, "Check 1: spent > 0");
         assert!(check2, "Check 2: spent <= amount_in + margin");
         assert!(check3, "Check 3: received >= min_out");

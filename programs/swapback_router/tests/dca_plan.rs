@@ -4,8 +4,8 @@
 #[cfg(test)]
 mod tests {
     // Constants matching lib.rs DCA limits
-    const MIN_INTERVAL_SECONDS: i64 = 3600;      // 1 hour minimum
-    const MAX_INTERVAL_SECONDS: i64 = 31536000;  // 1 year maximum
+    const MIN_INTERVAL_SECONDS: i64 = 3600; // 1 hour minimum
+    const MAX_INTERVAL_SECONDS: i64 = 31536000; // 1 year maximum
     const MAX_SWAPS: u32 = 10_000;
     const MAX_SINGLE_SWAP_LAMPORTS: u64 = 5_000_000_000_000; // ~5k SOL
 
@@ -66,7 +66,7 @@ mod tests {
         let plan = DcaPlan {
             amount_per_swap: 1_000_000_000, // 1000 USDC
             total_swaps: 10,
-            interval_seconds: 86400, // Daily
+            interval_seconds: 86400,       // Daily
             min_out_per_swap: 900_000_000, // 10% slippage tolerance
             expires_at: i64::MAX,
             is_active: true,
@@ -83,13 +83,19 @@ mod tests {
     #[test]
     fn test_interval_too_short() {
         let interval = 1800i64; // 30 minutes
-        assert!(interval < MIN_INTERVAL_SECONDS, "Interval should be rejected");
+        assert!(
+            interval < MIN_INTERVAL_SECONDS,
+            "Interval should be rejected"
+        );
     }
 
     #[test]
     fn test_interval_too_long() {
         let interval = 63072000i64; // 2 years
-        assert!(interval > MAX_INTERVAL_SECONDS, "Interval should be rejected");
+        assert!(
+            interval > MAX_INTERVAL_SECONDS,
+            "Interval should be rejected"
+        );
     }
 
     #[test]
@@ -101,7 +107,10 @@ mod tests {
     #[test]
     fn test_amount_exceeds_limit() {
         let amount = 10_000_000_000_000u64; // 10k SOL
-        assert!(amount > MAX_SINGLE_SWAP_LAMPORTS, "Amount should be rejected");
+        assert!(
+            amount > MAX_SINGLE_SWAP_LAMPORTS,
+            "Amount should be rejected"
+        );
     }
 
     // ========== Plan State Tests ==========
@@ -221,7 +230,7 @@ mod tests {
 
         // Simulate swap execution
         let amount_received = 950_000u64; // Slight slippage
-        
+
         plan.executed_swaps += 1;
         plan.total_invested += plan.amount_per_swap;
         plan.total_received += amount_received;
@@ -245,11 +254,11 @@ mod tests {
         };
 
         let execution_results = vec![
-            95_000_000u64,  // Swap 1: 95 output
-            98_000_000,     // Swap 2: 98 output
-            102_000_000,    // Swap 3: 102 output (positive slippage)
-            97_000_000,     // Swap 4: 97 output
-            99_000_000,     // Swap 5: 99 output
+            95_000_000u64, // Swap 1: 95 output
+            98_000_000,    // Swap 2: 98 output
+            102_000_000,   // Swap 3: 102 output (positive slippage)
+            97_000_000,    // Swap 4: 97 output
+            99_000_000,    // Swap 5: 99 output
         ];
 
         for amount_received in execution_results {
@@ -270,7 +279,7 @@ mod tests {
     #[test]
     fn test_average_execution_price() {
         let plan = DcaPlan {
-            total_invested: 1_000_000_000, // 1000 USDC
+            total_invested: 1_000_000_000,  // 1000 USDC
             total_received: 50_000_000_000, // 50000 tokens
             ..Default::default()
         };
@@ -381,7 +390,7 @@ mod tests {
             interval_seconds: 3600, // Hourly
             next_execution: 1700000000,
             min_out_per_swap: 90_000_000, // 10% slippage
-            expires_at: 1700100000, // ~27 hours from start
+            expires_at: 1700100000,       // ~27 hours from start
             is_active: true,
             ..Default::default()
         };
@@ -394,7 +403,7 @@ mod tests {
         // 2. Execute first swap
         let current_time_1 = 1700000000i64;
         assert!(plan.is_ready_for_execution(current_time_1));
-        
+
         plan.executed_swaps += 1;
         plan.total_invested += plan.amount_per_swap;
         plan.total_received += 95_000_000;
@@ -406,7 +415,7 @@ mod tests {
         // 3. Execute second swap
         let current_time_2 = 1700003600i64; // +1 hour
         assert!(plan.is_ready_for_execution(current_time_2));
-        
+
         plan.executed_swaps += 1;
         plan.total_invested += plan.amount_per_swap;
         plan.total_received += 98_000_000;
@@ -415,7 +424,7 @@ mod tests {
         // 4. Execute third (final) swap
         let current_time_3 = 1700007200i64; // +2 hours
         assert!(plan.is_ready_for_execution(current_time_3));
-        
+
         plan.executed_swaps += 1;
         plan.total_invested += plan.amount_per_swap;
         plan.total_received += 96_000_000;

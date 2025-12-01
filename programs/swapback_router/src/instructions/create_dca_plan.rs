@@ -1,6 +1,6 @@
 use crate::error::SwapbackError;
-use crate::MAX_SINGLE_SWAP_LAMPORTS;
 use crate::CreateDcaPlan;
+use crate::MAX_SINGLE_SWAP_LAMPORTS;
 use anchor_lang::prelude::*;
 
 pub fn handler(
@@ -25,7 +25,7 @@ pub fn handler(
         interval_seconds,
         min_out_per_swap,
         expires_at,
-        clock.unix_timestamp
+        clock.unix_timestamp,
     )?;
 
     // Initialize DCA plan
@@ -65,10 +65,13 @@ pub fn validate_plan_args(
     interval_seconds: i64,
     min_out_per_swap: u64,
     expires_at: i64,
-    current_ts: i64
+    current_ts: i64,
 ) -> Result<()> {
     require!(amount_per_swap > 0, SwapbackError::InvalidAmount);
-    require!(amount_per_swap <= MAX_SINGLE_SWAP_LAMPORTS, SwapbackError::AmountExceedsLimit);
+    require!(
+        amount_per_swap <= MAX_SINGLE_SWAP_LAMPORTS,
+        SwapbackError::AmountExceedsLimit
+    );
     require!(total_swaps > 0, SwapbackError::InvalidSwapCount);
     require!(total_swaps <= 10000, SwapbackError::TooManySwaps);
     require!(token_in != token_out, SwapbackError::IdenticalMints);
@@ -77,10 +80,7 @@ pub fn validate_plan_args(
     require!(min_out_per_swap > 0, SwapbackError::InvalidMinOutput);
 
     if expires_at > 0 {
-        require!(
-            expires_at > current_ts,
-            SwapbackError::InvalidExpiry
-        );
+        require!(expires_at > current_ts, SwapbackError::InvalidExpiry);
     }
 
     Ok(())

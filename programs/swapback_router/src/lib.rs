@@ -6,6 +6,7 @@ mod cpi_orca;
 mod cpi_raydium;
 pub mod error;
 pub mod instructions;
+pub mod math;
 mod oracle;
 pub mod oracle_cache;
 pub mod routing;
@@ -17,13 +18,19 @@ pub mod venue_scoring;
 #[cfg(target_os = "solana")]
 mod getrandom_stub;
 
+// Property-based tests (proptest)
+#[cfg(test)]
+mod proptest_fuzz;
+
 // Re-export for external use
 pub use error::SwapbackError;
 pub use state::{DcaPlan, RouterConfig, RouterState, UserRebate};
 
 // Internal use
-use slippage::{DynamicSlippageInputs, calculate_dynamic_slippage_bps, min_out_from_expected};
-use routing::{VenueAllocation, parse_venue_scores, adjust_weights_with_scores, MIN_QUALITY_SCORE_DEFAULT};
+use routing::{
+    adjust_weights_with_scores, parse_venue_scores, VenueAllocation, MIN_QUALITY_SCORE_DEFAULT,
+};
+use slippage::{calculate_dynamic_slippage_bps, DynamicSlippageInputs};
 
 // Program ID - Deployed on devnet (Nov 12, 2025)
 declare_id!("9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh");
@@ -196,7 +203,7 @@ pub struct InitializeOracleCache<'info> {
 pub struct InitializeVenueScore<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-    
+
     #[account(mut)]
     pub state: Account<'info, RouterState>,
 
@@ -249,7 +256,10 @@ pub mod swapback_router {
         create_plan_processor::process_create_plan(ctx, plan_id, plan_data)
     }
 
-    pub fn swap_toc<'info>(ctx: Context<'_, '_, '_, 'info, SwapToC<'info>>, args: SwapArgs) -> Result<()> {
+    pub fn swap_toc<'info>(
+        ctx: Context<'_, '_, '_, 'info, SwapToC<'info>>,
+        args: SwapArgs,
+    ) -> Result<()> {
         swap_toc_processor::process_swap_toc(ctx, args)
     }
 
@@ -584,7 +594,7 @@ pub mod swapback_router {
         cache.cache_duration = 5; // 5 seconds default
         cache.volatility_bps = 50; // Default 0.5% volatility
         cache.bump = ctx.bumps.oracle_cache;
-        
+
         msg!("📈 Oracle cache initialized for {}/{}", token_in, token_out);
         Ok(())
     }
@@ -1193,7 +1203,10 @@ pub mod swap_toc_processor {
     use crate::cpi_orca;
     use crate::oracle::{self, OracleObservation};
 
-    pub fn process_swap_toc<'info>(mut ctx: Context<'_, '_, '_, 'info, SwapToC<'info>>, args: SwapArgs) -> Result<()> {
+    pub fn process_swap_toc<'info>(
+        mut ctx: Context<'_, '_, '_, 'info, SwapToC<'info>>,
+        args: SwapArgs,
+    ) -> Result<()> {
         // ✅ SECURITY: Validate input parameters
         require!(args.amount_in > 0, ErrorCode::InvalidAmount);
         require!(args.min_out > 0, ErrorCode::InvalidAmount);
@@ -1227,27 +1240,30 @@ pub mod swap_toc_processor {
                 6, // Assume USDC decimals for token_a
                 6, // Assume USDC decimals for token_b (adjust based on actual tokens)
             );
-            
+
             // Get volatility from oracle cache or use default
-            let volatility_bps = ctx.accounts.oracle_cache
+            let volatility_bps = ctx
+                .accounts
+                .oracle_cache
                 .as_ref()
                 .map(|c| c.volatility_bps)
                 .unwrap_or(50u16);
-            
+
             let result = crate::slippage::calculate_dynamic_slippage_with_breakdown(
                 args.amount_in,
                 pool_tvl,
                 volatility_bps,
                 None,
             );
-            
-            msg!("📊 Dynamic Slippage: {} bps (base={}, size={}, vol={})",
+
+            msg!(
+                "📊 Dynamic Slippage: {} bps (base={}, size={}, vol={})",
                 result.slippage_bps,
                 result.base_component,
                 result.size_component,
                 result.volatility_component
             );
-            
+
             Some(result.slippage_bps)
         } else {
             None
@@ -1276,18 +1292,15 @@ pub mod swap_toc_processor {
             return process_dynamic_plan_swap(&mut ctx, args, &clock);
         }
 
-        let oracle_observation = get_oracle_price(
-            &ctx.accounts.primary_oracle,
-            fallback_account,
-            &clock,
-        )?;
+        let oracle_observation =
+            get_oracle_price(&ctx.accounts.primary_oracle, fallback_account, &clock)?;
         let expected_out = calculate_expected_output(args.amount_in, oracle_observation.price)?;
 
         // Calculate min_out: Use dynamic slippage if enabled, else user-provided tolerance
         let min_out = if let Some(dynamic_slippage) = slippage_bps_effective {
             // Dynamic slippage takes precedence when enabled
             let dynamic_min = calculate_min_output_with_slippage(expected_out, dynamic_slippage)?;
-            
+
             // Use the more conservative (higher) min_out between dynamic and user-specified
             if let Some(user_slippage) = args.slippage_tolerance {
                 let user_min = calculate_min_output_with_slippage(expected_out, user_slippage)?;
@@ -1319,14 +1332,14 @@ pub mod swap_toc_processor {
         // Calculate actual metrics for VenueScore
         let end_time = Clock::get()?.unix_timestamp;
         let latency_ms = ((end_time - start_time) * 1000).max(1) as u32;
-        
+
         // Calculate actual slippage: (expected - actual) / expected * 10000
         let actual_slippage_bps = if expected_out > 0 && amount_out < expected_out {
             ((expected_out - amount_out) as u128 * 10_000 / expected_out as u128) as u16
         } else {
             0
         };
-        
+
         // Calculate NPI (Net Positive Impact) = amount_out - min_out (if positive)
         let npi = if amount_out > min_out {
             (amount_out - min_out) as i64
@@ -1707,13 +1720,14 @@ pub mod swap_toc_processor {
         clock: &Clock,
     ) -> Result<OracleObservation> {
         let primary_result = oracle::read_price(primary_oracle, clock);
-        let fallback_observation = fallback_oracle.and_then(|account| match oracle::read_price(account, clock) {
-            Ok(observation) => Some(observation),
-            Err(_) => {
-                msg!("⚠️ Fallback oracle read failed");
-                None
-            }
-        });
+        let fallback_observation =
+            fallback_oracle.and_then(|account| match oracle::read_price(account, clock) {
+                Ok(observation) => Some(observation),
+                Err(_) => {
+                    msg!("⚠️ Fallback oracle read failed");
+                    None
+                }
+            });
 
         let observation = match (primary_result, fallback_observation) {
             (Ok(primary), Some(fallback)) => {
@@ -1723,9 +1737,7 @@ pub mod swap_toc_processor {
                     return err!(ErrorCode::InvalidOraclePrice);
                 }
 
-                let spread = high
-                    .checked_sub(low)
-                    .ok_or(ErrorCode::InvalidOraclePrice)?;
+                let spread = high.checked_sub(low).ok_or(ErrorCode::InvalidOraclePrice)?;
                 let divergence_bps = spread
                     .checked_mul(10_000)
                     .and_then(|value| value.checked_div(low))
@@ -1813,11 +1825,17 @@ pub mod swap_toc_processor {
 
     /// Calculate effective slippage using dynamic inputs if available
     /// Falls back to user-provided slippage_tolerance if dynamic slippage is disabled
-    fn effective_slippage_bps(args: &SwapArgs, dynamic_enabled: bool, fallback_user_bps: u16) -> Result<u16> {
+    fn effective_slippage_bps(
+        args: &SwapArgs,
+        dynamic_enabled: bool,
+        fallback_user_bps: u16,
+    ) -> Result<u16> {
         if !dynamic_enabled {
             return Ok(fallback_user_bps);
         }
-        let liquidity = args.liquidity_estimate.ok_or(error!(ErrorCode::InvalidLiquidityEstimate))?;
+        let liquidity = args
+            .liquidity_estimate
+            .ok_or(error!(ErrorCode::InvalidLiquidityEstimate))?;
         require!(liquidity > 0, ErrorCode::InvalidLiquidityEstimate);
         let vol = args.volatility_bps.unwrap_or(0);
         Ok(calculate_dynamic_slippage_bps(DynamicSlippageInputs {
@@ -1853,7 +1871,7 @@ pub mod swap_toc_processor {
     ) -> Result<u64> {
         // Require Jupiter route for single swaps
         let route = jupiter_route.ok_or(ErrorCode::MissingJupiterRoute)?;
-        
+
         // Validate route parameters match swap request
         require_eq!(
             route.expected_input_amount,
@@ -1900,7 +1918,9 @@ pub mod swap_toc_processor {
         });
 
         // Calculate and distribute fees/rebates
-        let user_boost = ctx.accounts.user_nft
+        let user_boost = ctx
+            .accounts
+            .user_nft
             .as_ref()
             .filter(|nft| nft.is_active)
             .map(|nft| nft.boost)
@@ -1912,7 +1932,7 @@ pub mod swap_toc_processor {
         let buyburn_fee = calculate_fee(platform_fee, ctx.accounts.state.buyburn_from_fees_bps)?;
 
         let net_amount = amount_out.saturating_sub(platform_fee);
-        
+
         // NPI (routing profit) calculation
         let routing_profit = if net_amount > min_out {
             net_amount.saturating_sub(min_out)
@@ -1923,9 +1943,11 @@ pub mod swap_toc_processor {
         // Rebate calculation with boost
         if routing_profit > 0 {
             let base_rebate = calculate_fee(routing_profit, ctx.accounts.state.rebate_percentage)?;
-            let treasury_from_npi = calculate_fee(routing_profit, ctx.accounts.state.treasury_percentage)?;
-            let boost_allocation = calculate_fee(routing_profit, ctx.accounts.state.boost_vault_percentage)?;
-            
+            let treasury_from_npi =
+                calculate_fee(routing_profit, ctx.accounts.state.treasury_percentage)?;
+            let boost_allocation =
+                calculate_fee(routing_profit, ctx.accounts.state.boost_vault_percentage)?;
+
             let boost_amount = if user_boost > 0 {
                 calculate_fee(base_rebate, user_boost)?
             } else {
@@ -1939,8 +1961,12 @@ pub mod swap_toc_processor {
 
             // Update state totals
             let state = &mut ctx.accounts.state;
-            state.total_treasury_from_npi = state.total_treasury_from_npi.saturating_add(treasury_from_npi);
-            state.total_boost_vault = state.total_boost_vault.saturating_add(boost_allocation.saturating_sub(boost_paid));
+            state.total_treasury_from_npi = state
+                .total_treasury_from_npi
+                .saturating_add(treasury_from_npi);
+            state.total_boost_vault = state
+                .total_boost_vault
+                .saturating_add(boost_allocation.saturating_sub(boost_paid));
 
             let now = Clock::get()?.unix_timestamp;
             emit!(NPIDistributed {
@@ -1956,7 +1982,8 @@ pub mod swap_toc_processor {
 
         // Update fee totals
         let state = &mut ctx.accounts.state;
-        state.total_treasury_from_fees = state.total_treasury_from_fees.saturating_add(treasury_fee);
+        state.total_treasury_from_fees =
+            state.total_treasury_from_fees.saturating_add(treasury_fee);
         state.total_buyburn = state.total_buyburn.saturating_add(buyburn_fee);
 
         emit!(FeesAllocated {
@@ -1968,7 +1995,7 @@ pub mod swap_toc_processor {
         });
 
         // Deposit to buyback if configured
-        if buyburn_fee > 0 
+        if buyburn_fee > 0
             && ctx.accounts.buyback_program.is_some()
             && ctx.accounts.buyback_usdc_vault.is_some()
             && ctx.accounts.buyback_state.is_some()
@@ -2010,7 +2037,7 @@ pub mod swap_toc_processor {
         }
 
         let slice_min_out = total_min_out / twap_slices as u64;
-        
+
         // For TWAP, execute first slice immediately, emit event for keeper to handle rest
         let amount_out = process_single_swap(
             ctx,
@@ -2032,8 +2059,11 @@ pub mod swap_toc_processor {
             timestamp: clock.unix_timestamp,
         });
 
-        msg!("🕐 TWAP: Executed slice 1/{}, remaining {} slices scheduled for keeper", 
-            twap_slices, twap_slices - 1);
+        msg!(
+            "🕐 TWAP: Executed slice 1/{}, remaining {} slices scheduled for keeper",
+            twap_slices,
+            twap_slices - 1
+        );
 
         Ok(())
     }
@@ -2080,7 +2110,6 @@ pub mod swap_toc_processor {
 
         Ok(boosted)
     }
-
 
     /// Pay rebate to user with pre-calculated amount
     /// New function with cleaner separation of concerns
