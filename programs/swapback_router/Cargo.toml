@@ -21,6 +21,7 @@ default = []
 devnet = []
 switchboard = ["switchboard-solana"]
 pyth = []
+test-mode = []
 
 [dependencies]
 anchor-lang = { workspace = true, features = ["init-if-needed"] }
@@ -39,3 +40,6 @@ getrandom = { version = "0.2", default-features = false, features = ["custom"] }
 # Forcer les versions compatibles avec Rust 1.79
 indexmap = "=2.6.0"
 toml_edit = "=0.22.22"
+
+[dev-dependencies]
+proptest = "=1.4.0"
