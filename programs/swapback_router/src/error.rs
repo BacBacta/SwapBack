@@ -65,4 +65,8 @@ pub enum SwapbackError {
     SlippageExceededCpi,
     #[msg("Invalid liquidity estimate (must be > 0)")]
     InvalidLiquidityEstimate,
+
+    // Compute Budget Guard
+    #[msg("Too many venues for one swap (compute guard)")]
+    TooManyVenues,
 }
