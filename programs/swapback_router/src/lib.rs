@@ -6,6 +6,8 @@ mod cpi_orca;
 mod cpi_raydium;
 pub mod error;
 pub mod instructions;
+#[macro_use]
+pub mod logging;
 pub mod math;
 mod oracle;
 pub mod oracle_cache;

@@ -22,6 +22,7 @@ devnet = []
 switchboard = ["switchboard-solana"]
 pyth = []
 test-mode = []
+debug-logs = []
 
 [dependencies]
 anchor-lang = { workspace = true, features = ["init-if-needed"] }
