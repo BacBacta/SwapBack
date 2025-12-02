@@ -189,3 +189,154 @@ npx tsx scripts/validate-remaining-accounts.ts \
 ```bash
 ./scripts/verify-docs-and-scripts.sh
 ```
+
+---
+
+## Priority fee & compute units
+
+The router emits a `PriorityFeeSet` event with recommended compute budget settings.
+
+### Event structure
+
+```rust
+#[event]
+pub struct PriorityFeeSet {
+    pub compute_unit_limit: u32,  // Recommended CU limit
+    pub compute_unit_price: u64,  // Recommended price in micro-lamports
+}
+```
+
+### Calculation logic
+
+```rust
+// Base: 200,000 CU
+// + 30,000 per venue
+// + 10,000 per fallback
+let cu_limit = 200_000 + (venue_count * 30_000) + (fallback_count * 10_000);
+
+// Priority fee: amount_in / 1000, clamped to [5,000..500,000] micro-lamports
+let priority_fee = clamp(amount_in / 1000, 5_000, 500_000);
+```
+
+### Keeper integration
+
+Listen for the event and set compute budget before submitting:
+
+```typescript
+import { ComputeBudgetProgram } from '@solana/web3.js';
+
+// After simulating the swap, extract PriorityFeeSet from logs
+const event = parsePriorityFeeSetEvent(simulationLogs);
+
+// Add compute budget instructions
+const transaction = new Transaction()
+  .add(ComputeBudgetProgram.setComputeUnitLimit({
+    units: event.compute_unit_limit,
+  }))
+  .add(ComputeBudgetProgram.setComputeUnitPrice({
+    microLamports: event.compute_unit_price,
+  }))
+  .add(swapInstruction);
+```
+
+### Recommended ranges
+
+| Swap type | CU Limit | Priority (µ-lamports) |
+|-----------|----------|----------------------|
+| Single venue | 230,000 | 5,000 - 50,000 |
+| Multi-venue (3) | 290,000 | 10,000 - 100,000 |
+| With fallbacks | +10,000/fallback | +50% during congestion |
+| Large swaps (>100 SOL) | Same | 100,000 - 500,000 |
+
+---
+
+## Buyback & Burn configuration
+
+The buyback system uses dedicated accounts for collecting platform fees and executing buy-burn.
+
+### Program & accounts
+
+| Account | PDA Seeds | Description |
+|---------|-----------|-------------|
+| `buyback_state` | `["buyback_state"]` | Global buyback configuration |
+| `usdc_vault` | `["usdc_vault"]` | USDC collected from platform fees |
+| `back_vault` | `["back_vault", buyback_state]` | BACK tokens before burning |
+
+### BuybackState structure
+
+```rust
+pub struct BuybackState {
+    pub authority: Pubkey,           // Admin wallet
+    pub back_mint: Pubkey,           // $BACK token mint
+    pub usdc_vault: Pubkey,          // USDC vault address
+    pub min_buyback_amount: u64,     // Minimum USDC to trigger (default: 100 USDC)
+    pub total_usdc_spent: u64,       // Cumulative USDC spent
+    pub total_back_burned: u64,      // Cumulative BACK burned
+    pub buyback_count: u64,          // Number of buyback executions
+    pub bump: u8,
+}
+```
+
+### Fee flow
+
+```
+User swap
+    ↓
+Platform fee (0.2%)
+    ↓
+┌───────────────────┬────────────────────┐
+│ 85% → Treasury    │ 15% → USDC Vault   │
+└───────────────────┴────────────────────┘
+                              ↓
+                    (When balance ≥ threshold)
+                              ↓
+                    Buyback Keeper triggers
+                              ↓
+                    Jupiter swap: USDC → BACK
+                              ↓
+                    100% BACK → Burn 🔥
+```
+
+### Buyback Keeper configuration
+
+Located at `oracle/src/buyback-keeper.ts`:
+
+| Parameter | Default | Environment Variable |
+|-----------|---------|---------------------|
+| RPC URL | devnet | `NEXT_PUBLIC_SOLANA_RPC_URL` |
+| Min threshold | 100 USDC | `MIN_BUYBACK_THRESHOLD` |
+| Slippage | 2% (200 bps) | `SLIPPAGE_BPS` |
+| Poll interval | 1 hour | `POLLING_INTERVAL_MS` |
+| Circuit breaker | 3 failures | `MAX_CONSECUTIVE_FAILURES` |
+
+### Monitoring integration
+
+The buyback keeper supports Discord, Slack, and Telegram alerts:
+
+```bash
+# Set environment variables
+export DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/..."
+export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
+export TELEGRAM_BOT_TOKEN="123456:ABC..."
+export TELEGRAM_CHAT_ID="-100123456789"
+```
+
+### Running the buyback keeper
+
+```bash
+# Start the keeper
+cd oracle && npx tsx src/buyback-keeper.ts
+
+# Or via script
+./scripts/start-buyback-keeper.sh
+```
+
+---
+
+## Related documentation
+
+- [ROUTING.md](./ROUTING.md) - Venue weights, VenueScore, fallback logic
+- [SLIPPAGE.md](./SLIPPAGE.md) - Dynamic slippage configuration
+- [TECHNICAL.md](./TECHNICAL.md) - Program architecture details
+- [DCA.md](./DCA.md) - DCA plan structure and keeper
+
