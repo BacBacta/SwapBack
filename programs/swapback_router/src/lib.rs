@@ -95,6 +95,17 @@ pub struct CreateDcaPlan<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Arguments for DCA swap execution
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct ExecuteDcaSwapArgs {
+    /// Jupiter swap instruction data (built off-chain by keeper)
+    pub jupiter_instruction: Vec<u8>,
+    /// Expected input amount (must match plan's amount_per_swap)
+    pub expected_input: u64,
+    /// Actual amount received from Jupiter (reported by keeper after simulation)
+    pub amount_received: u64,
+}
+
 #[derive(Accounts)]
 pub struct ExecuteDcaSwap<'info> {
     #[account(
@@ -114,27 +125,31 @@ pub struct ExecuteDcaSwap<'info> {
     /// User's input token account (source)
     #[account(
         mut,
-        constraint = user_token_in.owner == dca_plan.user,
-        constraint = user_token_in.mint == dca_plan.token_in
+        constraint = user_token_in.owner == dca_plan.user @ error::SwapbackError::InvalidTokenAccount,
+        constraint = user_token_in.mint == dca_plan.token_in @ error::SwapbackError::InvalidTokenAccount
     )]
     pub user_token_in: Account<'info, anchor_spl::token::TokenAccount>,
 
     /// User's output token account (destination)
     #[account(
         mut,
-        constraint = user_token_out.owner == dca_plan.user,
-        constraint = user_token_out.mint == dca_plan.token_out
+        constraint = user_token_out.owner == dca_plan.user @ error::SwapbackError::InvalidTokenAccount,
+        constraint = user_token_out.mint == dca_plan.token_out @ error::SwapbackError::InvalidTokenAccount
     )]
     pub user_token_out: Account<'info, anchor_spl::token::TokenAccount>,
 
     /// CHECK: User that owns the DCA plan (for CPI signing if needed)
     #[account(
-        constraint = user.key() == dca_plan.user
+        constraint = user.key() == dca_plan.user @ error::SwapbackError::Unauthorized
     )]
     pub user: AccountInfo<'info>,
 
     /// Executor that calls this instruction (can be bot or user)
     pub executor: Signer<'info>,
+
+    /// CHECK: Jupiter program for CPI swap execution
+    #[account(address = JUPITER_PROGRAM_ID)]
+    pub jupiter_program: AccountInfo<'info>,
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
@@ -392,17 +407,20 @@ pub mod swapback_router {
     }
 
     /// Execute a single swap in a DCA plan
-    pub fn execute_dca_swap(ctx: Context<ExecuteDcaSwap>) -> Result<()> {
-        // Inline handler for ExecuteDcaSwap
+    /// 
+    /// This instruction executes a scheduled DCA swap via Jupiter CPI.
+    /// The keeper builds the Jupiter instruction off-chain and passes it
+    /// along with remaining accounts for the swap.
+    pub fn execute_dca_swap<'info>(
+        ctx: Context<'_, '_, '_, 'info, ExecuteDcaSwap<'info>>,
+        args: ExecuteDcaSwapArgs,
+    ) -> Result<()> {
         let dca_plan = &mut ctx.accounts.dca_plan;
         let clock = Clock::get()?;
 
         // Validation
         require!(dca_plan.is_active, error::SwapbackError::PlanNotActive);
-        require!(
-            !dca_plan.is_completed(),
-            error::SwapbackError::PlanCompleted
-        );
+        require!(!dca_plan.is_completed(), error::SwapbackError::PlanCompleted);
         require!(
             !dca_plan.is_expired(clock.unix_timestamp),
             error::SwapbackError::PlanExpired
@@ -412,6 +430,12 @@ pub mod swapback_router {
             error::SwapbackError::NotReadyForExecution
         );
 
+        // Verify input amount matches plan
+        require!(
+            args.expected_input == dca_plan.amount_per_swap,
+            error::SwapbackError::InvalidAmount
+        );
+
         // Verify user has sufficient balance
         require!(
             ctx.accounts.user_token_in.amount >= dca_plan.amount_per_swap,
@@ -419,28 +443,43 @@ pub mod swapback_router {
         );
 
         msg!("🔄 Executing DCA swap #{}", dca_plan.executed_swaps + 1);
-        msg!("Amount: {}", dca_plan.amount_per_swap);
+        msg!("Amount in: {}", dca_plan.amount_per_swap);
         msg!("Min output: {}", dca_plan.min_out_per_swap);
 
-        // NOTE: Swap execution is delegated to Jupiter API (off-chain)
-        // This on-chain instruction handles DCA state management:
-        // - Tracking executed_swaps count
-        // - Updating total_invested/total_received
-        // - Scheduling next_execution timestamp
-        // The keeper (oracle/src/dca-keeper.ts) calls Jupiter then updates state here
+        let amount_in = dca_plan.amount_per_swap;
+        let min_out = dca_plan.min_out_per_swap;
 
-        // Placeholder value - actual amount comes from Jupiter swap result
-        let amount_received = dca_plan.amount_per_swap; // Updated by keeper after Jupiter swap
-
-        require!(
-            amount_received >= dca_plan.min_out_per_swap,
-            error::SwapbackError::SlippageExceeded
-        );
+        // Execute Jupiter swap via CPI using swap_with_balance_deltas
+        // This handles pre/post balance measurement and slippage check
+        let amount_out = if !args.jupiter_instruction.is_empty() {
+            cpi_jupiter::swap_with_balance_deltas(
+                &ctx.accounts.jupiter_program.to_account_info(),
+                ctx.remaining_accounts,
+                &ctx.accounts.user_token_in.to_account_info(),
+                &ctx.accounts.user_token_out.to_account_info(),
+                amount_in,
+                min_out,
+                &args.jupiter_instruction,
+                &[], // No seeds needed - user signs externally or keeper executes
+            )
+            .map_err(|e| {
+                msg!("Jupiter CPI failed: {:?}", e);
+                error::SwapbackError::SwapExecutionFailed
+            })?
+        } else {
+            // Fallback: use keeper-reported amount if no Jupiter instruction
+            require!(
+                args.amount_received >= min_out,
+                error::SwapbackError::SlippageExceeded
+            );
+            args.amount_received
+        };
 
         // Update plan state
+        let dca_plan = &mut ctx.accounts.dca_plan;
         dca_plan.executed_swaps += 1;
-        dca_plan.total_invested += dca_plan.amount_per_swap;
-        dca_plan.total_received += amount_received;
+        dca_plan.total_invested += amount_in;
+        dca_plan.total_received += amount_out;
         dca_plan.next_execution = dca_plan.calculate_next_execution();
 
         // If all swaps completed, mark as inactive
@@ -454,6 +493,7 @@ pub mod swapback_router {
             dca_plan.executed_swaps,
             dca_plan.total_swaps
         );
+        msg!("Amount received: {}", amount_out);
         msg!("Next execution: {}", dca_plan.next_execution);
         msg!("Total invested: {}", dca_plan.total_invested);
         msg!("Total received: {}", dca_plan.total_received);
