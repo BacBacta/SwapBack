@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{ErrorCode, OracleType, MAX_STALENESS_SECS};
+use crate::{ErrorCode, OracleType};
 
 #[cfg(feature = "switchboard")]
 use switchboard_solana::AggregatorAccountData;
@@ -18,7 +18,14 @@ pub struct OracleObservation {
 // Confidence maximale autorisée (2% = 200 bps) - Pyth seulement
 const MAX_CONFIDENCE_BPS: u128 = 200;
 
-pub fn read_price(oracle_account: &AccountInfo, clock: &Clock) -> Result<OracleObservation> {
+/// Read oracle price with configurable staleness threshold
+/// For volatile markets, use lower values (30-60s)
+/// Default: MAX_STALENESS_SECS (300s)
+pub fn read_price_with_staleness(
+    oracle_account: &AccountInfo,
+    clock: &Clock,
+    max_staleness_secs: i64,
+) -> Result<OracleObservation> {
     if oracle_account.key() == Pubkey::default() {
         return err!(ErrorCode::InvalidOraclePrice);
     }
@@ -29,9 +36,9 @@ pub fn read_price(oracle_account: &AccountInfo, clock: &Clock) -> Result<OracleO
     // Primary: Switchboard Oracle (ACTIVÉ - Compatible Solana 1.18)
     #[cfg(feature = "switchboard")]
     {
-        match try_read_switchboard(oracle_account, clock) {
+        match try_read_switchboard(oracle_account, clock, max_staleness_secs) {
             Ok(observation) => {
-                msg!("✅ Switchboard oracle used successfully");
+                msg!("✅ Switchboard oracle used (staleness limit: {}s)", max_staleness_secs);
                 return Ok(observation);
             }
             Err(e) => {
@@ -41,9 +48,9 @@ pub fn read_price(oracle_account: &AccountInfo, clock: &Clock) -> Result<OracleO
     }
 
     // Fallback: Pyth SDK
-    match try_read_pyth(oracle_account, clock) {
+    match try_read_pyth(oracle_account, clock, max_staleness_secs) {
         Ok(observation) => {
-            msg!("✅ Pyth oracle used as fallback");
+            msg!("✅ Pyth oracle used (staleness limit: {}s)", max_staleness_secs);
             Ok(observation)
         }
         Err(e) => {
@@ -54,7 +61,11 @@ pub fn read_price(oracle_account: &AccountInfo, clock: &Clock) -> Result<OracleO
 }
 
 #[cfg(feature = "switchboard")]
-fn try_read_switchboard(oracle_account: &AccountInfo, clock: &Clock) -> Result<OracleObservation> {
+fn try_read_switchboard(
+    oracle_account: &AccountInfo,
+    clock: &Clock,
+    max_staleness_secs: i64,
+) -> Result<OracleObservation> {
     // Check if account is a Switchboard aggregator
     let is_switchboard = {
         if let Ok(data) = oracle_account.try_borrow_data() {
@@ -78,11 +89,13 @@ fn try_read_switchboard(oracle_account: &AccountInfo, clock: &Clock) -> Result<O
     let round = &aggregator.latest_confirmed_round;
     let timestamp = round.round_open_timestamp;
 
-    // Vérifier staleness
-    if clock.unix_timestamp - timestamp > MAX_STALENESS_SECS {
+    // Vérifier staleness avec seuil configurable
+    let staleness = clock.unix_timestamp - timestamp;
+    if staleness > max_staleness_secs {
         msg!(
-            "⚠️ Switchboard data too old: {} seconds",
-            clock.unix_timestamp - timestamp
+            "⚠️ Switchboard data too old: {}s (max: {}s)",
+            staleness,
+            max_staleness_secs
         );
         return err!(ErrorCode::StaleOracleData);
     }
@@ -121,7 +134,11 @@ fn try_read_switchboard(oracle_account: &AccountInfo, clock: &Clock) -> Result<O
     })
 }
 
-fn try_read_pyth(oracle_account: &AccountInfo, clock: &Clock) -> Result<OracleObservation> {
+fn try_read_pyth(
+    oracle_account: &AccountInfo,
+    clock: &Clock,
+    max_staleness_secs: i64,
+) -> Result<OracleObservation> {
     let price_data = oracle_account
         .try_borrow_data()
         .map_err(|_| error!(ErrorCode::InvalidOraclePrice))?;
@@ -134,11 +151,16 @@ fn try_read_pyth(oracle_account: &AccountInfo, clock: &Clock) -> Result<OracleOb
     drop(price_data);
 
     let price = price_feed
-        .get_price_no_older_than(clock.unix_timestamp, MAX_STALENESS_SECS as u64)
+        .get_price_no_older_than(clock.unix_timestamp, max_staleness_secs as u64)
         .ok_or_else(|| error!(ErrorCode::StaleOracleData))?;
 
     let staleness = clock.unix_timestamp - price.publish_time;
-    if staleness > MAX_STALENESS_SECS {
+    if staleness > max_staleness_secs {
+        msg!(
+            "⚠️ Pyth data too old: {}s (max: {}s)",
+            staleness,
+            max_staleness_secs
+        );
         return err!(ErrorCode::StaleOracleData);
     }
 

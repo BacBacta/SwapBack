@@ -49,7 +49,8 @@ pub const BUYBACK_PROGRAM_ID: Pubkey = pubkey!("7wCCwRXxWvMY2DJDRrnhFg3b8jVPb5vV
 pub const CNFT_PROGRAM_ID: Pubkey = pubkey!("26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru");
 
 // Oracle constants
-pub const MAX_STALENESS_SECS: i64 = 300; // 5 minutes max staleness
+pub const MAX_STALENESS_SECS: i64 = 300; // 5 minutes max staleness (default)
+pub const MIN_STALENESS_SECS: i64 = 10;  // 10 seconds minimum (security floor)
 pub const MAX_ORACLE_DIVERGENCE_BPS: u64 = 200; // 2% max divergence between feeds
 
 // NPI (Routing Profit) allocation configuration (basis points, 10000 = 100%)
@@ -939,6 +940,9 @@ pub struct SwapArgs {
     pub token_a_decimals: Option<u8>,
     /// Token B decimals (for accurate TVL calculation, default: 6)
     pub token_b_decimals: Option<u8>,
+    /// Max staleness override in seconds (for volatile markets, use 30-60s instead of default 300s)
+    /// Must be between MIN_STALENESS_SECS and MAX_STALENESS_SECS
+    pub max_staleness_override: Option<i64>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -1362,7 +1366,7 @@ pub mod swap_toc_processor {
         }
 
         let oracle_observation =
-            get_oracle_price(&ctx.accounts.primary_oracle, fallback_account, &clock)?;
+            get_oracle_price(&ctx.accounts.primary_oracle, fallback_account, &clock, args.max_staleness_override)?;
         let expected_out = calculate_expected_output(args.amount_in, oracle_observation.price)?;
 
         // Calculate min_out: Use dynamic slippage if enabled, else user-provided tolerance
@@ -1821,10 +1825,28 @@ pub mod swap_toc_processor {
         primary_oracle: &AccountInfo<'info>,
         fallback_oracle: Option<&AccountInfo<'info>>,
         clock: &Clock,
+        max_staleness_override: Option<i64>,
     ) -> Result<OracleObservation> {
-        let primary_result = oracle::read_price(primary_oracle, clock);
+        // Use override if provided, otherwise use default MAX_STALENESS_SECS
+        // Clamp to safe range: MIN_STALENESS_SECS <= value <= MAX_STALENESS_SECS
+        let effective_staleness = match max_staleness_override {
+            Some(override_val) => {
+                let clamped = override_val.clamp(MIN_STALENESS_SECS, MAX_STALENESS_SECS);
+                if clamped != override_val {
+                    msg!(
+                        "⚠️ Staleness override {} clamped to safe range: {}s",
+                        override_val,
+                        clamped
+                    );
+                }
+                clamped
+            }
+            None => MAX_STALENESS_SECS,
+        };
+
+        let primary_result = oracle::read_price_with_staleness(primary_oracle, clock, effective_staleness);
         let fallback_observation =
-            fallback_oracle.and_then(|account| match oracle::read_price(account, clock) {
+            fallback_oracle.and_then(|account| match oracle::read_price_with_staleness(account, clock, effective_staleness) {
                 Ok(observation) => Some(observation),
                 Err(_) => {
                     msg!("⚠️ Fallback oracle read failed");
