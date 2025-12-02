@@ -39,7 +39,7 @@ pyth-sdk-solana = "=0.10.1"
 getrandom = { version = "0.2", default-features = false, features = ["custom"] }
 
 # Forcer les versions compatibles avec Rust 1.79
-indexmap = "=2.6.0"
+indexmap = "=2.12.1"
 toml_edit = "=0.22.22"
 
 [dev-dependencies]
