@@ -3,9 +3,114 @@ use anchor_lang::Discriminator;
 use std::collections::BTreeMap;
 
 use crate::venue_scoring::{VenueScore, VenueType};
+use crate::{JUPITER_PROGRAM_ID, ORCA_WHIRLPOOL_PROGRAM_ID, RAYDIUM_AMM_PROGRAM_ID};
 
 /// Minimum score en dessous duquel une venue est exclue du routing (0..=10_000).
 pub const MIN_QUALITY_SCORE_DEFAULT: u16 = 2500;
+
+/// Convert a DEX program Pubkey to VenueType
+pub fn pubkey_to_venue_type(pubkey: &Pubkey) -> VenueType {
+    if *pubkey == JUPITER_PROGRAM_ID {
+        VenueType::Jupiter
+    } else if *pubkey == RAYDIUM_AMM_PROGRAM_ID {
+        VenueType::Raydium
+    } else if *pubkey == ORCA_WHIRLPOOL_PROGRAM_ID {
+        VenueType::Orca
+    } else {
+        VenueType::Unknown
+    }
+}
+
+/// Parse venue scores from remaining_accounts, indexed by Pubkey
+pub fn parse_venue_scores_by_pubkey<'info>(
+    remaining: &[AccountInfo<'info>],
+) -> BTreeMap<Pubkey, u16> {
+    let mut map = BTreeMap::new();
+    for ai in remaining {
+        let data = ai.try_borrow_data();
+        if data.is_err() {
+            continue;
+        }
+        let data = data.unwrap();
+        if data.len() < 8 {
+            continue;
+        }
+        // Vérifie discriminator Anchor
+        if &data[..8] != VenueScore::discriminator() {
+            continue;
+        }
+        let mut slice: &[u8] = &data;
+        if let Ok(vs) = VenueScore::try_deserialize(&mut slice) {
+            map.insert(vs.venue, vs.quality_score);
+        }
+    }
+    map
+}
+
+/// Adjust VenueWeight weights based on scores (works with Pubkey-based venues)
+/// - Excludes venues with score < min_score
+/// - Scales weights by (score / 10000)
+/// - Renormalizes to sum = 10000
+pub fn adjust_venue_weights_with_scores(
+    venues: &mut Vec<crate::VenueWeight>,
+    scores: &BTreeMap<Pubkey, u16>,
+    min_score: u16,
+) {
+    for v in venues.iter_mut() {
+        // If no score found, assume 10000 (don't penalize unknown venues)
+        let s = scores.get(&v.venue).copied().unwrap_or(10_000);
+        if s < min_score {
+            v.weight = 0;
+            msg!(
+                "⚠️ Venue {} excluded: score {} < min {}",
+                v.venue,
+                s,
+                min_score
+            );
+            continue;
+        }
+        // Scale weight by score
+        let scaled = (v.weight as u32)
+            .saturating_mul(s as u32)
+            .checked_div(10_000)
+            .unwrap_or(0);
+        v.weight = (scaled.min(10_000)) as u16;
+    }
+    renormalize_venue_weights(venues);
+}
+
+/// Renormalize VenueWeight weights to sum = 10000
+pub fn renormalize_venue_weights(venues: &mut Vec<crate::VenueWeight>) {
+    // Remove zero-weight venues
+    venues.retain(|v| v.weight > 0);
+
+    let sum: u32 = venues.iter().map(|v| v.weight as u32).sum();
+    if sum == 0 {
+        return;
+    }
+
+    let mut acc: u32 = 0;
+    for v in venues.iter_mut() {
+        let w = (v.weight as u32) * 10_000u32 / sum;
+        v.weight = w.min(10_000) as u16;
+        acc += v.weight as u32;
+    }
+
+    // Adjust last venue to reach exactly 10_000
+    if let Some(last) = venues.last_mut() {
+        let acc_u16 = acc.min(10_000) as i32;
+        let diff = 10_000i32 - acc_u16;
+        if diff != 0 {
+            let new_last = (last.weight as i32 + diff).max(0).min(10_000) as u16;
+            last.weight = new_last;
+        }
+    }
+
+    // Log adjusted weights
+    for v in venues.iter() {
+        msg!("📊 Venue {} weight: {} bps", v.venue, v.weight);
+    }
+}
 
 /// Allocation d'une venue dans un plan (weights en BPS, somme = 10_000).
 /// NOTE: si ce type existe déjà dans ton code (ex: VenueAllocation), Claude doit mapper vers celui-ci

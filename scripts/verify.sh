@@ -79,22 +79,28 @@ fi
 echo -e "\n${YELLOW}[6/6] Scanning for placeholder/stub code...${NC}"
 
 # Patterns that indicate incomplete implementation in actual code (not comments)
-# We look for patterns that are NOT prefixed by // or ///
 STUB_FOUND=false
 
-# Check for unimplemented!() and todo!() macros (real code, not comments)
-if grep -rn "unimplemented!()" programs/swapback_router/src/*.rs 2>/dev/null | grep -v "^[^:]*:[^:]*:\s*//" | head -3; then
+# Check for unimplemented!() macro (not in comments)
+UNIMPL=$(grep -rn 'unimplemented!()' programs/swapback_router/src/*.rs 2>/dev/null | grep -v '^\s*//' || true)
+if [[ -n "$UNIMPL" ]]; then
+    echo "$UNIMPL" | head -3
     echo -e "${YELLOW}⚠️  Found unimplemented!() macro${NC}"
     STUB_FOUND=true
 fi
 
-if grep -rn "todo!()" programs/swapback_router/src/*.rs 2>/dev/null | grep -v "^[^:]*:[^:]*:\s*//" | head -3; then
+# Check for todo!() macro (not in comments)
+TODO_MACRO=$(grep -rn 'todo!()' programs/swapback_router/src/*.rs 2>/dev/null | grep -v '^\s*//' || true)
+if [[ -n "$TODO_MACRO" ]]; then
+    echo "$TODO_MACRO" | head -3
     echo -e "${YELLOW}⚠️  Found todo!() macro${NC}"
     STUB_FOUND=true
 fi
 
-# Check for suspicious patterns in swap execution (real stub indicators)
-if grep -rn "amount_out = amount_in" programs/swapback_router/src/cpi_*.rs programs/swapback_router/src/lib.rs 2>/dev/null | grep -v "//" | head -3; then
+# Check for stub pattern in swap code (amount_out = amount_in)
+STUB_SWAP=$(grep -rn 'amount_out = amount_in' programs/swapback_router/src/cpi_*.rs programs/swapback_router/src/lib.rs 2>/dev/null | grep -v '//' || true)
+if [[ -n "$STUB_SWAP" ]]; then
+    echo "$STUB_SWAP" | head -3
     echo -e "${RED}⚠️  Found stub: amount_out = amount_in in swap code${NC}"
     STUB_FOUND=true
 fi
