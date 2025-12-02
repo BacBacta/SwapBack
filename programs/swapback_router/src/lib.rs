@@ -907,6 +907,13 @@ pub struct JupiterRouteParams {
     pub expected_input_amount: u64,
 }
 
+/// Per-venue slippage configuration
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+pub struct VenueSlippage {
+    pub venue: Pubkey,      // DEX program ID
+    pub max_slippage_bps: u16, // Max slippage for this venue (0 = use global)
+}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct SwapArgs {
     pub amount_in: u64,
@@ -927,6 +934,12 @@ pub struct SwapArgs {
     pub volatility_bps: Option<u16>,
     /// Minimum venue quality score threshold (excludes venues below this)
     pub min_venue_score: Option<u16>,
+    /// Per-venue slippage overrides (allows user to set max slippage per DEX)
+    pub slippage_per_venue: Option<Vec<VenueSlippage>>,
+    /// Token A decimals (for accurate TVL calculation, default: 6)
+    pub token_a_decimals: Option<u8>,
+    /// Token B decimals (for accurate TVL calculation, default: 6)
+    pub token_b_decimals: Option<u8>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -1275,21 +1288,34 @@ pub mod swap_toc_processor {
 
         // --- Dynamic Slippage Calculation ---
         // Uses real TVL estimation from remaining accounts when available
+        // Priority: args.volatility_bps > oracle_cache > default
+        // Priority: args.liquidity_estimate > pool estimation > default
         let slippage_bps_effective = if ctx.accounts.state.dynamic_slippage_enabled {
-            // Estimate pool TVL from remaining accounts (Jupiter/Raydium pool data)
-            let pool_tvl = crate::slippage::estimate_pool_tvl_from_accounts(
-                ctx.remaining_accounts,
-                6, // Assume USDC decimals for token_a
-                6, // Assume USDC decimals for token_b (adjust based on actual tokens)
-            );
+            // Get token decimals from args or use defaults
+            let token_a_decimals = args.token_a_decimals.unwrap_or(6);
+            let token_b_decimals = args.token_b_decimals.unwrap_or(6);
 
-            // Get volatility from oracle cache or use default
-            let volatility_bps = ctx
-                .accounts
-                .oracle_cache
-                .as_ref()
-                .map(|c| c.volatility_bps)
-                .unwrap_or(50u16);
+            // Priority 1: Use liquidity_estimate from args if provided (off-chain data)
+            // Priority 2: Estimate from remaining_accounts (on-chain pool data)
+            // Priority 3: Default fallback
+            let pool_tvl = args.liquidity_estimate.unwrap_or_else(|| {
+                crate::slippage::estimate_pool_tvl_from_accounts(
+                    ctx.remaining_accounts,
+                    token_a_decimals,
+                    token_b_decimals,
+                )
+            });
+
+            // Priority 1: Use volatility_bps from args if provided (off-chain/keeper data)
+            // Priority 2: Use oracle_cache volatility
+            // Priority 3: Default to 50 bps
+            let volatility_bps = args.volatility_bps.unwrap_or_else(|| {
+                ctx.accounts
+                    .oracle_cache
+                    .as_ref()
+                    .map(|c| c.volatility_bps)
+                    .unwrap_or(50u16)
+            });
 
             let result = crate::slippage::calculate_dynamic_slippage_with_breakdown(
                 args.amount_in,
@@ -1299,11 +1325,13 @@ pub mod swap_toc_processor {
             );
 
             msg!(
-                "📊 Dynamic Slippage: {} bps (base={}, size={}, vol={})",
+                "📊 Dynamic Slippage: {} bps (base={}, size={}, vol={}) | TVL={}, vol_bps={}",
                 result.slippage_bps,
                 result.base_component,
                 result.size_component,
-                result.volatility_component
+                result.volatility_component,
+                pool_tvl,
+                volatility_bps
             );
 
             Some(result.slippage_bps)
@@ -1469,6 +1497,7 @@ pub mod swap_toc_processor {
             ctx.remaining_accounts,
             false,
             args.jupiter_route.as_ref(),
+            args.slippage_per_venue.as_deref(),
         );
 
         let mut failure_reason = match primary_result {
@@ -1491,6 +1520,7 @@ pub mod swap_toc_processor {
                 ctx.remaining_accounts,
                 true,
                 args.jupiter_route.as_ref(),
+                args.slippage_per_venue.as_deref(),
             );
 
             match fallback_result {
@@ -1515,6 +1545,7 @@ pub mod swap_toc_processor {
         remaining_accounts: &[AccountInfo],
         is_fallback: bool,
         jupiter_route: Option<&JupiterRouteParams>,
+        venue_slippage: Option<&[VenueSlippage]>,
     ) -> Result<u64> {
         let mut total_amount_out: u64 = 0;
         let mut account_cursor: usize = 0;
@@ -1530,11 +1561,35 @@ pub mod swap_toc_processor {
                 continue;
             }
 
-            let min_out_per_venue = min_out
+            // Calculate base min_out for this venue
+            let base_min_out_per_venue = min_out
                 .checked_mul(venue_weight.weight as u64)
                 .ok_or(ErrorCode::InvalidPlanWeights)?
                 .checked_div(10_000)
                 .ok_or(ErrorCode::InvalidPlanWeights)?;
+
+            // Apply per-venue slippage override if configured
+            let min_out_per_venue = if let Some(slippages) = venue_slippage {
+                if let Some(vs) = slippages.iter().find(|s| s.venue == venue_weight.venue) {
+                    if vs.max_slippage_bps > 0 {
+                        // Apply venue-specific slippage: min_out = amount_in * (1 - slippage)
+                        let keep_bps = 10_000u64.saturating_sub(vs.max_slippage_bps as u64);
+                        let venue_min = amount_in
+                            .checked_mul(keep_bps)
+                            .ok_or(ErrorCode::InvalidPlanWeights)?
+                            .checked_div(10_000)
+                            .ok_or(ErrorCode::InvalidPlanWeights)?;
+                        // Use the more conservative (higher) min_out
+                        base_min_out_per_venue.max(venue_min)
+                    } else {
+                        base_min_out_per_venue
+                    }
+                } else {
+                    base_min_out_per_venue
+                }
+            } else {
+                base_min_out_per_venue
+            };
 
             let required_accounts = required_account_len_for_dex(&venue_weight.venue)?;
             if account_cursor

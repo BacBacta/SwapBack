@@ -9,7 +9,16 @@ When `dynamic_slippage_enabled = false`, the router uses a fixed slippage tolera
 ```rust
 pub struct SwapArgs {
     pub slippage_tolerance: Option<u16>,  // In basis points
+    pub slippage_per_venue: Option<Vec<VenueSlippage>>, // Per-DEX slippage
+    pub token_a_decimals: Option<u8>,     // For accurate TVL calculation
+    pub token_b_decimals: Option<u8>,     // For accurate TVL calculation
     // ...
+}
+
+/// Per-venue slippage configuration
+pub struct VenueSlippage {
+    pub venue: Pubkey,         // DEX program ID
+    pub max_slippage_bps: u16, // Max slippage for this venue (0 = use global)
 }
 ```
 
@@ -28,6 +37,14 @@ If `slippage_tolerance` is `None`, the program uses **50 bps (0.5%)** as default
 ## Dynamic slippage
 
 When `dynamic_slippage_enabled = true`, slippage is calculated based on market conditions.
+
+### Data Sources (Priority Order)
+
+| Data | Priority 1 (Off-chain) | Priority 2 (On-chain) | Priority 3 (Default) |
+|------|------------------------|----------------------|----------------------|
+| TVL | `args.liquidity_estimate` | `estimate_pool_tvl_from_accounts()` | 1M USDC |
+| Volatility | `args.volatility_bps` | `oracle_cache.volatility_bps` | 50 bps |
+| Decimals | `args.token_a/b_decimals` | - | 6 (USDC) |
 
 ### Formula
 
@@ -85,6 +102,43 @@ let total = (base + size + volatility).min(max_slippage_bps);
 
 ---
 
+## Per-Venue Slippage
+
+Users can set maximum slippage per DEX venue:
+
+```typescript
+const args: SwapArgs = {
+  // ...
+  slippage_per_venue: [
+    { venue: JUPITER_PROGRAM_ID, max_slippage_bps: 100 },  // 1% max for Jupiter
+    { venue: RAYDIUM_PROGRAM_ID, max_slippage_bps: 150 },  // 1.5% max for Raydium
+    { venue: ORCA_PROGRAM_ID, max_slippage_bps: 80 },      // 0.8% max for Orca
+  ],
+};
+```
+
+The router uses the **more conservative** (higher min_out) between:
+- Global dynamic/static slippage
+- Per-venue slippage override
+
+---
+
+## Token Decimals
+
+For accurate TVL estimation, provide token decimals:
+
+```typescript
+const args: SwapArgs = {
+  // ...
+  token_a_decimals: 9,  // SOL has 9 decimals
+  token_b_decimals: 6,  // USDC has 6 decimals
+};
+```
+
+If not provided, defaults to 6 (USDC standard).
+
+---
+
 ## min_out computation
 
 ### From expected_out to min_out
@@ -119,7 +173,7 @@ min_out = expected_out * (1 - slippage%)
 
 ### Estimating liquidity offchain
 
-The keeper must provide `liquidity_estimate` (pool TVL). Options:
+The keeper should provide `liquidity_estimate` (pool TVL). Options:
 
 1. **Jupiter API**: Extract from quote response
    ```json
