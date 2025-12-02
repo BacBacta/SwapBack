@@ -73,3 +73,9 @@ Cargo.lock
 app/playwright-report/
 app/test-results/
 app/logs/
+
+# Fuzzing artifacts (keep README, ignore binaries)
+**/fuzz/artifacts/*
+!**/fuzz/artifacts/README.md
+**/fuzz/corpus/**/*.fuzz
+# Corpus seeds are kept for reproducibility

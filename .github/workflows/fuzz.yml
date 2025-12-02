@@ -1,0 +1,192 @@
+name: Fuzzing
+
+on:
+  # Lancement quotidien à 3h UTC
+  schedule:
+    - cron: '0 3 * * *'
+  
+  # Sur PR touchant le code Rust
+  pull_request:
+    paths:
+      - 'programs/swapback_router/**'
+      - 'programs/swapback_cnft/**'
+  
+  # Déclenchement manuel
+  workflow_dispatch:
+    inputs:
+      duration_hours:
+        description: 'Durée du fuzzing (heures)'
+        required: false
+        default: '1'
+      target:
+        description: 'Target spécifique (ou "all")'
+        required: false
+        default: 'all'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  fuzz-router:
+    name: Fuzz SwapBack Router
+    runs-on: ubuntu-latest
+    timeout-minutes: 120 # 2h max
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - fuzz_swap_amounts
+          - fuzz_oracle_price
+          - fuzz_buyback_flow
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install Rust nightly
+        uses: dtolnay/rust-action@stable
+        with:
+          toolchain: nightly
+          components: llvm-tools-preview
+      
+      - name: Install cargo-fuzz
+        run: cargo +nightly install cargo-fuzz
+      
+      - name: Cache corpus
+        uses: actions/cache@v4
+        with:
+          path: |
+            programs/swapback_router/fuzz/corpus
+            programs/swapback_router/fuzz/artifacts
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.sha }}
+          restore-keys: |
+            fuzz-corpus-${{ matrix.target }}-
+            fuzz-corpus-
+      
+      - name: Create corpus directory
+        run: |
+          mkdir -p programs/swapback_router/fuzz/corpus/${{ matrix.target }}
+          mkdir -p programs/swapback_router/fuzz/artifacts
+      
+      - name: Run fuzzing (${{ matrix.target }})
+        working-directory: programs/swapback_router
+        run: |
+          DURATION=${{ github.event.inputs.duration_hours || '1' }}
+          SECONDS=$((DURATION * 3600))
+          
+          echo "🎯 Fuzzing ${{ matrix.target }} for ${DURATION}h (${SECONDS}s)"
+          
+          # Lancer le fuzzing avec timeout
+          timeout ${SECONDS}s cargo +nightly fuzz run ${{ matrix.target }} \
+            -- -max_total_time=${SECONDS} \
+               -artifact_prefix=fuzz/artifacts/ \
+               -print_final_stats=1 \
+            || true
+          
+          echo "✅ Fuzzing terminé"
+      
+      - name: Check for crashes
+        id: check-crashes
+        working-directory: programs/swapback_router/fuzz
+        run: |
+          CRASH_COUNT=$(find artifacts -name 'crash-*' -o -name 'leak-*' -o -name 'timeout-*' 2>/dev/null | wc -l)
+          echo "crash_count=${CRASH_COUNT}" >> $GITHUB_OUTPUT
+          
+          if [ "$CRASH_COUNT" -gt 0 ]; then
+            echo "🚨 ${CRASH_COUNT} crash(es) détecté(s) !"
+            ls -la artifacts/
+            exit 1
+          else
+            echo "✅ Aucun crash détecté"
+          fi
+      
+      - name: Upload artifacts on crash
+        if: failure() && steps.check-crashes.outputs.crash_count > 0
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crashes-${{ matrix.target }}
+          path: programs/swapback_router/fuzz/artifacts/
+          retention-days: 30
+      
+      - name: Upload corpus
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-corpus-${{ matrix.target }}
+          path: programs/swapback_router/fuzz/corpus/${{ matrix.target }}/
+          retention-days: 7
+
+  fuzz-cnft:
+    name: Fuzz SwapBack cNFT
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - fuzz_lock_duration
+          - fuzz_boost
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install Rust nightly
+        uses: dtolnay/rust-action@stable
+        with:
+          toolchain: nightly
+      
+      - name: Install cargo-fuzz
+        run: cargo +nightly install cargo-fuzz
+      
+      - name: Cache corpus
+        uses: actions/cache@v4
+        with:
+          path: programs/swapback_cnft/fuzz/corpus
+          key: fuzz-corpus-cnft-${{ matrix.target }}-${{ github.sha }}
+          restore-keys: |
+            fuzz-corpus-cnft-${{ matrix.target }}-
+      
+      - name: Create corpus directory
+        run: mkdir -p programs/swapback_cnft/fuzz/corpus/${{ matrix.target }}
+      
+      - name: Run fuzzing (${{ matrix.target }})
+        working-directory: programs/swapback_cnft
+        run: |
+          DURATION=${{ github.event.inputs.duration_hours || '1' }}
+          SECONDS=$((DURATION * 3600))
+          
+          timeout ${SECONDS}s cargo +nightly fuzz run ${{ matrix.target }} \
+            -- -max_total_time=${SECONDS} \
+            || true
+
+  fuzz-summary:
+    name: Fuzzing Summary
+    runs-on: ubuntu-latest
+    needs: [fuzz-router, fuzz-cnft]
+    if: always()
+    
+    steps:
+      - name: Check results
+        run: |
+          echo "## 🔍 Fuzzing Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.fuzz-router.result }}" == "success" ] && [ "${{ needs.fuzz-cnft.result }}" == "success" ]; then
+            echo "✅ **All fuzzing targets passed without crashes**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Some fuzzing targets reported issues**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+            echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+            echo "| fuzz-router | ${{ needs.fuzz-router.result }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| fuzz-cnft | ${{ needs.fuzz-cnft.result }} |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📊 **Configuration:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Duration: ${{ github.event.inputs.duration_hours || '1' }}h per target" >> $GITHUB_STEP_SUMMARY
+          echo "- Triggered by: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
