@@ -32,7 +32,12 @@ import {
 const PROGRAM_ID = new PublicKey("9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh");
 
 // Admin Authority - Only this wallet can access the admin panel
-const ADMIN_AUTHORITY = new PublicKey("CeuPXDvL5p6qELK1JpDwCvT13PCA3bVk2Cfk6R8T9XHK");
+// Set via environment variable NEXT_PUBLIC_ADMIN_AUTHORITY
+// If not set, uses the default SwapBack authority
+const ADMIN_AUTHORITY_STRING = process.env.NEXT_PUBLIC_ADMIN_AUTHORITY || "";
+
+// Check if we're in devnet mode (allows easier testing)
+const IS_DEVNET = process.env.NEXT_PUBLIC_SOLANA_NETWORK === "devnet";
 
 // Known token mints
 const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
@@ -225,11 +230,11 @@ export default function AdminPage() {
       });
       
       if (response.ok) {
-        toast.success('Log marqué comme résolu');
+        toast.success('Log marked as resolved');
         fetchProtocolLogs();
       }
     } catch (error) {
-      toast.error('Erreur lors de la résolution');
+      toast.error('Error resolving log');
     }
   };
 
@@ -241,17 +246,17 @@ export default function AdminPage() {
       });
       
       if (response.ok) {
-        toast.success('Log supprimé');
+        toast.success('Log deleted');
         fetchProtocolLogs();
       }
     } catch (error) {
-      toast.error('Erreur lors de la suppression');
+      toast.error('Error deleting log');
     }
   };
 
   // Clear all logs
   const handleClearAllLogs = async () => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer tous les logs ?')) return;
+    if (!confirm('Are you sure you want to delete all logs?')) return;
     
     try {
       const response = await fetch('/api/protocol-logs?all=true', {
@@ -259,11 +264,11 @@ export default function AdminPage() {
       });
       
       if (response.ok) {
-        toast.success('Tous les logs supprimés');
+        toast.success('All logs deleted');
         fetchProtocolLogs();
       }
     } catch (error) {
-      toast.error('Erreur lors de la suppression');
+      toast.error('Error deleting logs');
     }
   };
 
@@ -319,10 +324,10 @@ export default function AdminPage() {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return 'À l\'instant';
-    if (diffMins < 60) return `Il y a ${diffMins} min`;
-    if (diffHours < 24) return `Il y a ${diffHours}h`;
-    return `Il y a ${diffDays}j`;
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
   };
 
   // Fetch router state
@@ -385,7 +390,7 @@ export default function AdminPage() {
       }
     } catch (error) {
       console.error("Error fetching router state:", error);
-      toast.error("Erreur lors du chargement de l'état");
+      toast.error("Error loading state");
     } finally {
       setIsLoading(false);
     }
@@ -401,17 +406,17 @@ export default function AdminPage() {
     
     setActionLoading("pause");
     try {
-      toast.info("Pause du protocole en cours...");
+      toast.info("Pausing protocol...");
       
       // In a real implementation, you would call the program instruction
       // For now, simulate the action
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      toast.success("Protocole mis en pause avec succès");
+      toast.success("Protocol paused successfully");
       await fetchRouterState();
     } catch (error) {
       console.error("Error pausing protocol:", error);
-      toast.error("Erreur lors de la mise en pause");
+      toast.error("Error pausing protocol");
     } finally {
       setActionLoading(null);
     }
@@ -422,15 +427,15 @@ export default function AdminPage() {
     
     setActionLoading("unpause");
     try {
-      toast.info("Reprise du protocole en cours...");
+      toast.info("Resuming protocol...");
       
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      toast.success("Protocole repris avec succès");
+      toast.success("Protocol resumed successfully");
       await fetchRouterState();
     } catch (error) {
       console.error("Error unpausing protocol:", error);
-      toast.error("Erreur lors de la reprise");
+      toast.error("Error resuming protocol");
     } finally {
       setActionLoading(null);
     }
@@ -442,22 +447,22 @@ export default function AdminPage() {
     try {
       new PublicKey(newAuthority); // Validate pubkey
     } catch {
-      toast.error("Adresse invalide");
+      toast.error("Invalid address");
       return;
     }
     
     setActionLoading("propose");
     try {
-      toast.info("Proposition de nouvelle autorité...");
+      toast.info("Proposing new authority...");
       
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      toast.success("Nouvelle autorité proposée");
+      toast.success("New authority proposed");
       setNewAuthority("");
       await fetchRouterState();
     } catch (error) {
       console.error("Error proposing authority:", error);
-      toast.error("Erreur lors de la proposition");
+      toast.error("Error proposing authority");
     } finally {
       setActionLoading(null);
     }
@@ -466,33 +471,64 @@ export default function AdminPage() {
   const handleUpdateWallets = async () => {
     setActionLoading("wallets");
     try {
-      toast.info("Mise à jour des wallets...");
+      toast.info("Updating wallets...");
       
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      toast.success("Wallets mis à jour avec succès");
+      toast.success("Wallets updated successfully");
       await fetchRouterState();
     } catch (error) {
       console.error("Error updating wallets:", error);
-      toast.error("Erreur lors de la mise à jour");
+      toast.error("Error updating wallets");
     } finally {
       setActionLoading(null);
     }
   };
 
   const formatAddress = (address: PublicKey | null) => {
-    if (!address || address.equals(PublicKey.default)) return "Non défini";
+    if (!address || address.equals(PublicKey.default)) return "Not set";
     const str = address.toBase58();
     return `${str.slice(0, 4)}...${str.slice(-4)}`;
   };
 
   const formatTimestamp = (ts: number) => {
-    if (ts === 0) return "Jamais";
+    if (ts === 0) return "Never";
     return new Date(ts * 1000).toLocaleString();
   };
 
   // Check if connected wallet is the admin authority
-  const isAuthorizedAdmin = publicKey && publicKey.equals(ADMIN_AUTHORITY);
+  const isAuthorizedAdmin = (() => {
+    if (!publicKey) return false;
+    
+    // If no admin authority is configured and we're on devnet, allow access
+    // This is useful for local development and testing
+    if (!ADMIN_AUTHORITY_STRING && IS_DEVNET) {
+      console.log("Admin check: Devnet mode without configured authority - access granted");
+      return true;
+    }
+    
+    // If no admin authority is configured on mainnet, deny access
+    if (!ADMIN_AUTHORITY_STRING) {
+      console.warn("Admin check: No NEXT_PUBLIC_ADMIN_AUTHORITY configured");
+      return false;
+    }
+    
+    try {
+      const adminAuthority = new PublicKey(ADMIN_AUTHORITY_STRING);
+      const isAuth = publicKey.equals(adminAuthority);
+      // Debug log - remove in production
+      console.log("Admin check:", {
+        connected: publicKey.toBase58(),
+        authority: ADMIN_AUTHORITY_STRING,
+        isAuthorized: isAuth,
+        network: IS_DEVNET ? "devnet" : "mainnet"
+      });
+      return isAuth;
+    } catch (e) {
+      console.error("Invalid admin authority address:", e);
+      return false;
+    }
+  })();
 
   if (!connected) {
     return (
@@ -501,8 +537,8 @@ export default function AdminPage() {
           <Breadcrumb items={[{ label: "App", href: "/app" }, { label: "Admin" }]} />
           <div className="mt-8 backdrop-blur-xl bg-gray-900/80 border-2 border-yellow-500/30 rounded-2xl p-8 text-center">
             <ShieldCheckIcon className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-white mb-2">Accès Admin</h2>
-            <p className="text-gray-400">Connectez votre wallet pour accéder au panneau d'administration.</p>
+            <h2 className="text-2xl font-bold text-white mb-2">Admin Access</h2>
+            <p className="text-gray-400">Connect your wallet to access the admin panel.</p>
           </div>
         </div>
       </div>
@@ -519,25 +555,25 @@ export default function AdminPage() {
             <div className="w-20 h-20 mx-auto mb-6 bg-red-500/20 rounded-full flex items-center justify-center">
               <XCircleIcon className="w-12 h-12 text-red-500" />
             </div>
-            <h2 className="text-2xl font-bold text-white mb-3">Accès Refusé</h2>
+            <h2 className="text-2xl font-bold text-white mb-3">Access Denied</h2>
             <p className="text-gray-400 mb-2">
-              Cette page est réservée à l'administrateur du protocole SwapBack.
+              This page is restricted to the SwapBack protocol administrator.
             </p>
             <p className="text-gray-500 text-sm mb-6">
-              Votre wallet : <span className="font-mono text-gray-400">{publicKey?.toBase58().slice(0, 8)}...{publicKey?.toBase58().slice(-8)}</span>
+              Your wallet: <span className="font-mono text-gray-400">{publicKey?.toBase58().slice(0, 8)}...{publicKey?.toBase58().slice(-8)}</span>
             </p>
             <div className="flex justify-center gap-4">
               <a
                 href="/app"
                 className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition-all"
               >
-                Retour à l'accueil
+                Back to Home
               </a>
               <a
                 href="/app/swap"
                 className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-xl transition-all"
               >
-                Faire un swap
+                Go to Swap
               </a>
             </div>
           </div>
@@ -553,7 +589,7 @@ export default function AdminPage() {
           <Breadcrumb items={[{ label: "App", href: "/app" }, { label: "Admin" }]} />
           <div className="mt-8 flex items-center justify-center">
             <ArrowPathIcon className="w-8 h-8 text-emerald-500 animate-spin" />
-            <span className="ml-3 text-gray-400">Chargement...</span>
+            <span className="ml-3 text-gray-400">Loading...</span>
           </div>
         </div>
       </div>
@@ -574,7 +610,7 @@ export default function AdminPage() {
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-white">Admin Panel</h1>
-                <p className="text-gray-400">Gestion du protocole SwapBack</p>
+                <p className="text-gray-400">SwapBack Protocol Management</p>
               </div>
             </div>
             
@@ -587,12 +623,12 @@ export default function AdminPage() {
               {routerState?.isPaused ? (
                 <>
                   <XCircleIcon className="w-5 h-5 text-red-500" />
-                  <span className="text-red-400 font-medium">Protocole en Pause</span>
+                  <span className="text-red-400 font-medium">Protocol Paused</span>
                 </>
               ) : (
                 <>
                   <CheckCircleIcon className="w-5 h-5 text-emerald-500" />
-                  <span className="text-emerald-400 font-medium">Protocole Actif</span>
+                  <span className="text-emerald-400 font-medium">Protocol Active</span>
                 </>
               )}
             </div>
@@ -603,26 +639,26 @@ export default function AdminPage() {
             <div className="backdrop-blur-xl bg-gray-900/80 border-2 border-emerald-500/30 rounded-2xl p-6">
               <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
                 <ClockIcon className="w-6 h-6 text-emerald-500" />
-                État du Protocole
+                Protocol Status
               </h2>
               
               <div className="space-y-4">
                 <div className="flex justify-between items-center py-3 border-b border-gray-700">
-                  <span className="text-gray-400">Statut</span>
+                  <span className="text-gray-400">Status</span>
                   <span className={`font-medium ${routerState?.isPaused ? 'text-red-400' : 'text-emerald-400'}`}>
-                    {routerState?.isPaused ? '⏸️ En Pause' : '▶️ Actif'}
+                    {routerState?.isPaused ? '⏸️ Paused' : '▶️ Active'}
                   </span>
                 </div>
                 
                 <div className="flex justify-between items-center py-3 border-b border-gray-700">
-                  <span className="text-gray-400">Autorité</span>
+                  <span className="text-gray-400">Authority</span>
                   <span className="text-white font-mono text-sm">
                     {formatAddress(routerState?.authority || null)}
                   </span>
                 </div>
                 
                 <div className="flex justify-between items-center py-3 border-b border-gray-700">
-                  <span className="text-gray-400">Autorité en attente</span>
+                  <span className="text-gray-400">Pending Authority</span>
                   <span className="text-white font-mono text-sm">
                     {formatAddress(routerState?.pendingAuthority || null)}
                   </span>
@@ -630,7 +666,7 @@ export default function AdminPage() {
                 
                 {routerState?.isPaused && (
                   <div className="flex justify-between items-center py-3 border-b border-gray-700">
-                    <span className="text-gray-400">Mis en pause le</span>
+                    <span className="text-gray-400">Paused at</span>
                     <span className="text-white text-sm">
                       {formatTimestamp(routerState.pausedAt)}
                     </span>
@@ -654,7 +690,7 @@ export default function AdminPage() {
               </h2>
               
               <p className="text-gray-400 text-sm mb-6">
-                Arrêt d'urgence du protocole. Quand activé, tous les swaps sont bloqués.
+                Emergency protocol shutdown. When active, all swaps are blocked.
               </p>
               
               <div className="flex gap-4">
@@ -669,7 +705,7 @@ export default function AdminPage() {
                     ) : (
                       <PlayIcon className="w-5 h-5" />
                     )}
-                    Reprendre
+                    Resume
                   </button>
                 ) : (
                   <button
@@ -682,7 +718,7 @@ export default function AdminPage() {
                     ) : (
                       <PauseIcon className="w-5 h-5" />
                     )}
-                    Pause d'Urgence
+                    Emergency Pause
                   </button>
                 )}
               </div>
@@ -692,21 +728,21 @@ export default function AdminPage() {
             <div className="backdrop-blur-xl bg-gray-900/80 border-2 border-cyan-500/30 rounded-2xl p-6">
               <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
                 <KeyIcon className="w-6 h-6 text-cyan-500" />
-                Transfert d'Autorité
+                Authority Transfer
               </h2>
               
               <p className="text-gray-400 text-sm mb-4">
-                Transfert en 2 étapes: proposer puis accepter par la nouvelle autorité.
+                Two-step transfer: propose then accept by the new authority.
               </p>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">Nouvelle Autorité</label>
+                  <label className="block text-sm text-gray-400 mb-2">New Authority</label>
                   <input
                     type="text"
                     value={newAuthority}
                     onChange={(e) => setNewAuthority(e.target.value)}
-                    placeholder="Adresse Solana..."
+                    placeholder="Solana address..."
                     disabled={!isAdmin}
                     className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none disabled:opacity-50"
                   />
@@ -722,7 +758,7 @@ export default function AdminPage() {
                   ) : (
                     <KeyIcon className="w-5 h-5" />
                   )}
-                  Proposer Nouvelle Autorité
+                  Propose New Authority
                 </button>
               </div>
             </div>
@@ -731,7 +767,7 @@ export default function AdminPage() {
             <div className="backdrop-blur-xl bg-gray-900/80 border-2 border-purple-500/30 rounded-2xl p-6">
               <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
                 <WalletIcon className="w-6 h-6 text-purple-500" />
-                Configuration Wallets
+                Wallet Configuration
               </h2>
               
               <div className="space-y-4">
@@ -781,7 +817,7 @@ export default function AdminPage() {
                   ) : (
                     <WalletIcon className="w-5 h-5" />
                   )}
-                  Mettre à jour les Wallets
+                  Update Wallets
                 </button>
               </div>
             </div>
@@ -789,28 +825,28 @@ export default function AdminPage() {
 
           {/* Statistics Section */}
           <div className="mt-8 backdrop-blur-xl bg-gray-900/80 border-2 border-emerald-500/30 rounded-2xl p-6">
-            <h2 className="text-xl font-bold text-white mb-6">📊 Statistiques du Protocole</h2>
+            <h2 className="text-xl font-bold text-white mb-6">📊 Protocol Statistics</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-gray-800/50 rounded-xl p-4 text-center">
                 <div className="text-3xl font-bold text-emerald-400 mb-1">
                   ${((routerState?.totalVolume?.toNumber() || 0) / 1e6).toLocaleString()}
                 </div>
-                <div className="text-gray-400 text-sm">Volume Total</div>
+                <div className="text-gray-400 text-sm">Total Volume</div>
               </div>
               
               <div className="bg-gray-800/50 rounded-xl p-4 text-center">
                 <div className="text-3xl font-bold text-cyan-400 mb-1">
                   ${((routerState?.totalNpi?.toNumber() || 0) / 1e6).toLocaleString()}
                 </div>
-                <div className="text-gray-400 text-sm">NPI Généré</div>
+                <div className="text-gray-400 text-sm">NPI Generated</div>
               </div>
               
               <div className="bg-gray-800/50 rounded-xl p-4 text-center">
                 <div className="text-3xl font-bold text-purple-400 mb-1">
                   ${((routerState?.totalRebatesPaid?.toNumber() || 0) / 1e6).toLocaleString()}
                 </div>
-                <div className="text-gray-400 text-sm">Rebates Distribués</div>
+                <div className="text-gray-400 text-sm">Rebates Distributed</div>
               </div>
             </div>
           </div>
@@ -820,7 +856,7 @@ export default function AdminPage() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <BanknotesIcon className="w-6 h-6 text-yellow-500" />
-                Soldes des Wallets
+                Wallet Balances
               </h2>
               <button
                 onClick={fetchWalletBalances}
@@ -989,7 +1025,7 @@ export default function AdminPage() {
             <div className="mt-6 p-4 bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border border-yellow-500/20 rounded-xl">
               <h3 className="text-yellow-400 font-semibold mb-3 flex items-center gap-2">
                 <BanknotesIcon className="w-5 h-5" />
-                Total Tous Wallets
+                Total All Wallets
               </h3>
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center">
@@ -1035,13 +1071,13 @@ export default function AdminPage() {
               <div className="flex items-center gap-3">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
                   <BellAlertIcon className="w-6 h-6 text-red-500" />
-                  Logs & Alertes du Protocole
+                  Protocol Logs & Alerts
                 </h2>
                 
                 {/* Unresolved badge */}
                 {logCounts.unresolved > 0 && (
                   <span className="px-2.5 py-1 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
-                    {logCounts.unresolved} non résolu{logCounts.unresolved > 1 ? 's' : ''}
+                    {logCounts.unresolved} unresolved
                   </span>
                 )}
               </div>
@@ -1059,7 +1095,7 @@ export default function AdminPage() {
                   className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-sm transition-all"
                 >
                   <ArrowDownTrayIcon className="w-4 h-4" />
-                  Exporter
+                  Export
                 </button>
                 {isAdmin && (
                   <button
@@ -1067,7 +1103,7 @@ export default function AdminPage() {
                     className="flex items-center gap-2 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm transition-all"
                   >
                     <TrashIcon className="w-4 h-4" />
-                    Tout effacer
+                    Clear all
                   </button>
                 )}
               </div>
@@ -1136,7 +1172,7 @@ export default function AdminPage() {
             <div className="flex items-center gap-4 mb-4">
               <div className="flex items-center gap-2">
                 <FunnelIcon className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-400 text-sm">Filtres:</span>
+                <span className="text-gray-400 text-sm">Filters:</span>
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -1145,7 +1181,7 @@ export default function AdminPage() {
                   onChange={(e) => setShowResolvedLogs(e.target.checked)}
                   className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-emerald-500 focus:ring-emerald-500"
                 />
-                <span className="text-gray-300 text-sm">Afficher les logs résolus</span>
+                <span className="text-gray-300 text-sm">Show resolved logs</span>
               </label>
             </div>
 
@@ -1154,13 +1190,13 @@ export default function AdminPage() {
               {logsLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <ArrowPathIcon className="w-8 h-8 text-gray-400 animate-spin" />
-                  <span className="ml-3 text-gray-400">Chargement des logs...</span>
+                  <span className="ml-3 text-gray-400">Loading logs...</span>
                 </div>
               ) : protocolLogs.length === 0 ? (
                 <div className="text-center py-12">
                   <CheckCircleIcon className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
-                  <p className="text-gray-400">Aucun log à afficher</p>
-                  <p className="text-gray-500 text-sm">Le protocole fonctionne sans erreur 🎉</p>
+                  <p className="text-gray-400">No logs to display</p>
+                  <p className="text-gray-500 text-sm">The protocol is running without errors 🎉</p>
                 </div>
               ) : (
                 protocolLogs.map((log) => (
@@ -1185,7 +1221,7 @@ export default function AdminPage() {
                             {log.resolved && (
                               <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs rounded flex items-center gap-1">
                                 <CheckCircleIcon className="w-3 h-3" />
-                                Résolu
+                                Resolved
                               </span>
                             )}
                           </div>
@@ -1194,7 +1230,7 @@ export default function AdminPage() {
                           {log.details && Object.keys(log.details).length > 0 && (
                             <details className="mt-2">
                               <summary className="text-gray-500 text-xs cursor-pointer hover:text-gray-400">
-                                Voir les détails
+                                View details
                               </summary>
                               <pre className="mt-2 p-2 bg-black/30 rounded text-xs text-gray-400 overflow-x-auto">
                                 {JSON.stringify(log.details, null, 2)}
@@ -1210,14 +1246,14 @@ export default function AdminPage() {
                           <button
                             onClick={() => handleResolveLog(log.id)}
                             className="p-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg transition-all"
-                            title="Marquer comme résolu"
+                            title="Mark as resolved"
                           >
                             <CheckCircleIcon className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDeleteLog(log.id)}
                             className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-all"
-                            title="Supprimer"
+                            title="Delete"
                           >
                             <TrashIcon className="w-4 h-4" />
                           </button>
