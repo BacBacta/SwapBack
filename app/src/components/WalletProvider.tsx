@@ -1,11 +1,11 @@
 "use client";
 
-import { FC, ReactNode, useMemo } from "react";
+import { FC, ReactNode, useMemo, useCallback } from "react";
 import {
   ConnectionProvider,
   WalletProvider as SolanaWalletProvider,
 } from "@solana/wallet-adapter-react";
-import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
+import { WalletAdapterNetwork, WalletError, WalletNotReadyError } from "@solana/wallet-adapter-base";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
@@ -65,12 +65,28 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
     []
   );
 
+  // Handle wallet errors gracefully - especially WalletNotReadyError
+  const onError = useCallback((error: WalletError) => {
+    // Silently ignore WalletNotReadyError - this happens when:
+    // 1. Extension is not installed
+    // 2. On mobile without the wallet app
+    // 3. autoConnect tries to connect before wallet is ready
+    if (error instanceof WalletNotReadyError) {
+      console.debug("Wallet not ready - extension may not be installed or mobile app not detected");
+      return;
+    }
+    
+    // Log other errors for debugging
+    console.error("Wallet error:", error.name, error.message);
+  }, []);
+
   return (
     <ConnectionProvider endpoint={endpoint}>
       <SolanaWalletProvider
         wallets={wallets}
-        autoConnect={true} // Activer autoConnect pour la persistance de connexion
+        autoConnect={true} // Keep autoConnect for UX, but errors are now handled
         localStorageKey="swapback-wallet" // Clé unique pour éviter les conflits
+        onError={onError} // Handle errors gracefully
       >
         <WalletModalProvider>{children}</WalletModalProvider>
       </SolanaWalletProvider>
