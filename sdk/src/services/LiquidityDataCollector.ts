@@ -23,6 +23,10 @@ import { SanctumService } from "./SanctumService";
 import { GooseFXService } from "./GooseFXService";
 import { MarinadeService } from "./MarinadeService";
 import { TensorService } from "./TensorService";
+import { SaberService } from "./SaberService";
+import { MercurialService } from "./MercurialService";
+import { KaminoService } from "./KaminoService";
+import { CropperService } from "./CropperService";
 import { StructuredLogger } from "../utils/StructuredLogger";
 import { RFQCompetitionService } from "./RFQCompetitionService";
 
@@ -134,6 +138,54 @@ const VENUE_CONFIGS: Record<VenueName, VenueConfig> = {
     maxSlippage: 0.01,
   },
 
+  // Stable/Multi-token AMMs - High priority for stable pairs
+  [VenueName.SABER]: {
+    name: VenueName.SABER,
+    type: VenueType.AMM,
+    enabled:
+      (process.env.NEXT_PUBLIC_ENABLE_SABER ?? "true").toLowerCase() !==
+      "false",
+    priority: 85, // High priority for stablecoin swaps
+    feeRate: 0.0004, // 0.04% for stable pairs
+    minTradeSize: 1,
+    maxSlippage: 0.002, // Very low slippage for stables
+  },
+  [VenueName.MERCURIAL]: {
+    name: VenueName.MERCURIAL,
+    type: VenueType.AMM,
+    enabled:
+      (process.env.NEXT_PUBLIC_ENABLE_MERCURIAL ?? "true").toLowerCase() !==
+      "false",
+    priority: 84, // High priority for multi-token pools
+    feeRate: 0.0001, // 0.01% for 3/4-pools
+    minTradeSize: 1,
+    maxSlippage: 0.002,
+  },
+
+  // CLMM/Concentrated Liquidity - High priority for deep liquidity
+  [VenueName.KAMINO]: {
+    name: VenueName.KAMINO,
+    type: VenueType.AMM,
+    enabled:
+      (process.env.NEXT_PUBLIC_ENABLE_KAMINO ?? "true").toLowerCase() !==
+      "false",
+    priority: 82, // High priority for CLMM
+    feeRate: 0.003, // 0.3% typical
+    minTradeSize: 1,
+    maxSlippage: 0.01,
+  },
+  [VenueName.CROPPER]: {
+    name: VenueName.CROPPER,
+    type: VenueType.AMM,
+    enabled:
+      (process.env.NEXT_PUBLIC_ENABLE_CROPPER ?? "true").toLowerCase() !==
+      "false",
+    priority: 58, // Medium priority
+    feeRate: 0.003,
+    minTradeSize: 1,
+    maxSlippage: 0.01,
+  },
+
   // LST Specialists - High priority for staking derivatives
   [VenueName.SANCTUM]: {
     name: VenueName.SANCTUM,
@@ -223,6 +275,10 @@ export class LiquidityDataCollector {
   private goosefxService: GooseFXService;
   private marinadeService: MarinadeService;
   private tensorService: TensorService;
+  private saberService: SaberService;
+  private mercurialService: MercurialService;
+  private kaminoService: KaminoService;
+  private cropperService: CropperService;
   private clobHealth: Partial<Record<VenueName, ClobHealthState>>;
   private logger: StructuredLogger;
 
@@ -240,6 +296,10 @@ export class LiquidityDataCollector {
     this.goosefxService = new GooseFXService(connection);
     this.marinadeService = new MarinadeService(connection);
     this.tensorService = new TensorService(connection);
+    this.saberService = new SaberService(connection);
+    this.mercurialService = new MercurialService(connection);
+    this.kaminoService = new KaminoService(connection);
+    this.cropperService = new CropperService(connection);
     this.clobHealth = {};
     this.logger = new StructuredLogger("liquidity");
   }

@@ -21,6 +21,14 @@ export enum VenueName {
   LIFINITY = "lifinity",
   GOOSEFX = "goosefx", // GooseFX CLMM pools
 
+  // Stable/Multi-token AMMs
+  SABER = "saber", // Stablecoin specialist
+  MERCURIAL = "mercurial", // Multi-token stable pools
+
+  // CLMM/Concentrated Liquidity
+  KAMINO = "kamino", // Concentrated liquidity management
+  CROPPER = "cropper", // Cropper Finance CLMM
+
   // LST Specialists
   SANCTUM = "sanctum", // LST swaps (mSOL, stSOL, jitoSOL, etc.)
   MARINADE = "marinade", // Direct mSOL staking/unstaking
