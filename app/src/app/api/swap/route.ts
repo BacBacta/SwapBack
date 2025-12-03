@@ -101,6 +101,42 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ routes, success: true });
   } catch (error) {
     console.error("Error in /api/swap:", error);
+    
+    // Log API error to protocol logs file
+    const errorLog = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      timestamp: new Date().toISOString(),
+      level: 'error' as const,
+      category: 'api',
+      title: 'Swap API Error',
+      message: error instanceof Error ? error.message : 'Unknown API error',
+      details: {
+        component: '/api/swap',
+        action: 'POST',
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+      resolved: false,
+    };
+
+    // Try to log to file (non-blocking)
+    try {
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      const logsDir = path.join(process.cwd(), 'logs');
+      await fs.mkdir(logsDir, { recursive: true });
+      const logsFile = path.join(logsDir, 'protocol-logs.json');
+      
+      let logs = [];
+      try {
+        const data = await fs.readFile(logsFile, 'utf-8');
+        logs = JSON.parse(data);
+      } catch { /* File doesn't exist yet */ }
+      
+      logs.unshift(errorLog);
+      logs = logs.slice(0, 500); // Keep max 500 logs
+      await fs.writeFile(logsFile, JSON.stringify(logs, null, 2));
+    } catch { /* Silent fail for logging */ }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

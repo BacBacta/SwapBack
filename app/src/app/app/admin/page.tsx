@@ -19,7 +19,13 @@ import {
   XCircleIcon,
   ClockIcon,
   BanknotesIcon,
-  CurrencyDollarIcon
+  CurrencyDollarIcon,
+  BellAlertIcon,
+  TrashIcon,
+  ArrowDownTrayIcon,
+  FunnelIcon,
+  ExclamationCircleIcon,
+  InformationCircleIcon
 } from "@heroicons/react/24/outline";
 
 // Program ID
@@ -34,6 +40,28 @@ interface WalletBalance {
   usdc: number;
   back: number;
   isLoading: boolean;
+}
+
+interface ProtocolLog {
+  id: string;
+  timestamp: string;
+  level: 'error' | 'warning' | 'info' | 'critical';
+  category: string;
+  title: string;
+  message: string;
+  details?: Record<string, unknown>;
+  resolved: boolean;
+  resolvedAt?: string;
+  resolvedBy?: string;
+}
+
+interface LogCounts {
+  total: number;
+  critical: number;
+  error: number;
+  warning: number;
+  info: number;
+  unresolved: number;
 }
 
 interface RouterState {
@@ -80,6 +108,15 @@ export default function AdminPage() {
     boostVault: { sol: 0, usdc: 0, back: 0, isLoading: true },
     npiVault: { sol: 0, usdc: 0, back: 0, isLoading: true },
   });
+
+  // Protocol logs state
+  const [protocolLogs, setProtocolLogs] = useState<ProtocolLog[]>([]);
+  const [logCounts, setLogCounts] = useState<LogCounts>({
+    total: 0, critical: 0, error: 0, warning: 0, info: 0, unresolved: 0
+  });
+  const [logsLoading, setLogsLoading] = useState(true);
+  const [logFilter, setLogFilter] = useState<'all' | 'critical' | 'error' | 'warning' | 'info'>('all');
+  const [showResolvedLogs, setShowResolvedLogs] = useState(false);
 
   // Fetch token balance helper
   const fetchTokenBalance = async (walletAddress: PublicKey, mint: PublicKey): Promise<number> => {
@@ -139,6 +176,151 @@ export default function AdminPage() {
       fetchWalletBalances();
     }
   }, [routerState, fetchWalletBalances]);
+
+  // Fetch protocol logs
+  const fetchProtocolLogs = useCallback(async () => {
+    setLogsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (logFilter !== 'all') {
+        params.set('level', logFilter);
+      }
+      if (!showResolvedLogs) {
+        params.set('unresolved', 'true');
+      }
+      params.set('limit', '100');
+
+      const response = await fetch(`/api/protocol-logs?${params.toString()}`);
+      if (response.ok) {
+        const data = await response.json();
+        setProtocolLogs(data.logs || []);
+        setLogCounts(data.counts || { total: 0, critical: 0, error: 0, warning: 0, info: 0, unresolved: 0 });
+      }
+    } catch (error) {
+      console.error('Error fetching protocol logs:', error);
+    } finally {
+      setLogsLoading(false);
+    }
+  }, [logFilter, showResolvedLogs]);
+
+  // Fetch logs on mount and when filter changes
+  useEffect(() => {
+    fetchProtocolLogs();
+  }, [fetchProtocolLogs]);
+
+  // Resolve a log
+  const handleResolveLog = async (logId: string) => {
+    try {
+      const response = await fetch('/api/protocol-logs', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          id: logId, 
+          resolved: true,
+          resolvedBy: publicKey?.toBase58()?.slice(0, 8) 
+        }),
+      });
+      
+      if (response.ok) {
+        toast.success('Log marqué comme résolu');
+        fetchProtocolLogs();
+      }
+    } catch (error) {
+      toast.error('Erreur lors de la résolution');
+    }
+  };
+
+  // Delete a log
+  const handleDeleteLog = async (logId: string) => {
+    try {
+      const response = await fetch(`/api/protocol-logs?id=${logId}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        toast.success('Log supprimé');
+        fetchProtocolLogs();
+      }
+    } catch (error) {
+      toast.error('Erreur lors de la suppression');
+    }
+  };
+
+  // Clear all logs
+  const handleClearAllLogs = async () => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer tous les logs ?')) return;
+    
+    try {
+      const response = await fetch('/api/protocol-logs?all=true', {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        toast.success('Tous les logs supprimés');
+        fetchProtocolLogs();
+      }
+    } catch (error) {
+      toast.error('Erreur lors de la suppression');
+    }
+  };
+
+  // Download logs
+  const handleDownloadLogs = () => {
+    const blob = new Blob([JSON.stringify(protocolLogs, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `protocol-logs-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Get icon for log level
+  const getLogIcon = (level: string) => {
+    switch (level) {
+      case 'critical':
+        return <ExclamationCircleIcon className="w-5 h-5 text-red-500" />;
+      case 'error':
+        return <XCircleIcon className="w-5 h-5 text-red-400" />;
+      case 'warning':
+        return <ExclamationTriangleIcon className="w-5 h-5 text-yellow-400" />;
+      case 'info':
+        return <InformationCircleIcon className="w-5 h-5 text-blue-400" />;
+      default:
+        return <InformationCircleIcon className="w-5 h-5 text-gray-400" />;
+    }
+  };
+
+  // Get color classes for log level
+  const getLogColors = (level: string) => {
+    switch (level) {
+      case 'critical':
+        return 'border-red-500/50 bg-red-500/10';
+      case 'error':
+        return 'border-red-400/30 bg-red-400/5';
+      case 'warning':
+        return 'border-yellow-400/30 bg-yellow-400/5';
+      case 'info':
+        return 'border-blue-400/30 bg-blue-400/5';
+      default:
+        return 'border-gray-500/30 bg-gray-500/5';
+    }
+  };
+
+  // Format relative time
+  const formatRelativeTime = (timestamp: string) => {
+    const now = new Date();
+    const logTime = new Date(timestamp);
+    const diffMs = now.getTime() - logTime.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'À l\'instant';
+    if (diffMins < 60) return `Il y a ${diffMins} min`;
+    if (diffHours < 24) return `Il y a ${diffHours}h`;
+    return `Il y a ${diffDays}j`;
+  };
 
   // Fetch router state
   const fetchRouterState = useCallback(async () => {
@@ -816,6 +998,207 @@ export default function AdminPage() {
                   <div className="text-gray-400 text-sm">BACK</div>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Protocol Logs & Errors Section */}
+          <div className="mt-8 backdrop-blur-xl bg-gray-900/80 border-2 border-red-500/30 rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <BellAlertIcon className="w-6 h-6 text-red-500" />
+                  Logs & Alertes du Protocole
+                </h2>
+                
+                {/* Unresolved badge */}
+                {logCounts.unresolved > 0 && (
+                  <span className="px-2.5 py-1 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
+                    {logCounts.unresolved} non résolu{logCounts.unresolved > 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={fetchProtocolLogs}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-all"
+                >
+                  <ArrowPathIcon className={`w-4 h-4 ${logsLoading ? 'animate-spin' : ''}`} />
+                  Actualiser
+                </button>
+                <button
+                  onClick={handleDownloadLogs}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-sm transition-all"
+                >
+                  <ArrowDownTrayIcon className="w-4 h-4" />
+                  Exporter
+                </button>
+                {isAdmin && (
+                  <button
+                    onClick={handleClearAllLogs}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm transition-all"
+                  >
+                    <TrashIcon className="w-4 h-4" />
+                    Tout effacer
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Stats Summary */}
+            <div className="grid grid-cols-5 gap-3 mb-6">
+              <button
+                onClick={() => setLogFilter('all')}
+                className={`p-3 rounded-xl text-center transition-all ${
+                  logFilter === 'all' 
+                    ? 'bg-white/10 ring-2 ring-white/30' 
+                    : 'bg-gray-800/50 hover:bg-gray-700/50'
+                }`}
+              >
+                <div className="text-2xl font-bold text-white">{logCounts.total}</div>
+                <div className="text-gray-400 text-xs">Total</div>
+              </button>
+              <button
+                onClick={() => setLogFilter('critical')}
+                className={`p-3 rounded-xl text-center transition-all ${
+                  logFilter === 'critical' 
+                    ? 'bg-red-500/20 ring-2 ring-red-500/50' 
+                    : 'bg-gray-800/50 hover:bg-red-500/10'
+                }`}
+              >
+                <div className="text-2xl font-bold text-red-500">{logCounts.critical}</div>
+                <div className="text-red-400 text-xs">Critical</div>
+              </button>
+              <button
+                onClick={() => setLogFilter('error')}
+                className={`p-3 rounded-xl text-center transition-all ${
+                  logFilter === 'error' 
+                    ? 'bg-red-400/20 ring-2 ring-red-400/50' 
+                    : 'bg-gray-800/50 hover:bg-red-400/10'
+                }`}
+              >
+                <div className="text-2xl font-bold text-red-400">{logCounts.error}</div>
+                <div className="text-red-300 text-xs">Errors</div>
+              </button>
+              <button
+                onClick={() => setLogFilter('warning')}
+                className={`p-3 rounded-xl text-center transition-all ${
+                  logFilter === 'warning' 
+                    ? 'bg-yellow-500/20 ring-2 ring-yellow-500/50' 
+                    : 'bg-gray-800/50 hover:bg-yellow-500/10'
+                }`}
+              >
+                <div className="text-2xl font-bold text-yellow-400">{logCounts.warning}</div>
+                <div className="text-yellow-300 text-xs">Warnings</div>
+              </button>
+              <button
+                onClick={() => setLogFilter('info')}
+                className={`p-3 rounded-xl text-center transition-all ${
+                  logFilter === 'info' 
+                    ? 'bg-blue-500/20 ring-2 ring-blue-500/50' 
+                    : 'bg-gray-800/50 hover:bg-blue-500/10'
+                }`}
+              >
+                <div className="text-2xl font-bold text-blue-400">{logCounts.info}</div>
+                <div className="text-blue-300 text-xs">Info</div>
+              </button>
+            </div>
+
+            {/* Filter Options */}
+            <div className="flex items-center gap-4 mb-4">
+              <div className="flex items-center gap-2">
+                <FunnelIcon className="w-4 h-4 text-gray-400" />
+                <span className="text-gray-400 text-sm">Filtres:</span>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showResolvedLogs}
+                  onChange={(e) => setShowResolvedLogs(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-emerald-500 focus:ring-emerald-500"
+                />
+                <span className="text-gray-300 text-sm">Afficher les logs résolus</span>
+              </label>
+            </div>
+
+            {/* Logs List */}
+            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+              {logsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <ArrowPathIcon className="w-8 h-8 text-gray-400 animate-spin" />
+                  <span className="ml-3 text-gray-400">Chargement des logs...</span>
+                </div>
+              ) : protocolLogs.length === 0 ? (
+                <div className="text-center py-12">
+                  <CheckCircleIcon className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
+                  <p className="text-gray-400">Aucun log à afficher</p>
+                  <p className="text-gray-500 text-sm">Le protocole fonctionne sans erreur 🎉</p>
+                </div>
+              ) : (
+                protocolLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className={`border rounded-xl p-4 ${getLogColors(log.level)} ${
+                      log.resolved ? 'opacity-60' : ''
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3 flex-1">
+                        <div className="mt-0.5">{getLogIcon(log.level)}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-white">{log.title}</span>
+                            <span className="px-2 py-0.5 bg-gray-700/50 text-gray-300 text-xs rounded">
+                              {log.category}
+                            </span>
+                            <span className="text-gray-500 text-xs">
+                              {formatRelativeTime(log.timestamp)}
+                            </span>
+                            {log.resolved && (
+                              <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs rounded flex items-center gap-1">
+                                <CheckCircleIcon className="w-3 h-3" />
+                                Résolu
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-gray-300 text-sm mt-1">{log.message}</p>
+                          
+                          {log.details && Object.keys(log.details).length > 0 && (
+                            <details className="mt-2">
+                              <summary className="text-gray-500 text-xs cursor-pointer hover:text-gray-400">
+                                Voir les détails
+                              </summary>
+                              <pre className="mt-2 p-2 bg-black/30 rounded text-xs text-gray-400 overflow-x-auto">
+                                {JSON.stringify(log.details, null, 2)}
+                              </pre>
+                            </details>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Actions */}
+                      {isAdmin && !log.resolved && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleResolveLog(log.id)}
+                            className="p-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg transition-all"
+                            title="Marquer comme résolu"
+                          >
+                            <CheckCircleIcon className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteLog(log.id)}
+                            className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-all"
+                            title="Supprimer"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

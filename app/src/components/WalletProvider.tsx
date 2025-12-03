@@ -12,6 +12,7 @@ import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
 import { BackpackWalletAdapter } from "@solana/wallet-adapter-backpack";
 import { clusterApiUrl } from "@solana/web3.js";
 import { DEFAULT_SOLANA_NETWORK, DEFAULT_SOLANA_RPC_URL } from "@/config/constants";
+import { monitor } from "@/lib/protocolMonitor";
 
 // Import des styles du wallet adapter
 import "@solana/wallet-adapter-react-ui/styles.css";
@@ -75,6 +76,13 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
       console.debug("Wallet not ready - extension may not be installed or mobile app not detected");
       return;
     }
+    
+    // Log wallet errors to protocol monitor
+    monitor.walletError(error.message, {
+      component: 'WalletProvider',
+      action: 'onError',
+      errorCode: error.name,
+    });
     
     // Log other errors for debugging
     console.error("Wallet error:", error.name, error.message);

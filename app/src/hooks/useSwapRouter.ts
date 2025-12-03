@@ -25,6 +25,7 @@ import { createProgramWithProvider } from "@/lib/program";
 import { getOracleFeedsForPair, type OracleFeedConfig } from "@/config/oracles";
 import { USDC_MINT } from "@/config/constants";
 import toast from "react-hot-toast";
+import { monitor } from "@/lib/protocolMonitor";
 
 const ROUTER_PROGRAM_ID = PROGRAM_IDS.routerProgram;
 
@@ -200,10 +201,30 @@ export function useSwapRouter() {
 
       const txSig = await builder.rpc();
 
+      // Log successful swap
+      monitor.swapSuccess(
+        request.amountIn.toString(),
+        request.tokenIn.toBase58().slice(0, 8),
+        request.tokenOut.toBase58().slice(0, 8),
+        txSig
+      );
+
       toast.success(`Swap envoyé: ${txSig}`);
       return txSig;
     } catch (err) {
       console.error("swap_toc error", err);
+      
+      // Log swap error to protocol monitor
+      const errorMessage = err instanceof Error ? err.message : "Unknown swap error";
+      monitor.swapError(errorMessage, {
+        component: 'useSwapRouter',
+        action: 'swapWithRouter',
+        amount: request.amountIn.toString(),
+        tokenMint: request.tokenIn.toBase58(),
+        walletAddress: wallet.publicKey?.toBase58(),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
+
       toast.error(err instanceof Error ? err.message : "Swap échoué");
       throw err;
     }
