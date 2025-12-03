@@ -139,14 +139,52 @@ export const ClientOnlyWallet = () => {
 
   const handleDisconnect = useCallback(async () => {
     try {
-      await disconnect();
-      showToast.info("Wallet disconnected");
+      // Close menu first
       setShowMenu(false);
+      
+      // Disconnect the wallet
+      await disconnect();
+      
+      // Clear any cached wallet data
+      if (typeof window !== 'undefined') {
+        // Clear localStorage wallet keys
+        localStorage.removeItem('walletName');
+        localStorage.removeItem('swapback-wallet');
+        
+        // Force clear wallet adapter state
+        try {
+          const keys = Object.keys(localStorage);
+          keys.forEach(key => {
+            if (key.includes('wallet') || key.includes('Wallet')) {
+              localStorage.removeItem(key);
+            }
+          });
+        } catch (e) {
+          // Ignore storage errors
+        }
+      }
+      
+      showToast.info("Wallet disconnected");
+      
+      // On mobile, sometimes we need to reload to fully disconnect
+      if (isMobile) {
+        // Small delay then reload to ensure clean state
+        setTimeout(() => {
+          window.location.reload();
+        }, 500);
+      }
     } catch (error) {
       console.error("Disconnect error:", error);
       showToast.error("Failed to disconnect wallet");
+      
+      // Force reload on error for mobile
+      if (isMobile) {
+        setTimeout(() => {
+          window.location.reload();
+        }, 500);
+      }
     }
-  }, [disconnect]);
+  }, [disconnect, isMobile]);
 
   const copyAddress = useCallback(() => {
     if (publicKey) {
