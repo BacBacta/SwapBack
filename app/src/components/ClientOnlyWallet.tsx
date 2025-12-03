@@ -329,85 +329,169 @@ export const ClientOnlyWallet = () => {
       {/* Mobile Wallet Selection Modal */}
       {showMobileWalletModal && (
         <div 
-          className="fixed inset-0 flex items-center justify-center p-4"
-          style={{ zIndex: 9999999 }}
+          style={{ 
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 9999999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+            boxSizing: 'border-box',
+          }}
         >
           {/* Overlay */}
           <div 
-            className="absolute inset-0 bg-black/95 backdrop-blur-md"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.95)',
+              backdropFilter: 'blur(10px)',
+            }}
             onClick={() => setShowMobileWalletModal(false)}
           />
           
           {/* Modal Content - Centered */}
           <div 
-            className="relative w-full max-w-sm bg-[#0a0a14] border-2 border-primary/50 rounded-3xl overflow-hidden shadow-2xl shadow-primary/20"
+            style={{
+              position: 'relative',
+              width: '100%',
+              maxWidth: '340px',
+              backgroundColor: '#0a0a14',
+              border: '2px solid rgba(16, 185, 129, 0.5)',
+              borderRadius: '24px',
+              overflow: 'hidden',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.9)',
+              maxHeight: 'calc(100vh - 32px)',
+              overflowY: 'auto',
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Close Button */}
             <button
               onClick={() => setShowMobileWalletModal(false)}
-              className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+              style={{
+                position: 'absolute',
+                top: '12px',
+                right: '12px',
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                border: 'none',
+                cursor: 'pointer',
+                zIndex: 10,
+              }}
             >
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg style={{ width: '20px', height: '20px', color: 'white' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
             
             {/* Header */}
-            <div className="p-6 pb-4 border-b border-gray-800">
-              <h2 className="text-2xl font-bold text-white text-center">
+            <div style={{ padding: '24px 24px 16px', borderBottom: '1px solid #1f1f2e' }}>
+              <h2 style={{ fontSize: '22px', fontWeight: 'bold', color: 'white', textAlign: 'center', margin: 0 }}>
                 Connect Wallet
               </h2>
-              <p className="text-gray-400 text-sm text-center mt-2">
+              <p style={{ color: '#9ca3af', fontSize: '14px', textAlign: 'center', marginTop: '8px', marginBottom: 0 }}>
                 Choose your Solana wallet
               </p>
             </div>
 
             {/* Wallet Options */}
-            <div className="p-4 space-y-3">
+            <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <button
                 onClick={() => handleMobileWalletSelect('phantom')}
-                className="w-full p-4 rounded-2xl bg-gradient-to-r from-purple-600 to-purple-700 text-white font-semibold flex items-center gap-4 active:scale-[0.98] transition-transform shadow-lg"
+                style={{
+                  width: '100%',
+                  padding: '16px',
+                  borderRadius: '16px',
+                  background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                  color: 'white',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '16px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 15px rgba(124, 58, 237, 0.3)',
+                }}
               >
-                <span className="text-3xl">👻</span>
-                <div className="flex-1 text-left">
-                  <div className="font-bold text-lg">Phantom</div>
-                  <div className="text-xs opacity-80">Tap to open</div>
+                <span style={{ fontSize: '28px' }}>👻</span>
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '17px' }}>Phantom</div>
+                  <div style={{ fontSize: '12px', opacity: 0.8 }}>Tap to open</div>
                 </div>
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg style={{ width: '24px', height: '24px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
               
               <button
                 onClick={() => handleMobileWalletSelect('solflare')}
-                className="w-full p-4 rounded-2xl bg-gradient-to-r from-orange-500 to-red-600 text-white font-semibold flex items-center gap-4 active:scale-[0.98] transition-transform shadow-lg"
+                style={{
+                  width: '100%',
+                  padding: '16px',
+                  borderRadius: '16px',
+                  background: 'linear-gradient(135deg, #f97316, #dc2626)',
+                  color: 'white',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '16px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 15px rgba(249, 115, 22, 0.3)',
+                }}
               >
-                <span className="text-3xl">🔥</span>
-                <div className="flex-1 text-left">
-                  <div className="font-bold text-lg">Solflare</div>
-                  <div className="text-xs opacity-80">Tap to open</div>
+                <span style={{ fontSize: '28px' }}>🔥</span>
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '17px' }}>Solflare</div>
+                  <div style={{ fontSize: '12px', opacity: 0.8 }}>Tap to open</div>
                 </div>
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg style={{ width: '24px', height: '24px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
             </div>
 
             {/* Info */}
-            <div className="p-4 pt-0">
-              <div className="p-4 bg-primary/10 border border-primary/30 rounded-xl">
-                <p className="text-xs text-primary text-center">
-                  💡 Make sure Phantom or Solflare is installed on your device
+            <div style={{ padding: '0 16px 16px' }}>
+              <div style={{ 
+                padding: '12px 16px', 
+                backgroundColor: 'rgba(16, 185, 129, 0.1)', 
+                border: '1px solid rgba(16, 185, 129, 0.3)', 
+                borderRadius: '12px' 
+              }}>
+                <p style={{ fontSize: '12px', color: '#10b981', textAlign: 'center', margin: 0 }}>
+                  💡 Make sure the wallet app is installed
                 </p>
               </div>
             </div>
 
             {/* Cancel Button */}
-            <div className="p-4 pt-0">
+            <div style={{ padding: '0 16px 16px' }}>
               <button
                 onClick={() => setShowMobileWalletModal(false)}
-                className="w-full p-3 bg-white/5 hover:bg-white/10 rounded-xl text-gray-400 font-medium transition-colors"
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  color: '#9ca3af',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                }}
               >
                 Cancel
               </button>
