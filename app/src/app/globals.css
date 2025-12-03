@@ -998,93 +998,209 @@ html {
   scrollbar-color: var(--primary) rgba(0, 0, 0, 0.3);
 }
 
-/* Wallet Adapter Modal - Fix z-index for accessibility */
+/* ============================================
+   WALLET ADAPTER MODAL - MOBILE FIX
+   Force modal to stay centered and visible
+   ============================================ */
+
+/* Base wrapper - covers full screen */
 .wallet-adapter-modal-wrapper {
-  z-index: 99999 !important;
   position: fixed !important;
-}
-
-.wallet-adapter-modal-overlay {
-  z-index: 99998 !important;
-  position: fixed !important;
-  inset: 0 !important;
-}
-
-.wallet-adapter-modal {
-  z-index: 99999 !important;
-  position: relative !important;
-}
-
-.wallet-adapter-modal-container {
-  z-index: 100000 !important;
-  position: fixed !important;
-  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 999999 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  padding: 20px !important;
+  box-sizing: border-box !important;
 }
 
-/* Mobile wallet modal styling */
+/* Dark overlay behind modal */
+.wallet-adapter-modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 999998 !important;
+  background: rgba(0, 0, 0, 0.9) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+}
+
+/* Container for the modal content */
+.wallet-adapter-modal-container {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 999999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 20px !important;
+  pointer-events: none !important;
+}
+
+/* The actual modal box */
+.wallet-adapter-modal {
+  position: relative !important;
+  z-index: 1000000 !important;
+  max-width: 400px !important;
+  width: 100% !important;
+  max-height: 80vh !important;
+  margin: auto !important;
+  background: #1a1a2e !important;
+  border-radius: 20px !important;
+  border: 1px solid rgba(16, 185, 129, 0.3) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8) !important;
+  overflow: hidden !important;
+  pointer-events: auto !important;
+  /* CRITICAL: Prevent any transform/animation from moving the modal */
+  transform: none !important;
+  animation: none !important;
+  transition: none !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+}
+
+/* Modal title */
+.wallet-adapter-modal-title {
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  color: white !important;
+  text-align: center !important;
+  padding: 20px 20px 10px !important;
+}
+
+/* Wallet list container */
+.wallet-adapter-modal-list {
+  max-height: 50vh !important;
+  overflow-y: auto !important;
+  padding: 10px 15px 20px !important;
+  margin: 0 !important;
+}
+
+/* Each wallet item */
+.wallet-adapter-modal-list li {
+  list-style: none !important;
+  margin-bottom: 8px !important;
+}
+
+/* Wallet button styling */
+.wallet-adapter-modal-list .wallet-adapter-button {
+  width: 100% !important;
+  min-height: 56px !important;
+  padding: 12px 16px !important;
+  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: white !important;
+  font-size: 16px !important;
+  font-weight: 500 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  transition: background 0.2s !important;
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button:hover,
+.wallet-adapter-modal-list .wallet-adapter-button:active {
+  background: rgba(16, 185, 129, 0.2) !important;
+  border-color: rgba(16, 185, 129, 0.5) !important;
+}
+
+/* Wallet icon in list */
+.wallet-adapter-modal-list .wallet-adapter-button-start-icon {
+  width: 32px !important;
+  height: 32px !important;
+}
+
+/* Close button */
+.wallet-adapter-modal-button-close {
+  position: absolute !important;
+  top: 15px !important;
+  right: 15px !important;
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: none !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 10 !important;
+  color: white !important;
+}
+
+.wallet-adapter-modal-button-close:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* "More options" / collapse section */
+.wallet-adapter-collapse {
+  max-height: 500px !important;
+  overflow: visible !important;
+}
+
+.wallet-adapter-modal-collapse-button {
+  width: 100% !important;
+  padding: 12px !important;
+  background: transparent !important;
+  border: none !important;
+  color: rgba(16, 185, 129, 0.8) !important;
+  font-size: 14px !important;
+  cursor: pointer !important;
+}
+
+/* Middle button (when no wallet detected) */
+.wallet-adapter-modal-middle {
+  padding: 20px !important;
+  text-align: center !important;
+}
+
+.wallet-adapter-modal-middle-button {
+  background: linear-gradient(135deg, #10b981, #06b6d4) !important;
+  color: black !important;
+  font-weight: 600 !important;
+  padding: 14px 24px !important;
+  border-radius: 12px !important;
+  border: none !important;
+  font-size: 16px !important;
+  cursor: pointer !important;
+}
+
+/* Mobile-specific adjustments */
 @media (max-width: 768px) {
-  /* Make sure the modal is visible and properly positioned */
   .wallet-adapter-modal-wrapper {
-    position: fixed !important;
-    inset: 0 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
     padding: 16px !important;
-  }
-  
-  .wallet-adapter-modal-overlay {
-    background: rgba(0, 0, 0, 0.85) !important;
-    backdrop-filter: blur(8px) !important;
   }
   
   .wallet-adapter-modal {
-    max-width: 95vw !important;
-    max-height: 85vh !important;
-    width: 100% !important;
-    margin: auto !important;
-    border-radius: 24px !important;
-    overflow: hidden !important;
-  }
-  
-  .wallet-adapter-modal-container {
-    padding: 16px !important;
+    max-width: calc(100vw - 32px) !important;
+    max-height: 75vh !important;
+    margin: 0 !important;
   }
   
   .wallet-adapter-modal-list {
-    max-height: 50vh !important;
-    overflow-y: auto !important;
+    max-height: 45vh !important;
   }
   
-  /* Make wallet options larger and easier to tap */
-  .wallet-adapter-modal-list li {
+  .wallet-adapter-modal-list .wallet-adapter-button {
     min-height: 60px !important;
+    font-size: 17px !important;
   }
   
-  .wallet-adapter-modal-list-item,
-  .wallet-adapter-modal-list button {
-    padding: 16px 20px !important;
-    min-height: 60px !important;
-    font-size: 16px !important;
-  }
-  
-  /* Style the close button */
-  .wallet-adapter-modal-button-close {
-    position: absolute !important;
-    top: 12px !important;
-    right: 12px !important;
-    z-index: 10 !important;
-    width: 40px !important;
-    height: 40px !important;
-  }
-  
-  /* Hide the collapse/expand section on mobile for cleaner UX */
-  .wallet-adapter-collapse {
-    max-height: none !important;
-    overflow: visible !important;
+  .wallet-adapter-modal-list .wallet-adapter-button-start-icon {
+    width: 36px !important;
+    height: 36px !important;
   }
 }
 
@@ -1094,30 +1210,13 @@ html {
   cursor: pointer !important;
 }
 
-/* Mobile wallet detection improvements */
+/* Mobile wallet button improvements */
 @media (max-width: 768px) {
   /* Make wallet button more prominent on mobile */
   .wallet-adapter-button {
     min-height: 44px !important;
     font-size: 14px !important;
     touch-action: manipulation !important;
-  }
-  
-  /* Ensure wallet modal is mobile-friendly */
-  .wallet-adapter-modal {
-    max-width: 90vw !important;
-    margin: auto !important;
-  }
-  
-  .wallet-adapter-modal-list {
-    max-height: 60vh !important;
-    overflow-y: auto !important;
-  }
-  
-  /* Make wallet options larger on mobile */
-  .wallet-adapter-modal-list-item {
-    padding: 16px !important;
-    min-height: 64px !important;
   }
 }
 
