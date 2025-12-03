@@ -5,6 +5,7 @@ import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { WalletReadyState } from "@solana/wallet-adapter-base";
 import { showToast } from "@/lib/toast";
+import { MobileWalletModal } from "./MobileWalletModal";
 
 // Mobile wallet deep links - these open the app directly
 const MOBILE_WALLETS = {
@@ -326,179 +327,13 @@ export const ClientOnlyWallet = () => {
         </div>
       )}
 
-      {/* Mobile Wallet Selection Modal */}
-      {showMobileWalletModal && (
-        <div 
-          style={{ 
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 9999999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-            boxSizing: 'border-box',
-          }}
-        >
-          {/* Overlay */}
-          <div 
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.95)',
-              backdropFilter: 'blur(10px)',
-            }}
-            onClick={() => setShowMobileWalletModal(false)}
-          />
-          
-          {/* Modal Content - Centered */}
-          <div 
-            style={{
-              position: 'relative',
-              width: '100%',
-              maxWidth: '340px',
-              backgroundColor: '#0a0a14',
-              border: '2px solid rgba(16, 185, 129, 0.5)',
-              borderRadius: '24px',
-              overflow: 'hidden',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.9)',
-              maxHeight: 'calc(100vh - 32px)',
-              overflowY: 'auto',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Close Button */}
-            <button
-              onClick={() => setShowMobileWalletModal(false)}
-              style={{
-                position: 'absolute',
-                top: '12px',
-                right: '12px',
-                width: '36px',
-                height: '36px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '50%',
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                border: 'none',
-                cursor: 'pointer',
-                zIndex: 10,
-              }}
-            >
-              <svg style={{ width: '20px', height: '20px', color: 'white' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            
-            {/* Header */}
-            <div style={{ padding: '24px 24px 16px', borderBottom: '1px solid #1f1f2e' }}>
-              <h2 style={{ fontSize: '22px', fontWeight: 'bold', color: 'white', textAlign: 'center', margin: 0 }}>
-                Connect Wallet
-              </h2>
-              <p style={{ color: '#9ca3af', fontSize: '14px', textAlign: 'center', marginTop: '8px', marginBottom: 0 }}>
-                Choose your Solana wallet
-              </p>
-            </div>
-
-            {/* Wallet Options */}
-            <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <button
-                onClick={() => handleMobileWalletSelect('phantom')}
-                style={{
-                  width: '100%',
-                  padding: '16px',
-                  borderRadius: '16px',
-                  background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
-                  color: 'white',
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '16px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 15px rgba(124, 58, 237, 0.3)',
-                }}
-              >
-                <span style={{ fontSize: '28px' }}>👻</span>
-                <div style={{ flex: 1, textAlign: 'left' }}>
-                  <div style={{ fontWeight: 'bold', fontSize: '17px' }}>Phantom</div>
-                  <div style={{ fontSize: '12px', opacity: 0.8 }}>Tap to open</div>
-                </div>
-                <svg style={{ width: '24px', height: '24px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-              
-              <button
-                onClick={() => handleMobileWalletSelect('solflare')}
-                style={{
-                  width: '100%',
-                  padding: '16px',
-                  borderRadius: '16px',
-                  background: 'linear-gradient(135deg, #f97316, #dc2626)',
-                  color: 'white',
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '16px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 15px rgba(249, 115, 22, 0.3)',
-                }}
-              >
-                <span style={{ fontSize: '28px' }}>🔥</span>
-                <div style={{ flex: 1, textAlign: 'left' }}>
-                  <div style={{ fontWeight: 'bold', fontSize: '17px' }}>Solflare</div>
-                  <div style={{ fontSize: '12px', opacity: 0.8 }}>Tap to open</div>
-                </div>
-                <svg style={{ width: '24px', height: '24px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Info */}
-            <div style={{ padding: '0 16px 16px' }}>
-              <div style={{ 
-                padding: '12px 16px', 
-                backgroundColor: 'rgba(16, 185, 129, 0.1)', 
-                border: '1px solid rgba(16, 185, 129, 0.3)', 
-                borderRadius: '12px' 
-              }}>
-                <p style={{ fontSize: '12px', color: '#10b981', textAlign: 'center', margin: 0 }}>
-                  💡 Make sure the wallet app is installed
-                </p>
-              </div>
-            </div>
-
-            {/* Cancel Button */}
-            <div style={{ padding: '0 16px 16px' }}>
-              <button
-                onClick={() => setShowMobileWalletModal(false)}
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: 'none',
-                  borderRadius: '12px',
-                  color: '#9ca3af',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Mobile Wallet Selection Modal - Using Portal */}
+      <MobileWalletModal
+        isOpen={showMobileWalletModal}
+        onClose={() => setShowMobileWalletModal(false)}
+        onSelectPhantom={() => handleMobileWalletSelect('phantom')}
+        onSelectSolflare={() => handleMobileWalletSelect('solflare')}
+      />
     </div>
   );
 };
