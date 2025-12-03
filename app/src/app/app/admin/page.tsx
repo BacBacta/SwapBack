@@ -597,48 +597,48 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen py-12 px-4">
+    <div className="min-h-screen py-6 sm:py-12 px-3 sm:px-4">
       <div className="max-w-6xl mx-auto">
         <Breadcrumb items={[{ label: "App", href: "/app" }, { label: "Admin" }]} />
         
-        <div className="mt-8">
+        <div className="mt-4 sm:mt-8">
           {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-emerald-500/20 rounded-xl">
-                <ShieldCheckIcon className="w-8 h-8 text-emerald-500" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="p-2 sm:p-3 bg-emerald-500/20 rounded-xl flex-shrink-0">
+                <ShieldCheckIcon className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-500" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-white">Admin Panel</h1>
-                <p className="text-gray-400">SwapBack Protocol Management</p>
+                <h1 className="text-xl sm:text-3xl font-bold text-white">Admin Panel</h1>
+                <p className="text-gray-400 text-xs sm:text-base">SwapBack Protocol Management</p>
               </div>
             </div>
             
             {/* Status Badge */}
-            <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${
+            <div className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full ${
               routerState?.isPaused 
                 ? 'bg-red-500/20 border border-red-500/50' 
                 : 'bg-emerald-500/20 border border-emerald-500/50'
             }`}>
               {routerState?.isPaused ? (
                 <>
-                  <XCircleIcon className="w-5 h-5 text-red-500" />
-                  <span className="text-red-400 font-medium">Protocol Paused</span>
+                  <XCircleIcon className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
+                  <span className="text-red-400 font-medium text-sm sm:text-base">Paused</span>
                 </>
               ) : (
                 <>
-                  <CheckCircleIcon className="w-5 h-5 text-emerald-500" />
-                  <span className="text-emerald-400 font-medium">Protocol Active</span>
+                  <CheckCircleIcon className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
+                  <span className="text-emerald-400 font-medium text-sm sm:text-base">Active</span>
                 </>
               )}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             {/* Protocol Status Card */}
-            <div className="backdrop-blur-xl bg-gray-900/80 border-2 border-emerald-500/30 rounded-2xl p-6">
-              <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                <ClockIcon className="w-6 h-6 text-emerald-500" />
+            <div className="backdrop-blur-xl bg-gray-900/80 border-2 border-emerald-500/30 rounded-2xl p-4 sm:p-6">
+              <h2 className="text-lg sm:text-xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
+                <ClockIcon className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-500" />
                 Protocol Status
               </h2>
               
@@ -683,13 +683,13 @@ export default function AdminPage() {
             </div>
 
             {/* Circuit Breaker Card */}
-            <div className="backdrop-blur-xl bg-gray-900/80 border-2 border-red-500/30 rounded-2xl p-6">
-              <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                <ExclamationTriangleIcon className="w-6 h-6 text-red-500" />
+            <div className="backdrop-blur-xl bg-gray-900/80 border-2 border-red-500/30 rounded-2xl p-4 sm:p-6">
+              <h2 className="text-lg sm:text-xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
+                <ExclamationTriangleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-red-500" />
                 Circuit Breaker
               </h2>
               
-              <p className="text-gray-400 text-sm mb-6">
+              <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6">
                 Emergency protocol shutdown. When active, all swaps are blocked.
               </p>
               
@@ -725,13 +725,13 @@ export default function AdminPage() {
             </div>
 
             {/* Authority Transfer Card */}
-            <div className="backdrop-blur-xl bg-gray-900/80 border-2 border-cyan-500/30 rounded-2xl p-6">
-              <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                <KeyIcon className="w-6 h-6 text-cyan-500" />
+            <div className="backdrop-blur-xl bg-gray-900/80 border-2 border-cyan-500/30 rounded-2xl p-4 sm:p-6">
+              <h2 className="text-lg sm:text-xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
+                <KeyIcon className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-500" />
                 Authority Transfer
               </h2>
               
-              <p className="text-gray-400 text-sm mb-4">
+              <p className="text-gray-400 text-xs sm:text-sm mb-3 sm:mb-4">
                 Two-step transfer: propose then accept by the new authority.
               </p>
               
@@ -764,9 +764,9 @@ export default function AdminPage() {
             </div>
 
             {/* Wallet Configuration Card */}
-            <div className="backdrop-blur-xl bg-gray-900/80 border-2 border-purple-500/30 rounded-2xl p-6">
-              <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                <WalletIcon className="w-6 h-6 text-purple-500" />
+            <div className="backdrop-blur-xl bg-gray-900/80 border-2 border-purple-500/30 rounded-2xl p-4 sm:p-6">
+              <h2 className="text-lg sm:text-xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
+                <WalletIcon className="w-5 h-5 sm:w-6 sm:h-6 text-purple-500" />
                 Wallet Configuration
               </h2>
               
@@ -824,60 +824,61 @@ export default function AdminPage() {
           </div>
 
           {/* Statistics Section */}
-          <div className="mt-8 backdrop-blur-xl bg-gray-900/80 border-2 border-emerald-500/30 rounded-2xl p-6">
-            <h2 className="text-xl font-bold text-white mb-6">📊 Protocol Statistics</h2>
+          <div className="mt-6 sm:mt-8 backdrop-blur-xl bg-gray-900/80 border-2 border-emerald-500/30 rounded-2xl p-4 sm:p-6">
+            <h2 className="text-lg sm:text-xl font-bold text-white mb-4 sm:mb-6">📊 Protocol Statistics</h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-gray-800/50 rounded-xl p-4 text-center">
-                <div className="text-3xl font-bold text-emerald-400 mb-1">
+            <div className="grid grid-cols-3 gap-2 sm:gap-6">
+              <div className="bg-gray-800/50 rounded-xl p-2 sm:p-4 text-center">
+                <div className="text-lg sm:text-3xl font-bold text-emerald-400 mb-1">
                   ${((routerState?.totalVolume?.toNumber() || 0) / 1e6).toLocaleString()}
                 </div>
-                <div className="text-gray-400 text-sm">Total Volume</div>
+                <div className="text-gray-400 text-xs sm:text-sm">Volume</div>
               </div>
               
-              <div className="bg-gray-800/50 rounded-xl p-4 text-center">
-                <div className="text-3xl font-bold text-cyan-400 mb-1">
+              <div className="bg-gray-800/50 rounded-xl p-2 sm:p-4 text-center">
+                <div className="text-lg sm:text-3xl font-bold text-cyan-400 mb-1">
                   ${((routerState?.totalNpi?.toNumber() || 0) / 1e6).toLocaleString()}
                 </div>
-                <div className="text-gray-400 text-sm">NPI Generated</div>
+                <div className="text-gray-400 text-xs sm:text-sm">NPI</div>
               </div>
               
-              <div className="bg-gray-800/50 rounded-xl p-4 text-center">
-                <div className="text-3xl font-bold text-purple-400 mb-1">
+              <div className="bg-gray-800/50 rounded-xl p-2 sm:p-4 text-center">
+                <div className="text-lg sm:text-3xl font-bold text-purple-400 mb-1">
                   ${((routerState?.totalRebatesPaid?.toNumber() || 0) / 1e6).toLocaleString()}
                 </div>
-                <div className="text-gray-400 text-sm">Rebates Distributed</div>
+                <div className="text-gray-400 text-xs sm:text-sm">Rebates</div>
               </div>
             </div>
           </div>
 
           {/* Wallet Balances Section */}
-          <div className="mt-8 backdrop-blur-xl bg-gray-900/80 border-2 border-yellow-500/30 rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <BanknotesIcon className="w-6 h-6 text-yellow-500" />
-                Wallet Balances
+          <div className="mt-6 sm:mt-8 backdrop-blur-xl bg-gray-900/80 border-2 border-yellow-500/30 rounded-2xl p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+                <BanknotesIcon className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-500" />
+                <span className="hidden sm:inline">Wallet Balances</span>
+                <span className="sm:hidden">Balances</span>
               </h2>
               <button
                 onClick={fetchWalletBalances}
-                className="flex items-center gap-2 px-3 py-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 rounded-lg text-sm transition-all"
+                className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 rounded-lg text-xs sm:text-sm transition-all"
               >
-                <ArrowPathIcon className="w-4 h-4" />
-                Actualiser
+                <ArrowPathIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Actualiser</span>
               </button>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               {/* Treasury Wallet */}
-              <div className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/20 rounded-xl p-5">
-                <div className="flex items-center justify-between mb-4">
+              <div className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/20 rounded-xl p-3 sm:p-5">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-emerald-500/20 rounded-lg">
-                      <CurrencyDollarIcon className="w-5 h-5 text-emerald-400" />
+                    <div className="p-1.5 sm:p-2 bg-emerald-500/20 rounded-lg flex-shrink-0">
+                      <CurrencyDollarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
                     </div>
-                    <div>
-                      <h3 className="text-white font-semibold">Treasury</h3>
-                      <p className="text-gray-500 text-xs font-mono">
+                    <div className="min-w-0">
+                      <h3 className="text-white font-semibold text-sm sm:text-base">Treasury</h3>
+                      <p className="text-gray-500 text-xs font-mono truncate">
                         {formatAddress(routerState?.treasuryWallet || null)}
                       </p>
                     </div>
@@ -907,15 +908,15 @@ export default function AdminPage() {
               </div>
 
               {/* Buyback Wallet */}
-              <div className="bg-gradient-to-br from-orange-500/10 to-orange-500/5 border border-orange-500/20 rounded-xl p-5">
-                <div className="flex items-center justify-between mb-4">
+              <div className="bg-gradient-to-br from-orange-500/10 to-orange-500/5 border border-orange-500/20 rounded-xl p-3 sm:p-5">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-orange-500/20 rounded-lg">
-                      <CurrencyDollarIcon className="w-5 h-5 text-orange-400" />
+                    <div className="p-1.5 sm:p-2 bg-orange-500/20 rounded-lg flex-shrink-0">
+                      <CurrencyDollarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-orange-400" />
                     </div>
-                    <div>
-                      <h3 className="text-white font-semibold">Buyback</h3>
-                      <p className="text-gray-500 text-xs font-mono">
+                    <div className="min-w-0">
+                      <h3 className="text-white font-semibold text-sm sm:text-base">Buyback</h3>
+                      <p className="text-gray-500 text-xs font-mono truncate">
                         {formatAddress(routerState?.buybackWallet || null)}
                       </p>
                     </div>
@@ -945,15 +946,15 @@ export default function AdminPage() {
               </div>
 
               {/* Boost Vault Wallet */}
-              <div className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20 rounded-xl p-5">
-                <div className="flex items-center justify-between mb-4">
+              <div className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20 rounded-xl p-3 sm:p-5">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-purple-500/20 rounded-lg">
-                      <CurrencyDollarIcon className="w-5 h-5 text-purple-400" />
+                    <div className="p-1.5 sm:p-2 bg-purple-500/20 rounded-lg flex-shrink-0">
+                      <CurrencyDollarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400" />
                     </div>
-                    <div>
-                      <h3 className="text-white font-semibold">Boost Vault</h3>
-                      <p className="text-gray-500 text-xs font-mono">
+                    <div className="min-w-0">
+                      <h3 className="text-white font-semibold text-sm sm:text-base">Boost Vault</h3>
+                      <p className="text-gray-500 text-xs font-mono truncate">
                         {formatAddress(routerState?.boostVaultWallet || null)}
                       </p>
                     </div>
@@ -983,15 +984,15 @@ export default function AdminPage() {
               </div>
 
               {/* NPI Vault Wallet */}
-              <div className="bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border border-cyan-500/20 rounded-xl p-5">
-                <div className="flex items-center justify-between mb-4">
+              <div className="bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border border-cyan-500/20 rounded-xl p-3 sm:p-5">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-cyan-500/20 rounded-lg">
-                      <CurrencyDollarIcon className="w-5 h-5 text-cyan-400" />
+                    <div className="p-1.5 sm:p-2 bg-cyan-500/20 rounded-lg flex-shrink-0">
+                      <CurrencyDollarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
                     </div>
-                    <div>
-                      <h3 className="text-white font-semibold">NPI Vault</h3>
-                      <p className="text-gray-500 text-xs font-mono">
+                    <div className="min-w-0">
+                      <h3 className="text-white font-semibold text-sm sm:text-base">NPI Vault</h3>
+                      <p className="text-gray-500 text-xs font-mono truncate">
                         {formatAddress(routerState?.npiVaultWallet || null)}
                       </p>
                     </div>
@@ -1022,36 +1023,36 @@ export default function AdminPage() {
             </div>
 
             {/* Total Summary */}
-            <div className="mt-6 p-4 bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border border-yellow-500/20 rounded-xl">
-              <h3 className="text-yellow-400 font-semibold mb-3 flex items-center gap-2">
-                <BanknotesIcon className="w-5 h-5" />
+            <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border border-yellow-500/20 rounded-xl">
+              <h3 className="text-yellow-400 font-semibold mb-2 sm:mb-3 flex items-center gap-2 text-sm sm:text-base">
+                <BanknotesIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                 Total All Wallets
               </h3>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-2 sm:gap-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-white">
+                  <div className="text-lg sm:text-2xl font-bold text-white">
                     {(
                       walletBalances.treasury.sol + 
                       walletBalances.buyback.sol + 
                       walletBalances.boostVault.sol + 
                       walletBalances.npiVault.sol
-                    ).toFixed(4)}
+                    ).toFixed(2)}
                   </div>
-                  <div className="text-gray-400 text-sm">SOL</div>
+                  <div className="text-gray-400 text-xs sm:text-sm">SOL</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-emerald-400">
+                  <div className="text-lg sm:text-2xl font-bold text-emerald-400">
                     ${(
                       walletBalances.treasury.usdc + 
                       walletBalances.buyback.usdc + 
                       walletBalances.boostVault.usdc + 
                       walletBalances.npiVault.usdc
-                    ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                   </div>
-                  <div className="text-gray-400 text-sm">USDC</div>
+                  <div className="text-gray-400 text-xs sm:text-sm">USDC</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-cyan-400">
+                  <div className="text-lg sm:text-2xl font-bold text-cyan-400">
                     {(
                       walletBalances.treasury.back + 
                       walletBalances.buyback.back + 
@@ -1059,134 +1060,135 @@ export default function AdminPage() {
                       walletBalances.npiVault.back
                     ).toLocaleString()}
                   </div>
-                  <div className="text-gray-400 text-sm">BACK</div>
+                  <div className="text-gray-400 text-xs sm:text-sm">BACK</div>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Protocol Logs & Errors Section */}
-          <div className="mt-8 backdrop-blur-xl bg-gray-900/80 border-2 border-red-500/30 rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <BellAlertIcon className="w-6 h-6 text-red-500" />
-                  Protocol Logs & Alerts
+          <div className="mt-6 sm:mt-8 backdrop-blur-xl bg-gray-900/80 border-2 border-red-500/30 rounded-2xl p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+                  <BellAlertIcon className="w-5 h-5 sm:w-6 sm:h-6 text-red-500" />
+                  <span className="hidden sm:inline">Protocol Logs & Alerts</span>
+                  <span className="sm:hidden">Logs</span>
                 </h2>
                 
                 {/* Unresolved badge */}
                 {logCounts.unresolved > 0 && (
-                  <span className="px-2.5 py-1 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
-                    {logCounts.unresolved} unresolved
+                  <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
+                    {logCounts.unresolved}
                   </span>
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={fetchProtocolLogs}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-all"
+                  className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-xs sm:text-sm transition-all"
                 >
-                  <ArrowPathIcon className={`w-4 h-4 ${logsLoading ? 'animate-spin' : ''}`} />
-                  Actualiser
+                  <ArrowPathIcon className={`w-3 h-3 sm:w-4 sm:h-4 ${logsLoading ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">Actualiser</span>
                 </button>
                 <button
                   onClick={handleDownloadLogs}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-sm transition-all"
+                  className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-xs sm:text-sm transition-all"
                 >
-                  <ArrowDownTrayIcon className="w-4 h-4" />
-                  Export
+                  <ArrowDownTrayIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                  <span className="hidden sm:inline">Export</span>
                 </button>
                 {isAdmin && (
                   <button
                     onClick={handleClearAllLogs}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm transition-all"
+                    className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-xs sm:text-sm transition-all"
                   >
-                    <TrashIcon className="w-4 h-4" />
-                    Clear all
+                    <TrashIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">Clear all</span>
                   </button>
                 )}
               </div>
             </div>
 
             {/* Stats Summary */}
-            <div className="grid grid-cols-5 gap-3 mb-6">
+            <div className="grid grid-cols-5 gap-1.5 sm:gap-3 mb-4 sm:mb-6">
               <button
                 onClick={() => setLogFilter('all')}
-                className={`p-3 rounded-xl text-center transition-all ${
+                className={`p-2 sm:p-3 rounded-lg sm:rounded-xl text-center transition-all ${
                   logFilter === 'all' 
                     ? 'bg-white/10 ring-2 ring-white/30' 
                     : 'bg-gray-800/50 hover:bg-gray-700/50'
                 }`}
               >
-                <div className="text-2xl font-bold text-white">{logCounts.total}</div>
-                <div className="text-gray-400 text-xs">Total</div>
+                <div className="text-lg sm:text-2xl font-bold text-white">{logCounts.total}</div>
+                <div className="text-gray-400 text-[10px] sm:text-xs">All</div>
               </button>
               <button
                 onClick={() => setLogFilter('critical')}
-                className={`p-3 rounded-xl text-center transition-all ${
+                className={`p-2 sm:p-3 rounded-lg sm:rounded-xl text-center transition-all ${
                   logFilter === 'critical' 
                     ? 'bg-red-500/20 ring-2 ring-red-500/50' 
                     : 'bg-gray-800/50 hover:bg-red-500/10'
                 }`}
               >
-                <div className="text-2xl font-bold text-red-500">{logCounts.critical}</div>
-                <div className="text-red-400 text-xs">Critical</div>
+                <div className="text-lg sm:text-2xl font-bold text-red-500">{logCounts.critical}</div>
+                <div className="text-red-400 text-[10px] sm:text-xs">Crit</div>
               </button>
               <button
                 onClick={() => setLogFilter('error')}
-                className={`p-3 rounded-xl text-center transition-all ${
+                className={`p-2 sm:p-3 rounded-lg sm:rounded-xl text-center transition-all ${
                   logFilter === 'error' 
                     ? 'bg-red-400/20 ring-2 ring-red-400/50' 
                     : 'bg-gray-800/50 hover:bg-red-400/10'
                 }`}
               >
-                <div className="text-2xl font-bold text-red-400">{logCounts.error}</div>
-                <div className="text-red-300 text-xs">Errors</div>
+                <div className="text-lg sm:text-2xl font-bold text-red-400">{logCounts.error}</div>
+                <div className="text-red-300 text-[10px] sm:text-xs">Err</div>
               </button>
               <button
                 onClick={() => setLogFilter('warning')}
-                className={`p-3 rounded-xl text-center transition-all ${
+                className={`p-2 sm:p-3 rounded-lg sm:rounded-xl text-center transition-all ${
                   logFilter === 'warning' 
                     ? 'bg-yellow-500/20 ring-2 ring-yellow-500/50' 
                     : 'bg-gray-800/50 hover:bg-yellow-500/10'
                 }`}
               >
-                <div className="text-2xl font-bold text-yellow-400">{logCounts.warning}</div>
-                <div className="text-yellow-300 text-xs">Warnings</div>
+                <div className="text-lg sm:text-2xl font-bold text-yellow-400">{logCounts.warning}</div>
+                <div className="text-yellow-300 text-[10px] sm:text-xs">Warn</div>
               </button>
               <button
                 onClick={() => setLogFilter('info')}
-                className={`p-3 rounded-xl text-center transition-all ${
+                className={`p-2 sm:p-3 rounded-lg sm:rounded-xl text-center transition-all ${
                   logFilter === 'info' 
                     ? 'bg-blue-500/20 ring-2 ring-blue-500/50' 
                     : 'bg-gray-800/50 hover:bg-blue-500/10'
                 }`}
               >
-                <div className="text-2xl font-bold text-blue-400">{logCounts.info}</div>
-                <div className="text-blue-300 text-xs">Info</div>
+                <div className="text-lg sm:text-2xl font-bold text-blue-400">{logCounts.info}</div>
+                <div className="text-blue-300 text-[10px] sm:text-xs">Info</div>
               </button>
             </div>
 
             {/* Filter Options */}
-            <div className="flex items-center gap-4 mb-4">
-              <div className="flex items-center gap-2">
-                <FunnelIcon className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-400 text-sm">Filters:</span>
+            <div className="flex items-center gap-2 sm:gap-4 mb-3 sm:mb-4">
+              <div className="flex items-center gap-1 sm:gap-2">
+                <FunnelIcon className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400" />
+                <span className="text-gray-400 text-xs sm:text-sm hidden sm:inline">Filters:</span>
               </div>
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className="flex items-center gap-1.5 sm:gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={showResolvedLogs}
                   onChange={(e) => setShowResolvedLogs(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-emerald-500 focus:ring-emerald-500"
+                  className="w-3 h-3 sm:w-4 sm:h-4 rounded border-gray-600 bg-gray-700 text-emerald-500 focus:ring-emerald-500"
                 />
-                <span className="text-gray-300 text-sm">Show resolved logs</span>
+                <span className="text-gray-300 text-xs sm:text-sm">Show resolved</span>
               </label>
             </div>
 
             {/* Logs List */}
-            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+            <div className="space-y-2 sm:space-y-3 max-h-[400px] sm:max-h-[500px] overflow-y-auto pr-1 sm:pr-2">
               {logsLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <ArrowPathIcon className="w-8 h-8 text-gray-400 animate-spin" />
