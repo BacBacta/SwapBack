@@ -52,36 +52,44 @@ export const ClientOnlyWallet = () => {
     w => w.readyState === WalletReadyState.Installed || w.readyState === WalletReadyState.Loadable
   );
 
-  // Force close the standard modal on mobile if no wallet is installed
-  // This prevents the "We can't find a wallet" message from staying open
+  // On mobile, hide the standard wallet modal completely via CSS
   useEffect(() => {
-    if (isMobile && visible && !hasInstalledWallet) {
-      // Close the standard modal immediately
-      setVisible(false);
-      // Show our custom modal instead
-      setShowMobileWalletModal(true);
-    }
-  }, [visible, isMobile, hasInstalledWallet, setVisible]);
-
-  // Also hide any wallet modal that might be stuck
-  useEffect(() => {
-    if (isMobile && !hasInstalledWallet) {
-      // Try to close any stuck modals
-      const closeModals = () => {
-        const modals = document.querySelectorAll('.wallet-adapter-modal-wrapper, .wallet-adapter-modal-overlay, .wallet-adapter-modal');
-        modals.forEach(modal => {
-          if (modal instanceof HTMLElement) {
-            modal.style.display = 'none';
-          }
-        });
-      };
+    if (isMobile) {
+      // Add a style tag to hide wallet adapter modals on mobile
+      const styleId = 'hide-wallet-modal-mobile';
+      let styleEl = document.getElementById(styleId) as HTMLStyleElement;
       
-      // Run immediately and after a short delay
-      closeModals();
-      const timeout = setTimeout(closeModals, 100);
-      return () => clearTimeout(timeout);
+      if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = styleId;
+        styleEl.textContent = `
+          @media (max-width: 768px) {
+            .wallet-adapter-modal-wrapper,
+            .wallet-adapter-modal-overlay,
+            .wallet-adapter-modal,
+            .wallet-adapter-modal-container {
+              display: none !important;
+              visibility: hidden !important;
+              opacity: 0 !important;
+              pointer-events: none !important;
+            }
+          }
+        `;
+        document.head.appendChild(styleEl);
+      }
+      
+      return () => {
+        // Don't remove on cleanup - keep it for the session
+      };
     }
-  }, [isMobile, hasInstalledWallet, visible]);
+  }, [isMobile]);
+
+  // Force close the standard modal on mobile if it somehow opens
+  useEffect(() => {
+    if (isMobile && visible) {
+      setVisible(false);
+    }
+  }, [visible, isMobile, setVisible]);
 
   // Detect network from RPC endpoint
   useEffect(() => {
@@ -352,14 +360,18 @@ export const ClientOnlyWallet = () => {
       {/* Mobile Wallet Selection Modal */}
       {showMobileWalletModal && (
         <>
-          {/* Overlay */}
+          {/* Overlay - very high z-index to be above everything */}
           <div 
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[200]"
+            className="fixed inset-0 bg-black/90 backdrop-blur-sm"
+            style={{ zIndex: 99999 }}
             onClick={() => setShowMobileWalletModal(false)}
           />
           
-          {/* Modal */}
-          <div className="fixed bottom-0 left-0 right-0 z-[201] bg-gray-900 border-t border-primary/30 rounded-t-3xl p-6 pb-8 animate-slide-up">
+          {/* Modal - even higher z-index */}
+          <div 
+            className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t-2 border-primary rounded-t-3xl p-6 pb-8 animate-slide-up"
+            style={{ zIndex: 100000 }}
+          >
             {/* Handle */}
             <div className="w-12 h-1 bg-gray-600 rounded-full mx-auto mb-6" />
             
@@ -377,7 +389,7 @@ export const ClientOnlyWallet = () => {
             <div className="space-y-3 mb-4">
               <button
                 onClick={() => handleMobileWalletSelect('phantom')}
-                className="w-full p-4 rounded-xl bg-gradient-to-r from-purple-600 to-purple-700 text-white font-semibold flex items-center gap-4 active:scale-98 transition-transform"
+                className="w-full p-4 rounded-xl bg-gradient-to-r from-purple-600 to-purple-700 text-white font-semibold flex items-center gap-4 active:scale-95 transition-transform touch-manipulation"
               >
                 <span className="text-3xl">👻</span>
                 <div className="flex-1 text-left">
@@ -389,7 +401,7 @@ export const ClientOnlyWallet = () => {
               
               <button
                 onClick={() => handleMobileWalletSelect('solflare')}
-                className="w-full p-4 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 text-white font-semibold flex items-center gap-4 active:scale-98 transition-transform"
+                className="w-full p-4 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 text-white font-semibold flex items-center gap-4 active:scale-95 transition-transform touch-manipulation"
               >
                 <span className="text-3xl">🔥</span>
                 <div className="flex-1 text-left">
