@@ -52,39 +52,8 @@ export const ClientOnlyWallet = () => {
     w => w.readyState === WalletReadyState.Installed || w.readyState === WalletReadyState.Loadable
   );
 
-  // On mobile, hide the standard wallet modal completely via CSS
-  useEffect(() => {
-    if (isMobile) {
-      // Add a style tag to hide wallet adapter modals on mobile
-      const styleId = 'hide-wallet-modal-mobile';
-      let styleEl = document.getElementById(styleId) as HTMLStyleElement;
-      
-      if (!styleEl) {
-        styleEl = document.createElement('style');
-        styleEl.id = styleId;
-        styleEl.textContent = `
-          @media (max-width: 768px) {
-            .wallet-adapter-modal-wrapper,
-            .wallet-adapter-modal-overlay,
-            .wallet-adapter-modal,
-            .wallet-adapter-modal-container {
-              display: none !important;
-              visibility: hidden !important;
-              opacity: 0 !important;
-              pointer-events: none !important;
-            }
-          }
-        `;
-        document.head.appendChild(styleEl);
-      }
-      
-      return () => {
-        // Don't remove on cleanup - keep it for the session
-      };
-    }
-  }, [isMobile]);
-
-  // Force close the standard modal on mobile if it somehow opens
+  // On mobile, we use our custom modal instead of wallet-adapter's modal
+  // Just prevent the standard modal from opening
   useEffect(() => {
     if (isMobile && visible) {
       setVisible(false);
@@ -359,75 +328,92 @@ export const ClientOnlyWallet = () => {
 
       {/* Mobile Wallet Selection Modal */}
       {showMobileWalletModal && (
-        <>
-          {/* Overlay - very high z-index to be above everything */}
+        <div 
+          className="fixed inset-0 flex items-center justify-center p-4"
+          style={{ zIndex: 9999999 }}
+        >
+          {/* Overlay */}
           <div 
-            className="fixed inset-0 bg-black/90 backdrop-blur-sm"
-            style={{ zIndex: 99999 }}
+            className="absolute inset-0 bg-black/95 backdrop-blur-md"
             onClick={() => setShowMobileWalletModal(false)}
           />
           
-          {/* Modal - even higher z-index */}
+          {/* Modal Content - Centered */}
           <div 
-            className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t-2 border-primary rounded-t-3xl p-6 pb-8 animate-slide-up"
-            style={{ zIndex: 100000 }}
+            className="relative w-full max-w-sm bg-[#0a0a14] border-2 border-primary/50 rounded-3xl overflow-hidden shadow-2xl shadow-primary/20"
+            onClick={(e) => e.stopPropagation()}
           >
-            {/* Handle */}
-            <div className="w-12 h-1 bg-gray-600 rounded-full mx-auto mb-6" />
+            {/* Close Button */}
+            <button
+              onClick={() => setShowMobileWalletModal(false)}
+              className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+            >
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
             
-            {/* Title */}
-            <div className="text-center mb-6">
-              <h2 className="text-xl font-bold text-white mb-2">
+            {/* Header */}
+            <div className="p-6 pb-4 border-b border-gray-800">
+              <h2 className="text-2xl font-bold text-white text-center">
                 Connect Wallet
               </h2>
-              <p className="text-gray-400 text-sm">
-                Choose your Solana wallet app
+              <p className="text-gray-400 text-sm text-center mt-2">
+                Choose your Solana wallet
               </p>
             </div>
 
             {/* Wallet Options */}
-            <div className="space-y-3 mb-4">
+            <div className="p-4 space-y-3">
               <button
                 onClick={() => handleMobileWalletSelect('phantom')}
-                className="w-full p-4 rounded-xl bg-gradient-to-r from-purple-600 to-purple-700 text-white font-semibold flex items-center gap-4 active:scale-95 transition-transform touch-manipulation"
+                className="w-full p-4 rounded-2xl bg-gradient-to-r from-purple-600 to-purple-700 text-white font-semibold flex items-center gap-4 active:scale-[0.98] transition-transform shadow-lg"
               >
                 <span className="text-3xl">👻</span>
                 <div className="flex-1 text-left">
                   <div className="font-bold text-lg">Phantom</div>
-                  <div className="text-xs opacity-80">Open in Phantom app</div>
+                  <div className="text-xs opacity-80">Tap to open</div>
                 </div>
-                <span className="text-xl">→</span>
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </button>
               
               <button
                 onClick={() => handleMobileWalletSelect('solflare')}
-                className="w-full p-4 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 text-white font-semibold flex items-center gap-4 active:scale-95 transition-transform touch-manipulation"
+                className="w-full p-4 rounded-2xl bg-gradient-to-r from-orange-500 to-red-600 text-white font-semibold flex items-center gap-4 active:scale-[0.98] transition-transform shadow-lg"
               >
                 <span className="text-3xl">🔥</span>
                 <div className="flex-1 text-left">
                   <div className="font-bold text-lg">Solflare</div>
-                  <div className="text-xs opacity-80">Open in Solflare app</div>
+                  <div className="text-xs opacity-80">Tap to open</div>
                 </div>
-                <span className="text-xl">→</span>
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </button>
             </div>
 
             {/* Info */}
-            <div className="mt-4 p-3 bg-primary/10 border border-primary/30 rounded-xl">
-              <p className="text-xs text-primary text-center">
-                💡 Make sure you have Phantom or Solflare installed on your device
-              </p>
+            <div className="p-4 pt-0">
+              <div className="p-4 bg-primary/10 border border-primary/30 rounded-xl">
+                <p className="text-xs text-primary text-center">
+                  💡 Make sure Phantom or Solflare is installed on your device
+                </p>
+              </div>
             </div>
 
             {/* Cancel Button */}
-            <button
-              onClick={() => setShowMobileWalletModal(false)}
-              className="mt-4 w-full p-3 bg-gray-800 hover:bg-gray-700 rounded-xl text-gray-400 font-medium transition-colors"
-            >
-              Cancel
-            </button>
+            <div className="p-4 pt-0">
+              <button
+                onClick={() => setShowMobileWalletModal(false)}
+                className="w-full p-3 bg-white/5 hover:bg-white/10 rounded-xl text-gray-400 font-medium transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
