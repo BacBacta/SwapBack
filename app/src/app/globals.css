@@ -1000,35 +1000,91 @@ html {
 
 /* Wallet Adapter Modal - Fix z-index for accessibility */
 .wallet-adapter-modal-wrapper {
-  z-index: 9999 !important;
+  z-index: 99999 !important;
+  position: fixed !important;
 }
 
 .wallet-adapter-modal-overlay {
-  z-index: 9998 !important;
+  z-index: 99998 !important;
+  position: fixed !important;
+  inset: 0 !important;
 }
 
 .wallet-adapter-modal {
-  z-index: 9999 !important;
+  z-index: 99999 !important;
+  position: relative !important;
 }
 
 .wallet-adapter-modal-container {
-  z-index: 10000 !important;
+  z-index: 100000 !important;
+  position: fixed !important;
+  inset: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
-/* Hide wallet adapter modal on mobile when showing custom modal */
+/* Mobile wallet modal styling */
 @media (max-width: 768px) {
-  /* Hide the "We can't find a wallet" message on mobile */
-  .wallet-adapter-modal-wrapper:has(.wallet-adapter-modal-list:empty),
-  .wallet-adapter-modal-wrapper:has(.wallet-adapter-modal-middle-button) {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
+  /* Make sure the modal is visible and properly positioned */
+  .wallet-adapter-modal-wrapper {
+    position: fixed !important;
+    inset: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 16px !important;
   }
   
-  /* Also target the collapsed modal state */
+  .wallet-adapter-modal-overlay {
+    background: rgba(0, 0, 0, 0.85) !important;
+    backdrop-filter: blur(8px) !important;
+  }
+  
+  .wallet-adapter-modal {
+    max-width: 95vw !important;
+    max-height: 85vh !important;
+    width: 100% !important;
+    margin: auto !important;
+    border-radius: 24px !important;
+    overflow: hidden !important;
+  }
+  
+  .wallet-adapter-modal-container {
+    padding: 16px !important;
+  }
+  
+  .wallet-adapter-modal-list {
+    max-height: 50vh !important;
+    overflow-y: auto !important;
+  }
+  
+  /* Make wallet options larger and easier to tap */
+  .wallet-adapter-modal-list li {
+    min-height: 60px !important;
+  }
+  
+  .wallet-adapter-modal-list-item,
+  .wallet-adapter-modal-list button {
+    padding: 16px 20px !important;
+    min-height: 60px !important;
+    font-size: 16px !important;
+  }
+  
+  /* Style the close button */
+  .wallet-adapter-modal-button-close {
+    position: absolute !important;
+    top: 12px !important;
+    right: 12px !important;
+    z-index: 10 !important;
+    width: 40px !important;
+    height: 40px !important;
+  }
+  
+  /* Hide the collapse/expand section on mobile for cleaner UX */
   .wallet-adapter-collapse {
-    display: none !important;
+    max-height: none !important;
+    overflow: visible !important;
   }
 }
 
