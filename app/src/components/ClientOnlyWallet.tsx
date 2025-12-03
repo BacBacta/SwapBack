@@ -28,8 +28,8 @@ export const ClientOnlyWallet = () => {
   const { connected, connecting, publicKey, wallet, disconnect, wallets, select } = useWallet();
   const { visible, setVisible } = useWalletModal();
   const { connection } = useConnection();
-  const [network, setNetwork] = useState<"mainnet-beta" | "devnet">(
-    (process.env.NEXT_PUBLIC_SOLANA_NETWORK as "mainnet-beta" | "devnet") || "devnet"
+  const [network, setNetwork] = useState<"mainnet-beta" | "devnet" | "testnet">(
+    (process.env.NEXT_PUBLIC_SOLANA_NETWORK as "mainnet-beta" | "devnet" | "testnet") || "testnet"
   );
   const [isWrongNetwork, setIsWrongNetwork] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
@@ -68,12 +68,14 @@ export const ClientOnlyWallet = () => {
         const endpoint = connection.rpcEndpoint;
         if (endpoint.includes("devnet")) {
           setNetwork("devnet");
+        } else if (endpoint.includes("testnet")) {
+          setNetwork("testnet");
         } else if (endpoint.includes("mainnet")) {
           setNetwork("mainnet-beta");
         }
         
         // Check if connected to wrong network
-        const expectedNetwork = process.env.NEXT_PUBLIC_SOLANA_NETWORK || "mainnet-beta";
+        const expectedNetwork = process.env.NEXT_PUBLIC_SOLANA_NETWORK || "testnet";
         setIsWrongNetwork(network !== expectedNetwork);
       } catch (error) {
         console.error("Network detection error:", error);
@@ -361,7 +363,7 @@ export const ClientOnlyWallet = () => {
       {/* Wrong Network Warning */}
       {isWrongNetwork && connected && (
         <div className="absolute top-full right-0 mt-2 w-64 bg-red-500/10 border border-red-500 rounded-lg p-3 text-sm text-red-400 z-50">
-          ⚠️ You&apos;re on {network}. Please switch to {process.env.NEXT_PUBLIC_SOLANA_NETWORK || "mainnet-beta"}.
+          ⚠️ You&apos;re on {network}. Please switch to {process.env.NEXT_PUBLIC_SOLANA_NETWORK || "testnet"}.
         </div>
       )}
 
