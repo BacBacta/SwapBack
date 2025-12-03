@@ -2,11 +2,12 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { showToast } from "@/lib/toast";
 
 export const ClientOnlyWallet = () => {
-  const { connected, connecting, publicKey, wallet, disconnect } = useWallet();
+  const { connected, connecting, publicKey, wallet, disconnect, select, wallets } = useWallet();
+  const { setVisible } = useWalletModal();
   const { connection } = useConnection();
   const [network, setNetwork] = useState<"mainnet-beta" | "devnet">(
     (process.env.NEXT_PUBLIC_SOLANA_NETWORK as "mainnet-beta" | "devnet") || "devnet"
@@ -70,6 +71,11 @@ export const ClientOnlyWallet = () => {
     }
   }, [connected, publicKey]);
 
+  const handleConnect = useCallback(() => {
+    // Open the wallet modal
+    setVisible(true);
+  }, [setVisible]);
+
   const handleDisconnect = useCallback(async () => {
     try {
       await disconnect();
@@ -115,14 +121,14 @@ export const ClientOnlyWallet = () => {
   // Prevent SSR rendering to avoid infinite recursion with wallet adapter
   if (!mounted) {
     return (
-      <div className="w-[140px] h-[40px] bg-gray-800 animate-pulse rounded" />
+      <div className="w-[140px] h-[40px] bg-gray-800 animate-pulse rounded-lg" />
     );
   }
 
   // Show connecting state
   if (connecting) {
     return (
-      <div className="flex items-center gap-2 px-4 py-2 bg-gray-800 rounded-lg">
+      <div className="flex items-center gap-2 px-4 py-2 bg-gray-800 rounded-lg min-h-[44px]">
         <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         <span className="text-sm text-gray-400">Connecting...</span>
       </div>
@@ -148,13 +154,22 @@ export const ClientOnlyWallet = () => {
         </div>
       )}
 
-      {/* Wallet Button - Use custom button when connected for better control */}
+      {/* Wallet Button - Custom button for better control */}
       {!connected ? (
-        <div className="wallet-adapter-button-wrapper">
-          <WalletMultiButton 
-            className="!bg-[var(--primary)] hover:!bg-[var(--primary-hover)] !text-black !font-bold !px-3 sm:!px-4 !py-2 !rounded-lg !text-xs sm:!text-sm !min-h-[44px]"
-          />
-        </div>
+        <button
+          onClick={handleConnect}
+          className="bg-primary hover:bg-primary-hover text-black font-bold px-4 py-2 rounded-lg text-sm min-h-[44px] transition-all hover:shadow-[0_0_20px_rgba(16,185,129,0.4)] active:scale-95 flex items-center gap-2"
+        >
+          <svg 
+            className="w-5 h-5" 
+            fill="none" 
+            viewBox="0 0 24 24" 
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          <span>Connect Wallet</span>
+        </button>
       ) : (
         <div className="relative">
           <button
