@@ -3,10 +3,25 @@
 import { useEffect, useState, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { WalletReadyState } from "@solana/wallet-adapter-base";
 import { showToast } from "@/lib/toast";
 
+// Mobile wallet deep links
+const MOBILE_WALLETS = {
+  phantom: {
+    name: 'Phantom',
+    icon: '👻',
+    getDeepLink: (url: string) => `https://phantom.app/ul/browse/${encodeURIComponent(url)}?ref=swapback`,
+  },
+  solflare: {
+    name: 'Solflare', 
+    icon: '🔥',
+    getDeepLink: (url: string) => `https://solflare.com/ul/v1/browse/${encodeURIComponent(url)}?ref=swapback`,
+  },
+};
+
 export const ClientOnlyWallet = () => {
-  const { connected, connecting, publicKey, wallet, disconnect, select, wallets } = useWallet();
+  const { connected, connecting, publicKey, wallet, disconnect, wallets } = useWallet();
   const { setVisible } = useWalletModal();
   const { connection } = useConnection();
   const [network, setNetwork] = useState<"mainnet-beta" | "devnet">(
@@ -15,12 +30,24 @@ export const ClientOnlyWallet = () => {
   const [isWrongNetwork, setIsWrongNetwork] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
   const [showMenu, setShowMenu] = useState(false);
+  const [showMobileWalletModal, setShowMobileWalletModal] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Critical: Only render wallet button client-side to avoid SSR issues
   useEffect(() => {
     setMounted(true);
+    // Detect mobile
+    const checkMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(
+      navigator.userAgent.toLowerCase()
+    );
+    setIsMobile(checkMobile);
   }, []);
+
+  // Check if any wallet is ready (installed)
+  const hasInstalledWallet = wallets.some(
+    w => w.readyState === WalletReadyState.Installed || w.readyState === WalletReadyState.Loadable
+  );
 
   // Detect network from RPC endpoint
   useEffect(() => {
@@ -68,13 +95,29 @@ export const ClientOnlyWallet = () => {
   useEffect(() => {
     if (connected && publicKey) {
       showToast.success(`Wallet connected: ${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`);
+      setShowMobileWalletModal(false);
     }
   }, [connected, publicKey]);
 
   const handleConnect = useCallback(() => {
-    // Open the wallet modal
-    setVisible(true);
-  }, [setVisible]);
+    // On mobile without installed wallet, show our custom modal
+    if (isMobile && !hasInstalledWallet) {
+      setShowMobileWalletModal(true);
+    } else {
+      // Open the standard wallet modal
+      setVisible(true);
+    }
+  }, [setVisible, isMobile, hasInstalledWallet]);
+
+  const handleMobileWalletSelect = (walletKey: keyof typeof MOBILE_WALLETS) => {
+    const walletConfig = MOBILE_WALLETS[walletKey];
+    const currentUrl = window.location.href;
+    const deepLink = walletConfig.getDeepLink(currentUrl);
+    
+    // Open the deep link
+    window.location.href = deepLink;
+    setShowMobileWalletModal(false);
+  };
 
   const handleDisconnect = useCallback(async () => {
     try {
@@ -264,6 +307,75 @@ export const ClientOnlyWallet = () => {
         <div className="absolute top-full right-0 mt-2 w-64 bg-red-500/10 border border-red-500 rounded-lg p-3 text-sm text-red-400 z-50">
           ⚠️ You&apos;re on {network}. Please switch to {process.env.NEXT_PUBLIC_SOLANA_NETWORK || "mainnet-beta"}.
         </div>
+      )}
+
+      {/* Mobile Wallet Selection Modal */}
+      {showMobileWalletModal && (
+        <>
+          {/* Overlay */}
+          <div 
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[200]"
+            onClick={() => setShowMobileWalletModal(false)}
+          />
+          
+          {/* Modal */}
+          <div className="fixed bottom-0 left-0 right-0 z-[201] bg-gray-900 border-t border-primary/30 rounded-t-3xl p-6 pb-8 animate-slide-up">
+            {/* Handle */}
+            <div className="w-12 h-1 bg-gray-600 rounded-full mx-auto mb-6" />
+            
+            {/* Title */}
+            <div className="text-center mb-6">
+              <h2 className="text-xl font-bold text-white mb-2">
+                Connect Wallet
+              </h2>
+              <p className="text-gray-400 text-sm">
+                Choose your Solana wallet app
+              </p>
+            </div>
+
+            {/* Wallet Options */}
+            <div className="space-y-3 mb-4">
+              <button
+                onClick={() => handleMobileWalletSelect('phantom')}
+                className="w-full p-4 rounded-xl bg-gradient-to-r from-purple-600 to-purple-700 text-white font-semibold flex items-center gap-4 active:scale-98 transition-transform"
+              >
+                <span className="text-3xl">👻</span>
+                <div className="flex-1 text-left">
+                  <div className="font-bold text-lg">Phantom</div>
+                  <div className="text-xs opacity-80">Open in Phantom app</div>
+                </div>
+                <span className="text-xl">→</span>
+              </button>
+              
+              <button
+                onClick={() => handleMobileWalletSelect('solflare')}
+                className="w-full p-4 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 text-white font-semibold flex items-center gap-4 active:scale-98 transition-transform"
+              >
+                <span className="text-3xl">🔥</span>
+                <div className="flex-1 text-left">
+                  <div className="font-bold text-lg">Solflare</div>
+                  <div className="text-xs opacity-80">Open in Solflare app</div>
+                </div>
+                <span className="text-xl">→</span>
+              </button>
+            </div>
+
+            {/* Info */}
+            <div className="mt-4 p-3 bg-primary/10 border border-primary/30 rounded-xl">
+              <p className="text-xs text-primary text-center">
+                💡 Make sure you have Phantom or Solflare installed on your device
+              </p>
+            </div>
+
+            {/* Cancel Button */}
+            <button
+              onClick={() => setShowMobileWalletModal(false)}
+              className="mt-4 w-full p-3 bg-gray-800 hover:bg-gray-700 rounded-xl text-gray-400 font-medium transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
