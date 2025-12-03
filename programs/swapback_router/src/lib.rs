@@ -48,6 +48,24 @@ pub const BUYBACK_PROGRAM_ID: Pubkey = pubkey!("7wCCwRXxWvMY2DJDRrnhFg3b8jVPb5vV
 // cNFT Program ID with unlock_tokens (verified Nov 14, 2025)
 pub const CNFT_PROGRAM_ID: Pubkey = pubkey!("26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru");
 
+// Jito MEV Protection (mainnet tip accounts)
+pub const JITO_TIP_PROGRAM_ID: Pubkey = pubkey!("T1pyyaTNZsKv2WcRAB8oVnk93mLJw2XzjtVYqCsaHqt");
+pub const JITO_TIP_ACCOUNTS: [Pubkey; 8] = [
+    pubkey!("96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5"),
+    pubkey!("HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe"),
+    pubkey!("Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY"),
+    pubkey!("ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49"),
+    pubkey!("DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh"),
+    pubkey!("ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt"),
+    pubkey!("DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL"),
+    pubkey!("3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT"),
+];
+
+// MEV Protection defaults
+pub const DEFAULT_JITO_TIP_LAMPORTS: u64 = 10_000; // 0.00001 SOL default tip
+pub const MIN_JITO_TIP_LAMPORTS: u64 = 1_000;      // Minimum tip
+pub const MAX_JITO_TIP_LAMPORTS: u64 = 1_000_000;  // Maximum tip (0.001 SOL)
+
 // Oracle constants
 pub const MAX_STALENESS_SECS: i64 = 300; // 5 minutes max staleness (default)
 pub const MIN_STALENESS_SECS: i64 = 10;  // 10 seconds minimum (security floor)
@@ -914,6 +932,40 @@ pub struct VenueSlippage {
     pub max_slippage_bps: u16, // Max slippage for this venue (0 = use global)
 }
 
+/// Jito MEV bundle configuration for sandwich attack protection
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+pub struct JitoBundleConfig {
+    /// Whether to use Jito bundle (private mempool)
+    pub enabled: bool,
+    /// Tip amount in lamports (clamped to MIN/MAX)
+    pub tip_lamports: u64,
+    /// Selected tip account index (0-7)
+    pub tip_account_index: u8,
+}
+
+impl Default for JitoBundleConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            tip_lamports: DEFAULT_JITO_TIP_LAMPORTS,
+            tip_account_index: 0,
+        }
+    }
+}
+
+impl JitoBundleConfig {
+    /// Get the tip account pubkey for this config
+    pub fn get_tip_account(&self) -> Pubkey {
+        let idx = (self.tip_account_index as usize) % JITO_TIP_ACCOUNTS.len();
+        JITO_TIP_ACCOUNTS[idx]
+    }
+    
+    /// Clamp tip to valid range
+    pub fn clamped_tip(&self) -> u64 {
+        self.tip_lamports.clamp(MIN_JITO_TIP_LAMPORTS, MAX_JITO_TIP_LAMPORTS)
+    }
+}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct SwapArgs {
     pub amount_in: u64,
@@ -943,6 +995,9 @@ pub struct SwapArgs {
     /// Max staleness override in seconds (for volatile markets, use 30-60s instead of default 300s)
     /// Must be between MIN_STALENESS_SECS and MAX_STALENESS_SECS
     pub max_staleness_override: Option<i64>,
+    /// Jito bundle configuration for MEV protection
+    /// When enabled, transaction is sent via Jito's private mempool
+    pub jito_bundle: Option<JitoBundleConfig>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -1055,6 +1110,14 @@ pub struct BundleHint {
 pub struct PriorityFeeSet {
     pub compute_unit_limit: u32,
     pub compute_unit_price: u64,
+}
+
+/// Emitted when Jito MEV protection is configured
+#[event]
+pub struct JitoBundleConfigured {
+    pub enabled: bool,
+    pub tip_lamports: u64,
+    pub tip_account: Pubkey,
 }
 
 #[event]
@@ -1919,6 +1982,23 @@ pub mod swap_toc_processor {
             compute_unit_limit: cu_limit,
             compute_unit_price: priority_fee,
         });
+    }
+
+    /// Emit Jito bundle configuration hint for off-chain processing
+    fn emit_jito_bundle_hint(jito_config: &Option<JitoBundleConfig>) {
+        let config = jito_config.clone().unwrap_or_default();
+        if config.enabled {
+            let tip = config.clamped_tip();
+            let tip_account = config.get_tip_account();
+            
+            msg!("🛡️ MEV Protection enabled: Jito bundle with {} lamports tip", tip);
+            
+            emit!(JitoBundleConfigured {
+                enabled: true,
+                tip_lamports: tip,
+                tip_account,
+            });
+        }
     }
 
     fn calculate_expected_output(amount_in: u64, oracle_price: u64) -> Result<u64> {

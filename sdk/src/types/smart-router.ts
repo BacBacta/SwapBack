@@ -19,6 +19,10 @@ export enum VenueName {
   RAYDIUM = "raydium",
   METEORA = "meteora",
   LIFINITY = "lifinity",
+  GOOSEFX = "goosefx", // GooseFX CLMM pools
+
+  // LST Specialists
+  SANCTUM = "sanctum", // LST swaps (mSOL, stSOL, jitoSOL, etc.)
 
   // CLOBs
   PHOENIX = "phoenix",

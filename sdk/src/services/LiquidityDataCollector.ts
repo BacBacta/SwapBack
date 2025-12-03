@@ -19,6 +19,8 @@ import { LifinityService } from "./LifinityService";
 import { ClobTradeDirection } from "./ClobMath";
 import { OrcaService } from "./OrcaService";
 import { RaydiumService } from "./RaydiumService";
+import { SanctumService } from "./SanctumService";
+import { GooseFXService } from "./GooseFXService";
 import { StructuredLogger } from "../utils/StructuredLogger";
 import { RFQCompetitionService } from "./RFQCompetitionService";
 
@@ -118,6 +120,30 @@ const VENUE_CONFIGS: Record<VenueName, VenueConfig> = {
     minTradeSize: 1,
     maxSlippage: 0.02,
   },
+  [VenueName.GOOSEFX]: {
+    name: VenueName.GOOSEFX,
+    type: VenueType.AMM,
+    enabled:
+      (process.env.NEXT_PUBLIC_ENABLE_GOOSEFX ?? "true").toLowerCase() !==
+      "false",
+    priority: 60,
+    feeRate: 0.002, // 0.2% typical CLMM fee
+    minTradeSize: 1,
+    maxSlippage: 0.01,
+  },
+
+  // LST Specialists - High priority for staking derivatives
+  [VenueName.SANCTUM]: {
+    name: VenueName.SANCTUM,
+    type: VenueType.AMM,
+    enabled:
+      (process.env.NEXT_PUBLIC_ENABLE_SANCTUM ?? "true").toLowerCase() !==
+      "false",
+    priority: 90, // High priority for LST swaps
+    feeRate: 0.0001, // Very low fee for LST-to-LST
+    minTradeSize: 0.1,
+    maxSlippage: 0.005, // Low slippage for LSTs
+  },
 
   // Aggregators - Lower priority (use as fallback)
   [VenueName.JUPITER]: {
@@ -167,6 +193,8 @@ export class LiquidityDataCollector {
   private lifinityService: LifinityService;
   private orcaService: OrcaService;
   private raydiumService: RaydiumService;
+  private sanctumService: SanctumService;
+  private goosefxService: GooseFXService;
   private clobHealth: Partial<Record<VenueName, ClobHealthState>>;
   private logger: StructuredLogger;
 
@@ -180,6 +208,8 @@ export class LiquidityDataCollector {
     this.lifinityService = new LifinityService(connection);
     this.orcaService = new OrcaService(connection);
     this.raydiumService = new RaydiumService(connection);
+    this.sanctumService = new SanctumService(connection);
+    this.goosefxService = new GooseFXService(connection);
     this.clobHealth = {};
     this.logger = new StructuredLogger("liquidity");
   }
@@ -523,6 +553,24 @@ export class LiquidityDataCollector {
 
     if (venue === VenueName.LIFINITY) {
       return this.lifinityService.fetchLiquidity(
+        inputMint,
+        outputMint,
+        inputAmount
+      );
+    }
+
+    // Sanctum - specialized for LST swaps
+    if (venue === VenueName.SANCTUM) {
+      return this.sanctumService.fetchLiquidity(
+        inputMint,
+        outputMint,
+        inputAmount
+      );
+    }
+
+    // GooseFX CLMM pools
+    if (venue === VenueName.GOOSEFX) {
+      return this.goosefxService.fetchLiquidity(
         inputMint,
         outputMint,
         inputAmount
