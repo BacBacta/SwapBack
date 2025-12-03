@@ -11,7 +11,6 @@ import {
   ChartBarIcon,
   Cog6ToothIcon,
   LockClosedIcon,
-  ChartPieIcon,
   HomeIcon
 } from "@heroicons/react/24/outline";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/Sheet";
@@ -42,11 +41,6 @@ const navItems = [
     href: "/app/lock", 
     label: "Lock Tokens", 
     icon: LockClosedIcon 
-  },
-  { 
-    href: "/app/portfolio", 
-    label: "Portfolio", 
-    icon: ChartPieIcon 
   },
   { 
     href: "/app/settings", 
