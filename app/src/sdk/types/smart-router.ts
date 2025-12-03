@@ -19,6 +19,14 @@ export enum VenueName {
   RAYDIUM = "raydium",
   METEORA = "meteora",
   LIFINITY = "lifinity",
+  GOOSEFX = "goosefx", // GooseFX CLMM pools
+
+  // LST Specialists
+  SANCTUM = "sanctum", // LST swaps (mSOL, stSOL, jitoSOL, etc.)
+  MARINADE = "marinade", // Direct mSOL staking/unstaking
+
+  // NFT Marketplaces
+  TENSOR = "tensor", // NFT marketplace for NFT-collateralized tokens
 
   // CLOBs
   PHOENIX = "phoenix",

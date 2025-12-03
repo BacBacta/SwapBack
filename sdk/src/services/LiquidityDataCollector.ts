@@ -21,6 +21,8 @@ import { OrcaService } from "./OrcaService";
 import { RaydiumService } from "./RaydiumService";
 import { SanctumService } from "./SanctumService";
 import { GooseFXService } from "./GooseFXService";
+import { MarinadeService } from "./MarinadeService";
+import { TensorService } from "./TensorService";
 import { StructuredLogger } from "../utils/StructuredLogger";
 import { RFQCompetitionService } from "./RFQCompetitionService";
 
@@ -144,6 +146,30 @@ const VENUE_CONFIGS: Record<VenueName, VenueConfig> = {
     minTradeSize: 0.1,
     maxSlippage: 0.005, // Low slippage for LSTs
   },
+  [VenueName.MARINADE]: {
+    name: VenueName.MARINADE,
+    type: VenueType.AMM,
+    enabled:
+      (process.env.NEXT_PUBLIC_ENABLE_MARINADE ?? "true").toLowerCase() !==
+      "false",
+    priority: 88, // High priority for mSOL staking
+    feeRate: 0.0, // No fee for staking
+    minTradeSize: 0.01,
+    maxSlippage: 0.001, // Very low slippage for staking
+  },
+
+  // NFT Marketplaces
+  [VenueName.TENSOR]: {
+    name: VenueName.TENSOR,
+    type: VenueType.RFQ,
+    enabled:
+      (process.env.NEXT_PUBLIC_ENABLE_TENSOR ?? "false").toLowerCase() ===
+      "true",
+    priority: 55, // Medium priority
+    feeRate: 0.02, // 2% marketplace fee
+    minTradeSize: 10,
+    maxSlippage: 0.05,
+  },
 
   // Aggregators - Lower priority (use as fallback)
   [VenueName.JUPITER]: {
@@ -195,6 +221,8 @@ export class LiquidityDataCollector {
   private raydiumService: RaydiumService;
   private sanctumService: SanctumService;
   private goosefxService: GooseFXService;
+  private marinadeService: MarinadeService;
+  private tensorService: TensorService;
   private clobHealth: Partial<Record<VenueName, ClobHealthState>>;
   private logger: StructuredLogger;
 
@@ -210,6 +238,8 @@ export class LiquidityDataCollector {
     this.raydiumService = new RaydiumService(connection);
     this.sanctumService = new SanctumService(connection);
     this.goosefxService = new GooseFXService(connection);
+    this.marinadeService = new MarinadeService(connection);
+    this.tensorService = new TensorService(connection);
     this.clobHealth = {};
     this.logger = new StructuredLogger("liquidity");
   }

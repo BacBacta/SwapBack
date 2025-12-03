@@ -1964,19 +1964,111 @@ pub mod swap_toc_processor {
         Ok(observation)
     }
 
+    /// Dynamic compute unit estimation based on swap complexity
+    /// Factors: venues, hops, token types, MEV protection
+    fn estimate_compute_units(
+        venue_count: usize,
+        fallback_count: usize,
+        has_clob: bool,
+        has_multi_hop: bool,
+        mev_protection: bool,
+    ) -> u32 {
+        // Base CU for simple swap
+        let mut cu_estimate: u32 = 150_000;
+        
+        // Per-venue overhead (CLOB is lighter than AMM)
+        let venue_cu = if has_clob {
+            25_000 // CLOB swaps are more CU-efficient
+        } else {
+            40_000 // AMM swaps require more computation
+        };
+        cu_estimate = cu_estimate.saturating_add((venue_count as u32).saturating_mul(venue_cu));
+        
+        // Fallback routes add overhead
+        cu_estimate = cu_estimate.saturating_add((fallback_count as u32).saturating_mul(15_000));
+        
+        // Multi-hop adds per-hop overhead
+        if has_multi_hop {
+            cu_estimate = cu_estimate.saturating_add(50_000);
+        }
+        
+        // MEV protection (Jito bundle) adds overhead
+        if mev_protection {
+            cu_estimate = cu_estimate.saturating_add(20_000);
+        }
+        
+        // Safety margin (10%)
+        cu_estimate = cu_estimate.saturating_mul(110).saturating_div(100);
+        
+        // Cap at reasonable maximum
+        cu_estimate.min(1_400_000)
+    }
+    
+    /// Calculate optimal priority fee based on trade value and network conditions
+    fn calculate_priority_fee(amount_in: u64, urgency: u8, network_congestion_bps: u16) -> u64 {
+        // Base fee proportional to trade size (1 lamport per 10k input)
+        let base_fee = amount_in / 10_000;
+        
+        // Urgency multiplier (1-5, where 5 is most urgent)
+        let urgency_multiplier = (urgency.clamp(1, 5) as u64).saturating_mul(20);
+        
+        // Network congestion adjustment (0-10000 bps)
+        let congestion_multiplier = 100u64.saturating_add(network_congestion_bps as u64 / 100);
+        
+        let priority_fee = base_fee
+            .saturating_mul(urgency_multiplier)
+            .saturating_mul(congestion_multiplier)
+            .saturating_div(100);
+        
+        // Clamp to reasonable range
+        priority_fee.clamp(5_000, 1_000_000)
+    }
+    
     fn emit_priority_fee_hint(amount_in: u64, venue_count: usize, fallback_count: usize) {
-        let base_limit: u32 = 200_000;
-        let cu_limit = base_limit
-            .saturating_add((venue_count as u32).saturating_mul(30_000))
-            .saturating_add((fallback_count as u32).saturating_mul(10_000));
+        // Use dynamic estimation
+        let cu_limit = estimate_compute_units(
+            venue_count,
+            fallback_count,
+            false, // Default no CLOB
+            false, // Default no multi-hop
+            false, // Default no MEV protection
+        );
 
-        let mut priority_fee = amount_in / 1_000;
-        if priority_fee < 5_000 {
-            priority_fee = 5_000;
-        }
-        if priority_fee > 500_000 {
-            priority_fee = 500_000;
-        }
+        // Calculate priority fee with default urgency
+        let priority_fee = calculate_priority_fee(amount_in, 3, 0);
+
+        emit!(PriorityFeeSet {
+            compute_unit_limit: cu_limit,
+            compute_unit_price: priority_fee,
+        });
+    }
+    
+    /// Enhanced priority fee hint with full context
+    fn emit_priority_fee_hint_advanced(
+        amount_in: u64,
+        venue_count: usize,
+        fallback_count: usize,
+        has_clob: bool,
+        has_multi_hop: bool,
+        mev_protection: bool,
+        urgency: u8,
+        network_congestion_bps: u16,
+    ) {
+        let cu_limit = estimate_compute_units(
+            venue_count,
+            fallback_count,
+            has_clob,
+            has_multi_hop,
+            mev_protection,
+        );
+
+        let priority_fee = calculate_priority_fee(amount_in, urgency, network_congestion_bps);
+
+        msg!(
+            "⚡ Gas Estimate: {} CU @ {} microlamports/CU",
+            cu_limit,
+            priority_fee
+        );
 
         emit!(PriorityFeeSet {
             compute_unit_limit: cu_limit,
