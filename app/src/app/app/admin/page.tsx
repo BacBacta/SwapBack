@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey, Transaction, SystemProgram } from "@solana/web3.js";
+import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
+import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { toast } from "sonner";
 import { Breadcrumb } from "@/components/BackButton";
 import { 
@@ -16,11 +17,24 @@ import {
   ArrowPathIcon,
   CheckCircleIcon,
   XCircleIcon,
-  ClockIcon
+  ClockIcon,
+  BanknotesIcon,
+  CurrencyDollarIcon
 } from "@heroicons/react/24/outline";
 
 // Program ID
 const PROGRAM_ID = new PublicKey("9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh");
+
+// Known token mints
+const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+const BACK_MINT = new PublicKey("BACKPvPvMqWKhjNPFCSzwV6u4EpFCiM3EGgsxJVGnTMc");
+
+interface WalletBalance {
+  sol: number;
+  usdc: number;
+  back: number;
+  isLoading: boolean;
+}
 
 interface RouterState {
   authority: PublicKey;
@@ -53,6 +67,78 @@ export default function AdminPage() {
   const [treasuryWallet, setTreasuryWallet] = useState("");
   const [buybackWallet, setBuybackWallet] = useState("");
   const [boostVaultWallet, setBoostVaultWallet] = useState("");
+  
+  // Wallet balances
+  const [walletBalances, setWalletBalances] = useState<{
+    treasury: WalletBalance;
+    buyback: WalletBalance;
+    boostVault: WalletBalance;
+    npiVault: WalletBalance;
+  }>({
+    treasury: { sol: 0, usdc: 0, back: 0, isLoading: true },
+    buyback: { sol: 0, usdc: 0, back: 0, isLoading: true },
+    boostVault: { sol: 0, usdc: 0, back: 0, isLoading: true },
+    npiVault: { sol: 0, usdc: 0, back: 0, isLoading: true },
+  });
+
+  // Fetch token balance helper
+  const fetchTokenBalance = async (walletAddress: PublicKey, mint: PublicKey): Promise<number> => {
+    try {
+      const ata = await getAssociatedTokenAddress(mint, walletAddress);
+      const balance = await connection.getTokenAccountBalance(ata);
+      return Number(balance.value.uiAmount || 0);
+    } catch {
+      return 0;
+    }
+  };
+
+  // Fetch all wallet balances
+  const fetchWalletBalances = useCallback(async () => {
+    if (!connection || !routerState) return;
+    
+    const wallets = [
+      { key: 'treasury' as const, address: routerState.treasuryWallet },
+      { key: 'buyback' as const, address: routerState.buybackWallet },
+      { key: 'boostVault' as const, address: routerState.boostVaultWallet },
+      { key: 'npiVault' as const, address: routerState.npiVaultWallet },
+    ];
+    
+    const newBalances = { ...walletBalances };
+    
+    for (const wallet of wallets) {
+      if (!wallet.address || wallet.address.equals(PublicKey.default)) {
+        newBalances[wallet.key] = { sol: 0, usdc: 0, back: 0, isLoading: false };
+        continue;
+      }
+      
+      try {
+        const [solBalance, usdcBalance, backBalance] = await Promise.all([
+          connection.getBalance(wallet.address),
+          fetchTokenBalance(wallet.address, USDC_MINT),
+          fetchTokenBalance(wallet.address, BACK_MINT),
+        ]);
+        
+        newBalances[wallet.key] = {
+          sol: solBalance / LAMPORTS_PER_SOL,
+          usdc: usdcBalance,
+          back: backBalance,
+          isLoading: false,
+        };
+      } catch (error) {
+        console.error(`Error fetching ${wallet.key} balance:`, error);
+        newBalances[wallet.key] = { sol: 0, usdc: 0, back: 0, isLoading: false };
+      }
+    }
+    
+    setWalletBalances(newBalances);
+  }, [connection, routerState]);
+
+  // Fetch balances when router state changes
+  useEffect(() => {
+    if (routerState) {
+      fetchWalletBalances();
+    }
+  }, [routerState, fetchWalletBalances]);
 
   // Fetch router state
   const fetchRouterState = useCallback(async () => {
@@ -515,6 +601,220 @@ export default function AdminPage() {
                   ${((routerState?.totalRebatesPaid?.toNumber() || 0) / 1e6).toLocaleString()}
                 </div>
                 <div className="text-gray-400 text-sm">Rebates Distribués</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Wallet Balances Section */}
+          <div className="mt-8 backdrop-blur-xl bg-gray-900/80 border-2 border-yellow-500/30 rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <BanknotesIcon className="w-6 h-6 text-yellow-500" />
+                Soldes des Wallets
+              </h2>
+              <button
+                onClick={fetchWalletBalances}
+                className="flex items-center gap-2 px-3 py-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 rounded-lg text-sm transition-all"
+              >
+                <ArrowPathIcon className="w-4 h-4" />
+                Actualiser
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Treasury Wallet */}
+              <div className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/20 rounded-xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-emerald-500/20 rounded-lg">
+                      <CurrencyDollarIcon className="w-5 h-5 text-emerald-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-white font-semibold">Treasury</h3>
+                      <p className="text-gray-500 text-xs font-mono">
+                        {formatAddress(routerState?.treasuryWallet || null)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {walletBalances.treasury.isLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <ArrowPathIcon className="w-5 h-5 text-emerald-400 animate-spin" />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center py-2 border-b border-emerald-500/10">
+                      <span className="text-gray-400 text-sm">SOL</span>
+                      <span className="text-white font-medium">{walletBalances.treasury.sol.toFixed(4)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-emerald-500/10">
+                      <span className="text-gray-400 text-sm">USDC</span>
+                      <span className="text-emerald-400 font-medium">${walletBalances.treasury.usdc.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-gray-400 text-sm">BACK</span>
+                      <span className="text-cyan-400 font-medium">{walletBalances.treasury.back.toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Buyback Wallet */}
+              <div className="bg-gradient-to-br from-orange-500/10 to-orange-500/5 border border-orange-500/20 rounded-xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-orange-500/20 rounded-lg">
+                      <CurrencyDollarIcon className="w-5 h-5 text-orange-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-white font-semibold">Buyback</h3>
+                      <p className="text-gray-500 text-xs font-mono">
+                        {formatAddress(routerState?.buybackWallet || null)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {walletBalances.buyback.isLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <ArrowPathIcon className="w-5 h-5 text-orange-400 animate-spin" />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center py-2 border-b border-orange-500/10">
+                      <span className="text-gray-400 text-sm">SOL</span>
+                      <span className="text-white font-medium">{walletBalances.buyback.sol.toFixed(4)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-orange-500/10">
+                      <span className="text-gray-400 text-sm">USDC</span>
+                      <span className="text-orange-400 font-medium">${walletBalances.buyback.usdc.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-gray-400 text-sm">BACK</span>
+                      <span className="text-cyan-400 font-medium">{walletBalances.buyback.back.toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Boost Vault Wallet */}
+              <div className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20 rounded-xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-purple-500/20 rounded-lg">
+                      <CurrencyDollarIcon className="w-5 h-5 text-purple-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-white font-semibold">Boost Vault</h3>
+                      <p className="text-gray-500 text-xs font-mono">
+                        {formatAddress(routerState?.boostVaultWallet || null)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {walletBalances.boostVault.isLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <ArrowPathIcon className="w-5 h-5 text-purple-400 animate-spin" />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center py-2 border-b border-purple-500/10">
+                      <span className="text-gray-400 text-sm">SOL</span>
+                      <span className="text-white font-medium">{walletBalances.boostVault.sol.toFixed(4)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-purple-500/10">
+                      <span className="text-gray-400 text-sm">USDC</span>
+                      <span className="text-purple-400 font-medium">${walletBalances.boostVault.usdc.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-gray-400 text-sm">BACK</span>
+                      <span className="text-cyan-400 font-medium">{walletBalances.boostVault.back.toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* NPI Vault Wallet */}
+              <div className="bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border border-cyan-500/20 rounded-xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-cyan-500/20 rounded-lg">
+                      <CurrencyDollarIcon className="w-5 h-5 text-cyan-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-white font-semibold">NPI Vault</h3>
+                      <p className="text-gray-500 text-xs font-mono">
+                        {formatAddress(routerState?.npiVaultWallet || null)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {walletBalances.npiVault.isLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <ArrowPathIcon className="w-5 h-5 text-cyan-400 animate-spin" />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center py-2 border-b border-cyan-500/10">
+                      <span className="text-gray-400 text-sm">SOL</span>
+                      <span className="text-white font-medium">{walletBalances.npiVault.sol.toFixed(4)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-cyan-500/10">
+                      <span className="text-gray-400 text-sm">USDC</span>
+                      <span className="text-cyan-400 font-medium">${walletBalances.npiVault.usdc.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-gray-400 text-sm">BACK</span>
+                      <span className="text-cyan-400 font-medium">{walletBalances.npiVault.back.toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Total Summary */}
+            <div className="mt-6 p-4 bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border border-yellow-500/20 rounded-xl">
+              <h3 className="text-yellow-400 font-semibold mb-3 flex items-center gap-2">
+                <BanknotesIcon className="w-5 h-5" />
+                Total Tous Wallets
+              </h3>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-white">
+                    {(
+                      walletBalances.treasury.sol + 
+                      walletBalances.buyback.sol + 
+                      walletBalances.boostVault.sol + 
+                      walletBalances.npiVault.sol
+                    ).toFixed(4)}
+                  </div>
+                  <div className="text-gray-400 text-sm">SOL</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-emerald-400">
+                    ${(
+                      walletBalances.treasury.usdc + 
+                      walletBalances.buyback.usdc + 
+                      walletBalances.boostVault.usdc + 
+                      walletBalances.npiVault.usdc
+                    ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-gray-400 text-sm">USDC</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-cyan-400">
+                    {(
+                      walletBalances.treasury.back + 
+                      walletBalances.buyback.back + 
+                      walletBalances.boostVault.back + 
+                      walletBalances.npiVault.back
+                    ).toLocaleString()}
+                  </div>
+                  <div className="text-gray-400 text-sm">BACK</div>
+                </div>
               </div>
             </div>
           </div>
