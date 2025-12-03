@@ -262,6 +262,9 @@ pub mod swapback_router {
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         let state = &mut ctx.accounts.state;
         state.authority = ctx.accounts.authority.key();
+        state.pending_authority = None;
+        state.is_paused = false;
+        state.paused_at = 0;
         state.rebate_percentage = DEFAULT_REBATE_BPS;
         state.treasury_percentage = TREASURY_FROM_NPI_BPS;
         state.boost_vault_percentage = BOOST_VAULT_BPS;
@@ -280,6 +283,207 @@ pub mod swapback_router {
         state.total_treasury_from_fees = 0;
         state.total_buyburn = 0;
         state.bump = ctx.bumps.state;
+        Ok(())
+    }
+
+    // ============================
+    // 🔐 ADMIN INSTRUCTIONS
+    // ============================
+
+    /// Pause the protocol (circuit breaker for emergencies)
+    /// Only callable by authority
+    pub fn pause_protocol(ctx: Context<AdminAction>) -> Result<()> {
+        let state = &mut ctx.accounts.state;
+        
+        require!(!state.is_paused, error::SwapbackError::AlreadyPausedProtocol);
+        
+        state.is_paused = true;
+        state.paused_at = Clock::get()?.unix_timestamp;
+
+        emit!(ProtocolPaused {
+            authority: ctx.accounts.authority.key(),
+            timestamp: state.paused_at,
+        });
+
+        msg!("🛑 Protocol PAUSED by {}", ctx.accounts.authority.key());
+        Ok(())
+    }
+
+    /// Unpause the protocol
+    /// Only callable by authority
+    pub fn unpause_protocol(ctx: Context<AdminAction>) -> Result<()> {
+        let state = &mut ctx.accounts.state;
+        
+        require!(state.is_paused, error::SwapbackError::AlreadyUnpausedProtocol);
+        
+        let paused_duration = Clock::get()?.unix_timestamp - state.paused_at;
+        state.is_paused = false;
+
+        emit!(ProtocolUnpaused {
+            authority: ctx.accounts.authority.key(),
+            paused_duration,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        msg!("✅ Protocol UNPAUSED after {} seconds", paused_duration);
+        Ok(())
+    }
+
+    /// Propose a new authority (two-step transfer for security)
+    /// Step 1: Current authority proposes new authority
+    pub fn propose_authority(ctx: Context<AdminAction>, new_authority: Pubkey) -> Result<()> {
+        let state = &mut ctx.accounts.state;
+        
+        require!(
+            new_authority != Pubkey::default(),
+            error::SwapbackError::InvalidWalletAddress
+        );
+
+        state.pending_authority = Some(new_authority);
+
+        emit!(AuthorityProposed {
+            current_authority: ctx.accounts.authority.key(),
+            proposed_authority: new_authority,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        msg!("📝 New authority proposed: {}", new_authority);
+        Ok(())
+    }
+
+    /// Accept authority transfer (two-step transfer for security)
+    /// Step 2: Pending authority accepts the transfer
+    pub fn accept_authority(ctx: Context<AcceptAuthority>) -> Result<()> {
+        let state = &mut ctx.accounts.state;
+        
+        let pending = state.pending_authority
+            .ok_or(error::SwapbackError::NoPendingAuthority)?;
+        
+        require!(
+            ctx.accounts.new_authority.key() == pending,
+            error::SwapbackError::NotPendingAuthority
+        );
+
+        let old_authority = state.authority;
+        state.authority = pending;
+        state.pending_authority = None;
+
+        emit!(AuthorityTransferred {
+            old_authority,
+            new_authority: pending,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        msg!("🔑 Authority transferred from {} to {}", old_authority, pending);
+        Ok(())
+    }
+
+    /// Cancel a pending authority transfer
+    pub fn cancel_authority_transfer(ctx: Context<AdminAction>) -> Result<()> {
+        let state = &mut ctx.accounts.state;
+        
+        let pending = state.pending_authority
+            .ok_or(error::SwapbackError::NoPendingAuthority)?;
+        
+        state.pending_authority = None;
+
+        emit!(AuthorityTransferCancelled {
+            authority: ctx.accounts.authority.key(),
+            cancelled_pending: pending,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        msg!("❌ Authority transfer to {} cancelled", pending);
+        Ok(())
+    }
+
+    /// Update wallet addresses (treasury, buyback, boost vault)
+    pub fn update_wallets(
+        ctx: Context<AdminAction>,
+        treasury_wallet: Option<Pubkey>,
+        buyback_wallet: Option<Pubkey>,
+        boost_vault_wallet: Option<Pubkey>,
+        npi_vault_wallet: Option<Pubkey>,
+    ) -> Result<()> {
+        let state = &mut ctx.accounts.state;
+
+        if let Some(wallet) = treasury_wallet {
+            require!(wallet != Pubkey::default(), error::SwapbackError::InvalidWalletAddress);
+            state.treasury_wallet = wallet;
+            msg!("💰 Treasury wallet updated: {}", wallet);
+        }
+
+        if let Some(wallet) = buyback_wallet {
+            require!(wallet != Pubkey::default(), error::SwapbackError::InvalidWalletAddress);
+            state.buyback_wallet = wallet;
+            msg!("🔥 Buyback wallet updated: {}", wallet);
+        }
+
+        if let Some(wallet) = boost_vault_wallet {
+            require!(wallet != Pubkey::default(), error::SwapbackError::InvalidWalletAddress);
+            state.boost_vault_wallet = wallet;
+            msg!("🚀 Boost vault wallet updated: {}", wallet);
+        }
+
+        if let Some(wallet) = npi_vault_wallet {
+            require!(wallet != Pubkey::default(), error::SwapbackError::InvalidWalletAddress);
+            state.npi_vault_wallet = wallet;
+            msg!("📦 NPI vault wallet updated: {}", wallet);
+        }
+
+        emit!(WalletsUpdated {
+            authority: ctx.accounts.authority.key(),
+            treasury_wallet: state.treasury_wallet,
+            buyback_wallet: state.buyback_wallet,
+            boost_vault_wallet: state.boost_vault_wallet,
+            npi_vault_wallet: state.npi_vault_wallet,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        Ok(())
+    }
+
+    /// Emergency withdraw from rebate vault (for stuck funds recovery)
+    /// Only callable by authority when protocol is paused
+    pub fn emergency_withdraw(
+        ctx: Context<EmergencyWithdraw>,
+        amount: u64,
+    ) -> Result<()> {
+        let state = &ctx.accounts.state;
+        
+        // Must be paused for emergency operations
+        require!(state.is_paused, error::SwapbackError::ProtocolPaused);
+        
+        // Validate amount
+        require!(
+            ctx.accounts.rebate_vault.amount >= amount,
+            error::SwapbackError::EmergencyWithdrawExceedsBalance
+        );
+
+        // Transfer from vault to destination
+        let seeds = &[b"router_state".as_ref(), &[state.bump]];
+        let signer = &[&seeds[..]];
+
+        let cpi_accounts = token::Transfer {
+            from: ctx.accounts.rebate_vault.to_account_info(),
+            to: ctx.accounts.destination.to_account_info(),
+            authority: ctx.accounts.state.to_account_info(),
+        };
+
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
+
+        token::transfer(cpi_ctx, amount)?;
+
+        emit!(EmergencyWithdrawal {
+            authority: ctx.accounts.authority.key(),
+            amount,
+            destination: ctx.accounts.destination.key(),
+            vault_remaining: ctx.accounts.rebate_vault.amount.saturating_sub(amount),
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        msg!("⚠️ EMERGENCY WITHDRAW: {} tokens to {}", amount, ctx.accounts.destination.key());
         Ok(())
     }
 
@@ -433,6 +637,9 @@ pub mod swapback_router {
         ctx: Context<'_, '_, '_, 'info, ExecuteDcaSwap<'info>>,
         args: ExecuteDcaSwapArgs,
     ) -> Result<()> {
+        // ✅ SECURITY: Check if protocol is paused (circuit breaker)
+        require!(!ctx.accounts.state.is_paused, error::SwapbackError::ProtocolPaused);
+        
         let dca_plan = &mut ctx.accounts.dca_plan;
         let clock = Clock::get()?;
 
@@ -917,6 +1124,66 @@ pub struct InitializeRebateVault<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
+// ============================
+// 🔐 ADMIN ACCOUNT CONTEXTS
+// ============================
+
+/// Context for admin actions requiring authority signature
+#[derive(Accounts)]
+pub struct AdminAction<'info> {
+    #[account(
+        mut,
+        seeds = [b"router_state"],
+        bump = state.bump,
+        has_one = authority @ ErrorCode::Unauthorized
+    )]
+    pub state: Account<'info, RouterState>,
+
+    pub authority: Signer<'info>,
+}
+
+/// Context for accepting authority transfer (new authority must sign)
+#[derive(Accounts)]
+pub struct AcceptAuthority<'info> {
+    #[account(
+        mut,
+        seeds = [b"router_state"],
+        bump = state.bump
+    )]
+    pub state: Account<'info, RouterState>,
+
+    /// The new authority accepting the transfer
+    pub new_authority: Signer<'info>,
+}
+
+/// Context for emergency withdrawal operations
+#[derive(Accounts)]
+pub struct EmergencyWithdraw<'info> {
+    #[account(
+        mut,
+        seeds = [b"router_state"],
+        bump = state.bump,
+        has_one = authority @ ErrorCode::Unauthorized
+    )]
+    pub state: Account<'info, RouterState>,
+
+    /// Rebate vault to withdraw from
+    #[account(
+        mut,
+        seeds = [b"rebate_vault", state.key().as_ref()],
+        bump
+    )]
+    pub rebate_vault: Account<'info, TokenAccount>,
+
+    /// Destination token account for withdrawn funds
+    #[account(mut)]
+    pub destination: Account<'info, TokenAccount>,
+
+    pub authority: Signer<'info>,
+
+    pub token_program: Program<'info, Token>,
+}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct JupiterRouteParams {
     /// Full Jupiter instruction data (including discriminator)
@@ -1200,6 +1467,63 @@ pub struct RewardsClaimed {
     pub timestamp: i64,
 }
 
+// ============================
+// 🔐 ADMIN EVENTS
+// ============================
+
+#[event]
+pub struct ProtocolPaused {
+    pub authority: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct ProtocolUnpaused {
+    pub authority: Pubkey,
+    pub paused_duration: i64,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct AuthorityProposed {
+    pub current_authority: Pubkey,
+    pub proposed_authority: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct AuthorityTransferred {
+    pub old_authority: Pubkey,
+    pub new_authority: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct AuthorityTransferCancelled {
+    pub authority: Pubkey,
+    pub cancelled_pending: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct WalletsUpdated {
+    pub authority: Pubkey,
+    pub treasury_wallet: Pubkey,
+    pub buyback_wallet: Pubkey,
+    pub boost_vault_wallet: Pubkey,
+    pub npi_vault_wallet: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct EmergencyWithdrawal {
+    pub authority: Pubkey,
+    pub amount: u64,
+    pub destination: Pubkey,
+    pub vault_remaining: u64,
+    pub timestamp: i64,
+}
+
 // Structure UserNft importée du programme cNFT pour vérification du boost
 #[account]
 #[derive(Default)]
@@ -1328,6 +1652,9 @@ pub mod swap_toc_processor {
         mut ctx: Context<'_, '_, '_, 'info, SwapToC<'info>>,
         args: SwapArgs,
     ) -> Result<()> {
+        // ✅ SECURITY: Check if protocol is paused (circuit breaker)
+        require!(!ctx.accounts.state.is_paused, error::SwapbackError::ProtocolPaused);
+
         // ✅ SECURITY: Validate input parameters
         require!(args.amount_in > 0, ErrorCode::InvalidAmount);
         require!(args.min_out > 0, ErrorCode::InvalidAmount);

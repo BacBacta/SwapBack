@@ -7,6 +7,15 @@ pub struct RouterState {
     /// Authority that can update configuration
     pub authority: Pubkey,
 
+    /// Pending authority for two-step transfer (security best practice)
+    pub pending_authority: Option<Pubkey>,
+
+    /// Whether the protocol is paused (circuit breaker)
+    pub is_paused: bool,
+
+    /// Timestamp when protocol was paused (for audit trail)
+    pub paused_at: i64,
+
     /// Percentage of NPI allocated to user rebates (basis points, 10000 = 100%)
     pub rebate_percentage: u16,
 
@@ -65,6 +74,9 @@ pub struct RouterState {
 impl RouterState {
     pub const LEN: usize = 8  // discriminator
         + 32                  // authority
+        + 1 + 32              // pending_authority option (1 byte flag + pubkey)
+        + 1                   // is_paused
+        + 8                   // paused_at
         + 2 + 2 + 2 + 2 + 2   // percentages
         + 32 + 32 + 32 + 32   // wallets
         + 8 + 8 + 8 + 8 + 8 + 8 + 8 // metrics

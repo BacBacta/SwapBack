@@ -69,4 +69,22 @@ pub enum SwapbackError {
     // Compute Budget Guard
     #[msg("Too many venues for one swap (compute guard)")]
     TooManyVenues,
+
+    // Admin Errors
+    #[msg("Protocol is currently paused")]
+    ProtocolPaused,
+    #[msg("No pending authority to accept")]
+    NoPendingAuthority,
+    #[msg("Caller is not the pending authority")]
+    NotPendingAuthority,
+    #[msg("Address is blacklisted")]
+    AddressBlacklisted,
+    #[msg("Invalid wallet address (zero address)")]
+    InvalidWalletAddress,
+    #[msg("Emergency withdraw amount exceeds vault balance")]
+    EmergencyWithdrawExceedsBalance,
+    #[msg("Cannot pause an already paused protocol")]
+    AlreadyPausedProtocol,
+    #[msg("Cannot unpause an already active protocol")]
+    AlreadyUnpausedProtocol,
 }
