@@ -13,6 +13,7 @@ import {
   Cog6ToothIcon,
   ChartPieIcon,
   GiftIcon,
+  ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
 import {
   HomeIcon as HomeIconSolid,
@@ -34,6 +35,7 @@ const moreNavItems = [
   { name: "My Rebates", href: "/app/rebates", icon: GiftIcon },
   { name: "Portfolio", href: "/app/portfolio", icon: ChartPieIcon },
   { name: "Settings", href: "/app/settings", icon: Cog6ToothIcon },
+  { name: "Admin", href: "/app/admin", icon: ShieldCheckIcon, isAdmin: true },
 ];
 
 export function BottomNav() {
@@ -104,6 +106,7 @@ export function BottomNav() {
               {moreNavItems.map((item) => {
                 const isActive = pathname === item.href;
                 const Icon = item.icon;
+                const isAdminItem = 'isAdmin' in item && item.isAdmin;
                 return (
                   <Link
                     key={item.name}
@@ -111,14 +114,27 @@ export function BottomNav() {
                     onClick={() => setShowMore(false)}
                     className={`
                       flex items-center gap-3 px-4 py-3 rounded-xl transition-all
+                      ${isAdminItem 
+                        ? "border border-yellow-500/30 bg-yellow-500/5"
+                        : ""
+                      }
                       ${isActive 
-                        ? "bg-primary/20 text-primary" 
-                        : "text-gray-400 hover:bg-white/5 hover:text-white"
+                        ? isAdminItem 
+                          ? "bg-yellow-500/20 text-yellow-400"
+                          : "bg-primary/20 text-primary" 
+                        : isAdminItem
+                          ? "text-yellow-400/70 hover:bg-yellow-500/10 hover:text-yellow-400"
+                          : "text-gray-400 hover:bg-white/5 hover:text-white"
                       }
                     `}
                   >
                     <Icon className="w-6 h-6" />
                     <span className="text-base font-medium">{item.name}</span>
+                    {isAdminItem && (
+                      <span className="ml-auto text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">
+                        Authority
+                      </span>
+                    )}
                   </Link>
                 );
               })}

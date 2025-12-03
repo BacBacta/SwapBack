@@ -13,6 +13,7 @@ import {
   LockClosedIcon,
   ChartPieIcon,
   GiftIcon,
+  ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
 
 const navigationItems = [
@@ -25,6 +26,7 @@ const navigationItems = [
   { name: "Analytics", href: "/app/analytics", icon: ChartPieIcon },
   { name: "History", href: "/app/history", icon: ClockIcon },
   { name: "Settings", href: "/app/settings", icon: Cog6ToothIcon },
+  { name: "Admin", href: "/app/admin", icon: ShieldCheckIcon, adminOnly: true },
 ];
 
 export function Sidebar() {
@@ -55,6 +57,7 @@ export function Sidebar() {
           {navigationItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
+            const isAdminLink = 'adminOnly' in item && item.adminOnly;
             
             return (
               <Link
@@ -65,18 +68,32 @@ export function Sidebar() {
                   transition-all duration-200 group
                   ${
                     isActive
-                      ? "bg-primary/10 text-primary border border-primary/30"
-                      : "text-gray-300 hover:bg-primary/5 hover:text-primary border border-transparent"
+                      ? isAdminLink 
+                        ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/30"
+                        : "bg-primary/10 text-primary border border-primary/30"
+                      : isAdminLink
+                        ? "text-yellow-400/70 hover:bg-yellow-500/5 hover:text-yellow-400 border border-transparent"
+                        : "text-gray-300 hover:bg-primary/5 hover:text-primary border border-transparent"
                   }
                 `}
               >
                 <Icon
                   className={`
                     mr-3 h-5 w-5 flex-shrink-0
-                    ${isActive ? "text-primary" : "text-gray-400 group-hover:text-primary"}
+                    ${isActive 
+                      ? isAdminLink ? "text-yellow-400" : "text-primary" 
+                      : isAdminLink 
+                        ? "text-yellow-500/50 group-hover:text-yellow-400" 
+                        : "text-gray-400 group-hover:text-primary"
+                    }
                   `}
                 />
                 {item.name}
+                {isAdminLink && (
+                  <span className="ml-auto text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">
+                    🔐
+                  </span>
+                )}
               </Link>
             );
           })}
