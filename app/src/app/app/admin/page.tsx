@@ -31,6 +31,9 @@ import {
 // Program ID
 const PROGRAM_ID = new PublicKey("9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh");
 
+// Admin Authority - Only this wallet can access the admin panel
+const ADMIN_AUTHORITY = new PublicKey("CeuPXDvL5p6qELK1JpDwCvT13PCA3bVk2Cfk6R8T9XHK");
+
 // Known token mints
 const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 const BACK_MINT = new PublicKey("BACKPvPvMqWKhjNPFCSzwV6u4EpFCiM3EGgsxJVGnTMc");
@@ -488,6 +491,9 @@ export default function AdminPage() {
     return new Date(ts * 1000).toLocaleString();
   };
 
+  // Check if connected wallet is the admin authority
+  const isAuthorizedAdmin = publicKey && publicKey.equals(ADMIN_AUTHORITY);
+
   if (!connected) {
     return (
       <div className="min-h-screen py-12 px-4">
@@ -497,6 +503,43 @@ export default function AdminPage() {
             <ShieldCheckIcon className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-white mb-2">Accès Admin</h2>
             <p className="text-gray-400">Connectez votre wallet pour accéder au panneau d'administration.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Block access for non-admin wallets
+  if (!isAuthorizedAdmin) {
+    return (
+      <div className="min-h-screen py-12 px-4">
+        <div className="max-w-4xl mx-auto">
+          <Breadcrumb items={[{ label: "App", href: "/app" }, { label: "Admin" }]} />
+          <div className="mt-8 backdrop-blur-xl bg-gray-900/80 border-2 border-red-500/30 rounded-2xl p-8 text-center">
+            <div className="w-20 h-20 mx-auto mb-6 bg-red-500/20 rounded-full flex items-center justify-center">
+              <XCircleIcon className="w-12 h-12 text-red-500" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-3">Accès Refusé</h2>
+            <p className="text-gray-400 mb-2">
+              Cette page est réservée à l'administrateur du protocole SwapBack.
+            </p>
+            <p className="text-gray-500 text-sm mb-6">
+              Votre wallet : <span className="font-mono text-gray-400">{publicKey?.toBase58().slice(0, 8)}...{publicKey?.toBase58().slice(-8)}</span>
+            </p>
+            <div className="flex justify-center gap-4">
+              <a
+                href="/app"
+                className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition-all"
+              >
+                Retour à l'accueil
+              </a>
+              <a
+                href="/app/swap"
+                className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-xl transition-all"
+              >
+                Faire un swap
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -554,21 +597,6 @@ export default function AdminPage() {
               )}
             </div>
           </div>
-
-          {/* Admin Check */}
-          {!isAdmin && (
-            <div className="mb-8 backdrop-blur-xl bg-yellow-500/10 border-2 border-yellow-500/30 rounded-2xl p-6">
-              <div className="flex items-center gap-3">
-                <ExclamationTriangleIcon className="w-6 h-6 text-yellow-500" />
-                <div>
-                  <h3 className="text-yellow-400 font-bold">Accès Limité</h3>
-                  <p className="text-yellow-400/70 text-sm">
-                    Vous n'êtes pas l'autorité du protocole. Les actions admin sont désactivées.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Protocol Status Card */}
