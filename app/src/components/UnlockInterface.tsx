@@ -399,46 +399,46 @@ export default function UnlockInterface({
   }
 
   return (
-    <div className="glass-effect rounded-xl p-6 max-w-lg mx-auto border border-gray-700/50">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-secondary/20 to-green-500/20 border border-secondary/30">
-          <span className="text-xl">🔓</span>
+    <div className="glass-effect rounded-xl p-4 sm:p-6 max-w-lg mx-auto border border-gray-700/50">
+      <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+        <div className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-secondary/20 to-green-500/20 border border-secondary/30">
+          <span className="text-lg sm:text-xl">🔓</span>
         </div>
-        <h2 className="card-title">Unlock $BACK</h2>
+        <h2 className="card-title text-lg sm:text-xl">Unlock $BACK</h2>
       </div>
 
       {/* Lock information with boost details */}
-      <div className="mb-6 p-5 glass-effect rounded-lg border border-secondary/10 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-radial from-secondary/10 to-transparent rounded-full blur-2xl"></div>
+      <div className="mb-4 sm:mb-6 p-3 sm:p-5 glass-effect rounded-lg border border-secondary/10 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-24 sm:w-32 h-24 sm:h-32 bg-gradient-radial from-secondary/10 to-transparent rounded-full blur-2xl"></div>
 
-        <div className="relative space-y-4">
-          <div className="flex justify-between items-center">
-            <span className="text-gray-400 font-medium">Locked Amount</span>
-            <span className="text-[var(--primary)] font-bold text-lg">
+        <div className="relative space-y-3 sm:space-y-4">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <span className="text-gray-400 font-medium text-sm sm:text-base">Locked Amount</span>
+            <span className="text-[var(--primary)] font-bold text-base sm:text-lg">
               {lockData.amount
                 ? Number(lockData.amount).toLocaleString() // Already in UI units
                 : "0"}{" "}
               <span className="text-primary">$BACK</span>
             </span>
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-gray-400 font-medium">Lock Duration</span>
-            <span className="text-[var(--primary)] font-bold">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <span className="text-gray-400 font-medium text-sm sm:text-base">Lock Duration</span>
+            <span className="text-[var(--primary)] font-bold text-sm sm:text-base">
               {boostDetails.durationDays} days
             </span>
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-gray-400 font-medium">cNFT Tier</span>
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <span className="text-gray-400 font-medium text-sm sm:text-base">cNFT Tier</span>
             <span
-              className={`px-4 py-1.5 rounded-full border font-bold ${levelColor} transition-all hover:scale-105`}
+              className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full border font-bold text-sm ${levelColor} transition-all hover:scale-105`}
             >
               {levelName || "Unknown"}
             </span>
           </div>
 
           {/* Boost Details Section */}
-          <div className="pt-3 border-t border-gray-700/30">
-            <div className="text-sm font-bold text-orange-400 mb-2">
+          <div className="pt-2 sm:pt-3 border-t border-gray-700/30">
+            <div className="text-xs sm:text-sm font-bold text-orange-400 mb-2">
               ⚠️ You Will Lose This Boost
             </div>
             <div className="space-y-1 text-xs">
@@ -459,7 +459,7 @@ export default function UnlockInterface({
                 <span className="text-gray-300 font-medium">
                   Total Boost Lost:
                 </span>
-                <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
+                <span className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
                   -{boostDetails.totalBoost.toFixed(1)}%
                 </span>
               </div>
@@ -468,19 +468,19 @@ export default function UnlockInterface({
 
           {/* Rebate Multiplier Impact */}
           {boostDetails.totalBoost > 0 && (
-            <div className="p-3 rounded-lg bg-gradient-to-r from-orange-500/5 to-transparent border border-orange-500/10">
-              <div className="text-sm font-bold text-orange-400 mb-1">
+            <div className="p-2.5 sm:p-3 rounded-lg bg-gradient-to-r from-orange-500/5 to-transparent border border-orange-500/10">
+              <div className="text-xs sm:text-sm font-bold text-orange-400 mb-1">
                 💔 Lost Benefits
               </div>
               <div className="text-xs text-gray-400 mb-1">
                 Your rebate multiplier will drop from:
               </div>
               <div className="flex items-center gap-2 justify-between">
-                <span className="text-lg font-bold text-orange-400">
+                <span className="text-base sm:text-lg font-bold text-orange-400">
                   {(1 + boostDetails.totalBoost / 100).toFixed(2)}x
                 </span>
                 <span className="text-gray-500">→</span>
-                <span className="text-lg font-bold text-gray-500">1.00x</span>
+                <span className="text-base sm:text-lg font-bold text-gray-500">1.00x</span>
               </div>
               <div className="text-xs text-gray-500 mt-1">
                 Example: {(3 * (1 + boostDetails.totalBoost / 100)).toFixed(2)}{" "}
@@ -492,19 +492,19 @@ export default function UnlockInterface({
       </div>
 
       {/* Countdown with animation */}
-      <div className="mb-6 p-6 glass-effect rounded-lg border border-gray-700/50 relative overflow-hidden">
+      <div className="mb-4 sm:mb-6 p-4 sm:p-6 glass-effect rounded-lg border border-gray-700/50 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5"></div>
 
         <div className="relative">
-          <div className="text-center mb-4">
-            <div className="flex items-center justify-center gap-2 mb-3">
+          <div className="text-center mb-3 sm:mb-4">
+            <div className="flex items-center justify-center gap-2 mb-2 sm:mb-3">
               <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
-              <div className="text-gray-400 text-sm font-medium">
+              <div className="text-gray-400 text-xs sm:text-sm font-medium">
                 Time Remaining
               </div>
             </div>
             <div
-              className={`text-4xl font-bold ${
+              className={`text-2xl sm:text-4xl font-bold ${
                 timeRemaining?.canUnlock
                   ? "text-secondary animate-pulse-glow"
                   : "text-yellow-400"
@@ -515,13 +515,13 @@ export default function UnlockInterface({
           </div>
 
           {/* Barre de progression améliorée */}
-          <div className="relative w-full h-3 glass-effect rounded-full overflow-hidden border border-gray-700/50">
+          <div className="relative w-full h-2 sm:h-3 glass-effect rounded-full overflow-hidden border border-gray-700/50">
             <div
               className="absolute top-0 left-0 h-full bg-gradient-to-r from-primary via-accent to-secondary transition-all duration-500 animate-shimmer"
               style={{ width: `${lockProgress}%` }}
             />
           </div>
-          <div className="flex justify-between items-center text-gray-400 text-xs mt-2">
+          <div className="flex justify-between items-center text-gray-400 text-xs mt-1.5 sm:mt-2">
             <span>Start</span>
             <span className="font-bold">{lockProgress}% elapsed</span>
             <span>End</span>
@@ -613,54 +613,54 @@ export default function UnlockInterface({
       </button>
 
       {/* Additional information */}
-      <div className="mt-6 p-5 glass-effect border border-secondary/20 rounded-lg">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-secondary/10 border border-secondary/30">
-            <span className="text-sm">ℹ️</span>
+      <div className="mt-4 sm:mt-6 p-3 sm:p-5 glass-effect border border-secondary/20 rounded-lg">
+        <div className="flex items-center gap-2 mb-2 sm:mb-3">
+          <div className="flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-secondary/10 border border-secondary/30">
+            <span className="text-xs sm:text-sm">ℹ️</span>
           </div>
-          <h4 className="text-secondary font-bold">Important Information</h4>
+          <h4 className="text-secondary font-bold text-sm sm:text-base">Important Information</h4>
         </div>
-        <ul className="text-gray-400 text-sm space-y-2">
+        <ul className="text-gray-400 text-xs sm:text-sm space-y-1.5 sm:space-y-2">
           {lockData?.amount && (
-            <li className="flex flex-col gap-2 p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+            <li className="flex flex-col gap-2 p-3 sm:p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg">
               <div className="flex items-start gap-2">
-                <span className="text-orange-400 mt-0.5 text-lg">{!timeRemaining?.canUnlock ? '⚠️' : '✅'}</span>
-                <span className={`font-bold text-base ${!timeRemaining?.canUnlock ? 'text-orange-300' : 'text-green-300'}`}>
+                <span className="text-orange-400 mt-0.5 text-base sm:text-lg">{!timeRemaining?.canUnlock ? '⚠️' : '✅'}</span>
+                <span className={`font-bold text-sm sm:text-base ${!timeRemaining?.canUnlock ? 'text-orange-300' : 'text-green-300'}`}>
                   {!timeRemaining?.canUnlock ? 'Early Unlock Penalty' : 'Lock Period Complete - No Penalty'}
                 </span>
               </div>
-              <div className="ml-7 space-y-2">
+              <div className="ml-6 sm:ml-7 space-y-2">
                 {!timeRemaining?.canUnlock ? (
-                  <p className="text-orange-200 text-sm">
+                  <p className="text-orange-200 text-xs sm:text-sm">
                     Unlocking before the lock period ends will incur a{" "}
                     <strong className="text-orange-400">2% penalty</strong>.
                     These tokens will be <strong className="text-red-400">BURNED 🔥</strong> permanently, reducing the total supply.
                   </p>
                 ) : (
-                  <p className="text-green-200 text-sm">
+                  <p className="text-green-200 text-xs sm:text-sm">
                     Your lock period is complete! You can unlock your full amount with{" "}
                     <strong className="text-green-400">NO PENALTY</strong>. All {Number(lockData.amount).toLocaleString()} BACK tokens will be returned.
                   </p>
                 )}
-                <div className="p-3 bg-black/30 rounded-lg border border-orange-500/20">
-                  <div className="flex justify-between items-center mb-1">
+                <div className="p-2.5 sm:p-3 bg-black/30 rounded-lg border border-orange-500/20">
+                  <div className="flex justify-between items-center mb-1 flex-wrap gap-1">
                     <span className="text-gray-400 text-xs">Locked Amount:</span>
-                    <span className="text-white font-medium">
+                    <span className="text-white font-medium text-xs sm:text-sm">
                       {Number(lockData.amount).toLocaleString()} BACK
                     </span>
                   </div>
-                  <div className="flex justify-between items-center mb-1">
+                  <div className="flex justify-between items-center mb-1 flex-wrap gap-1">
                     <span className="text-gray-400 text-xs">
                       {!timeRemaining?.canUnlock ? 'Penalty (2%):' : 'Penalty:'}
                     </span>
-                    <span className={!timeRemaining?.canUnlock ? "text-red-400 font-bold" : "text-green-400 font-bold"}>
+                    <span className={`text-xs sm:text-sm ${!timeRemaining?.canUnlock ? "text-red-400 font-bold" : "text-green-400 font-bold"}`}>
                       {!timeRemaining?.canUnlock ? `-${(Number(lockData.amount) * 0.02).toFixed(2)} BACK` : '0 BACK ✅'}
                     </span>
                   </div>
                   <div className="h-px bg-orange-500/30 my-2"></div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-300 text-sm font-medium">You will receive:</span>
-                    <span className="text-green-400 font-bold text-lg">
+                  <div className="flex justify-between items-center flex-wrap gap-1">
+                    <span className="text-gray-300 text-xs sm:text-sm font-medium">You will receive:</span>
+                    <span className="text-green-400 font-bold text-sm sm:text-lg">
                       {!timeRemaining?.canUnlock 
                         ? (Number(lockData.amount) * 0.98).toFixed(2)
                         : Number(lockData.amount).toFixed(2)

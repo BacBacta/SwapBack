@@ -715,21 +715,21 @@ export default function LockInterface({
   const quickAmounts = [100000, 500000, 1000000, 5000000];
 
   return (
-    <div className="glass-effect rounded-xl p-6 max-w-lg mx-auto border border-gray-700/50">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary-dark/20 border border-primary/30">
-          <span className="text-xl">🔒</span>
+    <div className="glass-effect rounded-xl p-4 sm:p-6 max-w-lg mx-auto border border-gray-700/50">
+      <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+        <div className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary-dark/20 border border-primary/30">
+          <span className="text-lg sm:text-xl">🔒</span>
         </div>
-        <h2 className="card-title">Lock $BACK</h2>
+        <h2 className="card-title text-lg sm:text-xl">Lock $BACK</h2>
       </div>
 
       {/* Information sur les locks multiples */}
       {/* Current NFT Information */}
       {/* Balance display */}
-      <div className="mb-6 p-4 glass-effect rounded-lg border border-primary/10">
-        <div className="flex justify-between items-center">
-          <span className="text-gray-400">Available Balance</span>
-          <span className="text-[var(--primary)] font-bold text-lg">
+      <div className="mb-4 sm:mb-6 p-3 sm:p-4 glass-effect rounded-lg border border-primary/10">
+        <div className="flex justify-between items-center flex-wrap gap-2">
+          <span className="text-gray-400 text-sm sm:text-base">Available Balance</span>
+          <span className="text-[var(--primary)] font-bold text-base sm:text-lg">
             {balance.toLocaleString()}{" "}
             <span className="text-primary">$BACK</span>
           </span>
@@ -737,8 +737,8 @@ export default function LockInterface({
       </div>
 
       {/* Amount field */}
-      <div className="mb-6">
-        <label className="block text-gray-300 mb-2 font-medium">
+      <div className="mb-4 sm:mb-6">
+        <label className="block text-gray-300 mb-2 font-medium text-sm sm:text-base">
           Amount to Lock
         </label>
         <div className="relative">
@@ -747,39 +747,39 @@ export default function LockInterface({
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
-            className={`w-full px-4 py-3 glass-effect text-[var(--primary)] rounded-lg focus:outline-none focus:ring-2 transition-all ${
+            className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 glass-effect text-[var(--primary)] rounded-lg focus:outline-none focus:ring-2 transition-all text-sm sm:text-base ${
               amountError
                 ? "border border-red-500/50 focus:ring-red-500/50 focus:border-red-500"
                 : "border border-gray-700/50 focus:ring-primary/50 focus:border-primary"
             }`}
             disabled={isLoading}
           />
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-primary font-semibold text-sm">
+          <div className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-primary font-semibold text-xs sm:text-sm">
             $BACK
           </div>
         </div>
         {amountError && (
-          <p className="text-red-400 text-sm mt-2 flex items-center gap-1">
+          <p className="text-red-400 text-xs sm:text-sm mt-2 flex items-center gap-1">
             <span>⚠️</span>
             {amountError}
           </p>
         )}
 
         {/* Quick amount buttons */}
-        <div className="flex gap-2 mt-3">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2 mt-2 sm:mt-3">
           {quickAmounts.map((amt) => (
             <button
               key={amt}
               onClick={() => setAmount(amt.toString())}
-              className="flex-1 px-3 py-2 glass-effect border border-gray-700/50 hover:border-primary/30 text-[var(--primary)] rounded-lg text-sm transition-all hover:scale-105"
+              className="flex-1 min-w-[60px] px-2 sm:px-3 py-1.5 sm:py-2 glass-effect border border-gray-700/50 hover:border-primary/30 text-[var(--primary)] rounded-lg text-xs sm:text-sm transition-all hover:scale-105"
               disabled={isLoading}
             >
-              {amt.toLocaleString()}
+              {amt >= 1000000 ? `${amt/1000000}M` : amt >= 1000 ? `${amt/1000}K` : amt}
             </button>
           ))}
           <button
             onClick={() => setAmount(balance.toString())}
-            className="px-4 py-2 bg-gradient-to-r from-primary to-primary-dark text-[var(--primary)] rounded-lg text-sm font-semibold transition-all hover:scale-105 hover:shadow-glow"
+            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-primary to-primary-dark text-[var(--primary)] rounded-lg text-xs sm:text-sm font-semibold transition-all hover:scale-105 hover:shadow-glow"
             disabled={isLoading}
           >
             Max
@@ -788,8 +788,8 @@ export default function LockInterface({
       </div>
 
       {/* Duration field */}
-      <div className="mb-6">
-        <label className="block text-gray-300 mb-2 font-medium">
+      <div className="mb-4 sm:mb-6">
+        <label className="block text-gray-300 mb-2 font-medium text-sm sm:text-base">
           Lock Duration (days)
         </label>
         <div className="relative">
@@ -798,50 +798,50 @@ export default function LockInterface({
             value={duration}
             onChange={(e) => setDuration(e.target.value)}
             placeholder="30"
-            className={`w-full px-4 py-3 glass-effect text-[var(--primary)] rounded-lg focus:outline-none focus:ring-2 transition-all ${
+            className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 glass-effect text-[var(--primary)] rounded-lg focus:outline-none focus:ring-2 transition-all text-sm sm:text-base ${
               durationError
                 ? "border border-red-500/50 focus:ring-red-500/50 focus:border-red-500"
                 : "border border-gray-700/50 focus:ring-primary/50 focus:border-primary"
             }`}
             disabled={isLoading}
           />
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">
+          <div className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-xs sm:text-sm">
             days
           </div>
         </div>
         {durationError && (
-          <p className="text-red-400 text-sm mt-2 flex items-center gap-1">
+          <p className="text-red-400 text-xs sm:text-sm mt-2 flex items-center gap-1">
             <span>⚠️</span>
             {durationError}
           </p>
         )}
 
         {/* Boutons de durée rapide */}
-        <div className="grid grid-cols-4 gap-2 mt-3">
+        <div className="grid grid-cols-4 gap-1.5 sm:gap-2 mt-2 sm:mt-3">
           <button
             onClick={() => setDuration("7")}
-            className="px-3 py-2 glass-effect border border-orange-500/20 hover:border-orange-500/40 text-orange-400 rounded-lg text-sm font-medium transition-all hover:scale-105"
+            className="px-2 sm:px-3 py-1.5 sm:py-2 glass-effect border border-orange-500/20 hover:border-orange-500/40 text-orange-400 rounded-lg text-xs sm:text-sm font-medium transition-all hover:scale-105"
             disabled={isLoading}
           >
             7j
           </button>
           <button
             onClick={() => setDuration("30")}
-            className="px-3 py-2 glass-effect border border-gray-500/20 hover:border-gray-400/40 text-gray-300 rounded-lg text-sm font-medium transition-all hover:scale-105"
+            className="px-2 sm:px-3 py-1.5 sm:py-2 glass-effect border border-gray-500/20 hover:border-gray-400/40 text-gray-300 rounded-lg text-xs sm:text-sm font-medium transition-all hover:scale-105"
             disabled={isLoading}
           >
             30j
           </button>
           <button
             onClick={() => setDuration("90")}
-            className="px-3 py-2 glass-effect border border-yellow-500/20 hover:border-yellow-500/40 text-yellow-400 rounded-lg text-sm font-medium transition-all hover:scale-105"
+            className="px-2 sm:px-3 py-1.5 sm:py-2 glass-effect border border-yellow-500/20 hover:border-yellow-500/40 text-yellow-400 rounded-lg text-xs sm:text-sm font-medium transition-all hover:scale-105"
             disabled={isLoading}
           >
             90j
           </button>
           <button
             onClick={() => setDuration("180")}
-            className="px-3 py-2 glass-effect border border-yellow-500/20 hover:border-yellow-500/40 text-yellow-400 rounded-lg text-sm font-medium transition-all hover:scale-105"
+            className="px-2 sm:px-3 py-1.5 sm:py-2 glass-effect border border-yellow-500/20 hover:border-yellow-500/40 text-yellow-400 rounded-lg text-xs sm:text-sm font-medium transition-all hover:scale-105"
             disabled={isLoading}
           >
             180j
@@ -867,23 +867,23 @@ export default function LockInterface({
       </div>
 
       {/* Tier and boost preview - ENHANCED with calculation details */}
-      <div className="mb-6 p-5 glass-effect rounded-lg border border-primary/20 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-radial from-primary/10 to-transparent rounded-full blur-2xl"></div>
+      <div className="mb-4 sm:mb-6 p-3 sm:p-5 glass-effect rounded-lg border border-primary/20 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-24 sm:w-32 h-24 sm:h-32 bg-gradient-radial from-primary/10 to-transparent rounded-full blur-2xl"></div>
 
-        <div className="relative space-y-4">
+        <div className="relative space-y-3 sm:space-y-4">
           {/* Visual Tier */}
-          <div className="flex justify-between items-center">
-            <span className="text-gray-400 font-medium">Visual Tier</span>
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <span className="text-gray-400 font-medium text-sm sm:text-base">Visual Tier</span>
             <span
-              className={`px-4 py-1.5 rounded-full border font-bold ${levelColor} transition-all hover:scale-105`}
+              className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full border font-bold text-sm ${levelColor} transition-all hover:scale-105`}
             >
               {displayLevel}
             </span>
           </div>
 
           {/* Boost Calculation Details */}
-          <div className="p-3 rounded-lg bg-gradient-to-r from-secondary/5 to-transparent border border-secondary/10">
-            <div className="text-sm font-bold text-secondary mb-2">
+          <div className="p-2.5 sm:p-3 rounded-lg bg-gradient-to-r from-secondary/5 to-transparent border border-secondary/10">
+            <div className="text-xs sm:text-sm font-bold text-secondary mb-2">
               🎯 Boost Calculation (Max 20%)
             </div>
             <div className="space-y-1 text-xs">
@@ -893,7 +893,7 @@ export default function LockInterface({
                   +{boostDetails.amountScore.toFixed(2)}%
                 </span>
               </div>
-              <div className="text-xs text-gray-500 mt-0.5 ml-2">
+              <div className="text-xs text-gray-500 mt-0.5 ml-2 hidden sm:block">
                 💡 Max atteint à 5M tokens
               </div>
               <div className="flex justify-between items-center">
@@ -905,7 +905,7 @@ export default function LockInterface({
               <div className="h-px bg-secondary/20 my-2"></div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-300 font-medium">Total Boost:</span>
-                <span className="text-2xl font-bold bg-gradient-to-r from-secondary to-green-400 bg-clip-text text-transparent">
+                <span className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-secondary to-green-400 bg-clip-text text-transparent">
                   +{predictedBoost.toFixed(2)}%
                 </span>
               </div>
@@ -915,14 +915,14 @@ export default function LockInterface({
           {/* Rebate Multiplier Impact */}
           {predictedBoost > 0 && (
             <>
-              <div className="p-3 rounded-lg bg-gradient-to-r from-primary/5 to-transparent border border-primary/10">
-                <div className="text-sm font-bold text-primary mb-2">
+              <div className="p-2.5 sm:p-3 rounded-lg bg-gradient-to-r from-primary/5 to-transparent border border-primary/10">
+                <div className="text-xs sm:text-sm font-bold text-primary mb-2">
                   💰 Rebate Multiplier
                 </div>
                 <div className="text-xs text-gray-400 mb-1">
                   Your rebates will be multiplied by:
                 </div>
-                <div className="text-2xl font-bold text-primary">
+                <div className="text-xl sm:text-2xl font-bold text-primary">
                   {(1 + predictedBoost / 100).toFixed(3)}x
                 </div>
                 <div className="text-xs text-gray-400 mt-1">
@@ -1024,14 +1024,14 @@ export default function LockInterface({
       </button>
 
       {/* Additional information */}
-      <div className="mt-6 p-5 glass-effect border border-primary/20 rounded-lg">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 border border-primary/30">
-            <span className="text-sm">ℹ️</span>
+      <div className="mt-4 sm:mt-6 p-3 sm:p-5 glass-effect border border-primary/20 rounded-lg">
+        <div className="flex items-center gap-2 mb-2 sm:mb-3">
+          <div className="flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-primary/10 border border-primary/30">
+            <span className="text-xs sm:text-sm">ℹ️</span>
           </div>
-          <h4 className="text-primary font-bold">Important Information</h4>
+          <h4 className="text-primary font-bold text-sm sm:text-base">Important Information</h4>
         </div>
-        <ul className="text-gray-400 text-sm space-y-2">
+        <ul className="text-gray-400 text-xs sm:text-sm space-y-1.5 sm:space-y-2">
           <li className="flex items-start gap-2">
             <span className="text-orange-400 mt-0.5">🥉</span>
             <span>Bronze (7-29d): +5% boost on your rebates</span>

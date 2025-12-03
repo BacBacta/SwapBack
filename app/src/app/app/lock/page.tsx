@@ -56,26 +56,26 @@ export default function LockPage() {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 px-4">
+    <div className="max-w-4xl mx-auto space-y-4 sm:space-y-8 px-3 sm:px-4">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-2 sm:mb-4">
           <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent mb-2">
+            <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent mb-1 sm:mb-2">
               Lock & Earn
             </h1>
-            <p className="text-gray-400 text-lg">
+            <p className="text-gray-400 text-sm sm:text-lg">
               Lock your BACK tokens to earn rewards and boost your trading benefits
             </p>
           </div>
         </div>
 
         {/* Features Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mt-4 sm:mt-6">
           {features.map((feature, index) => (
             <motion.div
               key={feature.title}
@@ -85,9 +85,9 @@ export default function LockPage() {
               className="group relative"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 rounded-xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <div className="relative backdrop-blur-xl bg-[#0C0C0C]/60 border border-emerald-500/20 rounded-xl p-4 hover:border-emerald-500/40 transition-all duration-300">
-                <feature.icon className="w-8 h-8 text-emerald-400 mb-2" />
-                <h3 className="text-sm font-semibold text-white mb-1">
+              <div className="relative backdrop-blur-xl bg-[#0C0C0C]/60 border border-emerald-500/20 rounded-xl p-3 sm:p-4 hover:border-emerald-500/40 transition-all duration-300">
+                <feature.icon className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-400 mb-2" />
+                <h3 className="text-xs sm:text-sm font-semibold text-white mb-1">
                   {feature.title}
                 </h3>
                 <p className="text-xs text-gray-400">{feature.description}</p>
@@ -105,8 +105,8 @@ export default function LockPage() {
         className="relative"
       >
         {/* Glassmorphism Container */}
-        <div className="backdrop-blur-xl bg-[#0C0C0C]/40 border border-emerald-500/20 rounded-2xl p-2 shadow-[0_0_50px_rgba(16,185,129,0.15)]">
-          <div className="flex space-x-2">
+        <div className="backdrop-blur-xl bg-[#0C0C0C]/40 border border-emerald-500/20 rounded-2xl p-1.5 sm:p-2 shadow-[0_0_50px_rgba(16,185,129,0.15)]">
+          <div className="flex space-x-1 sm:space-x-2">
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id;
               const Icon = tab.icon;
@@ -128,22 +128,22 @@ export default function LockPage() {
                   
                   {/* Tab Content */}
                   <div className={`
-                    relative px-6 py-4 rounded-xl transition-all duration-300
+                    relative px-3 py-3 sm:px-6 sm:py-4 rounded-xl transition-all duration-300
                     ${isActive 
                       ? "text-white" 
                       : "text-gray-400 hover:text-gray-200 hover:bg-white/5"
                     }
                   `}>
-                    <div className="flex items-center justify-center space-x-3">
-                      <Icon className={`w-5 h-5 ${isActive ? "animate-pulse" : ""}`} />
+                    <div className="flex items-center justify-center space-x-2 sm:space-x-3">
+                      <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${isActive ? "animate-pulse" : ""}`} />
                       <div className="text-left">
-                        <div className="font-semibold text-sm">{tab.label}</div>
+                        <div className="font-semibold text-xs sm:text-sm">{tab.label}</div>
                         {isActive && (
                           <motion.div
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: "auto" }}
                             exit={{ opacity: 0, height: 0 }}
-                            className="text-xs opacity-90 mt-0.5"
+                            className="text-xs opacity-90 mt-0.5 hidden sm:block"
                           >
                             {tab.description}
                           </motion.div>
@@ -171,7 +171,7 @@ export default function LockPage() {
           animate={{ opacity: 1, x: 0, scale: 1 }}
           exit={{ opacity: 0, x: -20, scale: 0.95 }}
           transition={{ duration: 0.4, type: "spring", bounce: 0.2 }}
-          className="backdrop-blur-xl bg-[#0C0C0C]/40 border border-emerald-500/20 rounded-2xl p-8 shadow-[0_0_50px_rgba(16,185,129,0.15)]"
+          className="backdrop-blur-xl bg-[#0C0C0C]/40 border border-emerald-500/20 rounded-2xl p-3 sm:p-6 md:p-8 shadow-[0_0_50px_rgba(16,185,129,0.15)] overflow-hidden"
         >
           {activeTab === "lock" ? <LockInterface key={`lock-${refreshKey}`} /> : <UnlockInterface key={`unlock-${refreshKey}`} />}
         </motion.div>
