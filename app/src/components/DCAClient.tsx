@@ -209,22 +209,22 @@ export const DCAClient = () => {
     Number.parseInt(totalOrders || "0");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Network Status and Wallet Status Display */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
           {/* RPC Status */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <div
               className={`w-2 h-2 rounded-full ${rpcError ? "bg-red-500" : "bg-green-500"} animate-pulse`}
             ></div>
-            <span className="text-xs text-gray-400 terminal-text">
-              NETWORK: {rpcError ? "DISCONNECTED" : "CONNECTED"}
+            <span className="text-[10px] sm:text-xs text-gray-400 terminal-text">
+              NET: {rpcError ? "OFF" : "ON"}
             </span>
           </div>
           
           {/* Wallet Status */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <div
               className={`w-2 h-2 rounded-full ${
                 !walletReady 
@@ -234,13 +234,13 @@ export const DCAClient = () => {
                   : "bg-red-500"
               } animate-pulse`}
             ></div>
-            <span className="text-xs text-gray-400 terminal-text">
+            <span className="text-[10px] sm:text-xs text-gray-400 terminal-text">
               WALLET: {
                 !walletReady 
-                  ? "INITIALIZING..." 
+                  ? "INIT..." 
                   : connected && publicKey 
-                  ? "CONNECTED" 
-                  : "DISCONNECTED"
+                  ? "ON" 
+                  : "OFF"
               }
             </span>
           </div>
@@ -249,7 +249,7 @@ export const DCAClient = () => {
         {rpcError && (
           <button
             onClick={testRpcConnection}
-            className="text-xs px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded terminal-text"
+            className="text-[10px] sm:text-xs px-2 sm:px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded terminal-text"
           >
             RETRY
           </button>
@@ -272,22 +272,22 @@ export const DCAClient = () => {
       )}
 
       {/* Tab Navigation */}
-      <div className="flex border-b border-gray-700">
+      <div className="flex border-b border-gray-700 overflow-x-auto">
         {[
-          { id: "create", label: "CREATE ORDER" },
-          { id: "orders", label: "MY ORDERS" },
-          { id: "simulator", label: "SIMULATOR" },
+          { id: "create", label: "CREATE", labelFull: "CREATE ORDER" },
+          { id: "orders", label: "ORDERS", labelFull: "MY ORDERS" },
+          { id: "simulator", label: "SIM", labelFull: "SIMULATOR" },
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as typeof activeTab)}
-            className={`px-6 py-3 font-bold terminal-text transition-all border-2 rounded ${
+            className={`px-3 sm:px-6 py-2 sm:py-3 font-bold terminal-text transition-all border-2 rounded text-xs sm:text-sm whitespace-nowrap ${
               activeTab === tab.id
                 ? "bg-[var(--primary)] border-[var(--primary)] text-black hover:bg-[var(--primary-hover)]"
                 : "bg-transparent border-transparent text-[var(--primary)] hover:bg-[var(--primary)]/10 hover:border-[var(--primary)]/30"
             }`}
           >
-            <span className="terminal-prefix">&gt;</span> [{tab.label}]
+            <span className="terminal-prefix hidden sm:inline">&gt;</span> [<span className="sm:hidden">{tab.label}</span><span className="hidden sm:inline">{tab.labelFull}</span>]
           </button>
         ))}
       </div>
@@ -308,74 +308,76 @@ export const DCAClient = () => {
       {activeTab === "create" && (
         <div className="space-y-6">
           {/* DCA Information */}
-          <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4">
-            <h4 className="text-blue-300 font-bold mb-2 terminal-text">
+          <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-3 sm:p-4">
+            <h4 className="text-blue-300 font-bold mb-1 sm:mb-2 terminal-text text-sm sm:text-base">
               <span className="terminal-prefix">&gt;</span> [ABOUT DCA]
             </h4>
-            <p className="text-blue-200 text-sm mb-2">
+            <p className="text-blue-200 text-xs sm:text-sm mb-2">
               Dollar Cost Averaging (DCA) allows you to invest automatically
               at regular intervals, reducing the impact of market volatility.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-blue-200">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-[10px] sm:text-xs text-blue-200">
               <div>
                 <span className="font-bold">📊 Risk reduction:</span>{" "}
-                Smooth your purchases over time
+                <span className="hidden sm:inline">Smooth your purchases over time</span>
               </div>
               <div>
-                <span className="font-bold">⏰ Automation:</span> No need for
-                manual intervention
+                <span className="font-bold">⏰ Automation:</span>{" "}
+                <span className="hidden sm:inline">No need for manual intervention</span>
               </div>
               <div>
-                <span className="font-bold">📈 Discipline:</span> Avoid emotional
-                decisions
+                <span className="font-bold">📈 Discipline:</span>{" "}
+                <span className="hidden sm:inline">Avoid emotional decisions</span>
               </div>
             </div>
           </div>
 
-          <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-6">
-            <h3 className="text-xl font-bold mb-4 terminal-text">
+          <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-4 sm:p-6">
+            <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 terminal-text">
               <span className="terminal-prefix">&gt;</span> [CREATE DCA ORDER]
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Input Token */}
-              <div>
-                <label className="block text-sm font-medium mb-2 terminal-text">
-                  <span className="terminal-prefix">&gt;</span> INPUT TOKEN
-                </label>
-                <select
-                  value={inputToken}
-                  onChange={(e) => setInputToken(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-sans focus:border-[var(--primary)] focus:outline-none"
-                >
-                  <option value="SOL">SOL</option>
-                  <option value="USDC">USDC</option>
-                  <option value="USDT">USDT</option>
-                </select>
-              </div>
+            <div className="grid grid-cols-1 gap-4 sm:gap-6">
+              {/* Row 1: Input/Output Token */}
+              <div className="grid grid-cols-2 gap-3 sm:gap-6">
+                {/* Input Token */}
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 terminal-text">
+                    <span className="terminal-prefix hidden sm:inline">&gt;</span> INPUT
+                  </label>
+                  <select
+                    value={inputToken}
+                    onChange={(e) => setInputToken(e.target.value)}
+                    className="w-full px-2 sm:px-4 py-2 sm:py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-sans text-sm focus:border-[var(--primary)] focus:outline-none"
+                  >
+                    <option value="SOL">SOL</option>
+                    <option value="USDC">USDC</option>
+                    <option value="USDT">USDT</option>
+                  </select>
+                </div>
 
-              {/* Output Token */}
-              <div>
-                <label className="block text-sm font-medium mb-2 terminal-text">
-                  <span className="terminal-prefix">&gt;</span> OUTPUT TOKEN
-                </label>
-                <select
-                  value={outputToken}
-                  onChange={(e) => setOutputToken(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-sans focus:border-[var(--primary)] focus:outline-none"
-                >
-                  <option value="USDC">USDC</option>
-                  <option value="USDT">USDT</option>
-                  <option value="SOL">SOL</option>
-                  <option value="BACK">BACK</option>
-                </select>
+                {/* Output Token */}
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 terminal-text">
+                    <span className="terminal-prefix hidden sm:inline">&gt;</span> OUTPUT
+                  </label>
+                  <select
+                    value={outputToken}
+                    onChange={(e) => setOutputToken(e.target.value)}
+                    className="w-full px-2 sm:px-4 py-2 sm:py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-sans text-sm focus:border-[var(--primary)] focus:outline-none"
+                  >
+                    <option value="USDC">USDC</option>
+                    <option value="USDT">USDT</option>
+                    <option value="SOL">SOL</option>
+                    <option value="BACK">BACK</option>
+                  </select>
+                </div>
               </div>
 
               {/* Amount per Order */}
               <div>
-                <label className="block text-sm font-medium mb-2 terminal-text">
-                  <span className="terminal-prefix">&gt;</span> AMOUNT PER
-                  ORDER
+                <label className="block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 terminal-text">
+                  <span className="terminal-prefix hidden sm:inline">&gt;</span> AMOUNT PER ORDER
                 </label>
                 <div className="relative">
                   <input
@@ -383,37 +385,27 @@ export const DCAClient = () => {
                     value={amountPerOrder}
                     onChange={(e) => setAmountPerOrder(e.target.value)}
                     placeholder="0.00"
-                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-sans focus:border-[var(--primary)] focus:outline-none pr-16"
+                    className="w-full px-2 sm:px-4 py-2 sm:py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-sans text-sm focus:border-[var(--primary)] focus:outline-none pr-12 sm:pr-16"
                   />
-                  <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                  <span className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-xs sm:text-sm">
                     {inputToken}
                   </span>
                 </div>
 
                 {/* Balance and Quick Actions */}
                 {inputTokenData && (
-                  <div className="mt-2 flex items-center justify-between">
-                    <p className="text-xs text-gray-400">
+                  <div className="mt-1.5 sm:mt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5">
+                    <p className="text-[10px] sm:text-xs text-gray-400">
                       Balance: {inputTokenData.balance?.toFixed(4) || "0.0000"}{" "}
                       {inputToken}
-                      {inputTokenData.usdValue && (
-                        <span className="ml-2">
-                          (~$
-                          {(
-                            inputTokenData.usdValue *
-                            (Number.parseFloat(amountPerOrder) || 0)
-                          ).toFixed(2)}
-                          )
-                        </span>
-                      )}
                     </p>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5 sm:gap-2">
                       <button
                         onClick={() => {
                           const balance = inputTokenData.balance || 0;
                           setAmountPerOrder((balance * 0.5).toFixed(6));
                         }}
-                        className="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded terminal-text"
+                        className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gray-700 hover:bg-gray-600 rounded terminal-text"
                       >
                         HALF
                       </button>
@@ -422,7 +414,7 @@ export const DCAClient = () => {
                           const balance = inputTokenData.balance || 0;
                           setAmountPerOrder(balance.toFixed(6));
                         }}
-                        className="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded terminal-text"
+                        className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gray-700 hover:bg-gray-600 rounded terminal-text"
                       >
                         MAX
                       </button>
@@ -431,54 +423,54 @@ export const DCAClient = () => {
                 )}
               </div>
 
-              {/* Frequency */}
-              <div>
-                <label className="block text-sm font-medium mb-2 terminal-text">
-                  <span className="terminal-prefix">&gt;</span> FREQUENCY
-                </label>
-                <select
-                  value={frequency}
-                  onChange={(e) =>
-                    setFrequency(e.target.value as typeof frequency)
-                  }
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-sans focus:border-[var(--primary)] focus:outline-none"
-                >
-                  <option value="hourly">Hourly</option>
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="monthly">Monthly</option>
-                </select>
-              </div>
+              {/* Row 2: Frequency and Total Orders */}
+              <div className="grid grid-cols-2 gap-3 sm:gap-6">
+                {/* Frequency */}
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 terminal-text">
+                    <span className="terminal-prefix hidden sm:inline">&gt;</span> FREQUENCY
+                  </label>
+                  <select
+                    value={frequency}
+                    onChange={(e) =>
+                      setFrequency(e.target.value as typeof frequency)
+                    }
+                    className="w-full px-2 sm:px-4 py-2 sm:py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-sans text-sm focus:border-[var(--primary)] focus:outline-none"
+                  >
+                    <option value="hourly">Hourly</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </div>
 
-              {/* Total Orders */}
-              <div>
-                <label className="block text-sm font-medium mb-2 terminal-text">
-                  <span className="terminal-prefix">&gt;</span> TOTAL NUMBER
-                  OF ORDERS
-                </label>
-                <input
-                  type="number"
-                  value={totalOrders}
-                  onChange={(e) => setTotalOrders(e.target.value)}
-                  placeholder="10"
-                  min="1"
-                  max="100"
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-sans focus:border-[var(--primary)] focus:outline-none"
-                />
+                {/* Total Orders */}
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 terminal-text">
+                    <span className="terminal-prefix hidden sm:inline">&gt;</span> # ORDERS
+                  </label>
+                  <input
+                    type="number"
+                    value={totalOrders}
+                    onChange={(e) => setTotalOrders(e.target.value)}
+                    placeholder="10"
+                    min="1"
+                    max="100"
+                    className="w-full px-2 sm:px-4 py-2 sm:py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-sans text-sm focus:border-[var(--primary)] focus:outline-none"
+                  />
+                </div>
               </div>
 
               {/* Total Investment Preview */}
               <div>
-                <label className="block text-sm font-medium mb-2 terminal-text">
-                  <span className="terminal-prefix">&gt;</span> TOTAL
-                  INVESTMENT
+                <label className="block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 terminal-text">
+                  <span className="terminal-prefix hidden sm:inline">&gt;</span> TOTAL INVESTMENT
                 </label>
-                <div className="px-4 py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-mono">
+                <div className="px-2 sm:px-4 py-2 sm:py-3 bg-gray-800 border border-gray-600 rounded terminal-text font-mono text-sm">
                   {totalInvestment.toFixed(2)} {inputToken}
                   {inputTokenData?.usdValue && (
-                    <span className="ml-2 text-gray-400">
-                      (~$
-                      {(inputTokenData.usdValue * totalInvestment).toFixed(2)})
+                    <span className="ml-2 text-gray-400 text-xs sm:text-sm">
+                      (~${(inputTokenData.usdValue * totalInvestment).toFixed(2)})
                     </span>
                   )}
                 </div>
@@ -486,36 +478,34 @@ export const DCAClient = () => {
             </div>
 
             {/* Next Execution Preview */}
-            <div className="mt-6 p-4 bg-gray-800/50 rounded">
-              <p className="text-sm text-gray-300 terminal-text">
-                <span className="terminal-prefix">&gt;</span> [NEXT
-                EXECUTION]: {getNextExecutionTime(frequency)}
+            <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-gray-800/50 rounded">
+              <p className="text-xs sm:text-sm text-gray-300 terminal-text">
+                <span className="terminal-prefix">&gt;</span> [NEXT]: {getNextExecutionTime(frequency)}
               </p>
-              <p className="text-sm text-gray-300 terminal-text mt-1">
-                <span className="terminal-prefix">&gt;</span> [TOTAL DURATION]:{" "}
+              <p className="text-xs sm:text-sm text-gray-300 terminal-text mt-1">
+                <span className="terminal-prefix">&gt;</span> [DURATION]:{" "}
                 {getFrequencyDuration(frequency, Number.parseInt(totalOrders))}
               </p>
             </div>
 
             {/* Create Button */}
-            <div className="mt-6">
+            <div className="mt-4 sm:mt-6">
               <button
                 type="button"
                 onClick={handleCreateDCA}
                 disabled={isCreating || !walletReady || !connected}
-                className="w-full px-6 py-4 bg-[var(--primary)] hover:bg-[var(--primary-hover)] disabled:bg-gray-600 text-black font-bold terminal-text rounded transition-colors"
+                className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-[var(--primary)] hover:bg-[var(--primary-hover)] disabled:bg-gray-600 text-black font-bold terminal-text rounded transition-colors text-sm sm:text-base"
               >
                 {isCreating ? (
                   <span>CREATING...</span>
                 ) : (
                   <span>
-                    <span className="terminal-prefix">&gt;</span> [CREATE DCA
-                    ORDER]
+                    <span className="terminal-prefix">&gt;</span> [CREATE DCA ORDER]
                   </span>
                 )}
               </button>
               {!connected && walletReady && (
-                <p className="text-red-400 text-sm mt-2 text-center">
+                <p className="text-red-400 text-xs sm:text-sm mt-2 text-center">
                   Please connect your wallet to create a DCA order
                 </p>
               )}
@@ -574,35 +564,34 @@ export const DCAClient = () => {
             <>
               {/* DCA Statistics Overview */}
               {stats && (
-                <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-6">
-                  <h4 className="text-lg font-bold mb-4 terminal-text">
-                    <span className="terminal-prefix">&gt;</span> [DCA
-                    STATISTICS]
+                <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-4 sm:p-6">
+                  <h4 className="text-base sm:text-lg font-bold mb-3 sm:mb-4 terminal-text">
+                    <span className="terminal-prefix">&gt;</span> [DCA STATISTICS]
                   </h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-[var(--primary)]">
+                      <p className="text-xl sm:text-2xl font-bold text-[var(--primary)]">
                         {stats.totalPlans}
                       </p>
-                      <p className="text-xs text-gray-400">TOTAL PLANS</p>
+                      <p className="text-[10px] sm:text-xs text-gray-400">TOTAL</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-green-400">
+                      <p className="text-xl sm:text-2xl font-bold text-green-400">
                         {stats.activePlans}
                       </p>
-                      <p className="text-xs text-gray-400">ACTIVE PLANS</p>
+                      <p className="text-[10px] sm:text-xs text-gray-400">ACTIVE</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-yellow-400">
+                      <p className="text-xl sm:text-2xl font-bold text-yellow-400">
                         {stats.pausedPlans}
                       </p>
-                      <p className="text-xs text-gray-400">PAUSED PLANS</p>
+                      <p className="text-[10px] sm:text-xs text-gray-400">PAUSED</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-blue-400">
+                      <p className="text-xl sm:text-2xl font-bold text-blue-400">
                         {stats.completedPlans}
                       </p>
-                      <p className="text-xs text-gray-400">COMPLETED PLANS</p>
+                      <p className="text-[10px] sm:text-xs text-gray-400">DONE</p>
                     </div>
                   </div>
                 </div>

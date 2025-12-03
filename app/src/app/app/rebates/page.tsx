@@ -330,20 +330,20 @@ export default function MyRebatesPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 px-3 sm:px-4">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-8"
+        className="text-center mb-4 sm:mb-8"
       >
-        <div className="flex items-center justify-center gap-3 mb-3">
-          <GiftIcon className="w-8 h-8 text-emerald-400" />
-          <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+        <div className="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+          <GiftIcon className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-400" />
+          <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
             My Rebates
           </h1>
         </div>
-        <p className="text-gray-400 text-sm sm:text-base">
+        <p className="text-gray-400 text-xs sm:text-base">
           Track your rewards, volume, and burned tokens
         </p>
       </motion.div>
@@ -368,23 +368,23 @@ export default function MyRebatesPage() {
       {!isLoading && rebateData && (
         <>
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
             {/* Unclaimed Rebates */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="bg-gradient-to-br from-emerald-500/10 to-cyan-500/10 border border-emerald-500/30 rounded-xl p-5"
+              className="bg-gradient-to-br from-emerald-500/10 to-cyan-500/10 border border-emerald-500/30 rounded-xl p-3 sm:p-5"
             >
-              <div className="flex items-center gap-2 mb-2">
-                <SparklesIcon className="w-5 h-5 text-emerald-400" />
-                <span className="text-gray-400 text-sm">Unclaimed Rebates</span>
+              <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+                <SparklesIcon className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+                <span className="text-gray-400 text-xs sm:text-sm">Unclaimed</span>
               </div>
-              <p className="text-2xl font-bold text-emerald-400">
+              <p className="text-lg sm:text-2xl font-bold text-emerald-400">
                 {formatUSD(rebateData.unclaimedRebate)}
               </p>
               {rebateData.unclaimedRebate > 0 && (
-                <p className="text-xs text-emerald-300/70 mt-1">Available to claim</p>
+                <p className="text-xs text-emerald-300/70 mt-1 hidden sm:block">Available to claim</p>
               )}
             </motion.div>
 
@@ -393,16 +393,16 @@ export default function MyRebatesPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.15 }}
-              className="bg-gradient-to-br from-gray-900 to-gray-950 border border-white/10 rounded-xl p-5"
+              className="bg-gradient-to-br from-gray-900 to-gray-950 border border-white/10 rounded-xl p-3 sm:p-5"
             >
-              <div className="flex items-center gap-2 mb-2">
-                <CheckCircleIcon className="w-5 h-5 text-cyan-400" />
-                <span className="text-gray-400 text-sm">Total Claimed</span>
+              <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+                <CheckCircleIcon className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
+                <span className="text-gray-400 text-xs sm:text-sm">Claimed</span>
               </div>
-              <p className="text-2xl font-bold text-white">
+              <p className="text-lg sm:text-2xl font-bold text-white">
                 {formatUSD(rebateData.totalClaimed)}
               </p>
-              <p className="text-xs text-gray-500 mt-1">Lifetime earnings</p>
+              <p className="text-xs text-gray-500 mt-1 hidden sm:block">Lifetime earnings</p>
             </motion.div>
 
             {/* Trading Volume */}
@@ -410,13 +410,13 @@ export default function MyRebatesPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="bg-gradient-to-br from-gray-900 to-gray-950 border border-white/10 rounded-xl p-5"
+              className="bg-gradient-to-br from-gray-900 to-gray-950 border border-white/10 rounded-xl p-3 sm:p-5"
             >
-              <div className="flex items-center gap-2 mb-2">
-                <ChartBarIcon className="w-5 h-5 text-blue-400" />
-                <span className="text-gray-400 text-sm">Trading Volume</span>
+              <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+                <ChartBarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
+                <span className="text-gray-400 text-xs sm:text-sm">Volume</span>
               </div>
-              <p className="text-2xl font-bold text-white">
+              <p className="text-lg sm:text-2xl font-bold text-white">
                 {formatUSD(rebateData.totalVolume)}
               </p>
               <p className="text-xs text-gray-500 mt-1">{rebateData.totalSwaps} swaps</p>
@@ -427,16 +427,16 @@ export default function MyRebatesPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.25 }}
-              className="bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/30 rounded-xl p-5"
+              className="bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/30 rounded-xl p-3 sm:p-5"
             >
-              <div className="flex items-center gap-2 mb-2">
-                <FireIcon className="w-5 h-5 text-orange-400" />
-                <span className="text-gray-400 text-sm">Tokens Burned</span>
+              <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+                <FireIcon className="w-4 h-4 sm:w-5 sm:h-5 text-orange-400" />
+                <span className="text-gray-400 text-xs sm:text-sm">Burned</span>
               </div>
-              <p className="text-2xl font-bold text-orange-400">
-                {burnData?.totalBurned.toLocaleString(undefined, { maximumFractionDigits: 2 }) || "0"} BACK
+              <p className="text-lg sm:text-2xl font-bold text-orange-400 truncate">
+                {burnData?.totalBurned.toLocaleString(undefined, { maximumFractionDigits: 2 }) || "0"}
               </p>
-              <p className="text-xs text-orange-300/70 mt-1">From early unlocks</p>
+              <p className="text-xs text-orange-300/70 mt-1 hidden sm:block">From early unlocks</p>
             </motion.div>
           </div>
 
@@ -446,28 +446,28 @@ export default function MyRebatesPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="bg-gradient-to-br from-gray-900 to-gray-950 border border-emerald-500/30 rounded-xl p-6"
+              className="bg-gradient-to-br from-gray-900 to-gray-950 border border-emerald-500/30 rounded-xl p-4 sm:p-6"
             >
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-lg font-bold text-white mb-1">Claim Your Rebates</h3>
-                  <p className="text-gray-400 text-sm">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+                <div className="text-center sm:text-left">
+                  <h3 className="text-base sm:text-lg font-bold text-white mb-1">Claim Your Rebates</h3>
+                  <p className="text-gray-400 text-xs sm:text-sm">
                     You have {formatUSD(rebateData.unclaimedRebate)} in unclaimed rebates
                   </p>
                 </div>
                 <button
                   onClick={handleClaimRebates}
                   disabled={isClaiming}
-                  className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+                  className="w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 text-sm sm:text-base"
                 >
                   {isClaiming ? (
                     <>
-                      <ArrowPathIcon className="w-5 h-5 animate-spin" />
+                      <ArrowPathIcon className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
                       <span>Claiming...</span>
                     </>
                   ) : (
                     <>
-                      <BanknotesIcon className="w-5 h-5" />
+                      <BanknotesIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                       <span>Claim {formatUSD(rebateData.unclaimedRebate)}</span>
                     </>
                   )}
@@ -481,11 +481,11 @@ export default function MyRebatesPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35 }}
-            className="bg-gradient-to-br from-gray-900 to-gray-950 border border-white/10 rounded-xl p-6"
+            className="bg-gradient-to-br from-gray-900 to-gray-950 border border-white/10 rounded-xl p-4 sm:p-6"
           >
-            <div className="flex items-center gap-2 mb-4">
-              <ClockIcon className="w-5 h-5 text-gray-400" />
-              <h3 className="text-lg font-bold text-white">Activity</h3>
+            <div className="flex items-center gap-2 mb-3 sm:mb-4">
+              <ClockIcon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+              <h3 className="text-base sm:text-lg font-bold text-white">Activity</h3>
             </div>
 
             <div className="space-y-4">
