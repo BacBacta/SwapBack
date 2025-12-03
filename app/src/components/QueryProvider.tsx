@@ -9,13 +9,18 @@ export function QueryProvider({ children }: { children: ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            // Performance: Optimized cache times
-            staleTime: 60_000, // 1 minute - data is considered fresh
-            gcTime: 5 * 60_000, // 5 minutes - cache garbage collection (formerly cacheTime)
-            refetchOnWindowFocus: false, // Disable auto-refetch on focus for performance
-            refetchOnReconnect: true,
-            retry: 3,
-            retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+            // 🚀 Aggressive caching for better performance
+            staleTime: 2 * 60_000, // 2 minutes - data is considered fresh
+            gcTime: 10 * 60_000, // 10 minutes - cache garbage collection
+            refetchOnWindowFocus: false, // Disable auto-refetch on focus
+            refetchOnReconnect: false, // Don't refetch on reconnect
+            refetchOnMount: false, // Don't refetch on component mount if data exists
+            retry: 2, // Reduce retries
+            retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+            // 🚀 Structural sharing for better memory usage
+            structuralSharing: true,
+            // 🚀 Throttle refetch interval
+            refetchInterval: false,
           },
           mutations: {
             retry: 1,

@@ -8,6 +8,23 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   
+  // 🚀 Performance optimizations
+  experimental: {
+    optimizePackageImports: [
+      '@solana/web3.js',
+      '@coral-xyz/anchor',
+      '@solana/wallet-adapter-react',
+      '@solana/wallet-adapter-react-ui',
+      'framer-motion',
+      'recharts',
+      'chart.js',
+      'lodash',
+      'lucide-react',
+      '@heroicons/react',
+      'date-fns',
+    ],
+  },
+  
   // Désactiver ESLint et TypeScript pendant le build
   eslint: {
     ignoreDuringBuilds: true,
@@ -16,7 +33,14 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   
-  webpack: (config, { isServer }) => {
+  // 🔥 Compiler optimizations
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn'],
+    } : false,
+  },
+  
+  webpack: (config, { isServer, dev }) => {
     // Polyfills pour les modules Node.js requis par Solana (côté client uniquement)
     if (!isServer) {
       config.resolve.fallback = {
@@ -48,33 +72,71 @@ const nextConfig = {
         })
       );
       
-      // Optimisation des chunks pour éviter les erreurs de chargement
+      // 🚀 Optimized chunk splitting for better caching
       config.optimization = {
         ...config.optimization,
+        moduleIds: 'deterministic',
         splitChunks: {
           chunks: 'all',
+          minSize: 20000,
+          maxSize: 244000, // Target ~240KB per chunk for optimal loading
           cacheGroups: {
-            default: false,
-            vendors: false,
-            // Groupe pour les node_modules
-            vendor: {
-              name: 'vendor',
-              chunks: 'all',
-              test: /node_modules/,
-              priority: 20,
+            // Solana/Web3 - loaded on demand
+            solana: {
+              test: /[\\/]node_modules[\\/](@solana|@coral-xyz|@project-serum)[\\/]/,
+              name: 'solana',
+              chunks: 'async', // Async loading for faster initial page load
+              priority: 30,
+              reuseExistingChunk: true,
             },
-            // Groupe pour le code commun
+            // Wallet adapters - loaded when wallet modal opens
+            wallet: {
+              test: /[\\/]node_modules[\\/](@solana[\\/]wallet-adapter|@walletconnect)[\\/]/,
+              name: 'wallet',
+              chunks: 'async',
+              priority: 25,
+              reuseExistingChunk: true,
+            },
+            // Charts/Visualization - loaded on dashboard pages only
+            charts: {
+              test: /[\\/]node_modules[\\/](recharts|chart\.js|react-chartjs-2|d3|victory)[\\/]/,
+              name: 'charts',
+              chunks: 'async',
+              priority: 20,
+              reuseExistingChunk: true,
+            },
+            // Animation libraries - loaded with components that use them
+            animation: {
+              test: /[\\/]node_modules[\\/](framer-motion|react-spring)[\\/]/,
+              name: 'animation',
+              chunks: 'async',
+              priority: 15,
+              reuseExistingChunk: true,
+            },
+            // React core - shared across all pages
+            react: {
+              test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+              name: 'react',
+              chunks: 'all',
+              priority: 40,
+              reuseExistingChunk: true,
+            },
+            // Common utilities
             common: {
               name: 'common',
               minChunks: 2,
               chunks: 'all',
-              priority: 10,
+              priority: 5,
               reuseExistingChunk: true,
-              enforce: true,
             },
           },
         },
       };
+      
+      // 🔥 Production-only optimizations
+      if (!dev) {
+        config.optimization.minimize = true;
+      }
     }
     
     return config;
