@@ -6,23 +6,26 @@ import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { WalletReadyState } from "@solana/wallet-adapter-base";
 import { showToast } from "@/lib/toast";
 
-// Mobile wallet deep links
+// Mobile wallet deep links - these open the app directly
 const MOBILE_WALLETS = {
   phantom: {
     name: 'Phantom',
     icon: '👻',
-    getDeepLink: (url: string) => `https://phantom.app/ul/browse/${encodeURIComponent(url)}?ref=swapback`,
+    // Use connect deep link format for Phantom
+    getConnectLink: () => `phantom://`,
+    getBrowseLink: (url: string) => `https://phantom.app/ul/browse/${encodeURIComponent(url)}`,
   },
   solflare: {
     name: 'Solflare', 
     icon: '🔥',
-    getDeepLink: (url: string) => `https://solflare.com/ul/v1/browse/${encodeURIComponent(url)}?ref=swapback`,
+    getConnectLink: () => `solflare://`,
+    getBrowseLink: (url: string) => `https://solflare.com/ul/v1/browse/${encodeURIComponent(url)}`,
   },
 };
 
 export const ClientOnlyWallet = () => {
-  const { connected, connecting, publicKey, wallet, disconnect, wallets } = useWallet();
-  const { setVisible } = useWalletModal();
+  const { connected, connecting, publicKey, wallet, disconnect, wallets, select } = useWallet();
+  const { visible, setVisible } = useWalletModal();
   const { connection } = useConnection();
   const [network, setNetwork] = useState<"mainnet-beta" | "devnet">(
     (process.env.NEXT_PUBLIC_SOLANA_NETWORK as "mainnet-beta" | "devnet") || "devnet"
@@ -44,10 +47,41 @@ export const ClientOnlyWallet = () => {
     setIsMobile(checkMobile);
   }, []);
 
-  // Check if any wallet is ready (installed)
+  // Check if any wallet is ready (installed) - on mobile this is usually false in regular browser
   const hasInstalledWallet = wallets.some(
     w => w.readyState === WalletReadyState.Installed || w.readyState === WalletReadyState.Loadable
   );
+
+  // Force close the standard modal on mobile if no wallet is installed
+  // This prevents the "We can't find a wallet" message from staying open
+  useEffect(() => {
+    if (isMobile && visible && !hasInstalledWallet) {
+      // Close the standard modal immediately
+      setVisible(false);
+      // Show our custom modal instead
+      setShowMobileWalletModal(true);
+    }
+  }, [visible, isMobile, hasInstalledWallet, setVisible]);
+
+  // Also hide any wallet modal that might be stuck
+  useEffect(() => {
+    if (isMobile && !hasInstalledWallet) {
+      // Try to close any stuck modals
+      const closeModals = () => {
+        const modals = document.querySelectorAll('.wallet-adapter-modal-wrapper, .wallet-adapter-modal-overlay, .wallet-adapter-modal');
+        modals.forEach(modal => {
+          if (modal instanceof HTMLElement) {
+            modal.style.display = 'none';
+          }
+        });
+      };
+      
+      // Run immediately and after a short delay
+      closeModals();
+      const timeout = setTimeout(closeModals, 100);
+      return () => clearTimeout(timeout);
+    }
+  }, [isMobile, hasInstalledWallet, visible]);
 
   // Detect network from RPC endpoint
   useEffect(() => {
@@ -100,23 +134,29 @@ export const ClientOnlyWallet = () => {
   }, [connected, publicKey]);
 
   const handleConnect = useCallback(() => {
-    // On mobile without installed wallet, show our custom modal
-    if (isMobile && !hasInstalledWallet) {
+    // On mobile, always show our custom modal (more reliable)
+    if (isMobile) {
       setShowMobileWalletModal(true);
     } else {
-      // Open the standard wallet modal
+      // On desktop, use the standard wallet modal
       setVisible(true);
     }
-  }, [setVisible, isMobile, hasInstalledWallet]);
+  }, [setVisible, isMobile]);
 
   const handleMobileWalletSelect = (walletKey: keyof typeof MOBILE_WALLETS) => {
     const walletConfig = MOBILE_WALLETS[walletKey];
-    const currentUrl = window.location.href;
-    const deepLink = walletConfig.getDeepLink(currentUrl);
+    const currentUrl = window.location.origin + window.location.pathname;
     
-    // Open the deep link
-    window.location.href = deepLink;
+    // Use the browse deep link to open the current page in the wallet's browser
+    const deepLink = walletConfig.getBrowseLink(currentUrl);
+    
+    // Close our modal first
     setShowMobileWalletModal(false);
+    
+    // Small delay then redirect
+    setTimeout(() => {
+      window.location.href = deepLink;
+    }, 100);
   };
 
   const handleDisconnect = useCallback(async () => {

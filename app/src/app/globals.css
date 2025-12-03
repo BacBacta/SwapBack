@@ -1015,6 +1015,23 @@ html {
   z-index: 10000 !important;
 }
 
+/* Hide wallet adapter modal on mobile when showing custom modal */
+@media (max-width: 768px) {
+  /* Hide the "We can't find a wallet" message on mobile */
+  .wallet-adapter-modal-wrapper:has(.wallet-adapter-modal-list:empty),
+  .wallet-adapter-modal-wrapper:has(.wallet-adapter-modal-middle-button) {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+  
+  /* Also target the collapsed modal state */
+  .wallet-adapter-collapse {
+    display: none !important;
+  }
+}
+
 /* Ensure wallet button is clickable - conservative approach */
 .wallet-adapter-button-trigger {
   pointer-events: auto !important;
