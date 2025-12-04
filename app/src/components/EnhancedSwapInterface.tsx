@@ -256,18 +256,6 @@ export function EnhancedSwapInterface() {
   // WebSocket for real-time data
   useSwapWebSocket();
 
-  // ✅ Reset routes when router changes
-  useEffect(() => {
-    clearRoutes();
-    setHasSearchedRoute(false);
-    // Re-fetch if inputs are valid
-    if (swap.inputToken && swap.outputToken && parseFloat(swap.inputAmount) > 0) {
-      fetchRoutes({ userPublicKey: publicKey?.toBase58() ?? null }).catch((err) => {
-        console.debug('[Router change] Auto-fetch failed:', err);
-      });
-    }
-  }, [selectedRouter, clearRoutes, fetchRoutes, swap.inputToken, swap.outputToken, swap.inputAmount, publicKey]);
-
   // State
   const [selectedRouter, setSelectedRouter] = useState<"swapback" | "jupiter">(
     "swapback"
@@ -311,6 +299,17 @@ export function EnhancedSwapInterface() {
   } | null>(null);
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // ✅ Reset routes when router changes
+  useEffect(() => {
+    clearRoutes();
+    setHasSearchedRoute(false);
+    if (swap.inputToken && swap.outputToken && parseFloat(swap.inputAmount) > 0) {
+      fetchRoutes({ userPublicKey: publicKey?.toBase58() ?? null }).catch((err) => {
+        console.debug('[Router change] Auto-fetch failed:', err);
+      });
+    }
+  }, [selectedRouter, clearRoutes, fetchRoutes, swap.inputToken, swap.outputToken, swap.inputAmount, publicKey]);
 
   // ✅ AUTO-FETCH activé avec debounce pour éviter trop d'appels API
   const debouncedFetchRoutes = useCallback(
