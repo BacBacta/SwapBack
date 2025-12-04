@@ -9,8 +9,9 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 
-// Jupiter API base URL
-const JUPITER_API = process.env.JUPITER_API_URL || "https://quote-api.jup.ag/v6";
+// Jupiter API - using public.jupiterapi.com which works on Vercel
+// The quote-api.jup.ag has DNS resolution issues on some serverless platforms
+const JUPITER_API = process.env.JUPITER_API_URL || "https://public.jupiterapi.com";
 
 // Helper to add no-store header
 const withNoStore = (init?: ResponseInit): ResponseInit => {

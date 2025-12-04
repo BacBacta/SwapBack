@@ -6,7 +6,6 @@
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const revalidate = 3600; // Cache for 1 hour
 
 import { NextRequest, NextResponse } from "next/server";
 
@@ -19,7 +18,21 @@ interface JupiterToken {
   tags?: string[];
 }
 
-// Cache tokens in memory for 1 hour
+// Popular tokens fallback (real mainnet addresses)
+const FALLBACK_TOKENS: JupiterToken[] = [
+  { address: "So11111111111111111111111111111111111111112", symbol: "SOL", name: "Solana", decimals: 9, logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png", tags: ["verified"] },
+  { address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", symbol: "USDC", name: "USD Coin", decimals: 6, logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png", tags: ["verified", "stablecoin"] },
+  { address: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", symbol: "USDT", name: "Tether USD", decimals: 6, logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.png", tags: ["verified", "stablecoin"] },
+  { address: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", symbol: "JUP", name: "Jupiter", decimals: 6, logoURI: "https://static.jup.ag/jup/icon.png", tags: ["verified"] },
+  { address: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", symbol: "BONK", name: "Bonk", decimals: 5, logoURI: "https://arweave.net/hQiPZOsRZXGXBJd_82PhVdlM_hACsT_q6wqwf5cSY7I", tags: ["verified"] },
+  { address: "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs", symbol: "ETH", name: "Wrapped Ether (Wormhole)", decimals: 8, logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs/logo.png", tags: ["verified"] },
+  { address: "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So", symbol: "mSOL", name: "Marinade Staked SOL", decimals: 9, logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So/logo.png", tags: ["verified"] },
+  { address: "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm", symbol: "WIF", name: "dogwifhat", decimals: 6, logoURI: "https://bafkreibk3covs5ltyqxa272uodhculbr6kea6betidfwy3ajsav2vjzyum.ipfs.nftstorage.link", tags: ["verified"] },
+  { address: "HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3", symbol: "PYTH", name: "Pyth Network", decimals: 6, logoURI: "https://pyth.network/token.svg", tags: ["verified"] },
+  { address: "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL", symbol: "JTO", name: "Jito", decimals: 9, logoURI: "https://metadata.jito.network/token/jto/image", tags: ["verified"] },
+];
+
+// Cache tokens in memory
 let cachedTokens: JupiterToken[] | null = null;
 let cacheTimestamp = 0;
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour in ms
@@ -27,10 +40,6 @@ const CACHE_TTL = 60 * 60 * 1000; // 1 hour in ms
 /**
  * GET /api/tokens
  * Returns list of verified tokens from Jupiter
- * Query params:
- * - search: Search by symbol or name
- * - address: Get specific token by address
- * - limit: Max number of tokens to return (default: 100)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -44,21 +53,28 @@ export async function GET(request: NextRequest) {
     if (!cachedTokens || now - cacheTimestamp > CACHE_TTL) {
       console.log("🔄 Fetching tokens from Jupiter API...");
       
-      const response = await fetch("https://token.jup.ag/strict", {
-        headers: {
-          Accept: "application/json",
-          "User-Agent": "SwapBack/1.0",
-        },
-        next: { revalidate: 3600 },
-      });
+      try {
+        // Try tokens.jup.ag first (newer API)
+        const response = await fetch("https://tokens.jup.ag/tokens?tags=verified", {
+          headers: {
+            Accept: "application/json",
+            "User-Agent": "SwapBack/1.0",
+          },
+          signal: AbortSignal.timeout(5000), // 5 second timeout
+        });
 
-      if (!response.ok) {
-        throw new Error(`Jupiter API error: ${response.status}`);
+        if (response.ok) {
+          cachedTokens = await response.json();
+          cacheTimestamp = now;
+          console.log(`✅ Cached ${cachedTokens?.length || 0} tokens from tokens.jup.ag`);
+        } else {
+          throw new Error(`API returned ${response.status}`);
+        }
+      } catch (fetchError) {
+        console.warn("⚠️ Failed to fetch from Jupiter, using fallback tokens:", fetchError);
+        cachedTokens = FALLBACK_TOKENS;
+        cacheTimestamp = now;
       }
-
-      cachedTokens = await response.json();
-      cacheTimestamp = now;
-      console.log(`✅ Cached ${cachedTokens?.length || 0} tokens`);
     }
 
     let tokens = cachedTokens || [];

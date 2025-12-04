@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 
-const JUPITER_API = process.env.JUPITER_API_URL || "https://quote-api.jup.ag/v6";
+// Jupiter API - using public.jupiterapi.com which works on Vercel
+const JUPITER_API = process.env.JUPITER_API_URL || "https://public.jupiterapi.com";
 
 // Simple rate limiting in memory
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
