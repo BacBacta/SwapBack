@@ -33,8 +33,8 @@ use routing::{
     adjust_venue_weights_with_scores, parse_venue_scores_by_pubkey, MIN_QUALITY_SCORE_DEFAULT,
 };
 
-// Program ID - Deployed on devnet (Nov 12, 2025)
-declare_id!("9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh");
+// Program ID - Deployed on mainnet-beta (Dec 4, 2025)
+declare_id!("5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf");
 
 // DEX Program IDs (example - would need to be updated with actual deployed programs)
 pub const RAYDIUM_AMM_PROGRAM_ID: Pubkey = pubkey!("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8");
