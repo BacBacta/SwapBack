@@ -1,11 +1,12 @@
 /**
  * Enhanced Token Selector Modal - Fullscreen with Search & Filters
  * Inspired by Jupiter/Uniswap V4 UX
+ * Production version - fetches real tokens from Jupiter API
  */
 
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -37,19 +38,17 @@ interface TokenSelectorModalProps {
   onSelect: (token: Token) => void;
   selectedToken?: string;
   title?: string;
+  walletAddress?: string; // To fetch balances
 }
 
-// Mock popular tokens (in real app, fetch from API)
-const POPULAR_TOKENS: Token[] = [
+// Default popular tokens (real mainnet addresses, no fake balances)
+const DEFAULT_POPULAR_TOKENS: Token[] = [
   {
     address: "So11111111111111111111111111111111111111112",
     symbol: "SOL",
     name: "Solana",
     decimals: 9,
     logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png",
-    balance: 2.5,
-    balanceUSD: 250,
-    priceUSD: 100,
     verified: true,
     tags: ["blue-chip"]
   },
@@ -59,9 +58,6 @@ const POPULAR_TOKENS: Token[] = [
     name: "USD Coin",
     decimals: 6,
     logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png",
-    balance: 1000,
-    balanceUSD: 1000,
-    priceUSD: 1,
     verified: true,
     tags: ["stablecoin"]
   },
@@ -71,9 +67,6 @@ const POPULAR_TOKENS: Token[] = [
     name: "Tether USD",
     decimals: 6,
     logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.png",
-    balance: 500,
-    balanceUSD: 500,
-    priceUSD: 1,
     verified: true,
     tags: ["stablecoin"]
   },
@@ -83,9 +76,24 @@ const POPULAR_TOKENS: Token[] = [
     name: "Jupiter",
     decimals: 6,
     logoURI: "https://static.jup.ag/jup/icon.png",
-    balance: 150,
-    balanceUSD: 120,
-    priceUSD: 0.8,
+    verified: true,
+    tags: ["blue-chip"]
+  },
+  {
+    address: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+    symbol: "BONK",
+    name: "Bonk",
+    decimals: 5,
+    logoURI: "https://arweave.net/hQiPZOsRZXGXBJd_82PhVdlM_hACsT_q6wqwf5cSY7I",
+    verified: true,
+    tags: ["blue-chip", "meme"]
+  },
+  {
+    address: "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs",
+    symbol: "ETH",
+    name: "Wrapped Ether (Wormhole)",
+    decimals: 8,
+    logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs/logo.png",
     verified: true,
     tags: ["blue-chip"]
   },
@@ -98,27 +106,143 @@ export function TokenSelectorModal({
   onClose,
   onSelect,
   selectedToken,
-  title = "Select a token"
+  title = "Select a token",
+  walletAddress
 }: TokenSelectorModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [favorites, setFavorites] = useState<Set<string>>(new Set(["So11111111111111111111111111111111111111112"]));
+  const [allTokens, setAllTokens] = useState<Token[]>(DEFAULT_POPULAR_TOKENS);
+  const [isLoadingTokens, setIsLoadingTokens] = useState(false);
+  const [searchedTokens, setSearchedTokens] = useState<Token[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Fetch tokens from Jupiter API on mount
+  useEffect(() => {
+    const fetchTokens = async () => {
+      if (!isOpen) return;
+      
+      setIsLoadingTokens(true);
+      try {
+        // Fetch strict verified tokens from Jupiter
+        const response = await fetch('https://token.jup.ag/strict');
+        if (response.ok) {
+          const data = await response.json();
+          // Map to our Token format and take top 100 by liquidity
+          const tokens: Token[] = data.slice(0, 100).map((t: { address: string; symbol: string; name: string; decimals: number; logoURI?: string; tags?: string[] }) => ({
+            address: t.address,
+            symbol: t.symbol,
+            name: t.name,
+            decimals: t.decimals,
+            logoURI: t.logoURI,
+            verified: true,
+            tags: t.tags || (t.symbol.includes('USD') ? ['stablecoin'] : ['blue-chip'])
+          }));
+          setAllTokens(tokens);
+        }
+      } catch (error) {
+        console.warn('Failed to fetch Jupiter tokens, using defaults:', error);
+        setAllTokens(DEFAULT_POPULAR_TOKENS);
+      } finally {
+        setIsLoadingTokens(false);
+      }
+    };
+
+    fetchTokens();
+  }, [isOpen]);
+
+  // Search for tokens when typing an address or symbol
+  const searchJupiterTokens = useCallback(async (query: string) => {
+    if (!query || query.length < 2) {
+      setSearchedTokens([]);
+      return;
+    }
+
+    // Check if it's a Solana address (32-44 chars base58)
+    const isAddress = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(query);
+    
+    setIsSearching(true);
+    try {
+      if (isAddress) {
+        // Search for specific token by address
+        const response = await fetch(`https://token.jup.ag/strict`);
+        if (response.ok) {
+          const data = await response.json();
+          const found = data.find((t: { address: string }) => t.address === query);
+          if (found) {
+            setSearchedTokens([{
+              address: found.address,
+              symbol: found.symbol,
+              name: found.name,
+              decimals: found.decimals,
+              logoURI: found.logoURI,
+              verified: true,
+              tags: found.tags || []
+            }]);
+          } else {
+            // Try all tokens list for unverified tokens
+            const allResponse = await fetch(`https://token.jup.ag/all`);
+            if (allResponse.ok) {
+              const allData = await allResponse.json();
+              const foundAll = allData.find((t: { address: string }) => t.address === query);
+              if (foundAll) {
+                setSearchedTokens([{
+                  address: foundAll.address,
+                  symbol: foundAll.symbol,
+                  name: foundAll.name,
+                  decimals: foundAll.decimals,
+                  logoURI: foundAll.logoURI,
+                  verified: false,
+                  tags: foundAll.tags || []
+                }]);
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Token search failed:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery.length >= 32) {
+        searchJupiterTokens(searchQuery);
+      } else {
+        setSearchedTokens([]);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, searchJupiterTokens]);
 
   // Filter and search tokens
   const filteredTokens = useMemo(() => {
-    let tokens = POPULAR_TOKENS;
+    // Combine searched tokens with all tokens
+    let tokens = searchedTokens.length > 0 ? [...searchedTokens, ...allTokens] : allTokens;
+
+    // Remove duplicates
+    const seen = new Set<string>();
+    tokens = tokens.filter(t => {
+      if (seen.has(t.address)) return false;
+      seen.add(t.address);
+      return true;
+    });
 
     // Apply filter
     if (activeFilter === "favorites") {
       tokens = tokens.filter(t => favorites.has(t.address));
     } else if (activeFilter === "stablecoins") {
-      tokens = tokens.filter(t => t.tags?.includes("stablecoin"));
+      tokens = tokens.filter(t => t.tags?.includes("stablecoin") || t.symbol.includes('USD'));
     } else if (activeFilter === "blue-chips") {
       tokens = tokens.filter(t => t.tags?.includes("blue-chip"));
     }
 
-    // Apply search
-    if (searchQuery) {
+    // Apply search (for non-address searches)
+    if (searchQuery && searchQuery.length < 32) {
       const query = searchQuery.toLowerCase();
       tokens = tokens.filter(
         t =>
@@ -128,9 +252,14 @@ export function TokenSelectorModal({
       );
     }
 
-    // Sort by balance (highest first)
-    return tokens.sort((a, b) => (b.balanceUSD || 0) - (a.balanceUSD || 0));
-  }, [searchQuery, activeFilter, favorites]);
+    // Sort by balance (highest first), then by symbol
+    return tokens.sort((a, b) => {
+      if ((b.balanceUSD || 0) !== (a.balanceUSD || 0)) {
+        return (b.balanceUSD || 0) - (a.balanceUSD || 0);
+      }
+      return a.symbol.localeCompare(b.symbol);
+    });
+  }, [searchQuery, activeFilter, favorites, allTokens, searchedTokens]);
 
   const toggleFavorite = (address: string) => {
     setFavorites(prev => {
