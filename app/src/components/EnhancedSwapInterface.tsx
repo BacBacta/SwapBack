@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { BN } from "@coral-xyz/anchor";
 import { AccountMeta, PublicKey } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
@@ -48,7 +48,7 @@ import { SmartSlippage } from "@/components/SmartSlippage";
 import { SwapDetailsExpandable } from "@/components/SwapDetailsExpandable";
 import { SuccessModal } from "@/components/SuccessModal";
 import { ErrorFeedback, detectErrorType, type ErrorType } from "@/components/ErrorFeedback";
-// import { debounce } from "lodash"; // Désactivé - Pas d'auto-fetch
+import { debounce } from "lodash";
 
 interface RouteStep {
   label: string;
