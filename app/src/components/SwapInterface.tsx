@@ -137,8 +137,9 @@ export const SwapInterface = () => {
 
       console.log("📊 Request params:", { inputToken, outputToken, inputAmount, amountInLamports });
 
-      // Call our API endpoint
-      const response = await fetch('/api/swap/quote', {
+      // Call our API endpoint (Fly.io in production)
+      const { getApiUrl, API_ENDPOINTS } = await import('@/config/api');
+      const response = await fetch(getApiUrl(API_ENDPOINTS.quote), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,6 +1,7 @@
 import { useMemo, useCallback } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
+import { getApiUrl, API_ENDPOINTS } from "@/config/api";
 
 /**
  * Jupiter Quote type (matches API response)
@@ -89,7 +90,7 @@ export function useJupiter() {
     onlyDirectRoutes: boolean = false
   ): Promise<JupiterQuote | null> => {
     try {
-      const response = await fetch('/api/swap/quote', {
+      const response = await fetch(getApiUrl(API_ENDPOINTS.quote), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

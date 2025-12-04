@@ -6,6 +6,7 @@
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import { RouteCandidate } from "@/../../sdk/src/types/smart-router";
+import { getApiUrl, API_ENDPOINTS } from "@/config/api";
 import { buildHybridIntents, type HybridRouteIntent, type RoutingStrategy } from "@/lib/routing/hybridRouting";
 import type { RouterReliabilitySummary } from "@/types/router";
 
@@ -275,8 +276,8 @@ export const useSwapStore = create<SwapStore>()(
             );
             const slippageBps = Math.max(1, Math.floor(swap.slippageTolerance * 10000));
 
-            // Call API route (uses CORS proxy on Vercel)
-            const response = await fetch("/api/swap/quote", {
+            // Call API route (uses Fly.io in production to avoid Vercel DNS issues)
+            const response = await fetch(getApiUrl(API_ENDPOINTS.quote), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
