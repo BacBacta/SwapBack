@@ -36,12 +36,22 @@ const JUPITER_PROGRAM_IDS = new Set([
 function extractJupiterAccounts(swapTxBase64: string): {
   accounts: { pubkey: string; isSigner: boolean; isWritable: boolean }[];
   programId: string;
+  addressTableLookups?: { accountKey: string; writableIndexes: number[]; readonlyIndexes: number[] }[];
 } {
   try {
     const buf = Buffer.from(swapTxBase64, "base64");
     const vtx = VersionedTransaction.deserialize(buf);
     const msg = vtx.message;
-    const acctKeys = msg.getAccountKeys({ accountKeysFromLookups: msg.addressTableLookups });
+    
+    // Pour les transactions V0, on utilise staticAccountKeys au lieu de getAccountKeys
+    // car getAccountKeys nécessite les adresses résolues des lookup tables
+    const staticKeys = msg.staticAccountKeys || [];
+    
+    // Vérifier qu'on a des clés statiques
+    if (staticKeys.length === 0) {
+      console.warn("⚠️ No static account keys in transaction");
+      return { accounts: [], programId: "" };
+    }
 
     // Trouver l'instruction Jupiter (on ignore ComputeBudget)
     const instructions = [...msg.compiledInstructions];
@@ -52,40 +62,68 @@ function extractJupiterAccounts(swapTxBase64: string): {
       return { accounts: [], programId: "" };
     }
     
+    // Chercher l'instruction Jupiter parmi les clés statiques
     const jupIx: MessageCompiledInstruction | undefined =
       [...instructions]
         .reverse()
         .find((ix) => {
-          const pid = acctKeys.get(ix.programIdIndex)?.toBase58();
+          // L'index doit être dans les clés statiques
+          if (ix.programIdIndex >= staticKeys.length) return false;
+          const pid = staticKeys[ix.programIdIndex]?.toBase58();
           if (!pid) return false;
           if (pid === "ComputeBudget111111111111111111111111111111") return false;
           return JUPITER_PROGRAM_IDS.has(pid);
-        }) ?? instructions[instructions.length - 1];
+        });
+    
+    // Si pas trouvé dans les clés statiques, utiliser la dernière instruction non-ComputeBudget
+    const fallbackIx = jupIx ?? [...instructions].reverse().find((ix) => {
+      if (ix.programIdIndex >= staticKeys.length) return true; // Probablement dans lookup table
+      const pid = staticKeys[ix.programIdIndex]?.toBase58();
+      return pid !== "ComputeBudget111111111111111111111111111111";
+    }) ?? instructions[instructions.length - 1];
 
-    // Vérifier que nous avons trouvé une instruction Jupiter
-    if (!jupIx) {
-      console.warn("⚠️ No Jupiter instruction found in transaction");
+    // Vérifier que nous avons trouvé une instruction
+    if (!fallbackIx) {
+      console.warn("⚠️ No suitable instruction found in transaction");
       return { accounts: [], programId: "" };
     }
 
-    const programId = acctKeys.get(jupIx.programIdIndex)?.toBase58() ?? "";
+    // Obtenir le programId (peut être dans lookup table)
+    const programId = fallbackIx.programIdIndex < staticKeys.length 
+      ? staticKeys[fallbackIx.programIdIndex]?.toBase58() ?? ""
+      : "";
     
     // Vérifier que accountKeyIndexes existe
-    if (!jupIx.accountKeyIndexes || jupIx.accountKeyIndexes.length === 0) {
-      console.warn("⚠️ No account key indexes in Jupiter instruction");
+    if (!fallbackIx.accountKeyIndexes || fallbackIx.accountKeyIndexes.length === 0) {
+      console.warn("⚠️ No account key indexes in instruction");
       return { accounts: [], programId };
     }
     
-    const accounts = jupIx.accountKeyIndexes.map((idx) => {
-      const pk = acctKeys.get(idx);
-      return {
-        pubkey: pk?.toBase58() ?? "",
-        isSigner: msg.isAccountSigner(idx),
-        isWritable: msg.isAccountWritable(idx),
-      };
-    }).filter(acc => acc.pubkey !== ""); // Filter out empty pubkeys
+    // Extraire les comptes depuis les clés statiques seulement
+    // Les comptes dans les lookup tables seront résolus côté client
+    const accounts = fallbackIx.accountKeyIndexes
+      .filter(idx => idx < staticKeys.length) // Seulement les clés statiques
+      .map((idx) => {
+        const pk = staticKeys[idx];
+        return {
+          pubkey: pk?.toBase58() ?? "",
+          isSigner: msg.isAccountSigner(idx),
+          isWritable: msg.isAccountWritable(idx),
+        };
+      })
+      .filter(acc => acc.pubkey !== "");
 
-    return { accounts, programId };
+    // Inclure les informations sur les lookup tables pour que le client puisse les résoudre
+    const addressTableLookups = msg.addressTableLookups?.map(lookup => ({
+      accountKey: lookup.accountKey.toBase58(),
+      writableIndexes: [...lookup.writableIndexes],
+      readonlyIndexes: [...lookup.readonlyIndexes],
+    }));
+
+    // Log pour debug
+    console.log(`📊 Extracted ${accounts.length} static accounts, ${addressTableLookups?.length || 0} lookup tables`);
+
+    return { accounts, programId, addressTableLookups };
   } catch (error) {
     console.error("❌ Error extracting Jupiter accounts:", error);
     return { accounts: [], programId: "" };
@@ -406,20 +444,25 @@ export async function POST(request: NextRequest) {
           if (swapData.swapTransaction) {
             const parsed = extractJupiterAccounts(swapData.swapTransaction);
 
-            if (parsed.accounts.length === 0 || !parsed.programId) {
-              console.warn("⚠️ Jupiter accounts extraction failed");
+            // On considère réussi si on a soit des comptes statiques, soit des lookup tables
+            const hasStaticAccounts = parsed.accounts.length > 0;
+            const hasLookupTables = parsed.addressTableLookups && parsed.addressTableLookups.length > 0;
+            
+            if (!hasStaticAccounts && !hasLookupTables) {
+              console.warn("⚠️ Jupiter accounts extraction failed - no accounts or lookup tables");
             } else {
               jupiterCpi = {
                 expectedInputAmount: quote.inAmount,
                 swapInstruction: swapData.swapTransaction, // Transaction sérialisée base64
                 accounts: parsed.accounts,
                 programId: parsed.programId,
+                addressTableLookups: parsed.addressTableLookups,
                 // Données additionnelles utiles
                 lastValidBlockHeight: swapData.lastValidBlockHeight,
                 prioritizationFeeLamports: swapData.prioritizationFeeLamports,
                 computeUnitLimit: swapData.computeUnitLimit,
               };
-              console.log("✅ Swap instructions obtained (accounts parsed)");
+              console.log(`✅ Swap instructions obtained (${parsed.accounts.length} static accounts, ${parsed.addressTableLookups?.length || 0} lookup tables)`);
             }
           }
         } else if (swapResponse) {
