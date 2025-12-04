@@ -37,34 +37,59 @@ function extractJupiterAccounts(swapTxBase64: string): {
   accounts: { pubkey: string; isSigner: boolean; isWritable: boolean }[];
   programId: string;
 } {
-  const buf = Buffer.from(swapTxBase64, "base64");
-  const vtx = VersionedTransaction.deserialize(buf);
-  const msg = vtx.message;
-  const acctKeys = msg.getAccountKeys({ accountKeysFromLookups: msg.addressTableLookups });
+  try {
+    const buf = Buffer.from(swapTxBase64, "base64");
+    const vtx = VersionedTransaction.deserialize(buf);
+    const msg = vtx.message;
+    const acctKeys = msg.getAccountKeys({ accountKeysFromLookups: msg.addressTableLookups });
 
-  // Trouver l'instruction Jupiter (on ignore ComputeBudget)
-  const instructions = [...msg.compiledInstructions];
-  const jupIx: MessageCompiledInstruction =
-    [...instructions]
-      .reverse()
-      .find((ix) => {
-        const pid = acctKeys.get(ix.programIdIndex)?.toBase58();
-        if (!pid) return false;
-        if (pid === "ComputeBudget111111111111111111111111111111") return false;
-        return JUPITER_PROGRAM_IDS.has(pid);
-      }) ?? instructions[instructions.length - 1];
+    // Trouver l'instruction Jupiter (on ignore ComputeBudget)
+    const instructions = [...msg.compiledInstructions];
+    
+    // Vérifier que nous avons des instructions
+    if (!instructions || instructions.length === 0) {
+      console.warn("⚠️ No instructions found in transaction");
+      return { accounts: [], programId: "" };
+    }
+    
+    const jupIx: MessageCompiledInstruction | undefined =
+      [...instructions]
+        .reverse()
+        .find((ix) => {
+          const pid = acctKeys.get(ix.programIdIndex)?.toBase58();
+          if (!pid) return false;
+          if (pid === "ComputeBudget111111111111111111111111111111") return false;
+          return JUPITER_PROGRAM_IDS.has(pid);
+        }) ?? instructions[instructions.length - 1];
 
-  const programId = acctKeys.get(jupIx.programIdIndex)?.toBase58() ?? "";
-  const accounts = jupIx.accountKeyIndexes.map((idx) => {
-    const pk = acctKeys.get(idx);
-    return {
-      pubkey: pk.toBase58(),
-      isSigner: msg.isAccountSigner(idx),
-      isWritable: msg.isAccountWritable(idx),
-    };
-  });
+    // Vérifier que nous avons trouvé une instruction Jupiter
+    if (!jupIx) {
+      console.warn("⚠️ No Jupiter instruction found in transaction");
+      return { accounts: [], programId: "" };
+    }
 
-  return { accounts, programId };
+    const programId = acctKeys.get(jupIx.programIdIndex)?.toBase58() ?? "";
+    
+    // Vérifier que accountKeyIndexes existe
+    if (!jupIx.accountKeyIndexes || jupIx.accountKeyIndexes.length === 0) {
+      console.warn("⚠️ No account key indexes in Jupiter instruction");
+      return { accounts: [], programId };
+    }
+    
+    const accounts = jupIx.accountKeyIndexes.map((idx) => {
+      const pk = acctKeys.get(idx);
+      return {
+        pubkey: pk?.toBase58() ?? "",
+        isSigner: msg.isAccountSigner(idx),
+        isWritable: msg.isAccountWritable(idx),
+      };
+    }).filter(acc => acc.pubkey !== ""); // Filter out empty pubkeys
+
+    return { accounts, programId };
+  } catch (error) {
+    console.error("❌ Error extracting Jupiter accounts:", error);
+    return { accounts: [], programId: "" };
+  }
 }
 
 // Circuit breaker pour Jupiter API
