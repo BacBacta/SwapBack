@@ -117,31 +117,33 @@ export function TokenSelectorModal({
   const [searchedTokens, setSearchedTokens] = useState<Token[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Fetch tokens from Jupiter API on mount
+  // Fetch tokens from our API (proxies Jupiter to avoid CORS)
   useEffect(() => {
     const fetchTokens = async () => {
       if (!isOpen) return;
       
       setIsLoadingTokens(true);
       try {
-        // Fetch strict verified tokens from Jupiter
-        const response = await fetch('https://token.jup.ag/strict');
+        // Use our internal API to avoid CORS issues
+        const response = await fetch('/api/tokens?limit=100');
         if (response.ok) {
           const data = await response.json();
-          // Map to our Token format and take top 100 by liquidity
-          const tokens: Token[] = data.slice(0, 100).map((t: { address: string; symbol: string; name: string; decimals: number; logoURI?: string; tags?: string[] }) => ({
-            address: t.address,
-            symbol: t.symbol,
-            name: t.name,
-            decimals: t.decimals,
-            logoURI: t.logoURI,
-            verified: true,
-            tags: t.tags || (t.symbol.includes('USD') ? ['stablecoin'] : ['blue-chip'])
-          }));
-          setAllTokens(tokens);
+          if (data.success && data.tokens?.length > 0) {
+            // Map to our Token format
+            const tokens: Token[] = data.tokens.map((t: { address: string; symbol: string; name: string; decimals: number; logoURI?: string; tags?: string[]; verified?: boolean }) => ({
+              address: t.address,
+              symbol: t.symbol,
+              name: t.name,
+              decimals: t.decimals,
+              logoURI: t.logoURI,
+              verified: t.verified !== false,
+              tags: t.tags || (t.symbol.includes('USD') ? ['stablecoin'] : ['blue-chip'])
+            }));
+            setAllTokens(tokens);
+          }
         }
       } catch (error) {
-        console.warn('Failed to fetch Jupiter tokens, using defaults:', error);
+        console.warn('Failed to fetch tokens from API, using defaults:', error);
         setAllTokens(DEFAULT_POPULAR_TOKENS);
       } finally {
         setIsLoadingTokens(false);
@@ -151,73 +153,59 @@ export function TokenSelectorModal({
     fetchTokens();
   }, [isOpen]);
 
-  // Search for tokens when typing an address or symbol
-  const searchJupiterTokens = useCallback(async (query: string) => {
-    if (!query || query.length < 2) {
+  // Search for tokens when typing an address
+  const searchTokenByAddress = useCallback(async (query: string) => {
+    if (!query || query.length < 32) {
       setSearchedTokens([]);
       return;
     }
 
     // Check if it's a Solana address (32-44 chars base58)
     const isAddress = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(query);
+    if (!isAddress) {
+      setSearchedTokens([]);
+      return;
+    }
     
     setIsSearching(true);
     try {
-      if (isAddress) {
-        // Search for specific token by address
-        const response = await fetch(`https://token.jup.ag/strict`);
-        if (response.ok) {
-          const data = await response.json();
-          const found = data.find((t: { address: string }) => t.address === query);
-          if (found) {
-            setSearchedTokens([{
-              address: found.address,
-              symbol: found.symbol,
-              name: found.name,
-              decimals: found.decimals,
-              logoURI: found.logoURI,
-              verified: true,
-              tags: found.tags || []
-            }]);
-          } else {
-            // Try all tokens list for unverified tokens
-            const allResponse = await fetch(`https://token.jup.ag/all`);
-            if (allResponse.ok) {
-              const allData = await allResponse.json();
-              const foundAll = allData.find((t: { address: string }) => t.address === query);
-              if (foundAll) {
-                setSearchedTokens([{
-                  address: foundAll.address,
-                  symbol: foundAll.symbol,
-                  name: foundAll.name,
-                  decimals: foundAll.decimals,
-                  logoURI: foundAll.logoURI,
-                  verified: false,
-                  tags: foundAll.tags || []
-                }]);
-              }
-            }
-          }
+      // Use our internal API to search by address (avoids CORS)
+      const response = await fetch(`/api/tokens?address=${encodeURIComponent(query)}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.tokens?.length > 0) {
+          setSearchedTokens(data.tokens.map((t: { address: string; symbol: string; name: string; decimals: number; logoURI?: string; verified?: boolean; tags?: string[] }) => ({
+            address: t.address,
+            symbol: t.symbol,
+            name: t.name,
+            decimals: t.decimals,
+            logoURI: t.logoURI,
+            verified: t.verified !== false,
+            tags: t.tags || []
+          })));
+        } else {
+          setSearchedTokens([]);
         }
       }
     } catch (error) {
       console.warn('Token search failed:', error);
+      setSearchedTokens([]);
     } finally {
       setIsSearching(false);
     }
   }, []);
 
-  // Debounced search
+  // Debounced search for addresses
   useEffect(() => {
     const timer = setTimeout(() => {
       if (searchQuery.length >= 32) {
-        searchJupiterTokens(searchQuery);
+        searchTokenByAddress(searchQuery);
       } else {
         setSearchedTokens([]);
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, searchJupiterTokens]);
+  }, [searchQuery, searchTokenByAddress]);
 
   // Filter and search tokens
   const filteredTokens = useMemo(() => {
