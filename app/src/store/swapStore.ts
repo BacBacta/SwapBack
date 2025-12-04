@@ -33,6 +33,7 @@ export type JupiterCpiState = {
   expectedInputAmount: string;
   swapInstruction: string; // Transaction sérialisée base64
   accounts: JupiterCpiMeta[];
+  programId?: string;
   // Données additionnelles de Jupiter v6
   lastValidBlockHeight?: number;
   prioritizationFeeLamports?: number;

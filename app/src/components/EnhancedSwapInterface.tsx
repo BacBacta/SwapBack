@@ -1,81 +1,4 @@
 /**
- * Professional Swap Interface
- * Modern, clean design with complete functionality
- */
-
-"use client";
-
-import { useState, useEffect, useCallback } from "react";
-import { BN } from "@coral-xyz/anchor";
-import { AccountMeta, PublicKey } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { useSwapStore } from "@/store/swapStore";
-import { useSwapWebSocket } from "@/hooks/useSwapWebSocket";
-import { useHaptic } from "@/hooks/useHaptic";
-import {
-  useSwapRouter,
-  DerivedSwapAccounts,
-} from "@/hooks/useSwapRouter";
-import { ORCA_WHIRLPOOL_PROGRAM_ID } from "@/sdk/config/orca-pools";
-import { RAYDIUM_AMM_PROGRAM_ID } from "@/sdk/config/raydium-pools";
-import { getExplorerUrl } from "@/config/constants";
-import { ClientOnlyConnectionStatus } from "./ClientOnlyConnectionStatus";
-
-// Phase 4: Lazy imports for heavy components
-import dynamic from "next/dynamic";
-const TokenSelector = dynamic(() => import("./TokenSelector").then(mod => ({ default: mod.TokenSelector })), { ssr: false });
-const DistributionBreakdown = dynamic(() => import("./DistributionBreakdown").then(mod => ({ default: mod.DistributionBreakdown })), { ssr: false });
-const SwapPreviewModal = dynamic(() => import("./SwapPreviewModal").then(mod => ({ default: mod.SwapPreviewModal })), { ssr: false });
-const LoadingProgress = dynamic(() => import("./LoadingProgress").then(mod => ({ default: mod.LoadingProgress })), { ssr: false });
-const RecentSwapsSidebar = dynamic(() => import("./RecentSwapsSidebar").then(mod => ({ default: mod.RecentSwapsSidebar })), { ssr: false });
-
-import { ClockIcon, ExclamationTriangleIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
-import { motion, AnimatePresence } from "framer-motion";
-import { useSwipeable } from "react-swipeable";
-import { toast } from "sonner";
-import { 
-  formatNumberWithCommas, 
-  parseFormattedNumber, 
-  validateNumberInput,
-  formatCurrency,
-  getAdaptiveFontSize 
-} from "@/utils/formatNumber";
-import { PriceImpactAlert } from "@/components/PriceImpactAlert";
-import { TokenSelectorModal } from "@/components/TokenSelectorModal";
-import { SmartSlippage } from "@/components/SmartSlippage";
-import { SwapDetailsExpandable } from "@/components/SwapDetailsExpandable";
-import { SuccessModal } from "@/components/SuccessModal";
-import { ErrorFeedback, detectErrorType, type ErrorType } from "@/components/ErrorFeedback";
-import { RoutingStrategySelector } from "@/components/RoutingStrategySelector";
-import { RouterReliabilityCard } from "@/components/RouterReliabilityCard";
-import { RouteIntentsList } from "@/components/RouteIntentsList";
-import type { RoutingStrategy } from "@/lib/routing/hybridRouting";
-import { debounce } from "lodash";
-
-interface RouteStep {
-  label: string;
-  inputMint: string;
-  outputMint: string;
-  inAmount: string;
-  outAmount: string;
-  fee: string;
-}
-
-type JupiterRoutePlanStep = {
-  swapInfo?: {
-    ammKey?: string;
-    label?: string;
-    inputMint?: string;
-    outputMint?: string;
-    inAmount?: string;
-    outAmount?: string;
-    feeAmount?: string;
-    feeMint?: string;
-  };
-  [key: string]: unknown;
-};
-
 type OrcaDexAccounts = {
   variant: "ORCA_WHIRLPOOL";
   dexProgramId: string;
@@ -240,7 +163,7 @@ function decodeBase64ToUint8Array(data: string): Uint8Array {
 export function EnhancedSwapInterface() {
   const { connected, publicKey } = useWallet();
   const { connection } = useConnection();
-  const { swapWithRouter, executeJupiterSwap } = useSwapRouter();
+  const { swapWithRouter } = useSwapRouter();
   const haptic = useHaptic();
 
   // Store
@@ -892,6 +815,33 @@ export function EnhancedSwapInterface() {
       minOutLamports = new BN(1);
     }
 
+    let staticRemainingAccounts: AccountMeta[] | null = null;
+    let jupiterRoutePayload: JupiterRouteParams | null = null;
+
+    try {
+      staticRemainingAccounts = routes.jupiterCpi!.accounts.map((meta) => ({
+        pubkey: new PublicKey(meta.pubkey),
+        isWritable: meta.isWritable,
+        isSigner: meta.isSigner,
+      }));
+
+      if (!staticRemainingAccounts.length) {
+        throw new Error("Liste de comptes Jupiter vide.");
+      }
+
+      jupiterRoutePayload = {
+        expectedInputAmount: new BN(routes.jupiterCpi!.expectedInputAmount),
+        swapInstruction: decodeBase64ToUint8Array(routes.jupiterCpi!.swapInstruction),
+      };
+    } catch (error) {
+      setSwapError(
+        error instanceof Error
+          ? error.message
+          : "Impossible de préparer l'instruction Jupiter."
+      );
+      return;
+    }
+
     setSwapError(null);
     setSwapSignature(null);
     setIsSwapping(true);
@@ -914,16 +864,16 @@ export function EnhancedSwapInterface() {
     try {
       setLoadingProgress(40);
       setLoadingStep('signing');
-      
-      // Use Jupiter's serialized transaction directly
-      const jupiterCpi = routes.jupiterCpi!;
-      const signature = await executeJupiterSwap(
-        jupiterCpi.swapInstruction,
-        {
-          lastValidBlockHeight: jupiterCpi.lastValidBlockHeight,
-          skipPreflight: false,
-        }
-      );
+
+      const signature = await swapWithRouter({
+        tokenIn: new PublicKey(swap.inputToken.mint),
+        tokenOut: new PublicKey(swap.outputToken.mint),
+        amountIn: amountInLamports,
+        minOut: minOutLamports,
+        slippageBps,
+        remainingAccounts: staticRemainingAccounts ?? undefined,
+        jupiterRoute: jupiterRoutePayload,
+      });
 
       setLoadingProgress(70);
       setLoadingStep('confirming');
@@ -968,7 +918,6 @@ export function EnhancedSwapInterface() {
       
       // Detect error type and show intelligent feedback
       const detectedType = detectErrorType(errorMsg);
-      setErrorType(detectedType);
       setErrorMessage(errorMsg);
       
       // Update swap status to failed

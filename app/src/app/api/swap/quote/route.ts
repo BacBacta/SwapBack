@@ -8,6 +8,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
+import {
+  Connection,
+  MessageCompiledInstruction,
+  PublicKey,
+  VersionedTransaction,
+} from "@solana/web3.js";
 import { recordRouterMetric, getRouterReliabilitySummary } from "@/lib/routerMetrics";
 import { buildHybridIntents, type RoutingStrategy } from "@/lib/routing/hybridRouting";
 import { getCircuit, retryWithBackoff, CircuitOpenError } from "@/lib/resilience";
@@ -21,6 +27,45 @@ const JUPITER_ENDPOINTS = [
   "https://public.jupiterapi.com",
   "https://api.jup.ag/v6",
 ].filter(Boolean);
+
+// Program IDs Jupiter v6 (mainnet/devnet)
+const JUPITER_PROGRAM_IDS = new Set([
+  "JUP6LkbZBMd1McqTgnmMSpZ88LdKgmhyaXtCXnVQ1Nm",
+]);
+
+function extractJupiterAccounts(swapTxBase64: string): {
+  accounts: { pubkey: string; isSigner: boolean; isWritable: boolean }[];
+  programId: string;
+} {
+  const buf = Buffer.from(swapTxBase64, "base64");
+  const vtx = VersionedTransaction.deserialize(buf);
+  const msg = vtx.message;
+  const acctKeys = msg.getAccountKeys({ accountKeysFromLookups: msg.addressTableLookups });
+
+  // Trouver l'instruction Jupiter (on ignore ComputeBudget)
+  const instructions = [...msg.compiledInstructions];
+  const jupIx: MessageCompiledInstruction =
+    [...instructions]
+      .reverse()
+      .find((ix) => {
+        const pid = acctKeys.get(ix.programIdIndex)?.toBase58();
+        if (!pid) return false;
+        if (pid === "ComputeBudget111111111111111111111111111111") return false;
+        return JUPITER_PROGRAM_IDS.has(pid);
+      }) ?? instructions[instructions.length - 1];
+
+  const programId = acctKeys.get(jupIx.programIdIndex)?.toBase58() ?? "";
+  const accounts = jupIx.accountKeyIndexes.map((idx) => {
+    const pk = acctKeys.get(idx);
+    return {
+      pubkey: pk.toBase58(),
+      isSigner: msg.isAccountSigner(idx),
+      isWritable: msg.isAccountWritable(idx),
+    };
+  });
+
+  return { accounts, programId };
+}
 
 // Circuit breaker pour Jupiter API
 const jupiterCircuit = getCircuit("jupiter", {
@@ -256,12 +301,11 @@ export async function POST(request: NextRequest) {
       priceImpactPct: routeInfo.priceImpactPct ?? 0,
     });
 
-    // Si userPublicKey est fourni, récupérer les instructions de swap pour l'exécution on-chain
+    // Si userPublicKey est fourni, récupérer les instructions de swap + comptes pour le router
     let jupiterCpi = null;
-    
     if (userPublicKey) {
       console.log("🔧 Fetching swap instructions for:", userPublicKey.slice(0, 8) + "...");
-      
+
       try {
         const swapResponse = await fetchFromJupiter("/swap", {
           method: "POST",
@@ -281,21 +325,25 @@ export async function POST(request: NextRequest) {
 
         if (swapResponse.ok) {
           const swapData = await swapResponse.json();
-          
+
           if (swapData.swapTransaction) {
-            // Décoder la transaction base64 pour extraire les infos CPI
-            // La structure retournée par Jupiter v6 /swap contient directement les données
-            jupiterCpi = {
-              expectedInputAmount: quote.inAmount,
-              swapInstruction: swapData.swapTransaction, // Transaction sérialisée base64
-              accounts: [], // Les comptes sont embarqués dans la transaction
-              // Données additionnelles utiles
-              lastValidBlockHeight: swapData.lastValidBlockHeight,
-              prioritizationFeeLamports: swapData.prioritizationFeeLamports,
-              computeUnitLimit: swapData.computeUnitLimit,
-            };
-            
-            console.log("✅ Swap instructions obtained");
+            const parsed = extractJupiterAccounts(swapData.swapTransaction);
+
+            if (parsed.accounts.length === 0 || !parsed.programId) {
+              console.warn("⚠️ Jupiter accounts extraction failed");
+            } else {
+              jupiterCpi = {
+                expectedInputAmount: quote.inAmount,
+                swapInstruction: swapData.swapTransaction, // Transaction sérialisée base64
+                accounts: parsed.accounts,
+                programId: parsed.programId,
+                // Données additionnelles utiles
+                lastValidBlockHeight: swapData.lastValidBlockHeight,
+                prioritizationFeeLamports: swapData.prioritizationFeeLamports,
+                computeUnitLimit: swapData.computeUnitLimit,
+              };
+              console.log("✅ Swap instructions obtained (accounts parsed)");
+            }
           }
         } else {
           const swapError = await swapResponse.text();
