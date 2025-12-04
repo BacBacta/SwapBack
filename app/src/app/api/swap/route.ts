@@ -1,88 +1,105 @@
 /**
  * API Route: Swap Execution
  * Gets swap transaction from Jupiter API (server-side to avoid CORS)
+ * Endpoint: POST /api/swap
  */
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
-import { Connection, PublicKey } from "@solana/web3.js";
-import {
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  TOKEN_PROGRAM_ID,
-  getAssociatedTokenAddressSync,
-} from "@solana/spl-token";
-import { checkRateLimit, getClientIdentifier } from "../../../lib/rateLimit";
-import { sanitizeAmount, isValidPublicKey } from "../../../lib/validation";
-import { DEFAULT_SOLANA_RPC_URL } from "@/config/constants";
 
-const RPC_ENDPOINT =
-  process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
-  DEFAULT_SOLANA_RPC_URL;
+const JUPITER_API = process.env.JUPITER_API_URL || "https://quote-api.jup.ag/v6";
 
-const JUPITER_API =
-  process.env.JUPITER_API_URL || "https://quote-api.jup.ag/v6";
+// Simple rate limiting in memory
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
+function checkRateLimit(clientId: string): { allowed: boolean; remaining: number; resetAt: number } {
+  const now = Date.now();
+  const windowMs = 60000; // 1 minute
+  const maxRequests = 30;
+  
+  let entry = rateLimitMap.get(clientId);
+  
+  if (!entry || now > entry.resetAt) {
+    entry = { count: 0, resetAt: now + windowMs };
+    rateLimitMap.set(clientId, entry);
+  }
+  
+  entry.count++;
+  
+  return {
+    allowed: entry.count <= maxRequests,
+    remaining: Math.max(0, maxRequests - entry.count),
+    resetAt: entry.resetAt,
+  };
+}
+
+function getClientId(headers: Headers): string {
+  return headers.get("x-forwarded-for")?.split(",")[0]?.trim() || 
+         headers.get("x-real-ip") || 
+         "anonymous";
+}
+
+function isValidBase58(str: string): boolean {
+  if (!str || str.length < 32 || str.length > 44) return false;
+  return /^[1-9A-HJ-NP-Za-km-z]+$/.test(str);
+}
+
+/**
+ * POST /api/swap
+ * Get swap transaction from Jupiter
+ */
 export async function POST(request: NextRequest) {
   try {
-    // Security: Rate limiting (30 requests per minute)
-    const clientId = getClientIdentifier(request.headers);
-    const rateLimit = checkRateLimit(clientId, { maxRequests: 30, windowMs: 60000 });
+    // Rate limiting
+    const clientId = getClientId(request.headers);
+    const rateLimit = checkRateLimit(clientId);
     
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { 
-          error: "Rate limit exceeded. Please try again later.",
-          retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
-        },
+        { error: "Rate limit exceeded. Please try again later." },
         { 
           status: 429,
           headers: {
-            'X-RateLimit-Limit': '30',
-            'X-RateLimit-Remaining': rateLimit.remaining.toString(),
-            'X-RateLimit-Reset': rateLimit.resetAt.toString(),
+            "X-RateLimit-Remaining": rateLimit.remaining.toString(),
+            "X-RateLimit-Reset": rateLimit.resetAt.toString(),
           },
         }
       );
     }
 
+    const body = await request.json();
     const {
       inputMint,
       outputMint,
       amount,
-      inputAmount, // Legacy support
       slippageBps = 50,
       userPublicKey,
       priorityFee,
-    } = await request.json();
+    } = body;
 
-    const actualAmount = amount || inputAmount;
-
-    // Security: Validate inputs
-    if (!inputMint || !outputMint || !actualAmount || !userPublicKey) {
+    // Validate inputs
+    if (!inputMint || !outputMint || !amount || !userPublicKey) {
       return NextResponse.json(
-        {
-          error: "Missing required fields: inputMint, outputMint, amount, userPublicKey",
-        },
+        { error: "Missing required fields: inputMint, outputMint, amount, userPublicKey" },
         { status: 400 }
       );
     }
 
-    // Security: Validate public keys
-    if (!isValidPublicKey(inputMint) || !isValidPublicKey(outputMint) || !isValidPublicKey(userPublicKey)) {
+    // Validate addresses
+    if (!isValidBase58(inputMint) || !isValidBase58(outputMint) || !isValidBase58(userPublicKey)) {
       return NextResponse.json(
-        { error: "Invalid public key address" },
+        { error: "Invalid address format" },
         { status: 400 }
       );
     }
 
-    // Security: Validate amount
-    const validatedAmount = sanitizeAmount(actualAmount.toString(), {
-      min: 1,
-      max: 1e18,
-    });
-
-    if (validatedAmount === null) {
+    // Validate amount
+    const parsedAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
       return NextResponse.json(
-        { error: "Invalid input amount" },
+        { error: "Invalid amount" },
         { status: 400 }
       );
     }
@@ -90,7 +107,7 @@ export async function POST(request: NextRequest) {
     console.log("🔄 Getting swap transaction:", {
       inputMint: inputMint.slice(0, 8) + "...",
       outputMint: outputMint.slice(0, 8) + "...",
-      amount: validatedAmount,
+      amount: parsedAmount,
       user: userPublicKey.slice(0, 8) + "...",
     });
 
@@ -98,19 +115,22 @@ export async function POST(request: NextRequest) {
     const quoteParams = new URLSearchParams({
       inputMint,
       outputMint,
-      amount: Math.floor(validatedAmount).toString(),
+      amount: Math.floor(parsedAmount).toString(),
       slippageBps: slippageBps.toString(),
     });
 
     const quoteResponse = await fetch(`${JUPITER_API}/quote?${quoteParams}`, {
-      headers: { Accept: "application/json" },
+      headers: { 
+        Accept: "application/json",
+        "User-Agent": "SwapBack/1.0",
+      },
     });
 
     if (!quoteResponse.ok) {
       const error = await quoteResponse.text();
-      console.error("❌ Jupiter quote failed:", error);
+      console.error("❌ Jupiter quote failed:", quoteResponse.status, error);
       return NextResponse.json(
-        { error: "Failed to get quote from Jupiter", details: error },
+        { error: "Failed to get quote", details: error },
         { status: 502 }
       );
     }
@@ -124,26 +144,6 @@ export async function POST(request: NextRequest) {
     });
 
     // Step 2: Get swap transaction from Jupiter
-    const userPk = new PublicKey(userPublicKey);
-    const inputMintPk = new PublicKey(inputMint);
-    const outputMintPk = new PublicKey(outputMint);
-
-    const userSourceAta = getAssociatedTokenAddressSync(
-      inputMintPk,
-      userPk,
-      false,
-      TOKEN_PROGRAM_ID,
-      ASSOCIATED_TOKEN_PROGRAM_ID
-    );
-
-    const userDestinationAta = getAssociatedTokenAddressSync(
-      outputMintPk,
-      userPk,
-      false,
-      TOKEN_PROGRAM_ID,
-      ASSOCIATED_TOKEN_PROGRAM_ID
-    );
-
     const swapBody: Record<string, unknown> = {
       quoteResponse: quote,
       userPublicKey: userPublicKey,
@@ -162,15 +162,16 @@ export async function POST(request: NextRequest) {
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
+        "User-Agent": "SwapBack/1.0",
       },
       body: JSON.stringify(swapBody),
     });
 
     if (!swapResponse.ok) {
       const error = await swapResponse.text();
-      console.error("❌ Jupiter swap failed:", error);
+      console.error("❌ Jupiter swap failed:", swapResponse.status, error);
       return NextResponse.json(
-        { error: "Failed to get swap transaction from Jupiter", details: error },
+        { error: "Failed to get swap transaction", details: error },
         { status: 502 }
       );
     }
@@ -190,7 +191,7 @@ export async function POST(request: NextRequest) {
       prioritizationFeeLamports: swapData.prioritizationFeeLamports,
     });
   } catch (error) {
-    console.error("Error in /api/swap:", error);
+    console.error("❌ Error in /api/swap:", error);
     
     return NextResponse.json(
       { 
@@ -202,22 +203,15 @@ export async function POST(request: NextRequest) {
   }
 }
 
+/**
+ * GET /api/swap
+ * Health check
+ */
 export async function GET() {
-  try {
-    const connection = new Connection(RPC_ENDPOINT);
-    const slot = await connection.getSlot();
-
-    return NextResponse.json({
-      status: "ok",
-      rpc: RPC_ENDPOINT,
-      jupiterApi: JUPITER_API,
-      currentSlot: slot,
-      timestamp: Date.now(),
-    });
-  } catch {
-    return NextResponse.json(
-      { status: "error", error: "RPC connection failed" },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json({
+    status: "ok",
+    service: "Jupiter Swap API Proxy",
+    jupiterApi: JUPITER_API,
+    timestamp: Date.now(),
+  });
 }
