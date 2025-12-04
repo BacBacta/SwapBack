@@ -191,6 +191,12 @@ function parseRouteInfo(quote: JupiterQuoteResponse) {
   };
 }
 
+// Detect transient DNS / network resolution errors so we can surface a clearer message
+const isNetworkResolutionError = (error: unknown) => {
+  const code = (error as any)?.code ?? (error as any)?.cause?.code;
+  return code === "ENOTFOUND" || code === "EAI_AGAIN";
+};
+
 /**
  * POST /api/swap/quote
  * Get a quote from Jupiter API
@@ -251,9 +257,23 @@ export async function POST(request: NextRequest) {
     });
 
     // Fetch quote from Jupiter
-    const response = await fetchFromJupiter(endpointPath, {
-      method: "GET",
-    });
+    let response: Response;
+    try {
+      response = await fetchFromJupiter(endpointPath, {
+        method: "GET",
+      });
+    } catch (fetchError) {
+      if (isNetworkResolutionError(fetchError)) {
+        console.warn("🌐 Jupiter DNS lookup failed, sending 503", fetchError);
+        return NextResponse.json(
+          {
+            error: "Jupiter indisponible (résolution DNS). Réessayez dans quelques instants.",
+          },
+          withNoStore({ status: 503 })
+        );
+      }
+      throw fetchError;
+    }
 
     console.log("📡 Jupiter response:", {
       status: response.status,
