@@ -327,23 +327,33 @@ export async function POST(request: NextRequest) {
       console.log("🔧 Fetching swap instructions for:", userPublicKey.slice(0, 8) + "...");
 
       try {
-        const swapResponse = await fetchFromJupiter("/swap", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            quoteResponse: quote,
-            userPublicKey,
-            wrapAndUnwrapSol: true,
-            useSharedAccounts: true,
-            dynamicComputeUnitLimit: true,
-            skipUserAccountsRpcCalls: false,
-            dynamicSlippage: { minBps: 50, maxBps: slippageBps },
-          }),
-        });
+        let swapResponse: Response | null = null;
+        try {
+          swapResponse = await fetchFromJupiter("/swap", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              quoteResponse: quote,
+              userPublicKey,
+              wrapAndUnwrapSol: true,
+              useSharedAccounts: true,
+              dynamicComputeUnitLimit: true,
+              skipUserAccountsRpcCalls: false,
+              dynamicSlippage: { minBps: 50, maxBps: slippageBps },
+            }),
+          });
+        } catch (swapErr) {
+          if (isNetworkResolutionError(swapErr)) {
+            console.warn("🌐 Jupiter DNS lookup failed for /swap", swapErr);
+            swapResponse = null;
+          } else {
+            throw swapErr;
+          }
+        }
 
-        if (swapResponse.ok) {
+        if (swapResponse?.ok) {
           const swapData = await swapResponse.json();
 
           if (swapData.swapTransaction) {
@@ -365,9 +375,11 @@ export async function POST(request: NextRequest) {
               console.log("✅ Swap instructions obtained (accounts parsed)");
             }
           }
-        } else {
+        } else if (swapResponse) {
           const swapError = await swapResponse.text();
           console.warn("⚠️ Failed to get swap instructions:", swapError);
+        } else {
+          console.warn("⚠️ Jupiter swap instructions skipped (network resolution error)");
         }
       } catch (swapError) {
         console.warn("⚠️ Error fetching swap instructions:", swapError);
