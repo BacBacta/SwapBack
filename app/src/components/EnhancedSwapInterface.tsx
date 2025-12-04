@@ -1,4 +1,79 @@
 /**
+ * Professional Swap Interface
+ * Modern, clean design with complete functionality
+ */
+
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { BN } from "@coral-xyz/anchor";
+import { AccountMeta, PublicKey } from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { useSwapStore } from "@/store/swapStore";
+import { useSwapWebSocket } from "@/hooks/useSwapWebSocket";
+import { useHaptic } from "@/hooks/useHaptic";
+import { useSwapRouter, DerivedSwapAccounts } from "@/hooks/useSwapRouter";
+import { ORCA_WHIRLPOOL_PROGRAM_ID } from "@/sdk/config/orca-pools";
+import { RAYDIUM_AMM_PROGRAM_ID } from "@/sdk/config/raydium-pools";
+import { getExplorerUrl } from "@/config/constants";
+import dynamic from "next/dynamic";
+import { ClockIcon, ExclamationTriangleIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
+import { motion, AnimatePresence } from "framer-motion";
+import { useSwipeable } from "react-swipeable";
+import { toast } from "sonner";
+import {
+  formatNumberWithCommas,
+  parseFormattedNumber,
+  validateNumberInput,
+  formatCurrency,
+  getAdaptiveFontSize,
+} from "@/utils/formatNumber";
+import { PriceImpactAlert } from "@/components/PriceImpactAlert";
+import { TokenSelectorModal } from "@/components/TokenSelectorModal";
+import { SmartSlippage } from "@/components/SmartSlippage";
+import { SuccessModal } from "@/components/SuccessModal";
+import { ErrorFeedback, detectErrorType, type ErrorType } from "@/components/ErrorFeedback";
+import { RoutingStrategySelector } from "@/components/RoutingStrategySelector";
+import { RouterReliabilityCard } from "@/components/RouterReliabilityCard";
+import { RouteIntentsList } from "@/components/RouteIntentsList";
+import type { RoutingStrategy } from "@/lib/routing/hybridRouting";
+import { debounce } from "lodash";
+import { ClientOnlyConnectionStatus } from "./ClientOnlyConnectionStatus";
+
+const SwapPreviewModal = dynamic(() => import("./SwapPreviewModal").then((mod) => ({ default: mod.SwapPreviewModal })), {
+  ssr: false,
+});
+const LoadingProgress = dynamic(() => import("./LoadingProgress").then((mod) => ({ default: mod.LoadingProgress })), {
+  ssr: false,
+});
+const RecentSwapsSidebar = dynamic(() => import("./RecentSwapsSidebar").then((mod) => ({ default: mod.RecentSwapsSidebar })), {
+  ssr: false,
+});
+
+interface RouteStep {
+  label: string;
+  inputMint: string;
+  outputMint: string;
+  inAmount: string;
+  outAmount: string;
+  fee: string;
+}
+
+type JupiterRoutePlanStep = {
+  swapInfo?: {
+    ammKey?: string;
+    label?: string;
+    inputMint?: string;
+    outputMint?: string;
+    inAmount?: string;
+    outAmount?: string;
+    feeAmount?: string;
+    feeMint?: string;
+  };
+  [key: string]: unknown;
+};
+
 type OrcaDexAccounts = {
   variant: "ORCA_WHIRLPOOL";
   dexProgramId: string;
