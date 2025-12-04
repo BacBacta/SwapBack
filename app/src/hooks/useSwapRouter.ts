@@ -245,8 +245,101 @@ export function useSwapRouter() {
     }
   };
 
+  /**
+   * Execute a swap directly using Jupiter's serialized transaction
+   * This bypasses the router program and uses Jupiter's transaction directly
+   */
+  const executeJupiterSwap = async (
+    swapTransactionBase64: string,
+    options?: {
+      lastValidBlockHeight?: number;
+      skipPreflight?: boolean;
+    }
+  ): Promise<string | null> => {
+    if (!wallet?.publicKey || !wallet.signTransaction) {
+      toast.error("Connectez votre wallet pour lancer un swap");
+      return null;
+    }
+    if (!connection) {
+      toast.error("Connexion non initialisée");
+      return null;
+    }
+
+    try {
+      // Decode the base64 transaction from Jupiter
+      const swapTransactionBuf = Buffer.from(swapTransactionBase64, 'base64');
+      
+      // Try to deserialize as VersionedTransaction first (Jupiter v6 default)
+      let transaction: VersionedTransaction | Transaction;
+      try {
+        transaction = VersionedTransaction.deserialize(swapTransactionBuf);
+      } catch {
+        // Fallback to legacy Transaction
+        transaction = Transaction.from(swapTransactionBuf);
+      }
+
+      // Sign the transaction
+      let signedTx: VersionedTransaction | Transaction;
+      if (transaction instanceof VersionedTransaction) {
+        signedTx = await wallet.signTransaction(transaction);
+      } else {
+        signedTx = await wallet.signTransaction(transaction);
+      }
+
+      // Get blockhash info for confirmation
+      const { blockhash, lastValidBlockHeight: currentBlockHeight } = 
+        await connection.getLatestBlockhash('confirmed');
+      
+      const blockHeightForConfirmation = options?.lastValidBlockHeight ?? currentBlockHeight;
+
+      // Send the transaction
+      const rawTx = signedTx.serialize();
+      const txSig = await connection.sendRawTransaction(rawTx, {
+        skipPreflight: options?.skipPreflight ?? false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+
+      console.log("🚀 Jupiter swap sent:", txSig);
+
+      // Confirm the transaction
+      await connection.confirmTransaction(
+        { 
+          signature: txSig, 
+          blockhash, 
+          lastValidBlockHeight: blockHeightForConfirmation 
+        }, 
+        'confirmed'
+      );
+
+      monitor.swapSuccess(
+        "jupiter-direct",
+        "unknown",
+        "unknown",
+        txSig
+      );
+
+      toast.success(`Swap exécuté: ${txSig.slice(0, 8)}...`);
+      return txSig;
+    } catch (err) {
+      console.error("Jupiter swap error:", err);
+      
+      const errorMessage = err instanceof Error ? err.message : "Unknown swap error";
+      monitor.swapError(errorMessage, {
+        component: 'useSwapRouter',
+        action: 'executeJupiterSwap',
+        walletAddress: wallet.publicKey?.toBase58(),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
+
+      toast.error(err instanceof Error ? err.message : "Swap Jupiter échoué");
+      throw err;
+    }
+  };
+
   return {
     swapWithRouter,
+    executeJupiterSwap,
     program,
   };
 }

@@ -17,7 +17,6 @@ import {
   useSwapRouter,
   DerivedSwapAccounts,
 } from "@/hooks/useSwapRouter";
-import type { JupiterRouteParams } from "@/hooks/useSwapRouter";
 import { ORCA_WHIRLPOOL_PROGRAM_ID } from "@/sdk/config/orca-pools";
 import { RAYDIUM_AMM_PROGRAM_ID } from "@/sdk/config/raydium-pools";
 import { getExplorerUrl } from "@/config/constants";
@@ -241,7 +240,7 @@ function decodeBase64ToUint8Array(data: string): Uint8Array {
 export function EnhancedSwapInterface() {
   const { connected, publicKey } = useWallet();
   const { connection } = useConnection();
-  const { swapWithRouter } = useSwapRouter();
+  const { swapWithRouter, executeJupiterSwap } = useSwapRouter();
   const haptic = useHaptic();
 
   // Store
@@ -893,36 +892,6 @@ export function EnhancedSwapInterface() {
       minOutLamports = new BN(1);
     }
 
-    let staticRemainingAccounts: AccountMeta[] | null = null;
-    let jupiterRoutePayload: JupiterRouteParams | null = null;
-
-    // Jupiter CPI is guaranteed to exist at this point (checked above)
-    try {
-      staticRemainingAccounts = routes.jupiterCpi!.accounts.map((meta) => ({
-        pubkey: new PublicKey(meta.pubkey),
-        isWritable: meta.isWritable,
-        isSigner: meta.isSigner,
-      }));
-
-      if (!staticRemainingAccounts.length) {
-        throw new Error("Liste de comptes Jupiter vide.");
-      }
-
-      jupiterRoutePayload = {
-        expectedInputAmount: new BN(routes.jupiterCpi!.expectedInputAmount),
-        swapInstruction: decodeBase64ToUint8Array(
-          routes.jupiterCpi!.swapInstruction
-        ),
-      };
-    } catch (error) {
-      setSwapError(
-        error instanceof Error
-          ? error.message
-          : "Impossible de préparer l'instruction Jupiter."
-      );
-      return;
-    }
-
     setSwapError(null);
     setSwapSignature(null);
     setIsSwapping(true);
@@ -945,15 +914,16 @@ export function EnhancedSwapInterface() {
     try {
       setLoadingProgress(40);
       setLoadingStep('signing');
-      const signature = await swapWithRouter({
-        tokenIn: new PublicKey(swap.inputToken.mint),
-        tokenOut: new PublicKey(swap.outputToken.mint),
-        amountIn: amountInLamports,
-        minOut: minOutLamports,
-        slippageBps,
-        remainingAccounts: staticRemainingAccounts ?? undefined,
-        jupiterRoute: jupiterRoutePayload,
-      });
+      
+      // Use Jupiter's serialized transaction directly
+      const jupiterCpi = routes.jupiterCpi!;
+      const signature = await executeJupiterSwap(
+        jupiterCpi.swapInstruction,
+        {
+          lastValidBlockHeight: jupiterCpi.lastValidBlockHeight,
+          skipPreflight: false,
+        }
+      );
 
       setLoadingProgress(70);
       setLoadingStep('confirming');
