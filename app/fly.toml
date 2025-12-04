@@ -1,0 +1,38 @@
+# Fly.io configuration for SwapBack API
+# Résout les problèmes DNS avec Jupiter sur Vercel
+
+app = "swapback-api"
+primary_region = "cdg" # Paris - proche des utilisateurs EU
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3000"
+  # Les autres variables sensibles sont dans fly secrets
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = false  # Garder actif pour éviter cold starts
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 250
+    soft_limit = 200
+
+[[http_service.checks]]
+  interval = "15s"
+  timeout = "5s"
+  grace_period = "10s"
+  method = "GET"
+  path = "/api/health"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

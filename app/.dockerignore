@@ -1,0 +1,19 @@
+# Fichiers à ignorer pour le build Docker
+node_modules
+.next
+.git
+.gitignore
+*.md
+*.log
+.env*.local
+.DS_Store
+coverage
+.nyc_output
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+__tests__
+__mocks__
+.eslintcache
+.turbo

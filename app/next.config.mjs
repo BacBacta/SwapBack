@@ -8,6 +8,12 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   
+  // 🚀 Output standalone pour Docker/Fly.io
+  output: 'standalone',
+  
+  // Désactiver le header X-Powered-By
+  poweredByHeader: false,
+  
   // 🚀 Performance optimizations
   experimental: {
     optimizePackageImports: [
