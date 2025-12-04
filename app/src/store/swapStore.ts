@@ -60,7 +60,7 @@ export interface RouteState {
   routes: RouteCandidate[];
   selectedRoute: RouteCandidate | null;
   selectedRoutePlan: JupiterRoutePlanStep[] | null;
-  jupiterCpi: JupiterCpiPayload | null;
+  jupiterCpi: JupiterCpiState;
   isMock: boolean; // Indicates if using mock data (devnet/test)
   isLoading: boolean;
   error: string | null;
@@ -212,6 +212,13 @@ export const useSwapStore = create<SwapStore>()(
 
         // Route State
         routes: initialRouteState,
+
+        clearRoutes: () =>
+          set((state) => ({
+            routes: {
+              ...initialRouteState,
+            },
+          })),
 
         fetchRoutes: async (options) => {
           const { swap } = get();

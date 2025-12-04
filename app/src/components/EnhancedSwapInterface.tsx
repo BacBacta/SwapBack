@@ -250,10 +250,23 @@ export function EnhancedSwapInterface() {
     setSlippageTolerance,
     switchTokens,
     fetchRoutes,
+    clearRoutes,
   } = useSwapStore();
 
   // WebSocket for real-time data
   useSwapWebSocket();
+
+  // ✅ Reset routes when router changes
+  useEffect(() => {
+    clearRoutes();
+    setHasSearchedRoute(false);
+    // Re-fetch if inputs are valid
+    if (swap.inputToken && swap.outputToken && parseFloat(swap.inputAmount) > 0) {
+      fetchRoutes({ userPublicKey: publicKey?.toBase58() ?? null }).catch((err) => {
+        console.debug('[Router change] Auto-fetch failed:', err);
+      });
+    }
+  }, [selectedRouter, clearRoutes, fetchRoutes, swap.inputToken, swap.outputToken, swap.inputAmount, publicKey]);
 
   // State
   const [selectedRouter, setSelectedRouter] = useState<"swapback" | "jupiter">(
@@ -299,24 +312,25 @@ export function EnhancedSwapInterface() {
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // ⚠️ AUTO-FETCH DÉSACTIVÉ pour éviter les boucles infinies
-  // User must click "Search Route" manually
+  // ✅ AUTO-FETCH activé avec debounce pour éviter trop d'appels API
+  const debouncedFetchRoutes = useCallback(
+    debounce((inputToken: typeof swap.inputToken, outputToken: typeof swap.outputToken, inputAmount: string, router: string) => {
+      const amount = parseFloat(inputAmount);
+      if (inputToken && outputToken && amount > 0) {
+        fetchRoutes({ userPublicKey: publicKey?.toBase58() ?? null }).catch((err) => {
+          console.debug('[Auto-fetch] Failed:', err);
+        });
+      }
+    }, 800),
+    [fetchRoutes, publicKey]
+  );
 
-  // Debounced route fetching - DÉSACTIVÉ
-  // const debouncedFetchRoutes = useCallback(
-  //   debounce((inputToken: typeof swap.inputToken, outputToken: typeof swap.outputToken, inputAmount: string) => {
-  //     const amount = parseFloat(inputAmount);
-  //     if (inputToken && outputToken && amount > 0) {
-  //       fetchRoutes();
-  //     }
-  //   }, 800),
-  //   [fetchRoutes]
-  // );
-
-  // Fetch routes when amount changes - DÉSACTIVÉ
-  // useEffect(() => {
-  //   debouncedFetchRoutes(swap.inputToken, swap.outputToken, swap.inputAmount);
-  // }, [swap.inputToken, swap.outputToken, swap.inputAmount, debouncedFetchRoutes]);
+  // Fetch routes when inputs change
+  useEffect(() => {
+    if (swap.inputToken && swap.outputToken && swap.inputAmount) {
+      debouncedFetchRoutes(swap.inputToken, swap.outputToken, swap.inputAmount, selectedRouter);
+    }
+  }, [swap.inputToken, swap.outputToken, swap.inputAmount, selectedRouter, debouncedFetchRoutes]);
 
   // Calculate price impact and suggest slippage
   useEffect(() => {
