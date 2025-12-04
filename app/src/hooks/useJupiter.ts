@@ -193,7 +193,7 @@ export function useJupiter() {
    */
   const getSupportedTokens = useCallback(async (): Promise<string[]> => {
     try {
-      const response = await fetch('/api/tokens?limit=500');
+      const response = await fetch(getApiUrl(`${API_ENDPOINTS.tokens}?limit=500`));
       if (!response.ok) return [];
       
       const data = await response.json();

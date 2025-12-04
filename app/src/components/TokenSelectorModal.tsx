@@ -18,6 +18,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import { formatCurrency, formatCompactNumber } from "@/utils/formatNumber";
+import { getApiUrl, API_ENDPOINTS } from "@/config/api";
 
 interface Token {
   address: string;
@@ -125,7 +126,7 @@ export function TokenSelectorModal({
       setIsLoadingTokens(true);
       try {
         // Use our internal API to avoid CORS issues
-        const response = await fetch('/api/tokens?limit=100');
+        const response = await fetch(getApiUrl(`${API_ENDPOINTS.tokens}?limit=100`));
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.tokens?.length > 0) {
@@ -170,7 +171,7 @@ export function TokenSelectorModal({
     setIsSearching(true);
     try {
       // Use our internal API to search by address (avoids CORS)
-      const response = await fetch(`/api/tokens?address=${encodeURIComponent(query)}`);
+      const response = await fetch(getApiUrl(`${API_ENDPOINTS.tokens}?address=${encodeURIComponent(query)}`));
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.tokens?.length > 0) {

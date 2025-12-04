@@ -9,6 +9,25 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 
+// CORS Headers for cross-origin requests
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Max-Age": "86400",
+};
+
+/**
+ * OPTIONS /api/tokens
+ * Handle CORS preflight requests
+ */
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: CORS_HEADERS,
+  });
+}
+
 interface JupiterToken {
   address: string;
   symbol: string;
@@ -87,7 +106,7 @@ export async function GET(request: NextRequest) {
           success: true,
           tokens: [found],
           total: 1,
-        });
+        }, { headers: CORS_HEADERS });
       }
 
       // Try fetching from all tokens if not in strict list
@@ -103,7 +122,7 @@ export async function GET(request: NextRequest) {
               success: true,
               tokens: [{ ...foundAll, verified: false }],
               total: 1,
-            });
+            }, { headers: CORS_HEADERS });
           }
         }
       } catch {
@@ -114,7 +133,7 @@ export async function GET(request: NextRequest) {
         success: true,
         tokens: [],
         total: 0,
-      });
+      }, { headers: CORS_HEADERS });
     }
 
     // Filter by search query
@@ -142,6 +161,8 @@ export async function GET(request: NextRequest) {
         verified: true,
       })),
       total: tokens.length,
+    }, {
+      headers: CORS_HEADERS,
     });
   } catch (error) {
     console.error("❌ Error fetching tokens:", error);
@@ -153,7 +174,7 @@ export async function GET(request: NextRequest) {
         message: error instanceof Error ? error.message : "Unknown error",
         tokens: [],
       },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   }
 }

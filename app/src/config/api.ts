@@ -33,4 +33,5 @@ export function getApiUrl(path: string): string {
 export const API_ENDPOINTS = {
   quote: '/api/swap/quote',
   health: '/api/health',
+  tokens: '/api/tokens',
 } as const;
