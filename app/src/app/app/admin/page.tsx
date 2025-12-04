@@ -28,8 +28,10 @@ import {
   InformationCircleIcon
 } from "@heroicons/react/24/outline";
 
-// Program ID
-const PROGRAM_ID = new PublicKey("9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh");
+// Program ID - Use environment variable for flexibility across networks
+const PROGRAM_ID = new PublicKey(
+  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf"
+);
 
 // Admin Authority - Only this wallet can access the admin panel
 // Set via environment variable NEXT_PUBLIC_ADMIN_AUTHORITY
