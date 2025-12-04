@@ -197,13 +197,11 @@ const JUPITER_ACCOUNT_SLOTS = 48;
 
 /**
  * Mock Mode (pour dev/test sans réseau)
- * Default: Auto-enabled on devnet (Jupiter doesn't support devnet tokens)
- * Vercel: Add USE_MOCK_QUOTES=false to force real Jupiter on mainnet
+ * Default: DISABLED - Real Jupiter API on mainnet
+ * Set USE_MOCK_QUOTES=true to enable mock mode for testing
  */
-const SOLANA_NETWORK = process.env.NEXT_PUBLIC_SOLANA_NETWORK || "devnet";
-const USE_MOCK_DATA = 
-  process.env.USE_MOCK_QUOTES === "true" || 
-  SOLANA_NETWORK === "devnet"; // Auto-enable mock for devnet
+const SOLANA_NETWORK = process.env.NEXT_PUBLIC_SOLANA_NETWORK || "mainnet-beta";
+const USE_MOCK_DATA = process.env.USE_MOCK_QUOTES === "true"; // Only enable if explicitly set
 
 export async function POST(request: NextRequest) {
   try {

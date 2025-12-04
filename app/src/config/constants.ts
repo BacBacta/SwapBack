@@ -1,8 +1,8 @@
 import { PublicKey } from '@solana/web3.js';
 
-// Devnet defaults remain in effect until mainnet launch
-export const DEFAULT_SOLANA_NETWORK = 'devnet';
-export const DEFAULT_SOLANA_RPC_URL = 'https://api.devnet.solana.com';
+// Mainnet defaults for production
+export const DEFAULT_SOLANA_NETWORK = 'mainnet-beta';
+export const DEFAULT_SOLANA_RPC_URL = 'https://api.mainnet-beta.solana.com';
 export const DEFAULT_BACK_MINT = '862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux';
 
 /**
@@ -11,7 +11,7 @@ export const DEFAULT_BACK_MINT = '862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux';
  */
 
 // ============================================
-// PROGRAM IDs (Devnet - Updated Oct 31, 2025)
+// PROGRAM IDs (Mainnet - Updated Dec 4, 2025)
 // ============================================
 
 // Lazy load to avoid module-level access to process.env (causes client-side errors)
@@ -19,7 +19,7 @@ let _routerProgramId: PublicKey | null = null;
 export function getRouterProgramId(): PublicKey {
   if (!_routerProgramId) {
     _routerProgramId = new PublicKey(
-      process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || '9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh'
+      process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || '5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf'
     );
   }
   return _routerProgramId;
