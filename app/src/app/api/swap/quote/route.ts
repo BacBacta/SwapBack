@@ -9,9 +9,47 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 
-// Jupiter API - using public.jupiterapi.com which works on Vercel
-// The quote-api.jup.ag has DNS resolution issues on some serverless platforms
-const JUPITER_API = process.env.JUPITER_API_URL || "https://public.jupiterapi.com";
+// Jupiter API endpoints (primary + fallbacks)
+const JUPITER_ENDPOINTS = [
+  process.env.JUPITER_API_URL,
+  "https://public.jupiterapi.com",
+  "https://quote-api.jup.ag/v6",
+  "https://api.jup.ag/v6",
+].filter(Boolean) as string[];
+
+async function fetchFromJupiter(path: string, init?: RequestInit) {
+  let lastError: unknown = null;
+
+  for (const baseUrl of JUPITER_ENDPOINTS) {
+    const url = `${baseUrl.replace(/\/$/, "")}${path}`;
+    try {
+      const response = await fetch(url, {
+        ...init,
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "SwapBack/1.0",
+          ...(init?.headers || {}),
+        },
+      });
+
+      if (response.ok) {
+        return response;
+      }
+
+      // Non-200: store error but continue to next endpoint for >=500 errors only
+      lastError = new Error(`Jupiter responded ${response.status}`);
+      if (response.status < 500) {
+        return response; // client error - no retry on other endpoints
+      }
+    } catch (error) {
+      lastError = error;
+      console.warn(`⚠️ Jupiter endpoint failed (${url}):`, error);
+      continue;
+    }
+  }
+
+  throw lastError || new Error("All Jupiter endpoints failed");
+}
 
 // Helper to add no-store header
 const withNoStore = (init?: ResponseInit): ResponseInit => {
@@ -120,22 +158,18 @@ export async function POST(request: NextRequest) {
       slippageBps: slippageBps.toString(),
     });
 
-    const quoteUrl = `${JUPITER_API}/quote?${params.toString()}`;
+    const endpointPath = `/quote?${params.toString()}`;
 
     console.log("🔄 Fetching Jupiter quote:", {
-      url: quoteUrl,
+      path: endpointPath,
       inputMint: inputMint.slice(0, 8) + "...",
       outputMint: outputMint.slice(0, 8) + "...",
       amount: parsedAmount,
     });
 
     // Fetch quote from Jupiter
-    const response = await fetch(quoteUrl, {
+    const response = await fetchFromJupiter(endpointPath, {
       method: "GET",
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "SwapBack/1.0",
-      },
     });
 
     console.log("📡 Jupiter response:", {

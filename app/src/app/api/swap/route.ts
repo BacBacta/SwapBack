@@ -9,8 +9,45 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 
-// Jupiter API - using public.jupiterapi.com which works on Vercel
-const JUPITER_API = process.env.JUPITER_API_URL || "https://public.jupiterapi.com";
+const JUPITER_ENDPOINTS = [
+  process.env.JUPITER_API_URL,
+  "https://public.jupiterapi.com",
+  "https://quote-api.jup.ag/v6",
+  "https://api.jup.ag/v6",
+].filter(Boolean) as string[];
+
+async function fetchFromJupiter(path: string, init?: RequestInit) {
+  let lastError: unknown = null;
+
+  for (const baseUrl of JUPITER_ENDPOINTS) {
+    const url = `${baseUrl.replace(/\/$/, "")}${path}`;
+    try {
+      const response = await fetch(url, {
+        ...init,
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "SwapBack/1.0",
+          ...(init?.headers || {}),
+        },
+      });
+
+      if (response.ok) {
+        return response;
+      }
+
+      lastError = new Error(`Jupiter responded ${response.status}`);
+      if (response.status < 500) {
+        return response;
+      }
+    } catch (error) {
+      lastError = error;
+      console.warn(`⚠️ Jupiter endpoint failed (${url}):`, error);
+      continue;
+    }
+  }
+
+  throw lastError || new Error("All Jupiter endpoints failed");
+}
 
 // Simple rate limiting in memory
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -120,11 +157,8 @@ export async function POST(request: NextRequest) {
       slippageBps: slippageBps.toString(),
     });
 
-    const quoteResponse = await fetch(`${JUPITER_API}/quote?${quoteParams}`, {
-      headers: { 
-        Accept: "application/json",
-        "User-Agent": "SwapBack/1.0",
-      },
+    const quoteResponse = await fetchFromJupiter(`/quote?${quoteParams}`, {
+      method: "GET",
     });
 
     if (!quoteResponse.ok) {
@@ -158,12 +192,10 @@ export async function POST(request: NextRequest) {
       swapBody.computeUnitPriceMicroLamports = priorityFee;
     }
 
-    const swapResponse = await fetch(`${JUPITER_API}/swap`, {
+    const swapResponse = await fetchFromJupiter(`/swap`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Accept: "application/json",
-        "User-Agent": "SwapBack/1.0",
       },
       body: JSON.stringify(swapBody),
     });
