@@ -11,10 +11,15 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat python3 make g++
 
 # Copier les fichiers de dépendances
-COPY package.json package-lock.json* ./
+COPY package.json ./
+COPY package-lock.json* ./
 
-# Installer les dépendances
-RUN npm ci --legacy-peer-deps
+# Installer les dépendances (npm install si pas de lock file)
+RUN if [ -f package-lock.json ]; then \
+      npm ci --legacy-peer-deps; \
+    else \
+      npm install --legacy-peer-deps; \
+    fi
 
 # ============================================
 # Stage 2: Builder
@@ -30,8 +35,8 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# Build de l'application
-RUN npm run build
+# Build de l'application (next build directement car IDL/SDK déjà dans src/)
+RUN npx next build
 
 # ============================================
 # Stage 3: Runner (Production)
