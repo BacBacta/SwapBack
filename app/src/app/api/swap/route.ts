@@ -1,10 +1,15 @@
 /**
- * API Route: Swap (Simplified for Build)
- * Returns mock routes until SDK is integrated
+ * API Route: Swap Execution
+ * Gets swap transaction from Jupiter API (server-side to avoid CORS)
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { Connection } from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddressSync,
+} from "@solana/spl-token";
 import { checkRateLimit, getClientIdentifier } from "../../../lib/rateLimit";
 import { sanitizeAmount, isValidPublicKey } from "../../../lib/validation";
 import { DEFAULT_SOLANA_RPC_URL } from "@/config/constants";
@@ -12,6 +17,9 @@ import { DEFAULT_SOLANA_RPC_URL } from "@/config/constants";
 const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
   DEFAULT_SOLANA_RPC_URL;
+
+const JUPITER_API =
+  process.env.JUPITER_API_URL || "https://quote-api.jup.ag/v6";
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,32 +47,37 @@ export async function POST(request: NextRequest) {
     const {
       inputMint,
       outputMint,
-      inputAmount,
-      useMEVProtection = true,
+      amount,
+      inputAmount, // Legacy support
+      slippageBps = 50,
+      userPublicKey,
+      priorityFee,
     } = await request.json();
 
+    const actualAmount = amount || inputAmount;
+
     // Security: Validate inputs
-    if (!inputMint || !outputMint || !inputAmount) {
+    if (!inputMint || !outputMint || !actualAmount || !userPublicKey) {
       return NextResponse.json(
         {
-          error: "Missing required fields: inputMint, outputMint, inputAmount",
+          error: "Missing required fields: inputMint, outputMint, amount, userPublicKey",
         },
         { status: 400 }
       );
     }
 
     // Security: Validate public keys
-    if (!isValidPublicKey(inputMint) || !isValidPublicKey(outputMint)) {
+    if (!isValidPublicKey(inputMint) || !isValidPublicKey(outputMint) || !isValidPublicKey(userPublicKey)) {
       return NextResponse.json(
-        { error: "Invalid token mint address" },
+        { error: "Invalid public key address" },
         { status: 400 }
       );
     }
 
     // Security: Validate amount
-    const validatedAmount = sanitizeAmount(inputAmount.toString(), {
-      min: 0.000001,
-      max: 1e12,
+    const validatedAmount = sanitizeAmount(actualAmount.toString(), {
+      min: 1,
+      max: 1e18,
     });
 
     if (validatedAmount === null) {
@@ -74,71 +87,116 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Return mock routes (replace with actual SDK integration later)
-    const routes = [
-      {
-        id: "route-1",
-        venues: ["Orca"],
-        expectedOutput: (inputAmount * 0.99).toString(),
-        effectiveRate: 0.99,
-        totalCost: inputAmount * 0.01,
-        mevRisk: useMEVProtection ? "low" : "medium",
-        estimatedTime: 1200,
-        splits: [],
-      },
-      {
-        id: "route-2",
-        venues: ["Raydium"],
-        expectedOutput: (inputAmount * 0.98).toString(),
-        effectiveRate: 0.98,
-        totalCost: inputAmount * 0.02,
-        mevRisk: useMEVProtection ? "low" : "high",
-        estimatedTime: 1500,
-        splits: [],
-      },
-    ];
+    console.log("🔄 Getting swap transaction:", {
+      inputMint: inputMint.slice(0, 8) + "...",
+      outputMint: outputMint.slice(0, 8) + "...",
+      amount: validatedAmount,
+      user: userPublicKey.slice(0, 8) + "...",
+    });
 
-    return NextResponse.json({ routes, success: true });
+    // Step 1: Get quote from Jupiter
+    const quoteParams = new URLSearchParams({
+      inputMint,
+      outputMint,
+      amount: Math.floor(validatedAmount).toString(),
+      slippageBps: slippageBps.toString(),
+    });
+
+    const quoteResponse = await fetch(`${JUPITER_API}/quote?${quoteParams}`, {
+      headers: { Accept: "application/json" },
+    });
+
+    if (!quoteResponse.ok) {
+      const error = await quoteResponse.text();
+      console.error("❌ Jupiter quote failed:", error);
+      return NextResponse.json(
+        { error: "Failed to get quote from Jupiter", details: error },
+        { status: 502 }
+      );
+    }
+
+    const quote = await quoteResponse.json();
+
+    console.log("📊 Quote received:", {
+      inAmount: quote.inAmount,
+      outAmount: quote.outAmount,
+      priceImpact: quote.priceImpactPct,
+    });
+
+    // Step 2: Get swap transaction from Jupiter
+    const userPk = new PublicKey(userPublicKey);
+    const inputMintPk = new PublicKey(inputMint);
+    const outputMintPk = new PublicKey(outputMint);
+
+    const userSourceAta = getAssociatedTokenAddressSync(
+      inputMintPk,
+      userPk,
+      false,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+
+    const userDestinationAta = getAssociatedTokenAddressSync(
+      outputMintPk,
+      userPk,
+      false,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+
+    const swapBody: Record<string, unknown> = {
+      quoteResponse: quote,
+      userPublicKey: userPublicKey,
+      wrapAndUnwrapSol: true,
+      useSharedAccounts: true,
+      dynamicComputeUnitLimit: true,
+      asLegacyTransaction: false,
+    };
+
+    if (priorityFee) {
+      swapBody.computeUnitPriceMicroLamports = priorityFee;
+    }
+
+    const swapResponse = await fetch(`${JUPITER_API}/swap`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(swapBody),
+    });
+
+    if (!swapResponse.ok) {
+      const error = await swapResponse.text();
+      console.error("❌ Jupiter swap failed:", error);
+      return NextResponse.json(
+        { error: "Failed to get swap transaction from Jupiter", details: error },
+        { status: 502 }
+      );
+    }
+
+    const swapData = await swapResponse.json();
+
+    console.log("✅ Swap transaction created:", {
+      lastValidBlockHeight: swapData.lastValidBlockHeight,
+      hasTransaction: !!swapData.swapTransaction,
+    });
+
+    return NextResponse.json({
+      success: true,
+      quote,
+      swapTransaction: swapData.swapTransaction,
+      lastValidBlockHeight: swapData.lastValidBlockHeight,
+      prioritizationFeeLamports: swapData.prioritizationFeeLamports,
+    });
   } catch (error) {
     console.error("Error in /api/swap:", error);
     
-    // Log API error to protocol logs file
-    const errorLog = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-      timestamp: new Date().toISOString(),
-      level: 'error' as const,
-      category: 'api',
-      title: 'Swap API Error',
-      message: error instanceof Error ? error.message : 'Unknown API error',
-      details: {
-        component: '/api/swap',
-        action: 'POST',
-        stack: error instanceof Error ? error.stack : undefined,
-      },
-      resolved: false,
-    };
-
-    // Try to log to file (non-blocking)
-    try {
-      const fs = await import('fs/promises');
-      const path = await import('path');
-      const logsDir = path.join(process.cwd(), 'logs');
-      await fs.mkdir(logsDir, { recursive: true });
-      const logsFile = path.join(logsDir, 'protocol-logs.json');
-      
-      let logs = [];
-      try {
-        const data = await fs.readFile(logsFile, 'utf-8');
-        logs = JSON.parse(data);
-      } catch { /* File doesn't exist yet */ }
-      
-      logs.unshift(errorLog);
-      logs = logs.slice(0, 500); // Keep max 500 logs
-      await fs.writeFile(logsFile, JSON.stringify(logs, null, 2));
-    } catch { /* Silent fail for logging */ }
-
     return NextResponse.json(
-      { error: "Internal server error" },
+      { 
+        error: "Internal server error",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
@@ -152,6 +210,7 @@ export async function GET() {
     return NextResponse.json({
       status: "ok",
       rpc: RPC_ENDPOINT,
+      jupiterApi: JUPITER_API,
       currentSlot: slot,
       timestamp: Date.now(),
     });
