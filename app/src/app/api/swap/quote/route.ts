@@ -150,12 +150,34 @@ async function fetchFromJupiter(path: string, init?: RequestInit) {
   );
 }
 
-// Helper to add no-store header
+// CORS headers for cross-origin requests (Vercel frontend → Fly.io API)
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Max-Age": "86400",
+};
+
+// Helper to add no-store header and CORS
 const withNoStore = (init?: ResponseInit): ResponseInit => {
   const headers = new Headers(init?.headers);
   headers.set("Cache-Control", "no-store");
+  // Add CORS headers
+  Object.entries(CORS_HEADERS).forEach(([key, value]) => {
+    headers.set(key, value);
+  });
   return { ...init, headers };
 };
+
+/**
+ * OPTIONS handler for CORS preflight requests
+ */
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: CORS_HEADERS,
+  });
+}
 
 /**
  * Parse Jupiter quote into readable route information
