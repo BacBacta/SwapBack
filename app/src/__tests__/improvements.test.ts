@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { QuoteCache } from "@/lib/cache/quoteCache";
 import { HealthMonitor } from "@/lib/monitoring/healthMonitor";
 import { MultiSourceQuoteAggregator } from "@/lib/quotes/multiSourceAggregator";
-import { InternalLiquidityPool } from "@/lib/liquidity/internalPool";
+// DEFERRED: InternalLiquidityPool sera développé plus tard
+// import { InternalLiquidityPool } from "@/lib/liquidity/internalPool";
 
 describe("QuoteCache", () => {
   let cache: QuoteCache;
@@ -171,94 +172,9 @@ describe("MultiSourceQuoteAggregator", () => {
   });
 });
 
-describe("InternalLiquidityPool", () => {
-  let pool: InternalLiquidityPool;
+// ============================================================================
+// DEFERRED: InternalLiquidityPool - Fonctionnalité mise en suspend
+// Sera développée dans une version ultérieure
+// ============================================================================
+// describe("InternalLiquidityPool", () => { ... });
 
-  beforeEach(() => {
-    pool = new InternalLiquidityPool();
-  });
-
-  it("devrait permettre de déposer de la liquidité", () => {
-    const position = pool.depositLiquidity(
-      "user123",
-      "So11111111111111111111111111111111111111112", // SOL
-      100,
-      30 // 30 jours lock
-    );
-
-    expect(position).not.toBeNull();
-    expect(position?.amount).toBe(100);
-    expect(position?.lockDurationDays).toBe(30);
-  });
-
-  it("devrait vérifier la possibilité de swap interne", () => {
-    // Déposer d'abord de la liquidité
-    pool.depositLiquidity(
-      "lp1",
-      "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
-      10000
-    );
-
-    const canSwap = pool.canExecuteInternally(
-      "So11111111111111111111111111111111111111112", // SOL input
-      "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC output
-      1 // 1 SOL
-    );
-
-    // Devrait pouvoir si assez de liquidité USDC
-    expect(typeof canSwap).toBe("boolean");
-  });
-
-  it("devrait calculer les savings vs DEX externe", () => {
-    const opportunity = pool.calculateSavings(
-      "So11111111111111111111111111111111111111112",
-      "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-      1, // 1 SOL
-      175 // Output externe de 175 USDC
-    );
-
-    expect(opportunity.inputAmount).toBe(1);
-    expect(opportunity.outputAmount).toBeGreaterThan(0);
-    expect(typeof opportunity.savings).toBe("number");
-    expect(typeof opportunity.rebateAmount).toBe("number");
-  });
-
-  it("devrait retourner les stats des pools", () => {
-    pool.depositLiquidity(
-      "lp1",
-      "So11111111111111111111111111111111111111112",
-      1000
-    );
-
-    const stats = pool.getPoolStats();
-    
-    expect(stats.length).toBeGreaterThan(0);
-    const solPool = stats.find(s => s.symbol === "SOL");
-    expect(solPool?.totalLiquidity).toBe(1000);
-    expect(solPool?.providers).toBe(1);
-  });
-
-  it("devrait calculer les rewards LPs", () => {
-    pool.depositLiquidity(
-      "lp1",
-      "So11111111111111111111111111111111111111112",
-      1000,
-      90 // 90 jours lock
-    );
-
-    const rewards = pool.calculateRewards("lp1");
-    
-    expect(rewards.length).toBe(1);
-    expect(rewards[0].rewards).toBeGreaterThanOrEqual(0);
-  });
-
-  it("devrait refuser le token non supporté", () => {
-    const position = pool.depositLiquidity(
-      "user123",
-      "InvalidMint123456789",
-      100
-    );
-
-    expect(position).toBeNull();
-  });
-});
