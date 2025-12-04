@@ -7,19 +7,15 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Installer les dépendances système nécessaires
-RUN apk add --no-cache libc6-compat python3 make g++
+# Installer les dépendances système nécessaires (incluant headers Linux pour USB)
+RUN apk add --no-cache libc6-compat python3 make g++ linux-headers eudev-dev
 
 # Copier les fichiers de dépendances
 COPY package.json ./
 COPY package-lock.json* ./
 
-# Installer les dépendances (npm install si pas de lock file)
-RUN if [ -f package-lock.json ]; then \
-      npm ci --legacy-peer-deps; \
-    else \
-      npm install --legacy-peer-deps; \
-    fi
+# Installer les dépendances (ignorer les erreurs des modules optionnels)
+RUN npm install --legacy-peer-deps --ignore-scripts || npm install --legacy-peer-deps --omit=optional
 
 # ============================================
 # Stage 2: Builder
