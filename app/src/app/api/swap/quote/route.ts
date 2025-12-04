@@ -8,47 +8,101 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
+import { recordRouterMetric, getRouterReliabilitySummary } from "@/lib/routerMetrics";
+import { buildHybridIntents, type RoutingStrategy } from "@/lib/routing/hybridRouting";
+import { getCircuit, retryWithBackoff, CircuitOpenError } from "@/lib/resilience";
+import type { JupiterQuoteResponse, JupiterRoutePlanStep } from "@/types/router";
+
+const PRIMARY_JUPITER_API = process.env.JUPITER_API_URL || "https://quote-api.jup.ag/v6";
 
 // Jupiter API endpoints (primary + fallbacks)
 const JUPITER_ENDPOINTS = [
-  process.env.JUPITER_API_URL,
+  PRIMARY_JUPITER_API,
   "https://public.jupiterapi.com",
-  "https://quote-api.jup.ag/v6",
   "https://api.jup.ag/v6",
-].filter(Boolean) as string[];
+].filter(Boolean);
+
+// Circuit breaker pour Jupiter API
+const jupiterCircuit = getCircuit("jupiter", {
+  failureThreshold: 5,
+  resetTimeoutMs: 30000,
+  successThreshold: 2,
+});
 
 async function fetchFromJupiter(path: string, init?: RequestInit) {
-  let lastError: unknown = null;
-
-  for (const baseUrl of JUPITER_ENDPOINTS) {
-    const url = `${baseUrl.replace(/\/$/, "")}${path}`;
-    try {
-      const response = await fetch(url, {
-        ...init,
-        headers: {
-          Accept: "application/json",
-          "User-Agent": "SwapBack/1.0",
-          ...(init?.headers || {}),
-        },
-      });
-
-      if (response.ok) {
-        return response;
-      }
-
-      // Non-200: store error but continue to next endpoint for >=500 errors only
-      lastError = new Error(`Jupiter responded ${response.status}`);
-      if (response.status < 500) {
-        return response; // client error - no retry on other endpoints
-      }
-    } catch (error) {
-      lastError = error;
-      console.warn(`⚠️ Jupiter endpoint failed (${url}):`, error);
-      continue;
-    }
+  // Vérifier le circuit breaker
+  if (!jupiterCircuit.canExecute()) {
+    const stats = jupiterCircuit.getStats();
+    throw new CircuitOpenError("jupiter", stats.timeUntilReset);
   }
 
-  throw lastError || new Error("All Jupiter endpoints failed");
+  return retryWithBackoff(
+    async () => {
+      let lastError: unknown = null;
+
+      for (const baseUrl of JUPITER_ENDPOINTS) {
+        const url = `${baseUrl.replace(/\/$/, "")}${path}`;
+        const attemptStart = Date.now();
+        try {
+          const response = await fetch(url, {
+            ...init,
+            headers: {
+              Accept: "application/json",
+              "User-Agent": "SwapBack/1.0",
+              ...(init?.headers || {}),
+            },
+            signal: AbortSignal.timeout(10000), // 10s timeout
+          });
+
+          const latencyMs = Date.now() - attemptStart;
+
+          recordRouterMetric({
+            provider: "jupiter",
+            endpoint: baseUrl,
+            status: response.status,
+            ok: response.ok,
+            latencyMs,
+          });
+
+          if (response.ok) {
+            jupiterCircuit.recordSuccess();
+            return response;
+          }
+
+          // Non-200: store error but continue to next endpoint for >=500 errors only
+          lastError = new Error(`Jupiter responded ${response.status}`);
+          if (response.status < 500) {
+            return response; // client error - no retry on other endpoints
+          }
+        } catch (error) {
+          lastError = error;
+          recordRouterMetric({
+            provider: "jupiter",
+            endpoint: baseUrl,
+            status: 0,
+            ok: false,
+            latencyMs: Date.now() - attemptStart,
+          });
+          console.warn(`⚠️ Jupiter endpoint failed (${url}):`, error);
+          continue;
+        }
+      }
+
+      jupiterCircuit.recordFailure();
+      throw lastError || new Error("All Jupiter endpoints failed");
+    },
+    {
+      maxRetries: 2,
+      initialDelayMs: 500,
+      backoffMultiplier: 2,
+      maxDelayMs: 5000,
+      jitter: true,
+      retryableErrors: (error) => {
+        // Ne pas retry sur les erreurs client (4xx)
+        return !error.message.includes("responded 4");
+      },
+    }
+  );
 }
 
 // Helper to add no-store header
@@ -57,33 +111,6 @@ const withNoStore = (init?: ResponseInit): ResponseInit => {
   headers.set("Cache-Control", "no-store");
   return { ...init, headers };
 };
-
-// Types
-interface JupiterRoutePlanStep {
-  swapInfo?: {
-    ammKey?: string;
-    label?: string;
-    inputMint?: string;
-    outputMint?: string;
-    inAmount?: string;
-    outAmount?: string;
-    feeAmount?: string;
-    feeMint?: string;
-  };
-  percent?: number;
-}
-
-interface JupiterQuoteResponse {
-  inputMint?: string;
-  outputMint?: string;
-  inAmount?: string;
-  outAmount?: string;
-  priceImpactPct?: number | string;
-  routePlan?: JupiterRoutePlanStep[];
-  otherAmountThreshold?: string;
-  swapMode?: string;
-  slippageBps?: number;
-}
 
 /**
  * Parse Jupiter quote into readable route information
@@ -131,7 +158,14 @@ export async function POST(request: NextRequest) {
       outputMint,
       amount,
       slippageBps = 50,
-    } = body;
+      routingStrategy = "smart",
+    } = body as {
+      inputMint?: string;
+      outputMint?: string;
+      amount?: number | string;
+      slippageBps?: number;
+      routingStrategy?: RoutingStrategy;
+    };
 
     // Validate inputs
     if (!inputMint || !outputMint || !amount) {
@@ -150,11 +184,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const amountLamports = Math.floor(parsedAmount);
+
     // Build Jupiter API URL
     const params = new URLSearchParams({
       inputMint,
       outputMint,
-      amount: Math.floor(parsedAmount).toString(),
+      amount: amountLamports.toString(),
       slippageBps: slippageBps.toString(),
     });
 
@@ -209,12 +245,23 @@ export async function POST(request: NextRequest) {
 
     // Parse route information
     const routeInfo = parseRouteInfo(quote);
+    const reliabilitySummary = getRouterReliabilitySummary();
+    const intents = buildHybridIntents({
+      quote,
+      strategy: routingStrategy,
+      amountLamports,
+      slippageBps,
+      priceImpactPct: routeInfo.priceImpactPct ?? 0,
+    });
 
     return NextResponse.json(
       {
         success: true,
         quote,
         routeInfo,
+        intents,
+        reliability: reliabilitySummary,
+        routingStrategy,
         timestamp: Date.now(),
       },
       withNoStore()
@@ -238,12 +285,13 @@ export async function POST(request: NextRequest) {
  */
 export async function GET() {
   try {
-    // Simple health check - just verify the API is reachable
+    const reliability = getRouterReliabilitySummary();
     return NextResponse.json(
       {
         status: "ok",
         service: "Jupiter Quote API Proxy",
-        jupiterApi: JUPITER_API,
+        jupiterApi: PRIMARY_JUPITER_API,
+        reliability,
         timestamp: Date.now(),
       },
       withNoStore()

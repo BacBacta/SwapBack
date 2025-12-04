@@ -6,6 +6,8 @@
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import { RouteCandidate } from "@/../../sdk/src/types/smart-router";
+import { buildHybridIntents, type HybridRouteIntent, type RoutingStrategy } from "@/lib/routing/hybridRouting";
+import type { RouterReliabilitySummary } from "@/types/router";
 
 type JupiterRoutePlanStep = {
   swapInfo?: {
@@ -53,6 +55,7 @@ export interface SwapState {
   outputAmount: string;
   slippageTolerance: number;
   useMEVProtection: boolean;
+  executionChannel: "public" | "jito" | "private-rpc";
   priorityLevel: "low" | "medium" | "high";
 }
 
@@ -64,6 +67,8 @@ export interface RouteState {
   isMock: boolean; // Indicates if using mock data (devnet/test)
   isLoading: boolean;
   error: string | null;
+  intents: HybridRouteIntent[];
+  reliability: RouterReliabilitySummary | null;
 }
 
 export interface TransactionState {
@@ -89,8 +94,11 @@ export interface SwapStore {
   setOutputAmount: (amount: string) => void;
   setSlippageTolerance: (tolerance: number) => void;
   setUseMEVProtection: (use: boolean) => void;
+  setExecutionChannel: (channel: SwapState["executionChannel"]) => void;
   setPriorityLevel: (level: "low" | "medium" | "high") => void;
   switchTokens: () => void;
+  routingStrategy: RoutingStrategy;
+  setRoutingStrategy: (strategy: RoutingStrategy) => void;
 
   // Route State
   routes: RouteState;
@@ -133,6 +141,7 @@ const initialSwapState: SwapState = {
   outputAmount: "",
   slippageTolerance: 0.01, // 1%
   useMEVProtection: true,
+  executionChannel: "jito",
   priorityLevel: "medium",
 };
 
@@ -144,6 +153,8 @@ const initialRouteState: RouteState = {
   isMock: false,
   isLoading: false,
   error: null,
+  intents: [],
+  reliability: null,
 };
 
 const initialTransactionState: TransactionState = {
@@ -191,7 +202,16 @@ export const useSwapStore = create<SwapStore>()(
 
         setUseMEVProtection: (use) =>
           set((state) => ({
-            swap: { ...state.swap, useMEVProtection: use },
+            swap: {
+              ...state.swap,
+              useMEVProtection: use,
+              executionChannel: use ? "jito" : "public",
+            },
+          })),
+
+        setExecutionChannel: (channel) =>
+          set((state) => ({
+            swap: { ...state.swap, executionChannel: channel },
           })),
 
         setPriorityLevel: (level) =>
@@ -210,6 +230,9 @@ export const useSwapStore = create<SwapStore>()(
             },
           })),
 
+        routingStrategy: "smart",
+        setRoutingStrategy: (strategy) => set({ routingStrategy: strategy }),
+
         // Route State
         routes: initialRouteState,
 
@@ -221,7 +244,7 @@ export const useSwapStore = create<SwapStore>()(
           })),
 
         fetchRoutes: async (options) => {
-          const { swap } = get();
+          const { swap, routingStrategy } = get();
           
           if (!swap.inputToken || !swap.outputToken || !swap.inputAmount) {
             return;
@@ -234,6 +257,8 @@ export const useSwapStore = create<SwapStore>()(
               error: null,
               jupiterCpi: null,
               isMock: false,
+              intents: [],
+              reliability: null,
             },
           }));
 
@@ -243,6 +268,7 @@ export const useSwapStore = create<SwapStore>()(
             const amountInSmallestUnit = Math.floor(
               parseFloat(swap.inputAmount) * Math.pow(10, inputDecimals)
             );
+            const slippageBps = Math.max(1, Math.floor(swap.slippageTolerance * 10000));
 
             // Call API route (uses CORS proxy on Vercel)
             const response = await fetch("/api/swap/quote", {
@@ -252,7 +278,8 @@ export const useSwapStore = create<SwapStore>()(
                 inputMint: swap.inputToken.mint,
                 outputMint: swap.outputToken.mint,
                 amount: amountInSmallestUnit,
-                slippageBps: Math.floor(swap.slippageTolerance * 10000),
+                slippageBps,
+                routingStrategy,
                 userPublicKey: options?.userPublicKey ?? null,
               }),
             });
@@ -299,6 +326,30 @@ export const useSwapStore = create<SwapStore>()(
               const outputDecimals = swap.outputToken.decimals || 9;
               const outputAmount = parseFloat(quote.outAmount) / Math.pow(10, outputDecimals);
 
+              const serverIntents = Array.isArray(data.intents) ? data.intents : null;
+              const intents = serverIntents?.length
+                ? (serverIntents as HybridRouteIntent[])
+                : buildHybridIntents({
+                    quote,
+                    strategy: routingStrategy,
+                    amountLamports: amountInSmallestUnit,
+                    slippageBps,
+                    priceImpactPct: priceImpact,
+                  });
+
+              let reliabilitySummary: RouterReliabilitySummary | null = data.reliability ?? null;
+              if (!reliabilitySummary) {
+                try {
+                  const metricsResponse = await fetch("/api/analytics/router-metrics");
+                  if (metricsResponse.ok) {
+                    const metricsData = await metricsResponse.json();
+                    reliabilitySummary = metricsData.summary ?? null;
+                  }
+                } catch (metricsError) {
+                  console.debug("Router metrics unavailable", metricsError);
+                }
+              }
+
               set((state) => ({
                 swap: {
                   ...state.swap,
@@ -312,6 +363,8 @@ export const useSwapStore = create<SwapStore>()(
                   jupiterCpi: data.jupiterCpi ?? null,
                   isMock: data.mock === true,
                   isLoading: false,
+                  intents,
+                  reliability: reliabilitySummary,
                 },
               }));
             } else {
@@ -327,6 +380,8 @@ export const useSwapStore = create<SwapStore>()(
                 selectedRoutePlan: null,
                 jupiterCpi: null,
                 isMock: false,
+                intents: [],
+                reliability: null,
               },
             }));
           }

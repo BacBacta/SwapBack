@@ -1,0 +1,32 @@
+{
+  "name": "@swapback/sdk",
+  "version": "0.1.0",
+  "description": "SwapBack SDK – get quotes and execute swaps on Solana",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["solana", "swap", "dex", "sdk", "swapback"],
+  "author": "SwapBack Team",
+  "license": "MIT",
+  "peerDependencies": {
+    "@solana/web3.js": "^1.87.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3"
+  }
+}

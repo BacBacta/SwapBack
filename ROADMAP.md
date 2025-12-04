@@ -9,6 +9,28 @@
 - Service Oracle
 - Documentation complète
 
+## Focus Décembre 2025 – Axes Différenciants
+
+### 1. Routage hybride « split intents »
+- **API** : étendre `/api/swap/quote` pour produire plusieurs intents (`jupiter_best`, `twap_plan`, `internal_liquidity`) avec pondérations.
+- **Store/UI** : ajouter `routingStrategy` dans `swapStore` pour sélectionner/combiner les intents et afficher la ventilation dans l’interface.
+- **Execution** : prévoir un worker (cron) ou des instructions Anchor supplémentaires permettant de séquencer les tranches TWAP/bundles internes en s’appuyant sur `twapSlices`, `planAccount` et `useBundle` déjà présents dans `useSwapRouter`.
+
+### 2. Protection MEV avancée
+- **Canaux d’exécution** : ajouter un paramètre `executionChannel` (`public`, `jito`, `private-rpc`) aux fonctions de swap (hook + API) et exposer l’option dans l’UI (toggle MEV Shield).
+- **Intégrations** : brancher Jito/Triton pour signer et pousser des bundles privés lorsque l’utilisateur active la protection, tout en conservant le fallback RPC public.
+- **Monitoring** : enrichir `monitor.swapSuccess` / `monitor.swapError` avec le canal utilisé pour suivre le taux de réussite et détecter les rechutes.
+
+### 3. Score de fiabilité & analytics
+- **Instrumentation** : journaliser chaque appel Jupiter (endpoint, latence, statut) dans un flux `router-metrics` via `monitor` et stocker 24 h d’historique.
+- **API analytics** : créer `/api/analytics/router-metrics` qui agrège latence moyenne, P95, taux d’erreur et uptime pour SwapBack, Jupiter natif, DEX directs.
+- **UI** : nouveau composant (ex. `RouterReliabilityCard`) affichant score (A/B/C), statistiques clés et mini trendline, avec mise à jour auto toutes les 30 s.
+
+### 4. SDK public
+- **Extraction** : déplacer les helpers de quote/routage (normalisation Jupiter, calcul lamports, fetch fallback) dans `sdk/` et exposer des entrées stables (`getQuote`, `executeSwap`).
+- **Packaging** : ajouter build tsup/rollup + `package.json` dédié (ex. `packages/sdk`) et publier via GitHub Packages/NPM.
+- **Documentation** : fournir README + exemples (Node, Next.js) et versionner la surface d’API pour permettre aux intégrateurs d’utiliser SwapBack comme plateforme.
+
 ## Phase 1 : Finalisation MVP (Semaines 1-3) 🏗️
 
 ### Semaine 1 : Configuration & Build

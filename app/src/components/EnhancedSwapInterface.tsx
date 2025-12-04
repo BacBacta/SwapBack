@@ -48,6 +48,10 @@ import { SmartSlippage } from "@/components/SmartSlippage";
 import { SwapDetailsExpandable } from "@/components/SwapDetailsExpandable";
 import { SuccessModal } from "@/components/SuccessModal";
 import { ErrorFeedback, detectErrorType, type ErrorType } from "@/components/ErrorFeedback";
+import { RoutingStrategySelector } from "@/components/RoutingStrategySelector";
+import { RouterReliabilityCard } from "@/components/RouterReliabilityCard";
+import { RouteIntentsList } from "@/components/RouteIntentsList";
+import type { RoutingStrategy } from "@/lib/routing/hybridRouting";
 import { debounce } from "lodash";
 
 interface RouteStep {
@@ -248,9 +252,13 @@ export function EnhancedSwapInterface() {
     setInputToken,
     setOutputToken,
     setSlippageTolerance,
+    setUseMEVProtection,
+    setExecutionChannel,
     switchTokens,
     fetchRoutes,
     clearRoutes,
+    routingStrategy,
+    setRoutingStrategy,
   } = useSwapStore();
 
   // WebSocket for real-time data
@@ -313,7 +321,7 @@ export function EnhancedSwapInterface() {
 
   // ✅ AUTO-FETCH activé avec debounce pour éviter trop d'appels API
   const debouncedFetchRoutes = useCallback(
-    debounce((inputToken: typeof swap.inputToken, outputToken: typeof swap.outputToken, inputAmount: string, router: string) => {
+    debounce((inputToken: typeof swap.inputToken, outputToken: typeof swap.outputToken, inputAmount: string) => {
       const amount = parseFloat(inputAmount);
       if (inputToken && outputToken && amount > 0) {
         fetchRoutes({ userPublicKey: publicKey?.toBase58() ?? null }).catch((err) => {
@@ -327,9 +335,9 @@ export function EnhancedSwapInterface() {
   // Fetch routes when inputs change
   useEffect(() => {
     if (swap.inputToken && swap.outputToken && swap.inputAmount) {
-      debouncedFetchRoutes(swap.inputToken, swap.outputToken, swap.inputAmount, selectedRouter);
+      debouncedFetchRoutes(swap.inputToken, swap.outputToken, swap.inputAmount);
     }
-  }, [swap.inputToken, swap.outputToken, swap.inputAmount, selectedRouter, debouncedFetchRoutes]);
+  }, [swap.inputToken, swap.outputToken, swap.inputAmount, selectedRouter, routingStrategy, debouncedFetchRoutes]);
 
   // Calculate price impact and suggest slippage
   useEffect(() => {
@@ -431,6 +439,28 @@ export function EnhancedSwapInterface() {
       const reduced = currentAmount * (1 - percentage / 100);
       setInputAmount(reduced.toFixed(swap.inputToken?.decimals || 6));
     }
+  };
+
+  const handleRoutingStrategyChange = (strategy: RoutingStrategy) => {
+    setRoutingStrategy(strategy);
+    if (swap.inputToken && swap.outputToken && parseFloat(swap.inputAmount) > 0) {
+      fetchRoutes({ userPublicKey: publicKey?.toBase58() ?? null }).catch((err) =>
+        console.debug("[Routing strategy] fetch failed", err)
+      );
+    }
+  };
+
+  const handleExecutionChannelChange = (
+    channel: "public" | "jito" | "private-rpc"
+  ) => {
+    setExecutionChannel(channel);
+    setUseMEVProtection(channel !== "public");
+  };
+
+  const toggleMEVProtection = () => {
+    const next = !swap.useMEVProtection;
+    setUseMEVProtection(next);
+    setExecutionChannel(next ? "jito" : "public");
   };
 
   const getBalancePercentage = () => {
@@ -1234,6 +1264,50 @@ export function EnhancedSwapInterface() {
               </div>
             </button>
           </div>
+          <div className="grid gap-3 md:grid-cols-2 mb-3">
+            <RoutingStrategySelector
+              value={routingStrategy}
+              onChange={handleRoutingStrategyChange}
+            />
+            <RouterReliabilityCard summary={routes.reliability} />
+          </div>
+          <div className="flex flex-wrap items-center gap-3 mb-4 text-xs text-white/70">
+            <div className="flex items-center gap-2">
+              <span className="text-white font-semibold">MEV Shield</span>
+              <button
+                type="button"
+                onClick={toggleMEVProtection}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                  swap.useMEVProtection
+                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                    : "bg-white/5 text-white/60 border border-white/10"
+                }`}
+              >
+                {swap.useMEVProtection ? "Actif" : "Inactif"}
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span>Canal</span>
+              <select
+                value={swap.executionChannel}
+                onChange={(event) =>
+                  handleExecutionChannelChange(event.target.value as typeof swap.executionChannel)
+                }
+                className="rounded-lg bg-black/40 border border-white/10 px-3 py-1 text-white text-xs"
+              >
+                <option value="public">Public RPC</option>
+                <option value="jito">Jito bundle</option>
+                <option value="private-rpc">Private RPC</option>
+              </select>
+            </div>
+            <span className="text-[11px] text-white/50">
+              {swap.executionChannel === "public"
+                ? "Latence minimale"
+                : swap.executionChannel === "jito"
+                ? "Bundles atomiques anti-MEV"
+                : "Execution relais prive"}
+            </span>
+          </div>
           {/* Bloc d'info avancé désactivé */}
           {false && !isMinimalLayout && selectedRouter === "swapback" && (
             <div className="grid gap-3 md:grid-cols-2 mt-4">
@@ -1753,6 +1827,12 @@ export function EnhancedSwapInterface() {
                 </div>
               </>
             )}
+          </div>
+        )}
+
+        {routes.intents.length > 0 && (
+          <div className="mb-4">
+            <RouteIntentsList intents={routes.intents} />
           </div>
         )}
         

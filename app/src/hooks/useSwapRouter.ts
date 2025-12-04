@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { AnchorProvider, BN, Idl } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, Idl, Program } from "@coral-xyz/anchor";
 import {
   AccountMeta,
   Connection,
@@ -49,6 +49,8 @@ function buildReadOnlyProgram(connection: Connection) {
   return createProgramWithProvider(routerIdl as Idl, ROUTER_PROGRAM_ID, provider);
 }
 
+export type ExecutionChannel = "public" | "jito" | "private-rpc";
+
 export interface SwapRequest {
   tokenIn: PublicKey;
   tokenOut: PublicKey;
@@ -73,6 +75,7 @@ export interface SwapRequest {
   postInstructions?: TransactionInstruction[];
   signers?: Keypair[];
   jupiterRoute?: JupiterRouteParams | null;
+  executionChannel?: ExecutionChannel;
 }
 
 export interface JupiterRouteParams {
@@ -104,6 +107,8 @@ export function useSwapRouter() {
       toast.error("Programme router non initialisé");
       return null;
     }
+
+    const executionChannel = request.executionChannel ?? (request.useBundle ? "private-rpc" : "public");
 
     try {
       const derived = await deriveSwapAccounts({
@@ -199,7 +204,16 @@ export function useSwapRouter() {
         builder = builder.signers(request.signers);
       }
 
-      const txSig = await builder.rpc();
+      const transaction = await builder.transaction();
+      transaction.feePayer = wallet.publicKey;
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+
+      const signedTx = await wallet.signTransaction(transaction);
+      const rawTx = signedTx.serialize();
+
+      const txSig = await sendTransactionWithChannel(rawTx, connection, executionChannel);
+      await connection.confirmTransaction({ signature: txSig, blockhash, lastValidBlockHeight }, "confirmed");
 
       // Log successful swap
       monitor.swapSuccess(
@@ -222,6 +236,7 @@ export function useSwapRouter() {
         amount: request.amountIn.toString(),
         tokenMint: request.tokenIn.toBase58(),
         walletAddress: wallet.publicKey?.toBase58(),
+        executionChannel,
         stack: err instanceof Error ? err.stack : undefined,
       });
 
@@ -251,6 +266,24 @@ export type DerivedSwapAccounts = {
   preInstructions: TransactionInstruction[];
   walletPublicKey: PublicKey;
 };
+
+const EXECUTION_RPC_MAP: Record<ExecutionChannel, string | null> = {
+  public: null,
+  jito: process.env.NEXT_PUBLIC_JITO_RPC_URL ?? null,
+  "private-rpc": process.env.NEXT_PUBLIC_PRIVATE_RPC_URL ?? null,
+};
+
+async function sendTransactionWithChannel(
+  rawTransaction: Uint8Array,
+  fallbackConnection: Connection,
+  channel: ExecutionChannel
+) {
+  const target = EXECUTION_RPC_MAP[channel];
+  const connection = target ? new Connection(target, "confirmed") : fallbackConnection;
+  return connection.sendRawTransaction(rawTransaction, {
+    skipPreflight: false,
+  });
+}
 
 async function deriveSwapAccounts(params: {
   connection: Connection;

@@ -44,6 +44,7 @@
     "eslint-plugin-react-hooks": "^7.0.0",
     "husky": "^9.1.7",
     "jsdom": "^27.0.0",
+    "patch-package": "^8.0.1",
     "pino-pretty": "^13.1.2",
     "prettier": "^3.0.0",
     "solana-bankrun": "^0.4.0",
@@ -64,6 +65,7 @@
     "@project-serum/serum": "^0.13.65",
     "@solana/web3.js": "^1.98.4",
     "ajv": "^8.17.1",
+    "bigint-buffer": "^1.1.5",
     "csv-parser": "^3.2.0",
     "next": "14.2.33",
     "node-fetch": "^2.7.0"
