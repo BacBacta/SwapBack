@@ -845,9 +845,24 @@ export function EnhancedSwapInterface() {
     }
     
     // Check if Jupiter CPI is available for execution
-    if (!routes.jupiterCpi) {
-      setSwapError("Route Jupiter non disponible. Veuillez relancer la recherche de route avec un wallet connecté.");
-      return;
+    if (!routes.jupiterCpi || !routes.jupiterCpi.swapInstruction) {
+      // Si pas de jupiterCpi, relancer automatiquement la recherche avec le wallet connecté
+      if (publicKey) {
+        console.log("🔄 Re-fetching routes with wallet for swap instructions...");
+        setSwapError(null);
+        await fetchRoutes({ userPublicKey: publicKey.toBase58() });
+        // Récupérer les nouvelles routes après le fetch
+        const updatedRoutes = useSwapStore.getState().routes;
+        if (!updatedRoutes.jupiterCpi || !updatedRoutes.jupiterCpi.swapInstruction) {
+          setSwapError("Impossible d'obtenir les instructions de swap. Veuillez réessayer.");
+          return;
+        }
+        // Continuer avec les nouvelles données
+        toast.info("Route mise à jour avec les instructions de swap");
+      } else {
+        setSwapError("Veuillez connecter votre wallet pour exécuter le swap.");
+        return;
+      }
     }
 
     const amountInLamports = toLamports(

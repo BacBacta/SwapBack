@@ -1,5 +1,5 @@
 /**
- * API Route: Get Jupiter Quote
+ * API Route: Get Jupiter Quote + Swap Instructions
  * Proxies requests to Jupiter API to avoid CORS issues
  * Endpoint: POST /api/swap/quote
  */
@@ -159,12 +159,14 @@ export async function POST(request: NextRequest) {
       amount,
       slippageBps = 50,
       routingStrategy = "smart",
+      userPublicKey,
     } = body as {
       inputMint?: string;
       outputMint?: string;
       amount?: number | string;
       slippageBps?: number;
       routingStrategy?: RoutingStrategy;
+      userPublicKey?: string | null;
     };
 
     // Validate inputs
@@ -254,6 +256,57 @@ export async function POST(request: NextRequest) {
       priceImpactPct: routeInfo.priceImpactPct ?? 0,
     });
 
+    // Si userPublicKey est fourni, récupérer les instructions de swap pour l'exécution on-chain
+    let jupiterCpi = null;
+    
+    if (userPublicKey) {
+      console.log("🔧 Fetching swap instructions for:", userPublicKey.slice(0, 8) + "...");
+      
+      try {
+        const swapResponse = await fetchFromJupiter("/swap", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            quoteResponse: quote,
+            userPublicKey,
+            wrapAndUnwrapSol: true,
+            useSharedAccounts: true,
+            dynamicComputeUnitLimit: true,
+            skipUserAccountsRpcCalls: false,
+            dynamicSlippage: { minBps: 50, maxBps: slippageBps },
+          }),
+        });
+
+        if (swapResponse.ok) {
+          const swapData = await swapResponse.json();
+          
+          if (swapData.swapTransaction) {
+            // Décoder la transaction base64 pour extraire les infos CPI
+            // La structure retournée par Jupiter v6 /swap contient directement les données
+            jupiterCpi = {
+              expectedInputAmount: quote.inAmount,
+              swapInstruction: swapData.swapTransaction, // Transaction sérialisée base64
+              accounts: [], // Les comptes sont embarqués dans la transaction
+              // Données additionnelles utiles
+              lastValidBlockHeight: swapData.lastValidBlockHeight,
+              prioritizationFeeLamports: swapData.prioritizationFeeLamports,
+              computeUnitLimit: swapData.computeUnitLimit,
+            };
+            
+            console.log("✅ Swap instructions obtained");
+          }
+        } else {
+          const swapError = await swapResponse.text();
+          console.warn("⚠️ Failed to get swap instructions:", swapError);
+        }
+      } catch (swapError) {
+        console.warn("⚠️ Error fetching swap instructions:", swapError);
+        // Continue without jupiterCpi - user will need to retry with wallet connected
+      }
+    }
+
     return NextResponse.json(
       {
         success: true,
@@ -262,6 +315,7 @@ export async function POST(request: NextRequest) {
         intents,
         reliability: reliabilitySummary,
         routingStrategy,
+        jupiterCpi,
         timestamp: Date.now(),
       },
       withNoStore()
