@@ -893,6 +893,9 @@ export function EnhancedSwapInterface() {
     let staticRemainingAccounts: AccountMeta[] | null = null;
     let jupiterRoutePayload: JupiterRouteParams | null = null;
 
+    // Flag to track if we can use Router CPI (with rebates) or need Jupiter direct
+    let canUseRouterCpi = true;
+
     try {
       staticRemainingAccounts = routes.jupiterCpi!.accounts.map((meta) => ({
         pubkey: new PublicKey(meta.pubkey),
@@ -904,17 +907,24 @@ export function EnhancedSwapInterface() {
         throw new Error("Liste de comptes Jupiter vide.");
       }
 
-      jupiterRoutePayload = {
-        expectedInputAmount: new BN(routes.jupiterCpi!.expectedInputAmount),
-        swapInstruction: decodeBase64ToUint8Array(routes.jupiterCpi!.swapInstruction),
-      };
+      // Use instructionData (raw instruction bytes) for Router CPI, NOT the full transaction
+      const instructionBytes = routes.jupiterCpi!.instructionData 
+        ? new Uint8Array(routes.jupiterCpi!.instructionData)
+        : null;
+
+      if (!instructionBytes || instructionBytes.length === 0) {
+        console.warn("⚠️ No instructionData found, will use Jupiter direct fallback");
+        canUseRouterCpi = false;
+      } else {
+        jupiterRoutePayload = {
+          expectedInputAmount: new BN(routes.jupiterCpi!.expectedInputAmount),
+          swapInstruction: instructionBytes,
+        };
+        console.log(`✅ Jupiter instruction prepared: ${instructionBytes.length} bytes (vs full transaction)`);
+      }
     } catch (error) {
-      setSwapError(
-        error instanceof Error
-          ? error.message
-          : "Impossible de préparer l'instruction Jupiter."
-      );
-      return;
+      console.warn("⚠️ Failed to prepare Router CPI:", error);
+      canUseRouterCpi = false;
     }
 
     setSwapError(null);
@@ -943,69 +953,87 @@ export function EnhancedSwapInterface() {
       let signature: string | null = null;
       let swapMethod: 'versioned' | 'legacy' | 'jupiter-direct' = 'versioned';
 
-      // Strategy: Try versioned (ALT) first → Legacy → Jupiter direct
-      try {
-        // 1. First try with Versioned Transaction + ALT (optimal)
-        console.log('🚀 Trying swap with Versioned Transaction + ALT...');
-        signature = await swapWithRouterVersioned({
-          tokenIn: new PublicKey(swap.inputToken.mint),
-          tokenOut: new PublicKey(swap.outputToken.mint),
-          amountIn: amountInLamports,
-          minOut: minOutLamports,
-          slippageBps,
-          remainingAccounts: staticRemainingAccounts ?? undefined,
-          jupiterRoute: {
-            ...jupiterRoutePayload!,
-            addressTableLookups: routes.jupiterCpi?.addressTableLookups,
-          },
-        });
-        swapMethod = 'versioned';
-      } catch (versionedError) {
-        const errorMsg = versionedError instanceof Error ? versionedError.message : '';
-        console.warn('⚠️ Versioned swap failed:', errorMsg);
-        
-        // 2. If ALT not available or still too large, try legacy
-        if (errorMsg.includes('ALT') || errorMsg.includes('not set')) {
-          console.log('📦 ALT not available, trying legacy transaction...');
-          try {
-            signature = await swapWithRouter({
-              tokenIn: new PublicKey(swap.inputToken.mint),
-              tokenOut: new PublicKey(swap.outputToken.mint),
-              amountIn: amountInLamports,
-              minOut: minOutLamports,
-              slippageBps,
-              remainingAccounts: staticRemainingAccounts ?? undefined,
-              jupiterRoute: jupiterRoutePayload,
-            });
-            swapMethod = 'legacy';
-          } catch (legacyError) {
-            const legacyMsg = legacyError instanceof Error ? legacyError.message : '';
-            if (legacyMsg.includes('Transaction too large') || legacyMsg.includes('1232')) {
-              // Fall through to Jupiter direct
+      // If we can't use Router CPI (no instructionData), go directly to Jupiter
+      if (!canUseRouterCpi || !jupiterRoutePayload) {
+        console.log('📦 Router CPI not available, using Jupiter direct...');
+        if (routes.jupiterCpi?.swapInstruction) {
+          signature = await executeJupiterSwap(
+            routes.jupiterCpi.swapInstruction,
+            {
+              lastValidBlockHeight: routes.jupiterCpi.lastValidBlockHeight,
+              skipPreflight: false,
+            }
+          );
+          swapMethod = 'jupiter-direct';
+          toast.info('Swap exécuté via Jupiter direct (rebates différées)');
+        } else {
+          throw new Error('No Jupiter swap instruction available');
+        }
+      } else {
+        // Strategy: Try versioned (ALT) first → Legacy → Jupiter direct
+        try {
+          // 1. First try with Versioned Transaction + ALT (optimal)
+          console.log('🚀 Trying swap with Versioned Transaction + ALT...');
+          signature = await swapWithRouterVersioned({
+            tokenIn: new PublicKey(swap.inputToken.mint),
+            tokenOut: new PublicKey(swap.outputToken.mint),
+            amountIn: amountInLamports,
+            minOut: minOutLamports,
+            slippageBps,
+            remainingAccounts: staticRemainingAccounts ?? undefined,
+            jupiterRoute: {
+              ...jupiterRoutePayload,
+              addressTableLookups: routes.jupiterCpi?.addressTableLookups,
+            },
+          });
+          swapMethod = 'versioned';
+        } catch (versionedError) {
+          const errorMsg = versionedError instanceof Error ? versionedError.message : '';
+          console.warn('⚠️ Versioned swap failed:', errorMsg);
+          
+          // 2. If ALT not available or still too large, try legacy
+          if (errorMsg.includes('ALT') || errorMsg.includes('not set')) {
+            console.log('📦 ALT not available, trying legacy transaction...');
+            try {
+              signature = await swapWithRouter({
+                tokenIn: new PublicKey(swap.inputToken.mint),
+                tokenOut: new PublicKey(swap.outputToken.mint),
+                amountIn: amountInLamports,
+                minOut: minOutLamports,
+                slippageBps,
+                remainingAccounts: staticRemainingAccounts ?? undefined,
+                jupiterRoute: jupiterRoutePayload,
+              });
+              swapMethod = 'legacy';
+            } catch (legacyError) {
+              const legacyMsg = legacyError instanceof Error ? legacyError.message : '';
+              if (legacyMsg.includes('Transaction too large') || legacyMsg.includes('1232')) {
+                // Fall through to Jupiter direct
+                throw legacyError;
+              }
               throw legacyError;
             }
-            throw legacyError;
-          }
-        } else if (errorMsg.includes('Transaction too large') || errorMsg.includes('1232')) {
-          // 3. Last resort: Jupiter direct (no router rebates)
-          console.log('📦 Transaction still too large, using Jupiter direct...');
-          if (routes.jupiterCpi?.swapInstruction) {
-            signature = await executeJupiterSwap(
-              routes.jupiterCpi.swapInstruction,
-              {
-                lastValidBlockHeight: routes.jupiterCpi.lastValidBlockHeight,
-                skipPreflight: false,
-              }
-            );
-            swapMethod = 'jupiter-direct';
-            toast.info('Swap exécuté via Jupiter direct (rebates différées)');
+          } else if (errorMsg.includes('Transaction too large') || errorMsg.includes('1232')) {
+            // 3. Last resort: Jupiter direct (no router rebates)
+            console.log('📦 Transaction still too large, using Jupiter direct...');
+            if (routes.jupiterCpi?.swapInstruction) {
+              signature = await executeJupiterSwap(
+                routes.jupiterCpi.swapInstruction,
+                {
+                  lastValidBlockHeight: routes.jupiterCpi.lastValidBlockHeight,
+                  skipPreflight: false,
+                }
+              );
+              swapMethod = 'jupiter-direct';
+              toast.info('Swap exécuté via Jupiter direct (rebates différées)');
+            } else {
+              throw new Error('No Jupiter swap instruction available');
+            }
           } else {
-            throw new Error('No Jupiter swap instruction available');
+            throw versionedError;
           }
-        } else {
-          throw versionedError;
         }
-      }
+      } // End of canUseRouterCpi else block
 
       setLoadingProgress(70);
       setLoadingStep('confirming');

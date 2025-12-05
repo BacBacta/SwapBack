@@ -32,9 +32,11 @@ type JupiterCpiMeta = {
 
 export type JupiterCpiState = {
   expectedInputAmount: string;
-  swapInstruction: string; // Transaction sérialisée base64
+  swapInstruction: string; // Transaction sérialisée base64 (pour fallback Jupiter direct)
   accounts: JupiterCpiMeta[];
   programId?: string;
+  // Données instruction pour CPI Router (bytes bruts de l'instruction Jupiter)
+  instructionData?: number[];
   // Données additionnelles de Jupiter v6
   lastValidBlockHeight?: number;
   prioritizationFeeLamports?: number;

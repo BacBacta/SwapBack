@@ -37,6 +37,7 @@ function extractJupiterAccounts(swapTxBase64: string): {
   accounts: { pubkey: string; isSigner: boolean; isWritable: boolean }[];
   programId: string;
   addressTableLookups?: { accountKey: string; writableIndexes: number[]; readonlyIndexes: number[] }[];
+  instructionData?: string; // Base64-encoded instruction data for CPI
 } {
   try {
     const buf = Buffer.from(swapTxBase64, "base64");
@@ -93,10 +94,15 @@ function extractJupiterAccounts(swapTxBase64: string): {
       ? staticKeys[fallbackIx.programIdIndex]?.toBase58() ?? ""
       : "";
     
+    // Extraire les données de l'instruction Jupiter pour le CPI
+    // C'est ce qui sera passé au Router pour exécuter le swap
+    const instructionData = Buffer.from(fallbackIx.data).toString('base64');
+    console.log(`📦 Jupiter instruction data: ${fallbackIx.data.length} bytes`);
+    
     // Vérifier que accountKeyIndexes existe
     if (!fallbackIx.accountKeyIndexes || fallbackIx.accountKeyIndexes.length === 0) {
       console.warn("⚠️ No account key indexes in instruction");
-      return { accounts: [], programId };
+      return { accounts: [], programId, instructionData };
     }
     
     // Extraire les comptes depuis les clés statiques seulement
@@ -121,9 +127,9 @@ function extractJupiterAccounts(swapTxBase64: string): {
     }));
 
     // Log pour debug
-    console.log(`📊 Extracted ${accounts.length} static accounts, ${addressTableLookups?.length || 0} lookup tables`);
+    console.log(`📊 Extracted ${accounts.length} static accounts, ${addressTableLookups?.length || 0} lookup tables, ${fallbackIx.data.length} bytes instruction data`);
 
-    return { accounts, programId, addressTableLookups };
+    return { accounts, programId, addressTableLookups, instructionData };
   } catch (error) {
     console.error("❌ Error extracting Jupiter accounts:", error);
     return { accounts: [], programId: "" };
@@ -457,12 +463,14 @@ export async function POST(request: NextRequest) {
                 accounts: parsed.accounts,
                 programId: parsed.programId,
                 addressTableLookups: parsed.addressTableLookups,
+                // Données instruction pour CPI Router (bytes bruts)
+                instructionData: parsed.instructionData,
                 // Données additionnelles utiles
                 lastValidBlockHeight: swapData.lastValidBlockHeight,
                 prioritizationFeeLamports: swapData.prioritizationFeeLamports,
                 computeUnitLimit: swapData.computeUnitLimit,
               };
-              console.log(`✅ Swap instructions obtained (${parsed.accounts.length} static accounts, ${parsed.addressTableLookups?.length || 0} lookup tables)`);
+              console.log(`✅ Swap instructions obtained (${parsed.accounts.length} static accounts, ${parsed.addressTableLookups?.length || 0} lookup tables, instruction data: ${parsed.instructionData?.length || 0} bytes)`);
             }
           }
         } else if (swapResponse) {
