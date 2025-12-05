@@ -1,12 +1,31 @@
 use anchor_lang::prelude::*;
 
+/// Enumeration of all supported DEX venues for native routing
+/// Each venue can generate NPI (Native Price Improvement) rebates
 #[derive(
     AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord,
 )]
 pub enum VenueType {
-    Raydium,
-    Orca,
-    Jupiter,
+    // AMM DEXs
+    Raydium,      // Classic AMM
+    RaydiumClmm,  // Concentrated Liquidity (like Uniswap V3)
+    Orca,         // Whirlpool CLMM
+    Meteora,      // Dynamic LMM (bin-based)
+    
+    // CLOB DEXs
+    Phoenix,      // Fully on-chain orderbook
+    
+    // Oracle-based AMMs
+    Lifinity,     // Pyth oracle pricing
+    
+    // Specialized DEXs
+    Sanctum,      // LST swaps (mSOL, jitoSOL, etc.)
+    Saber,        // StableSwap (USDC/USDT pairs)
+    
+    // Aggregator (fallback)
+    Jupiter,      // Route through Jupiter if native not optimal
+    
+    // Unknown/Other
     Unknown,
 }
 

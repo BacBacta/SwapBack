@@ -1,9 +1,17 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
 
+// CPI modules for DEX integrations
 mod cpi_jupiter;
+mod cpi_lifinity;
+mod cpi_meteora;
 mod cpi_orca;
+mod cpi_phoenix;
 mod cpi_raydium;
+mod cpi_raydium_clmm;
+mod cpi_saber;
+mod cpi_sanctum;
+
 pub mod error;
 pub mod instructions;
 #[macro_use]
@@ -36,10 +44,27 @@ use routing::{
 // Program ID - Deployed on mainnet-beta (Dec 4, 2025)
 declare_id!("5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf");
 
-// DEX Program IDs (example - would need to be updated with actual deployed programs)
+// ============================================
+// DEX Program IDs (Mainnet-beta)
+// ============================================
+
+// AMM DEXs
 pub const RAYDIUM_AMM_PROGRAM_ID: Pubkey = pubkey!("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8");
-pub const ORCA_WHIRLPOOL_PROGRAM_ID: Pubkey =
-    pubkey!("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc");
+pub const RAYDIUM_CLMM_PROGRAM_ID: Pubkey = pubkey!("CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK");
+pub const ORCA_WHIRLPOOL_PROGRAM_ID: Pubkey = pubkey!("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc");
+pub const METEORA_DLMM_PROGRAM_ID: Pubkey = pubkey!("LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo");
+
+// CLOB DEXs
+pub const PHOENIX_PROGRAM_ID: Pubkey = pubkey!("PhoeNiXZ8ByJGLkxNfZRnkUfjvmuYqLR89jjFHGqdXY");
+
+// Oracle-based AMMs
+pub const LIFINITY_PROGRAM_ID: Pubkey = pubkey!("EewxydAPCCVuNEyrVN68PuSYdQ7wKn27V9Gjeoi8dy3S");
+
+// Specialized DEXs
+pub const SANCTUM_PROGRAM_ID: Pubkey = pubkey!("5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx");
+pub const SABER_PROGRAM_ID: Pubkey = pubkey!("SSwpkEEcbUqx4vtoEByFjSkhKdCT862DNVb52nZg1UZ");
+
+// Aggregator (fallback)
 pub const JUPITER_PROGRAM_ID: Pubkey = pubkey!("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4");
 
 // Buyback Program ID - 100% Burn Model (deployed Nov 24, 2025)
@@ -2186,6 +2211,75 @@ pub mod swap_toc_processor {
                 });
                 Ok(amount_out)
             }
+            // ============================================
+            // NEW DEX INTEGRATIONS (Dec 2025)
+            // ============================================
+            RAYDIUM_CLMM_PROGRAM_ID => {
+                let amount_out = cpi_raydium_clmm::swap(ctx, account_slice, amount_in, min_out)?;
+                emit!(VenueExecuted {
+                    venue: dex_program,
+                    amount_in,
+                    amount_out,
+                    success: true,
+                    fallback_used: is_fallback,
+                });
+                Ok(amount_out)
+            }
+            METEORA_DLMM_PROGRAM_ID => {
+                let amount_out = cpi_meteora::swap(ctx, account_slice, amount_in, min_out)?;
+                emit!(VenueExecuted {
+                    venue: dex_program,
+                    amount_in,
+                    amount_out,
+                    success: true,
+                    fallback_used: is_fallback,
+                });
+                Ok(amount_out)
+            }
+            PHOENIX_PROGRAM_ID => {
+                let amount_out = cpi_phoenix::swap(ctx, account_slice, amount_in, min_out)?;
+                emit!(VenueExecuted {
+                    venue: dex_program,
+                    amount_in,
+                    amount_out,
+                    success: true,
+                    fallback_used: is_fallback,
+                });
+                Ok(amount_out)
+            }
+            LIFINITY_PROGRAM_ID => {
+                let amount_out = cpi_lifinity::swap(ctx, account_slice, amount_in, min_out)?;
+                emit!(VenueExecuted {
+                    venue: dex_program,
+                    amount_in,
+                    amount_out,
+                    success: true,
+                    fallback_used: is_fallback,
+                });
+                Ok(amount_out)
+            }
+            SANCTUM_PROGRAM_ID => {
+                let amount_out = cpi_sanctum::swap(ctx, account_slice, amount_in, min_out)?;
+                emit!(VenueExecuted {
+                    venue: dex_program,
+                    amount_in,
+                    amount_out,
+                    success: true,
+                    fallback_used: is_fallback,
+                });
+                Ok(amount_out)
+            }
+            SABER_PROGRAM_ID => {
+                let amount_out = cpi_saber::swap(ctx, account_slice, amount_in, min_out)?;
+                emit!(VenueExecuted {
+                    venue: dex_program,
+                    amount_in,
+                    amount_out,
+                    success: true,
+                    fallback_used: is_fallback,
+                });
+                Ok(amount_out)
+            }
             _ => {
                 emit!(VenueExecuted {
                     venue: dex_program,
@@ -2204,6 +2298,18 @@ pub mod swap_toc_processor {
             Ok(cpi_orca::ORCA_SWAP_ACCOUNT_COUNT)
         } else if *program_id == RAYDIUM_AMM_PROGRAM_ID {
             Ok(cpi_raydium::RAYDIUM_SWAP_ACCOUNT_COUNT)
+        } else if *program_id == RAYDIUM_CLMM_PROGRAM_ID {
+            Ok(cpi_raydium_clmm::RAYDIUM_CLMM_SWAP_ACCOUNT_COUNT)
+        } else if *program_id == METEORA_DLMM_PROGRAM_ID {
+            Ok(cpi_meteora::METEORA_SWAP_ACCOUNT_COUNT)
+        } else if *program_id == PHOENIX_PROGRAM_ID {
+            Ok(cpi_phoenix::PHOENIX_SWAP_ACCOUNT_COUNT)
+        } else if *program_id == LIFINITY_PROGRAM_ID {
+            Ok(cpi_lifinity::LIFINITY_SWAP_ACCOUNT_COUNT)
+        } else if *program_id == SANCTUM_PROGRAM_ID {
+            Ok(cpi_sanctum::SANCTUM_SWAP_ACCOUNT_COUNT)
+        } else if *program_id == SABER_PROGRAM_ID {
+            Ok(cpi_saber::SABER_SWAP_ACCOUNT_COUNT)
         } else if *program_id == JUPITER_PROGRAM_ID {
             Ok(cpi_jupiter::JUPITER_SWAP_ACCOUNT_COUNT)
         } else {
