@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { BN } from "@coral-xyz/anchor";
 import { AccountMeta, PublicKey } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
@@ -326,36 +326,60 @@ export function EnhancedSwapInterface() {
     trackPageView("enhanced-swap", typeof document !== "undefined" ? document.referrer || undefined : undefined);
   }, []);
 
-  // ✅ Reset routes when router changes
-  useEffect(() => {
-    clearRoutes();
-    setHasSearchedRoute(false);
-    if (swap.inputToken && swap.outputToken && parseFloat(swap.inputAmount) > 0) {
-      instrumentedFetchRoutes("router-change").catch((err) => {
-        console.debug('[Router change] Auto-fetch failed:', err);
-      });
-    }
-  }, [selectedRouter, clearRoutes, instrumentedFetchRoutes, swap.inputToken, swap.outputToken, swap.inputAmount]);
+  // 🔒 Ref to track if a fetch is in progress (prevents duplicate calls)
+  const isFetchingRef = useRef(false);
+  const lastFetchParamsRef = useRef<string>("");
 
-  // ✅ AUTO-FETCH activé avec debounce pour éviter trop d'appels API
-  const debouncedFetchRoutes = useCallback(
-    debounce((inputToken: typeof swap.inputToken, outputToken: typeof swap.outputToken, inputAmount: string) => {
-      const amount = parseFloat(inputAmount);
-      if (inputToken && outputToken && amount > 0) {
-        instrumentedFetchRoutes("input-change").catch((err) => {
-          console.debug('[Auto-fetch] Failed:', err);
-        });
-      }
-    }, 800),
-    [instrumentedFetchRoutes]
+  // ✅ Single debounced fetch function with duplicate prevention
+  const debouncedFetchRoutes = useMemo(
+    () =>
+      debounce(async (source: string) => {
+        // Create a unique key for current params
+        const currentParams = `${swap.inputToken?.mint}-${swap.outputToken?.mint}-${swap.inputAmount}-${selectedRouter}-${routingStrategy}`;
+        
+        // Skip if already fetching with same params
+        if (isFetchingRef.current && currentParams === lastFetchParamsRef.current) {
+          console.debug('[Debounce] Skipping duplicate fetch');
+          return;
+        }
+
+        const amount = parseFloat(swap.inputAmount);
+        if (!swap.inputToken || !swap.outputToken || !Number.isFinite(amount) || amount <= 0) {
+          return;
+        }
+
+        isFetchingRef.current = true;
+        lastFetchParamsRef.current = currentParams;
+        
+        try {
+          await instrumentedFetchRoutes(source as "input-change" | "router-change" | "auto-refresh");
+          setHasSearchedRoute(true);
+        } catch (err) {
+          console.debug(`[${source}] Route fetch failed:`, err);
+        } finally {
+          isFetchingRef.current = false;
+        }
+      }, 800), // 800ms debounce
+    [swap.inputToken, swap.outputToken, swap.inputAmount, selectedRouter, routingStrategy, instrumentedFetchRoutes]
   );
 
-  // Fetch routes when inputs change
+  // Cleanup debounce on unmount
   useEffect(() => {
-    if (swap.inputToken && swap.outputToken && swap.inputAmount) {
-      debouncedFetchRoutes(swap.inputToken, swap.outputToken, swap.inputAmount);
+    return () => {
+      debouncedFetchRoutes.cancel();
+    };
+  }, [debouncedFetchRoutes]);
+
+  // ✅ Consolidated: Fetch routes when any relevant input changes
+  useEffect(() => {
+    if (swap.inputToken && swap.outputToken && parseFloat(swap.inputAmount) > 0) {
+      debouncedFetchRoutes("input-change");
+    } else {
+      // Clear routes if inputs are invalid
+      clearRoutes();
+      setHasSearchedRoute(false);
     }
-  }, [swap.inputToken, swap.outputToken, swap.inputAmount, selectedRouter, routingStrategy, debouncedFetchRoutes]);
+  }, [swap.inputToken, swap.outputToken, swap.inputAmount, selectedRouter, routingStrategy, debouncedFetchRoutes, clearRoutes]);
 
   // Calculate price impact and suggest slippage
   useEffect(() => {
@@ -377,27 +401,27 @@ export function EnhancedSwapInterface() {
     }
   }, [routes.selectedRoute]);
   
-  // Real-time price refresh countdown
+  // Real-time price refresh countdown (30s interval to avoid rate limits)
   useEffect(() => {
     if (!hasSearchedRoute || routes.isLoading) return;
+    
+    const REFRESH_INTERVAL = 30; // 30 seconds to avoid rate limiting
     
     const interval = setInterval(() => {
       setPriceRefreshCountdown((prev) => {
         if (prev <= 1) {
-          // Auto-refresh route
-          if (swap.inputToken && swap.outputToken && parseFloat(swap.inputAmount) > 0) {
-            instrumentedFetchRoutes("auto-refresh").catch((err) => {
-              console.debug('[Auto-refresh] Route fetch failed:', err);
-            });
+          // Auto-refresh route using debounced function
+          if (swap.inputToken && swap.outputToken && parseFloat(swap.inputAmount) > 0 && !isFetchingRef.current) {
+            debouncedFetchRoutes("auto-refresh");
           }
-          return 10;
+          return REFRESH_INTERVAL;
         }
         return prev - 1;
       });
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [hasSearchedRoute, routes.isLoading, swap.inputToken, swap.outputToken, swap.inputAmount, instrumentedFetchRoutes]);
+  }, [hasSearchedRoute, routes.isLoading, swap.inputToken, swap.outputToken, swap.inputAmount, debouncedFetchRoutes]);
 
   // Handlers
   const handleInputChange = (value: string) => {

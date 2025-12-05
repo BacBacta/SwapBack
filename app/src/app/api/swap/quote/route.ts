@@ -33,6 +33,66 @@ const JUPITER_ENDPOINTS = [
   "https://api.jup.ag/v6",
 ].filter(Boolean);
 
+// ========================================
+// Rate Limiting & Caching
+// ========================================
+
+// Simple in-memory rate limiter (per IP)
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 30; // 30 requests per minute per IP
+
+// Simple quote cache (5 second TTL)
+const quoteCache = new Map<string, { data: unknown; expiresAt: number }>();
+const CACHE_TTL_MS = 5_000; // 5 seconds
+
+function getCacheKey(params: { inputMint: string; outputMint: string; amount: number; slippageBps: number }): string {
+  return `${params.inputMint}-${params.outputMint}-${params.amount}-${params.slippageBps}`;
+}
+
+function getFromCache(key: string): unknown | null {
+  const cached = quoteCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data;
+  }
+  quoteCache.delete(key);
+  return null;
+}
+
+function setCache(key: string, data: unknown): void {
+  // Clean old entries periodically
+  if (quoteCache.size > 1000) {
+    const now = Date.now();
+    for (const [k, v] of quoteCache.entries()) {
+      if (v.expiresAt < now) quoteCache.delete(k);
+    }
+  }
+  quoteCache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+}
+
+function checkRateLimit(ip: string): { allowed: boolean; remaining: number; resetIn: number } {
+  const now = Date.now();
+  let record = rateLimitMap.get(ip);
+  
+  // Clean old entries
+  if (record && record.resetAt < now) {
+    rateLimitMap.delete(ip);
+    record = undefined;
+  }
+  
+  if (!record) {
+    record = { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS };
+    rateLimitMap.set(ip, record);
+    return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - 1, resetIn: RATE_LIMIT_WINDOW_MS };
+  }
+  
+  record.count++;
+  const remaining = Math.max(0, RATE_LIMIT_MAX_REQUESTS - record.count);
+  const resetIn = Math.max(0, record.resetAt - now);
+  
+  return { allowed: record.count <= RATE_LIMIT_MAX_REQUESTS, remaining, resetIn };
+}
+
 // Program IDs Jupiter v6 (mainnet/devnet)
 const JUPITER_PROGRAM_IDS = new Set([
   "JUP6LkbZBMd1McqTgnmMSpZ88LdKgmhyaXtCXnVQ1Nm",
@@ -300,6 +360,33 @@ const isNetworkResolutionError = (error: unknown) => {
 export async function POST(request: NextRequest) {
   const requestStartedAt = Date.now();
   let analyticsId = "swapback-server";
+  
+  // Get client IP for rate limiting
+  const clientIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() 
+    ?? request.headers.get("x-real-ip") 
+    ?? "unknown";
+  
+  // Check rate limit
+  const rateLimit = checkRateLimit(clientIp);
+  if (!rateLimit.allowed) {
+    console.warn(`⚠️ Rate limit exceeded for IP: ${clientIp}`);
+    return NextResponse.json(
+      { 
+        error: "Rate limit exceeded. Please slow down your requests.",
+        retryAfter: Math.ceil(rateLimit.resetIn / 1000),
+      },
+      {
+        status: 429,
+        headers: {
+          ...CORS_HEADERS,
+          "Retry-After": String(Math.ceil(rateLimit.resetIn / 1000)),
+          "X-RateLimit-Remaining": "0",
+          "X-RateLimit-Reset": String(Math.ceil(rateLimit.resetIn / 1000)),
+        },
+      }
+    );
+  }
+  
   try {
     const body = await request.json();
     const {
@@ -341,6 +428,20 @@ export async function POST(request: NextRequest) {
         { error: "Invalid amount: must be a positive number" },
         withNoStore({ status: 400 })
       );
+    }
+
+    // Check cache first
+    const cacheKey = getCacheKey({ inputMint, outputMint, amount: parsedAmount, slippageBps });
+    const cachedResponse = getFromCache(cacheKey);
+    if (cachedResponse) {
+      console.log(`📦 Cache hit for ${inputMint.slice(0, 8)}...→${outputMint.slice(0, 8)}...`);
+      return NextResponse.json(cachedResponse, {
+        headers: {
+          ...CORS_HEADERS,
+          "X-Cache": "HIT",
+          "X-RateLimit-Remaining": String(rateLimit.remaining),
+        },
+      });
     }
 
     analyticsId = userPublicKey ?? "swapback-server";
@@ -646,7 +747,17 @@ export async function POST(request: NextRequest) {
       multiSourceCandidates: multiSourceQuotes.length,
     });
 
-    return NextResponse.json(responsePayload, withNoStore());
+    // Cache the successful response
+    setCache(cacheKey, responsePayload);
+
+    return NextResponse.json(responsePayload, {
+      headers: {
+        ...CORS_HEADERS,
+        "Cache-Control": "no-store",
+        "X-Cache": "MISS",
+        "X-RateLimit-Remaining": String(rateLimit.remaining),
+      },
+    });
   } catch (error) {
     console.error("❌ Error in /api/swap/quote:", error);
 
