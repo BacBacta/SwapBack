@@ -238,7 +238,7 @@ function decodeBase64ToUint8Array(data: string): Uint8Array {
 export function EnhancedSwapInterface() {
   const { connected, publicKey } = useWallet();
   const { connection } = useConnection();
-  const { swapWithRouter, executeJupiterSwap } = useSwapRouter();
+  const { swapWithRouter, swapWithRouterVersioned, executeJupiterSwap } = useSwapRouter();
   const haptic = useHaptic();
 
   // Store
@@ -941,45 +941,77 @@ export function EnhancedSwapInterface() {
       setLoadingStep('signing');
 
       let signature: string | null = null;
-      let useDirectJupiter = false;
+      let swapMethod: 'versioned' | 'legacy' | 'jupiter-direct' = 'versioned';
 
-      // Try router first, fallback to direct Jupiter if transaction too large
+      // Strategy: Try versioned (ALT) first → Legacy → Jupiter direct
       try {
-        signature = await swapWithRouter({
+        // 1. First try with Versioned Transaction + ALT (optimal)
+        console.log('🚀 Trying swap with Versioned Transaction + ALT...');
+        signature = await swapWithRouterVersioned({
           tokenIn: new PublicKey(swap.inputToken.mint),
           tokenOut: new PublicKey(swap.outputToken.mint),
           amountIn: amountInLamports,
           minOut: minOutLamports,
           slippageBps,
           remainingAccounts: staticRemainingAccounts ?? undefined,
-          jupiterRoute: jupiterRoutePayload,
+          jupiterRoute: {
+            ...jupiterRoutePayload!,
+            addressTableLookups: routes.jupiterCpi?.addressTableLookups,
+          },
         });
-      } catch (routerError) {
-        const errorMsg = routerError instanceof Error ? routerError.message : '';
+        swapMethod = 'versioned';
+      } catch (versionedError) {
+        const errorMsg = versionedError instanceof Error ? versionedError.message : '';
+        console.warn('⚠️ Versioned swap failed:', errorMsg);
         
-        // If transaction too large, use direct Jupiter swap
-        if (errorMsg.includes('Transaction too large') || errorMsg.includes('1232')) {
-          console.log('📦 Transaction trop grande, utilisation directe de Jupiter...');
-          useDirectJupiter = true;
-          toast.info('Swap optimisé via Jupiter direct');
-        } else {
-          throw routerError;
-        }
-      }
-
-      // Fallback to direct Jupiter execution if router failed due to size
-      if (useDirectJupiter && routes.jupiterCpi?.swapInstruction) {
-        signature = await executeJupiterSwap(
-          routes.jupiterCpi.swapInstruction,
-          {
-            lastValidBlockHeight: routes.jupiterCpi.lastValidBlockHeight,
-            skipPreflight: false,
+        // 2. If ALT not available or still too large, try legacy
+        if (errorMsg.includes('ALT') || errorMsg.includes('not set')) {
+          console.log('📦 ALT not available, trying legacy transaction...');
+          try {
+            signature = await swapWithRouter({
+              tokenIn: new PublicKey(swap.inputToken.mint),
+              tokenOut: new PublicKey(swap.outputToken.mint),
+              amountIn: amountInLamports,
+              minOut: minOutLamports,
+              slippageBps,
+              remainingAccounts: staticRemainingAccounts ?? undefined,
+              jupiterRoute: jupiterRoutePayload,
+            });
+            swapMethod = 'legacy';
+          } catch (legacyError) {
+            const legacyMsg = legacyError instanceof Error ? legacyError.message : '';
+            if (legacyMsg.includes('Transaction too large') || legacyMsg.includes('1232')) {
+              // Fall through to Jupiter direct
+              throw legacyError;
+            }
+            throw legacyError;
           }
-        );
+        } else if (errorMsg.includes('Transaction too large') || errorMsg.includes('1232')) {
+          // 3. Last resort: Jupiter direct (no router rebates)
+          console.log('📦 Transaction still too large, using Jupiter direct...');
+          if (routes.jupiterCpi?.swapInstruction) {
+            signature = await executeJupiterSwap(
+              routes.jupiterCpi.swapInstruction,
+              {
+                lastValidBlockHeight: routes.jupiterCpi.lastValidBlockHeight,
+                skipPreflight: false,
+              }
+            );
+            swapMethod = 'jupiter-direct';
+            toast.info('Swap exécuté via Jupiter direct (rebates différées)');
+          } else {
+            throw new Error('No Jupiter swap instruction available');
+          }
+        } else {
+          throw versionedError;
+        }
       }
 
       setLoadingProgress(70);
       setLoadingStep('confirming');
+      
+      // Log the swap method used
+      console.log(`✅ Swap completed using: ${swapMethod}`);
       
       if (signature) {
         haptic.success();

@@ -12,6 +12,9 @@ import {
   Transaction,
   VersionedTransaction,
   TransactionInstruction,
+  TransactionMessage,
+  ComputeBudgetProgram,
+  AddressLookupTableAccount,
 } from "@solana/web3.js";
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
@@ -26,6 +29,7 @@ import { getOracleFeedsForPair, type OracleFeedConfig } from "@/config/oracles";
 import { USDC_MINT } from "@/config/constants";
 import toast from "react-hot-toast";
 import { monitor } from "@/lib/protocolMonitor";
+import { getAllALTs } from "@/lib/alt";
 
 const ROUTER_PROGRAM_ID = PROGRAM_IDS.routerProgram;
 
@@ -81,6 +85,11 @@ export interface SwapRequest {
 export interface JupiterRouteParams {
   expectedInputAmount: BN;
   swapInstruction: Uint8Array | number[];
+  addressTableLookups?: Array<{
+    accountKey: string;
+    writableIndexes: number[];
+    readonlyIndexes: number[];
+  }>;
 }
 
 export function useSwapRouter() {
@@ -356,8 +365,209 @@ export function useSwapRouter() {
     }
   };
 
+  /**
+   * Execute a swap using Versioned Transactions with Address Lookup Tables
+   * This reduces transaction size from ~1500 bytes to ~400 bytes
+   */
+  const swapWithRouterVersioned = async (
+    request: SwapRequest
+  ): Promise<string | null> => {
+    if (!wallet?.publicKey || !wallet.signTransaction) {
+      toast.error("Connectez votre wallet pour lancer un swap");
+      return null;
+    }
+    if (!program || !connection) {
+      toast.error("Programme router non initialisé");
+      return null;
+    }
+
+    const executionChannel = request.executionChannel ?? (request.useBundle ? "private-rpc" : "public");
+
+    try {
+      // 1. Derive all accounts
+      const derived = await deriveSwapAccounts({
+        connection,
+        program,
+        tokenIn: request.tokenIn,
+        tokenOut: request.tokenOut,
+        walletPublicKey: wallet.publicKey,
+      });
+
+      // 2. Get oracle feeds
+      const oracleFeeds =
+        request.oracleFeeds ||
+        getOracleFeedsForPair(
+          request.tokenIn.toBase58(),
+          request.tokenOut.toBase58()
+        );
+
+      // 3. Prepare Jupiter route params
+      const normalizedJupiterRoute = request.jupiterRoute
+        ? {
+            swapInstruction: Array.isArray(request.jupiterRoute.swapInstruction)
+              ? Buffer.from(request.jupiterRoute.swapInstruction)
+              : Buffer.from(request.jupiterRoute.swapInstruction),
+            expectedInputAmount: request.jupiterRoute.expectedInputAmount,
+          }
+        : null;
+
+      // 4. Prepare swap arguments
+      const args = {
+        amountIn: request.amountIn,
+        minOut: request.minOut,
+        slippageTolerance: request.slippageBps ?? 50,
+        twapSlices: request.twapSlices ?? null,
+        useDynamicPlan: request.useDynamicPlan ?? false,
+        planAccount: request.planAccount ?? null,
+        useBundle: request.useBundle ?? false,
+        primaryOracleAccount: oracleFeeds.primary,
+        fallbackOracleAccount: oracleFeeds.fallback ?? null,
+        jupiterRoute: normalizedJupiterRoute,
+        jupiterSwapIxData: null,
+        liquidityEstimate: null,
+        volatilityBps: null,
+        minVenueScore: null,
+        slippagePerVenue: null,
+        tokenADecimals: null,
+        tokenBDecimals: null,
+        maxStalenessOverride: null,
+        jitoBundle: null,
+      };
+
+      // 5. Prepare accounts
+      const accounts = {
+        state: derived.routerState,
+        user: wallet.publicKey,
+        primaryOracle: oracleFeeds.primary,
+        fallbackOracle: oracleFeeds.fallback ?? null,
+        userTokenAccountA: derived.userTokenAccountA,
+        userTokenAccountB: derived.userTokenAccountB,
+        vaultTokenAccountA: derived.vaultTokenAccountA,
+        vaultTokenAccountB: derived.vaultTokenAccountB,
+        plan: request.planAccount ?? null,
+        userNft: derived.userNft,
+        buybackProgram: derived.buybackProgram,
+        buybackUsdcVault: derived.buybackUsdcVault,
+        buybackState: derived.buybackState,
+        userRebateAccount: derived.userRebateAccount,
+        rebateVault: derived.rebateVault,
+        oracleCache: derived.oracleCache ?? null,
+        venueScore: derived.venueScore ?? null,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      };
+
+      // 6. Get remaining accounts
+      let remainingAccounts = request.remainingAccounts ?? [];
+      if (!remainingAccounts.length && request.buildRemainingAccounts) {
+        const built = await request.buildRemainingAccounts({
+          derived,
+          request,
+        });
+        remainingAccounts = built ?? [];
+      }
+
+      // 7. Build the swap instruction
+      const swapIx = await program.methods
+        .swapToc(args)
+        .accounts(accounts)
+        .remainingAccounts(remainingAccounts.map(acc => ({
+          pubkey: acc.pubkey,
+          isSigner: acc.isSigner ?? false,
+          isWritable: acc.isWritable ?? false
+        })))
+        .instruction();
+
+      // 8. Collect all instructions
+      const instructions: TransactionInstruction[] = [
+        // Priority fee for faster confirmation
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50000 }),
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
+        // Pre-instructions (ATA creation, etc.)
+        ...derived.preInstructions,
+        ...(request.preInstructions ?? []),
+        // Main swap instruction
+        swapIx,
+        // Post-instructions
+        ...(request.postInstructions ?? []),
+      ];
+
+      // 9. Get Address Lookup Tables
+      const jupiterLookups = request.jupiterRoute?.addressTableLookups;
+      const allALTs = await getAllALTs(connection, jupiterLookups);
+      
+      console.log(`[Swap] Using ${allALTs.length} Address Lookup Tables`);
+
+      // 10. Get fresh blockhash
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+
+      // 11. Build Versioned Transaction
+      const messageV0 = new TransactionMessage({
+        payerKey: wallet.publicKey,
+        recentBlockhash: blockhash,
+        instructions,
+      }).compileToV0Message(allALTs);
+
+      const transaction = new VersionedTransaction(messageV0);
+
+      // 12. Check transaction size
+      const serialized = transaction.serialize();
+      console.log(`[Swap] Transaction size with ALT: ${serialized.length} bytes`);
+
+      if (serialized.length > 1232) {
+        console.warn(`[Swap] Transaction still too large (${serialized.length} bytes), falling back to Jupiter direct`);
+        throw new Error(`Transaction too large even with ALT: ${serialized.length} bytes`);
+      }
+
+      // 13. Sign the transaction
+      const signedTx = await wallet.signTransaction(transaction);
+
+      // 14. Send transaction
+      const txSig = await sendTransactionWithChannel(
+        signedTx.serialize(),
+        connection,
+        executionChannel
+      );
+
+      // 15. Confirm transaction
+      await connection.confirmTransaction(
+        { signature: txSig, blockhash, lastValidBlockHeight },
+        "confirmed"
+      );
+
+      // 16. Log success
+      monitor.swapSuccess(
+        request.amountIn.toString(),
+        request.tokenIn.toBase58().slice(0, 8),
+        request.tokenOut.toBase58().slice(0, 8),
+        txSig
+      );
+
+      toast.success(`Swap réussi (ALT): ${txSig.slice(0, 8)}...`);
+      return txSig;
+
+    } catch (err) {
+      console.error("swapWithRouterVersioned error:", err);
+
+      const errorMessage = err instanceof Error ? err.message : "Unknown swap error";
+      monitor.swapError(errorMessage, {
+        component: 'useSwapRouter',
+        action: 'swapWithRouterVersioned',
+        amount: request.amountIn.toString(),
+        tokenMint: request.tokenIn.toBase58(),
+        walletAddress: wallet.publicKey?.toBase58(),
+        executionChannel,
+        stack: err instanceof Error ? err.stack : undefined,
+      });
+
+      // Re-throw to allow fallback handling
+      throw err;
+    }
+  };
+
   return {
     swapWithRouter,
+    swapWithRouterVersioned,
     executeJupiterSwap,
     program,
   };
