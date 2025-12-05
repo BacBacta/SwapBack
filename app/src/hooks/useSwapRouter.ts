@@ -128,12 +128,11 @@ export function useSwapRouter() {
 
       const normalizedJupiterRoute = request.jupiterRoute
         ? {
+            // Fields must match IDL order and names (snake_case)
+            swapInstruction: Array.isArray(request.jupiterRoute.swapInstruction)
+              ? Buffer.from(request.jupiterRoute.swapInstruction)
+              : Buffer.from(request.jupiterRoute.swapInstruction),
             expectedInputAmount: request.jupiterRoute.expectedInputAmount,
-            swapInstruction: Array.isArray(
-              request.jupiterRoute.swapInstruction
-            )
-              ? request.jupiterRoute.swapInstruction
-              : Array.from(request.jupiterRoute.swapInstruction),
           }
         : null;
 
@@ -148,8 +147,7 @@ export function useSwapRouter() {
         primaryOracleAccount: oracleFeeds.primary,
         fallbackOracleAccount: oracleFeeds.fallback ?? null,
         jupiterRoute: normalizedJupiterRoute,
-        // New fields required by updated IDL
-        jupiterSwapIxData: null, // Will be populated by keeper if needed
+        jupiterSwapIxData: null,
         liquidityEstimate: null,
         volatilityBps: null,
         minVenueScore: null,
@@ -158,7 +156,7 @@ export function useSwapRouter() {
         tokenBDecimals: null,
         maxStalenessOverride: null,
         jitoBundle: null,
-      } as const;
+      };
 
       const accounts = {
         state: derived.routerState,
@@ -176,9 +174,11 @@ export function useSwapRouter() {
         buybackState: derived.buybackState,
         userRebateAccount: derived.userRebateAccount,
         rebateVault: derived.rebateVault,
+        oracleCache: derived.oracleCache ?? null,
+        venueScore: derived.venueScore ?? null,
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
-      } as const;
+      };
 
       let remainingAccounts = request.remainingAccounts ?? [];
       if (!remainingAccounts.length && request.buildRemainingAccounts) {
@@ -366,6 +366,8 @@ export type DerivedSwapAccounts = {
   buybackProgram: PublicKey | null;
   buybackState: PublicKey | null;
   buybackUsdcVault: PublicKey | null;
+  oracleCache: PublicKey | null;
+  venueScore: PublicKey | null;
   preInstructions: TransactionInstruction[];
   walletPublicKey: PublicKey;
 };
@@ -461,6 +463,25 @@ async function deriveSwapAccounts(params: {
   const userNft = await deriveUserNft(connection, walletPublicKey);
   const buybackInfo = await deriveBuybackAccounts(connection);
 
+  // Derive optional performance accounts (oracleCache, venueScore)
+  // These are optional - they will be null if not initialized
+  let oracleCache: PublicKey | null = null;
+  let venueScore: PublicKey | null = null;
+  
+  try {
+    // venueScore seeds: [b"venue_score", state.key().as_ref()]
+    const [venueScorePda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("venue_score"), routerState.toBuffer()],
+      ROUTER_PROGRAM_ID
+    );
+    const venueScoreInfo = await connection.getAccountInfo(venueScorePda);
+    if (venueScoreInfo) {
+      venueScore = venueScorePda;
+    }
+  } catch {
+    // Optional - ignore errors
+  }
+
   const preInstructions = [
     userTokenAData.instruction,
     userTokenBData.instruction,
@@ -479,6 +500,8 @@ async function deriveSwapAccounts(params: {
     buybackProgram: buybackInfo ? PROGRAM_IDS.buybackProgram : null,
     buybackState: buybackInfo?.state ?? null,
     buybackUsdcVault: buybackInfo?.vault ?? null,
+    oracleCache,
+    venueScore,
     preInstructions,
     walletPublicKey,
   };
