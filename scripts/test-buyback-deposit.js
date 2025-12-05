@@ -9,7 +9,7 @@ const fs = require('fs');
 
 const RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com';
 const ROUTER_PROGRAM_ID = new PublicKey('9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh');
-const BUYBACK_PROGRAM_ID = new PublicKey('F8S1r81FcTsSBb9vP3jFNuVoTMYNrxaCptbvkzSXcEce');
+const BUYBACK_PROGRAM_ID = new PublicKey('4cyYvpjwERF67UDpd5euYzZ6xZ5tcDL6XrByBaZbVVjK');
 
 async function testBuybackDeposit() {
   console.log('🔍 Testing Buyback Deposit Flow...\n');

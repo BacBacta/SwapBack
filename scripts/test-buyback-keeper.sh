@@ -19,7 +19,7 @@ const { Connection, PublicKey } = require('@solana/web3.js');
 
 (async () => {
   const conn = new Connection('https://api.devnet.solana.com', 'confirmed');
-  const BUYBACK_PROGRAM_ID = new PublicKey('F8S1r81FcTsSBb9vP3jFNuVoTMYNrxaCptbvkzSXcEce');
+  const BUYBACK_PROGRAM_ID = new PublicKey('4cyYvpjwERF67UDpd5euYzZ6xZ5tcDL6XrByBaZbVVjK');
   
   const [vaultPDA] = PublicKey.findProgramAddressSync(
     [Buffer.from('usdc_vault')],
@@ -92,7 +92,7 @@ const axios = require('axios');
 
 echo ""
 echo "📝 Next Steps:"
-echo "   1. Initialize new buyback state with Program ID: F8S1r81FcTsSBb9vP3jFNuVoTMYNrxaCptbvkzSXcEce"
+echo "   1. Initialize new buyback state with Program ID: 4cyYvpjwERF67UDpd5euYzZ6xZ5tcDL6XrByBaZbVVjK"
 echo "   2. Fund vault with test USDC (via swap)"
 echo "   3. Run keeper: ts-node oracle/src/buyback-keeper.ts"
 echo "   4. Monitor logs for automatic buyback execution"

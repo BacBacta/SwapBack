@@ -86,5 +86,14 @@
     "CARGO_HOME": "/usr/local/cargo",
     "PATH": "/home/codespace/.local/share/solana/install/active_release/bin:/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin"
   },
-  "markdown.validate.enabled": true
+  "markdown.validate.enabled": true,
+  "python.testing.unittestArgs": [
+    "-v",
+    "-s",
+    ".",
+    "-p",
+    "*test*.py"
+  ],
+  "python.testing.pytestEnabled": false,
+  "python.testing.unittestEnabled": true
 }

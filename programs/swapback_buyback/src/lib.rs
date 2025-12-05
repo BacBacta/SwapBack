@@ -2,8 +2,8 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Burn, Mint, TokenAccount, Transfer};
 use anchor_spl::token_2022::{self};
 
-// Program ID déployé sur devnet - 24 Nov 2025 (100% Burn Model)
-declare_id!("7wCCwRXxWvMY2DJDRrnhFg3b8jVPb5vVPxLH5YAGL6eJ");
+// Program ID déployé sur devnet - 5 Dec 2025 (New Keypair)
+declare_id!("4cyYvpjwERF67UDpd5euYzZ6xZ5tcDL6XrByBaZbVVjK");
 
 // Program ID du cNFT pour lire GlobalState et UserNft (mis à jour)
 pub const CNFT_PROGRAM_ID: Pubkey = pubkey!("9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw");
@@ -22,6 +22,7 @@ pub mod swapback_buyback {
 
         buyback_state.authority = ctx.accounts.authority.key();
         buyback_state.back_mint = ctx.accounts.back_mint.key();
+        buyback_state.usdc_mint = ctx.accounts.usdc_mint.key();
         buyback_state.usdc_vault = ctx.accounts.usdc_vault.key();
         buyback_state.min_buyback_amount = min_buyback_amount;
         buyback_state.total_usdc_spent = 0;
@@ -87,7 +88,7 @@ pub mod swapback_buyback {
 
         // 2. Vérifier que le mint du vault est correct
         require!(
-            ctx.accounts.usdc_vault.mint == ctx.accounts.buyback_state.usdc_vault,
+            ctx.accounts.usdc_vault.mint == buyback_state.usdc_mint,
             ErrorCode::InvalidVaultMint
         );
 
@@ -510,6 +511,7 @@ pub struct DistributeBuyback<'info> {
 pub struct BuybackState {
     pub authority: Pubkey,
     pub back_mint: Pubkey,
+    pub usdc_mint: Pubkey,
     pub usdc_vault: Pubkey,
     pub min_buyback_amount: u64,
     pub total_usdc_spent: u64,

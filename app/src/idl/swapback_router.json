@@ -1,5 +1,5 @@
 {
-  "address": "5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf",
+  "address": "Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa",
   "metadata": {
     "name": "swapback_router",
     "version": "0.1.0",
@@ -1640,7 +1640,81 @@
         241,
         52,
         84
-      ]
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "planId",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "tokenIn",
+            "type": "pubkey"
+          },
+          {
+            "name": "tokenOut",
+            "type": "pubkey"
+          },
+          {
+            "name": "amountPerSwap",
+            "type": "u64"
+          },
+          {
+            "name": "totalSwaps",
+            "type": "u32"
+          },
+          {
+            "name": "executedSwaps",
+            "type": "u32"
+          },
+          {
+            "name": "intervalSeconds",
+            "type": "i64"
+          },
+          {
+            "name": "nextExecution",
+            "type": "i64"
+          },
+          {
+            "name": "minOutPerSwap",
+            "type": "u64"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "expiresAt",
+            "type": "i64"
+          },
+          {
+            "name": "isActive",
+            "type": "bool"
+          },
+          {
+            "name": "totalInvested",
+            "type": "u64"
+          },
+          {
+            "name": "totalReceived",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
     },
     {
       "name": "OracleCache",
@@ -1653,7 +1727,37 @@
         223,
         73,
         212
-      ]
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokenPair",
+            "type": {
+              "array": [
+                "pubkey",
+                2
+              ]
+            }
+          },
+          {
+            "name": "cachedPrice",
+            "type": "u64"
+          },
+          {
+            "name": "cachedAt",
+            "type": "i64"
+          },
+          {
+            "name": "cacheDuration",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
     },
     {
       "name": "RouterConfig",
@@ -1666,7 +1770,54 @@
         251,
         46,
         139
-      ]
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "pendingAuthority",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "rebateBps",
+            "type": "u16"
+          },
+          {
+            "name": "treasuryBps",
+            "type": "u16"
+          },
+          {
+            "name": "boostVaultBps",
+            "type": "u16"
+          },
+          {
+            "name": "treasuryFromFeesBps",
+            "type": "u16"
+          },
+          {
+            "name": "buyburnFromFeesBps",
+            "type": "u16"
+          },
+          {
+            "name": "dynamicSlippageEnabled",
+            "type": "bool"
+          },
+          {
+            "name": "npiBenchmarkingEnabled",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
     },
     {
       "name": "RouterState",
@@ -1679,7 +1830,48 @@
         208,
         200,
         27
-      ]
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "rebatePercentage",
+            "type": "u16"
+          },
+          {
+            "name": "treasuryPercentage",
+            "type": "u16"
+          },
+          {
+            "name": "boostVaultPercentage",
+            "type": "u16"
+          },
+          {
+            "name": "totalSwaps",
+            "type": "u64"
+          },
+          {
+            "name": "totalVolume",
+            "type": "u64"
+          },
+          {
+            "name": "totalFees",
+            "type": "u64"
+          },
+          {
+            "name": "totalRebates",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
     },
     {
       "name": "SwapPlan",
@@ -1692,7 +1884,69 @@
         35,
         247,
         120
-      ]
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "planId",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "tokenIn",
+            "type": "pubkey"
+          },
+          {
+            "name": "tokenOut",
+            "type": "pubkey"
+          },
+          {
+            "name": "amountIn",
+            "type": "u64"
+          },
+          {
+            "name": "minOut",
+            "type": "u64"
+          },
+          {
+            "name": "venues",
+            "type": {
+              "vec": {
+                "defined": "VenueWeight"
+              }
+            }
+          },
+          {
+            "name": "fallbackPlans",
+            "type": {
+              "vec": {
+                "defined": "FallbackPlan"
+              }
+            }
+          },
+          {
+            "name": "expiresAt",
+            "type": "i64"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
     },
     {
       "name": "UserNft",
@@ -1705,7 +1959,42 @@
         180,
         173,
         226
-      ]
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "level",
+            "type": {
+              "defined": "LockLevel"
+            }
+          },
+          {
+            "name": "amountLocked",
+            "type": "u64"
+          },
+          {
+            "name": "lockDuration",
+            "type": "i64"
+          },
+          {
+            "name": "boost",
+            "type": "u16"
+          },
+          {
+            "name": "mintTime",
+            "type": "i64"
+          },
+          {
+            "name": "isActive",
+            "type": "bool"
+          }
+        ]
+      }
     },
     {
       "name": "UserRebate",
@@ -1718,7 +2007,32 @@
         134,
         112,
         99
-      ]
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "totalRebates",
+            "type": "u64"
+          },
+          {
+            "name": "claimedRebates",
+            "type": "u64"
+          },
+          {
+            "name": "lastClaimAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
     },
     {
       "name": "VenueScore",
@@ -1731,7 +2045,54 @@
         238,
         81,
         248
-      ]
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "venue",
+            "type": "pubkey"
+          },
+          {
+            "name": "venueType",
+            "type": {
+              "defined": "VenueType"
+            }
+          },
+          {
+            "name": "totalSwaps",
+            "type": "u64"
+          },
+          {
+            "name": "totalVolume",
+            "type": "u64"
+          },
+          {
+            "name": "totalNpiGenerated",
+            "type": "i64"
+          },
+          {
+            "name": "avgLatencyMs",
+            "type": "u32"
+          },
+          {
+            "name": "avgSlippageBps",
+            "type": "u16"
+          },
+          {
+            "name": "qualityScore",
+            "type": "u16"
+          },
+          {
+            "name": "lastUpdated",
+            "type": "i64"
+          },
+          {
+            "name": "windowStart",
+            "type": "i64"
+          }
+        ]
+      }
     }
   ],
   "events": [

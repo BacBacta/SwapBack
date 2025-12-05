@@ -96,9 +96,9 @@ describe("JitoBundleService", () => {
     vi.clearAllMocks();
 
     mockConnection = {
-      getRecentBlockhash: vi.fn().mockResolvedValue({
+      getLatestBlockhash: vi.fn().mockResolvedValue({
         blockhash: "mock-blockhash",
-        feeCalculator: { lamportsPerSignature: 5000 },
+        lastValidBlockHeight: 123456,
       }),
     };
 

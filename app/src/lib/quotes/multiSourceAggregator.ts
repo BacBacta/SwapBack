@@ -17,7 +17,12 @@ export interface QuoteSource {
 export interface QuoteParams {
   inputMint: string;
   outputMint: string;
-  amount: number;
+  /** Amount expressed in human readable units (e.g. SOL, USDC) */
+  amountTokens: number;
+  /** Amount in smallest units (lamports) */
+  amountLamports: number;
+  inputDecimals: number;
+  outputDecimals: number;
   slippageBps: number;
   userPublicKey?: string;
 }
@@ -27,6 +32,7 @@ export interface QuoteResult {
   quote: JupiterQuoteResponse | null;
   latencyMs: number;
   error?: string;
+  improvementBps?: number;
 }
 
 export interface AggregatedQuote {
@@ -48,7 +54,7 @@ async function fetchJupiterQuote(params: QuoteParams, endpoint: string): Promise
   const url = new URL(`${endpoint}/quote`);
   url.searchParams.set("inputMint", params.inputMint);
   url.searchParams.set("outputMint", params.outputMint);
-  url.searchParams.set("amount", Math.floor(params.amount * 1e9).toString());
+  url.searchParams.set("amount", Math.floor(params.amountLamports).toString());
   url.searchParams.set("slippageBps", params.slippageBps.toString());
   url.searchParams.set("onlyDirectRoutes", "false");
   url.searchParams.set("asLegacyTransaction", "false");
@@ -81,16 +87,19 @@ async function fetchRaydiumQuote(params: QuoteParams): Promise<JupiterQuoteRespo
     if (!inputPrice || !outputPrice) return null;
 
     // Estimation simple basée sur le prix
+    const amountInTokens = params.amountTokens;
     const rate = inputPrice / outputPrice;
-    const outputAmount = params.amount * rate * 0.997; // 0.3% fee estimation
+    const outputAmountTokens = amountInTokens * rate * 0.997; // 0.3% fee estimation
+    const outputLamports = Math.floor(outputAmountTokens * Math.pow(10, params.outputDecimals));
+    const inputLamports = Math.floor(amountInTokens * Math.pow(10, params.inputDecimals));
 
     // Format compatible Jupiter
     return {
       inputMint: params.inputMint,
       outputMint: params.outputMint,
-      inAmount: Math.floor(params.amount * 1e9).toString(),
-      outAmount: Math.floor(outputAmount * 1e9).toString(),
-      otherAmountThreshold: Math.floor(outputAmount * 0.99 * 1e9).toString(),
+      inAmount: inputLamports.toString(),
+      outAmount: outputLamports.toString(),
+      otherAmountThreshold: Math.floor(outputLamports * 0.99).toString(),
       priceImpactPct: "0.1",
       routePlan: [{
         swapInfo: {
@@ -98,9 +107,9 @@ async function fetchRaydiumQuote(params: QuoteParams): Promise<JupiterQuoteRespo
           label: "Raydium",
           inputMint: params.inputMint,
           outputMint: params.outputMint,
-          inAmount: Math.floor(params.amount * 1e9).toString(),
-          outAmount: Math.floor(outputAmount * 1e9).toString(),
-          feeAmount: Math.floor(params.amount * 0.003 * 1e9).toString(),
+          inAmount: inputLamports.toString(),
+          outAmount: outputLamports.toString(),
+          feeAmount: Math.floor(amountInTokens * 0.003 * Math.pow(10, params.inputDecimals)).toString(),
           feeMint: params.inputMint,
         },
         percent: 100,
@@ -117,7 +126,7 @@ async function fetchRaydiumQuote(params: QuoteParams): Promise<JupiterQuoteRespo
 async function fetchOrcaQuote(params: QuoteParams): Promise<JupiterQuoteResponse | null> {
   try {
     // Orca Whirlpool API
-    const url = `https://api.orca.so/v2/quote?inputMint=${params.inputMint}&outputMint=${params.outputMint}&amount=${Math.floor(params.amount * 1e9)}&slippage=${params.slippageBps / 10000}`;
+    const url = `https://api.orca.so/v2/quote?inputMint=${params.inputMint}&outputMint=${params.outputMint}&amount=${params.amountLamports}&slippage=${params.slippageBps / 10000}`;
     const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
     
     if (!response.ok) return null;
@@ -129,7 +138,7 @@ async function fetchOrcaQuote(params: QuoteParams): Promise<JupiterQuoteResponse
     return {
       inputMint: params.inputMint,
       outputMint: params.outputMint,
-      inAmount: data.inAmount || Math.floor(params.amount * 1e9).toString(),
+      inAmount: data.inAmount || params.amountLamports.toString(),
       outAmount: data.outAmount,
       otherAmountThreshold: Math.floor(Number(data.outAmount) * 0.99).toString(),
       priceImpactPct: data.priceImpact || "0.1",
@@ -139,7 +148,7 @@ async function fetchOrcaQuote(params: QuoteParams): Promise<JupiterQuoteResponse
           label: "Orca",
           inputMint: params.inputMint,
           outputMint: params.outputMint,
-          inAmount: data.inAmount || Math.floor(params.amount * 1e9).toString(),
+          inAmount: data.inAmount || params.amountLamports.toString(),
           outAmount: data.outAmount,
           feeAmount: "0",
           feeMint: params.inputMint,
@@ -231,7 +240,7 @@ export class MultiSourceQuoteAggregator {
     const startTime = Date.now();
 
     // 1. Vérifier le cache d'abord
-    const cached = this.cache.get(params.inputMint, params.outputMint, params.amount);
+    const cached = this.cache.get(params.inputMint, params.outputMint, params.amountTokens);
     if (cached) {
       return {
         bestQuote: cached,
@@ -265,7 +274,7 @@ export class MultiSourceQuoteAggregator {
     const best = validResults[0];
 
     // 5. Mettre en cache
-    this.cache.set(params.inputMint, params.outputMint, params.amount, best.quote!);
+    this.cache.set(params.inputMint, params.outputMint, params.amountTokens, best.quote!);
 
     return {
       bestQuote: best.quote!,
@@ -283,7 +292,7 @@ export class MultiSourceQuoteAggregator {
     const startTime = Date.now();
 
     // Cache check
-    const cached = this.cache.get(params.inputMint, params.outputMint, params.amount);
+    const cached = this.cache.get(params.inputMint, params.outputMint, params.amountTokens);
     if (cached) {
       return {
         bestQuote: cached,
@@ -309,7 +318,7 @@ export class MultiSourceQuoteAggregator {
       throw new Error("Aucune source de quote disponible");
     }
 
-    this.cache.set(params.inputMint, params.outputMint, params.amount, result.quote!);
+    this.cache.set(params.inputMint, params.outputMint, params.amountTokens, result.quote!);
 
     return {
       bestQuote: result.quote!,

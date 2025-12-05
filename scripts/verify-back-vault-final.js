@@ -12,7 +12,7 @@ const path = require('path');
 // Configuration
 const CONFIG = {
   RPC_URL: 'https://api.devnet.solana.com',
-  BUYBACK_PROGRAM_ID: new PublicKey('F8S1r81FcTsSBb9vP3jFNuVoTMYNrxaCptbvkzSXcEce'),
+  BUYBACK_PROGRAM_ID: new PublicKey('4cyYvpjwERF67UDpd5euYzZ6xZ5tcDL6XrByBaZbVVjK'),
   BACK_MINT: new PublicKey('862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux'),
 };
 

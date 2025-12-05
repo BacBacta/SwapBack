@@ -5,6 +5,7 @@
 
 "use client";
 
+import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   XMarkIcon,
@@ -15,6 +16,7 @@ import {
   BanknotesIcon
 } from "@heroicons/react/24/outline";
 import { formatNumberWithCommas, formatCurrency } from "@/utils/formatNumber";
+import { trackRouterComparisonAction } from "@/lib/analytics";
 
 interface RouterComparisonProps {
   isOpen: boolean;
@@ -55,8 +57,36 @@ export function RouterComparisonModal({
   if (!isOpen) return null;
 
   const difference = swapbackData.outputAmount - jupiterData.outputAmount;
-  const percentDiff = ((difference / jupiterData.outputAmount) * 100).toFixed(2);
+  const percentDiffValue = jupiterData.outputAmount !== 0
+    ? (difference / jupiterData.outputAmount) * 100
+    : 0;
+  const percentDiff = percentDiffValue.toFixed(2);
   const isBetter = difference > 0;
+  const recommendedRouter = difference >= 0 ? "swapback" : "jupiter";
+  const hasEconomics = swapbackData.rebateAmount > 0 || swapbackData.burnAmount > 0;
+
+  const handleRouterSelection = (
+    router: "swapback" | "jupiter",
+    actionSource: "card" | "cta"
+  ) => {
+    trackRouterComparisonAction({
+      selectedRouter: router,
+      actionSource,
+      currentRouter,
+      recommendedRouter,
+      inputToken: inputToken.symbol,
+      outputToken: outputToken.symbol,
+      inputAmount: parseFloat(inputToken.amount) || 0,
+      swapbackOutput: swapbackData.outputAmount,
+      jupiterOutput: jupiterData.outputAmount,
+      difference,
+      percentDifference: percentDiffValue,
+      hasEconomics,
+      priceImpact: router === "swapback" ? swapbackData.priceImpact : jupiterData.priceImpact,
+      source: "modal",
+    });
+    onSelectRouter(router);
+  };
 
   const FEATURES = [
     {
@@ -135,7 +165,7 @@ export function RouterComparisonModal({
             <div className="grid md:grid-cols-2 gap-4">
               {/* SwapBack Card */}
               <motion.button
-                onClick={() => onSelectRouter('swapback')}
+                onClick={() => handleRouterSelection('swapback', 'card')}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className={`relative p-6 rounded-2xl border-2 transition-all ${
@@ -201,7 +231,7 @@ export function RouterComparisonModal({
 
               {/* Jupiter Card */}
               <motion.button
-                onClick={() => onSelectRouter('jupiter')}
+                onClick={() => handleRouterSelection('jupiter', 'card')}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className={`relative p-6 rounded-2xl border-2 transition-all ${
@@ -345,7 +375,7 @@ export function RouterComparisonModal({
             <div className="flex gap-3">
               <button
                 onClick={() => {
-                  onSelectRouter('swapback');
+                  handleRouterSelection('swapback', 'cta');
                   onClose();
                 }}
                 className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 
@@ -356,7 +386,7 @@ export function RouterComparisonModal({
               </button>
               <button
                 onClick={() => {
-                  onSelectRouter('jupiter');
+                  handleRouterSelection('jupiter', 'cta');
                   onClose();
                 }}
                 className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-blue-600 

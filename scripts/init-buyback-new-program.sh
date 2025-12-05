@@ -7,7 +7,7 @@ echo "🚀 Initializing Buyback State"
 echo "=============================="
 echo ""
 
-NEW_PROGRAM_ID="F8S1r81FcTsSBb9vP3jFNuVoTMYNrxaCptbvkzSXcEce"
+NEW_PROGRAM_ID="4cyYvpjwERF67UDpd5euYzZ6xZ5tcDL6XrByBaZbVVjK"
 BACK_MINT="862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux"
 USDC_MINT="4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU" # Devnet
 

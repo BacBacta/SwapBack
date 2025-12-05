@@ -1,0 +1,762 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`RouterComparisonModal > met en avant SwapBack lorsqu'il est plus avantageux 1`] = `
+<div>
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
+    style="opacity: 0;"
+  >
+    <div
+      class="relative max-w-4xl w-full bg-gradient-to-br from-gray-900 to-gray-800 
+                   rounded-2xl border border-white/10 shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
+      style="opacity: 0; transform: translateY(20px) scale(0.9);"
+    >
+      <div
+        class="sticky top-0 bg-gray-900/95 backdrop-blur-lg border-b border-white/10 p-6 z-10"
+      >
+        <div
+          class="flex items-center justify-between"
+        >
+          <div
+            class="flex items-center gap-3"
+          >
+            <svg
+              aria-hidden="true"
+              class="w-6 h-6 text-emerald-400"
+              data-slot="icon"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <div>
+              <h2
+                class="text-2xl font-bold text-white"
+              >
+                Router Comparison
+              </h2>
+              <p
+                class="text-sm text-gray-400"
+              >
+                10
+                 
+                SOL
+                 → 
+                USDC
+              </p>
+            </div>
+          </div>
+          <button
+            class="p-2 hover:bg-white/10 rounded-lg transition-colors active:scale-95"
+          >
+            <svg
+              aria-hidden="true"
+              class="w-6 h-6 text-gray-400"
+              data-slot="icon"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M6 18 18 6M6 6l12 12"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div
+        class="p-6 space-y-6"
+      >
+        <div
+          class="grid md:grid-cols-2 gap-4"
+        >
+          <button
+            class="relative p-6 rounded-2xl border-2 transition-all border-emerald-500 bg-emerald-500/10"
+            tabindex="0"
+          >
+            <div
+              class="absolute top-4 right-4"
+            >
+              <svg
+                aria-hidden="true"
+                class="w-6 h-6 text-emerald-400"
+                data-slot="icon"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </div>
+            <div
+              class="flex items-center gap-2 mb-4"
+            >
+              <span
+                class="text-2xl"
+              >
+                ⚡
+              </span>
+              <h3
+                class="text-xl font-bold text-white"
+              >
+                SwapBack
+              </h3>
+              <span
+                class="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded-full"
+              >
+                BEST
+              </span>
+            </div>
+            <div
+              class="space-y-3 text-left"
+            >
+              <div>
+                <div
+                  class="text-sm text-gray-400 mb-1"
+                >
+                  You receive
+                </div>
+                <div
+                  class="text-3xl font-bold text-white"
+                >
+                  105.123456
+                </div>
+                <div
+                  class="text-sm text-gray-500"
+                >
+                  USDC
+                </div>
+              </div>
+              <div
+                class="flex items-center gap-2 pt-3 border-t border-white/10"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="w-4 h-4 text-emerald-400"
+                  data-slot="icon"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                <span
+                  class="text-sm text-emerald-400 font-medium"
+                >
+                  +
+                  2.500000
+                   
+                  USDC
+                   saved
+                </span>
+              </div>
+              <div
+                class="space-y-1.5 text-xs"
+              >
+                <div
+                  class="flex justify-between text-gray-400"
+                >
+                  <span>
+                    Price Impact
+                  </span>
+                  <span
+                    class="text-emerald-400"
+                  >
+                    0.25
+                    %
+                  </span>
+                </div>
+                <div
+                  class="flex justify-between text-gray-400"
+                >
+                  <span>
+                    Network Fee
+                  </span>
+                  <span>
+                    0.000005
+                     SOL
+                  </span>
+                </div>
+                <div
+                  class="flex justify-between text-gray-400"
+                >
+                  <span>
+                    Platform Fee
+                  </span>
+                  <span>
+                    0
+                    %
+                  </span>
+                </div>
+                <div
+                  class="flex justify-between text-emerald-400"
+                >
+                  <span>
+                    BACK Rebate
+                  </span>
+                  <span>
+                    +
+                    1.234500
+                  </span>
+                </div>
+              </div>
+            </div>
+          </button>
+          <button
+            class="relative p-6 rounded-2xl border-2 transition-all border-white/10 bg-white/5 hover:border-blue-500/50"
+            tabindex="0"
+          >
+            <div
+              class="flex items-center gap-2 mb-4"
+            >
+              <span
+                class="text-2xl"
+              >
+                🪐
+              </span>
+              <h3
+                class="text-xl font-bold text-white"
+              >
+                Jupiter
+              </h3>
+            </div>
+            <div
+              class="space-y-3 text-left"
+            >
+              <div>
+                <div
+                  class="text-sm text-gray-400 mb-1"
+                >
+                  You receive
+                </div>
+                <div
+                  class="text-3xl font-bold text-white"
+                >
+                  103.123456
+                </div>
+                <div
+                  class="text-sm text-gray-500"
+                >
+                  USDC
+                </div>
+              </div>
+              <div
+                class="space-y-1.5 text-xs"
+              >
+                <div
+                  class="flex justify-between text-gray-400"
+                >
+                  <span>
+                    Price Impact
+                  </span>
+                  <span
+                    class="text-emerald-400"
+                  >
+                    0.45
+                    %
+                  </span>
+                </div>
+                <div
+                  class="flex justify-between text-gray-400"
+                >
+                  <span>
+                    Network Fee
+                  </span>
+                  <span>
+                    0.00001
+                     SOL
+                  </span>
+                </div>
+                <div
+                  class="flex justify-between text-gray-400"
+                >
+                  <span>
+                    Platform Fee
+                  </span>
+                  <span>
+                    0
+                    %
+                  </span>
+                </div>
+                <div
+                  class="flex justify-between text-gray-500"
+                >
+                  <span>
+                    Rebate
+                  </span>
+                  <span>
+                    None
+                  </span>
+                </div>
+              </div>
+            </div>
+          </button>
+        </div>
+        <div
+          class="p-4 rounded-xl border bg-emerald-500/10 border-emerald-500/30"
+          style="opacity: 0; transform: translateY(10px);"
+        >
+          <div
+            class="flex items-center justify-between"
+          >
+            <div
+              class="flex items-center gap-3"
+            >
+              <svg
+                aria-hidden="true"
+                class="w-5 h-5 text-emerald-400"
+                data-slot="icon"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              <div>
+                <div
+                  class="font-semibold text-white"
+                >
+                  SwapBack saves you
+                </div>
+                <div
+                  class="text-sm text-gray-400"
+                >
+                  Compared to 
+                  Jupiter
+                </div>
+              </div>
+            </div>
+            <div
+              class="text-right"
+            >
+              <div
+                class="text-2xl font-bold text-emerald-400"
+              >
+                +
+                2.000000
+              </div>
+              <div
+                class="text-sm text-gray-500"
+              >
+                (
+                +
+                1.94
+                %)
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          class="bg-white/5 rounded-xl border border-white/10 overflow-hidden"
+        >
+          <div
+            class="p-4 border-b border-white/10"
+          >
+            <h4
+              class="font-semibold text-white"
+            >
+              Features Comparison
+            </h4>
+          </div>
+          <div
+            class="divide-y divide-white/10"
+          >
+            <div
+              class="grid grid-cols-3 gap-4 p-4 hover:bg-white/5 transition-colors"
+              style="opacity: 0; transform: translateX(-10px);"
+            >
+              <div
+                class="flex items-center gap-2"
+              >
+                <span
+                  class="text-sm text-gray-300"
+                >
+                  BACK Token Rebates
+                </span>
+                <div
+                  class="group relative"
+                >
+                  <span
+                    class="text-xs text-gray-500 cursor-help"
+                  >
+                    ℹ️
+                  </span>
+                  <div
+                    class="absolute left-0 bottom-full mb-2 hidden group-hover:block w-48 p-2 
+                                      bg-gray-900 rounded-lg text-xs text-gray-300 border border-white/10 z-20"
+                  >
+                    70% of fees returned as BACK tokens
+                  </div>
+                </div>
+              </div>
+              <div
+                class="flex justify-center"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="w-5 h-5 text-emerald-400"
+                  data-slot="icon"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </div>
+              <div
+                class="flex justify-center"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="w-5 h-5 text-gray-600"
+                  data-slot="icon"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M6 18 18 6M6 6l12 12"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </div>
+            </div>
+            <div
+              class="grid grid-cols-3 gap-4 p-4 hover:bg-white/5 transition-colors"
+              style="opacity: 0; transform: translateX(-10px);"
+            >
+              <div
+                class="flex items-center gap-2"
+              >
+                <span
+                  class="text-sm text-gray-300"
+                >
+                  Auto-Burn Mechanism
+                </span>
+                <div
+                  class="group relative"
+                >
+                  <span
+                    class="text-xs text-gray-500 cursor-help"
+                  >
+                    ℹ️
+                  </span>
+                  <div
+                    class="absolute left-0 bottom-full mb-2 hidden group-hover:block w-48 p-2 
+                                      bg-gray-900 rounded-lg text-xs text-gray-300 border border-white/10 z-20"
+                  >
+                    30% of fees burned to reduce supply
+                  </div>
+                </div>
+              </div>
+              <div
+                class="flex justify-center"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="w-5 h-5 text-emerald-400"
+                  data-slot="icon"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </div>
+              <div
+                class="flex justify-center"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="w-5 h-5 text-gray-600"
+                  data-slot="icon"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M6 18 18 6M6 6l12 12"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </div>
+            </div>
+            <div
+              class="grid grid-cols-3 gap-4 p-4 hover:bg-white/5 transition-colors"
+              style="opacity: 0; transform: translateX(-10px);"
+            >
+              <div
+                class="flex items-center gap-2"
+              >
+                <span
+                  class="text-sm text-gray-300"
+                >
+                  Price Impact Optimization
+                </span>
+                <div
+                  class="group relative"
+                >
+                  <span
+                    class="text-xs text-gray-500 cursor-help"
+                  >
+                    ℹ️
+                  </span>
+                  <div
+                    class="absolute left-0 bottom-full mb-2 hidden group-hover:block w-48 p-2 
+                                      bg-gray-900 rounded-lg text-xs text-gray-300 border border-white/10 z-20"
+                  >
+                    Smart routing to minimize slippage
+                  </div>
+                </div>
+              </div>
+              <div
+                class="flex justify-center"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="w-5 h-5 text-emerald-400"
+                  data-slot="icon"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </div>
+              <div
+                class="flex justify-center"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="w-5 h-5 text-blue-400"
+                  data-slot="icon"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </div>
+            </div>
+            <div
+              class="grid grid-cols-3 gap-4 p-4 hover:bg-white/5 transition-colors"
+              style="opacity: 0; transform: translateX(-10px);"
+            >
+              <div
+                class="flex items-center gap-2"
+              >
+                <span
+                  class="text-sm text-gray-300"
+                >
+                  Multi-DEX Aggregation
+                </span>
+                <div
+                  class="group relative"
+                >
+                  <span
+                    class="text-xs text-gray-500 cursor-help"
+                  >
+                    ℹ️
+                  </span>
+                  <div
+                    class="absolute left-0 bottom-full mb-2 hidden group-hover:block w-48 p-2 
+                                      bg-gray-900 rounded-lg text-xs text-gray-300 border border-white/10 z-20"
+                  >
+                    Routes across Orca, Raydium, etc.
+                  </div>
+                </div>
+              </div>
+              <div
+                class="flex justify-center"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="w-5 h-5 text-emerald-400"
+                  data-slot="icon"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </div>
+              <div
+                class="flex justify-center"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="w-5 h-5 text-blue-400"
+                  data-slot="icon"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </div>
+            </div>
+            <div
+              class="grid grid-cols-3 gap-4 p-4 hover:bg-white/5 transition-colors"
+              style="opacity: 0; transform: translateX(-10px);"
+            >
+              <div
+                class="flex items-center gap-2"
+              >
+                <span
+                  class="text-sm text-gray-300"
+                >
+                  Transaction Batching
+                </span>
+                <div
+                  class="group relative"
+                >
+                  <span
+                    class="text-xs text-gray-500 cursor-help"
+                  >
+                    ℹ️
+                  </span>
+                  <div
+                    class="absolute left-0 bottom-full mb-2 hidden group-hover:block w-48 p-2 
+                                      bg-gray-900 rounded-lg text-xs text-gray-300 border border-white/10 z-20"
+                  >
+                    Combine multiple swaps in one tx
+                  </div>
+                </div>
+              </div>
+              <div
+                class="flex justify-center"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="w-5 h-5 text-gray-600"
+                  data-slot="icon"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M6 18 18 6M6 6l12 12"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </div>
+              <div
+                class="flex justify-center"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="w-5 h-5 text-blue-400"
+                  data-slot="icon"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          class="flex gap-3"
+        >
+          <button
+            class="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 
+                         hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold 
+                         rounded-xl transition-all active:scale-95 shadow-lg shadow-emerald-500/20"
+          >
+            Use SwapBack
+          </button>
+          <button
+            class="flex-1 py-3 bg-gradient-to-r from-blue-500 to-blue-600 
+                         hover:from-blue-600 hover:to-blue-700 text-white font-semibold 
+                         rounded-xl transition-all active:scale-95 shadow-lg shadow-blue-500/20"
+          >
+            Use Jupiter
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;

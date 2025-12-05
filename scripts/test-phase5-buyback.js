@@ -31,7 +31,7 @@ const CONFIG = {
   RPC_URL: process.env.RPC_URL || 'https://api.devnet.solana.com',
   
   // Program IDs (devnet)
-  BUYBACK_PROGRAM_ID: new PublicKey('F8S1r81FcTsSBb9vP3jFNuVoTMYNrxaCptbvkzSXcEce'),
+  BUYBACK_PROGRAM_ID: new PublicKey('4cyYvpjwERF67UDpd5euYzZ6xZ5tcDL6XrByBaZbVVjK'),
   CNFT_PROGRAM_ID: new PublicKey('9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw'),
   
   // Tokens

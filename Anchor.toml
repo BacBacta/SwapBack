@@ -18,7 +18,7 @@ swapback_router = "Gws21om1MSeL9fnZq5yc3tsMMdQDTwHDvE7zARG8rQBa"
 [programs.devnet]
 swapback_cnft = "EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP"
 swapback_router = "9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh"
-swapback_buyback = "F8S1r81FcTsSBb9vP3jFNuVoTMYNrxaCptbvkzSXcEce"
+swapback_buyback = "4cyYvpjwERF67UDpd5euYzZ6xZ5tcDL6XrByBaZbVVjK"
 
 [programs.mainnet]
 swapback_buyback = "Fx6yfXhqq1i3CJjocwnLXMw3VMLFt5mfoLtWPJzSRQvn"
@@ -32,17 +32,7 @@ test = "npm exec vitest -- run --reporter=verbose"
 [test]
 startup_wait = 10000
 
+# Note: Removed validator.clone entries to avoid devnet timeouts
+# Token-2022, Jupiter, Pyth are not needed for unit tests
 [test.validator]
-url = "https://api.devnet.solana.com"
-
-[[test.validator.clone]]
-address = "HCsNTpvkUGV7XMAw5VsBSR4Kxvt5x59iFDAeucvY4cre"
-
-[[test.validator.clone]]
-address = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
-
-[[test.validator.clone]]
-address = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
-
-[[test.validator.clone]]
-address = "J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix"
+# No external dependencies needed - all tests use mocks

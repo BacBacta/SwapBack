@@ -6,6 +6,17 @@ export default defineConfig({
     globals: true,
     environment: "node",
     setupFiles: ["./tests/setup-env.ts"],
+    include: [
+      "app/src/**/*.{test,spec}.{ts,tsx}",
+      "sdk/src/**/*.{test,spec}.{ts,tsx}",
+      "tests/**/*.{test,spec}.{ts,tsx}",
+    ],
+    exclude: [
+      "node_modules/**",
+      "dist/**",
+      "**/node_modules/**",
+      "app/e2e/**",
+    ],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
@@ -19,7 +30,9 @@ export default defineConfig({
       "@/hooks": path.resolve(__dirname, "./app/src/hooks"),
       "@/components": path.resolve(__dirname, "./app/src/components"),
       "@/config": path.resolve(__dirname, "./app/src/config"),
+      "@/store": path.resolve(__dirname, "./app/src/store"),
       "@/idl": path.resolve(__dirname, "./app/src/idl"),
+      "@/utils": path.resolve(__dirname, "./app/src/utils"),
       "@": path.resolve(__dirname, "./sdk/src"),
     },
   },

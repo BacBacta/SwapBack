@@ -31,7 +31,7 @@ if (!fs.existsSync(idlPath)) {
 const idl = JSON.parse(fs.readFileSync(idlPath, "utf8"));
 
 // Configuration
-const BUYBACK_PROGRAM_ID = new PublicKey("F8S1r81FcTsSBb9vP3jFNuVoTMYNrxaCptbvkzSXcEce");
+const BUYBACK_PROGRAM_ID = new PublicKey("4cyYvpjwERF67UDpd5euYzZ6xZ5tcDL6XrByBaZbVVjK");
 const BACK_MINT = new PublicKey("862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux");
 
 async function main() {
@@ -51,7 +51,7 @@ async function main() {
     "confirmed"
   );
 
-  const walletPath = process.env.HOME + "/.config/solana/id.json";
+  const walletPath = process.env.ANCHOR_WALLET || (process.env.HOME + "/.config/solana/id.json");
   if (!fs.existsSync(walletPath)) {
     console.error("❌ Wallet not found at:", walletPath);
     console.log("Run: solana-keygen new first");

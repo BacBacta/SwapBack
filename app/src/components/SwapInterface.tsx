@@ -1,12 +1,23 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { ArrowDownUp, Settings, TrendingUp, Zap, Info, ChevronDown } from "lucide-react";
 import { useTokenData } from "../hooks/useTokenData";
 import { TokenSelector } from "./TokenSelector";
 import { depositToBuybackVault, BuybackDepositResult } from "../lib/buybackIntegration";
-import { trackSwap } from "../lib/analytics";
+import {
+  trackSwap,
+  trackRouteRequest,
+  trackRouteResult,
+  trackRouterSelection,
+  trackPageView,
+  trackWalletConnect,
+  trackWalletDisconnect,
+  trackError,
+  trackRouterComparisonViewed,
+  trackRouterComparisonAction,
+} from "../lib/analytics";
 import { getExplorerTxUrl } from "../utils/explorer";
 import toast from "react-hot-toast";
 
@@ -18,6 +29,16 @@ interface RouteStep {
   outAmount: string;
   fee: string;
 }
+
+type JupiterSwapInfo = {
+  label?: string;
+  inputMint?: string;
+  outputMint?: string;
+  inAmount?: string;
+  outAmount?: string;
+  fee?: string;
+  feeAmount?: string;
+};
 
 interface RouteInfo {
   type: "Direct" | "Aggregator" | "RFQ" | "Bundle";
@@ -40,10 +61,52 @@ interface RouteOption {
   badge?: "Best Price" | "Fastest" | "Lowest Gas";
 }
 
+type RouteComparisonSummary = {
+  swapbackOutput: number;
+  jupiterOutput: number;
+  difference: number;
+  percentDifference?: number;
+  recommendedRouter: "swapback" | "jupiter";
+  hasEconomics: boolean;
+};
+
+const inferRouterFromRouteName = (name: string): "swapback" | "jupiter" | "other" => {
+  const normalized = name.toLowerCase();
+  if (normalized.includes("swapback")) {
+    return "swapback";
+  }
+  if (normalized.includes("jupiter")) {
+    return "jupiter";
+  }
+  return "other";
+};
+
+const CLASSIC_COMPARISON_SOURCE = "classic-route-card";
+
 export const SwapInterface = () => {
   const { connected, publicKey } = useWallet();
   const { connection } = useConnection();
   const wallet = useWallet();
+  const walletAddress = publicKey?.toBase58() ?? null;
+  const lastWalletRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    trackPageView(
+      "classic-swap",
+      typeof document !== "undefined" ? document.referrer || undefined : undefined
+    );
+  }, []);
+
+  useEffect(() => {
+    const previous = lastWalletRef.current;
+    if (walletAddress && walletAddress !== previous) {
+      trackWalletConnect(walletAddress);
+    }
+    if (!walletAddress && previous) {
+      trackWalletDisconnect();
+    }
+    lastWalletRef.current = walletAddress;
+  }, [walletAddress]);
 
   const [inputAmount, setInputAmount] = useState("");
   const [outputAmount, setOutputAmount] = useState("");
@@ -63,6 +126,46 @@ export const SwapInterface = () => {
   const [showRouteComparison, setShowRouteComparison] = useState(false);
   const [showPriceImpactModal, setShowPriceImpactModal] = useState(false);
   const [buybackDeposit, setBuybackDeposit] = useState<BuybackDepositResult | null>(null);
+
+  const routeComparisonSummary = useMemo<RouteComparisonSummary | null>(() => {
+    if (!routeOptions.length) {
+      return null;
+    }
+
+    const swapbackRoute = routeOptions.find(
+      (option) => inferRouterFromRouteName(option.name) === "swapback"
+    );
+    const jupiterRoute = routeOptions.find(
+      (option) => inferRouterFromRouteName(option.name) === "jupiter"
+    );
+
+    if (!swapbackRoute && !jupiterRoute) {
+      return null;
+    }
+
+    const swapbackOutput = swapbackRoute?.output ?? 0;
+    const jupiterOutput = jupiterRoute?.output ?? 0;
+    const difference = swapbackOutput - jupiterOutput;
+    const percentDifference = jupiterOutput !== 0 ? (difference / jupiterOutput) * 100 : undefined;
+    const recommendedRouter =
+      swapbackRoute && jupiterRoute
+        ? swapbackRoute.output >= jupiterRoute.output
+          ? "swapback"
+          : "jupiter"
+        : swapbackRoute
+        ? "swapback"
+        : "jupiter";
+    const hasEconomics = Boolean(swapbackRoute?.rebate && swapbackRoute.rebate > 0);
+
+    return {
+      swapbackOutput,
+      jupiterOutput,
+      difference,
+      percentDifference,
+      recommendedRouter,
+      hasEconomics,
+    };
+  }, [routeOptions]);
 
   // Token addresses mapping - stable reference
   const tokenAddresses = useMemo(() => ({
@@ -101,6 +204,20 @@ export const SwapInterface = () => {
 
   const inputTokenData = useTokenData(inputMintAddress);
   const outputTokenData = useTokenData(outputMintAddress);
+
+  const getTokenDecimals = (symbol: string): number => {
+    if (symbol === "SOL" || symbol === "mSOL") {
+      return 9;
+    }
+    return 6;
+  };
+
+  const toBaseUnits = (amount: number, decimals: number): number => {
+    if (!Number.isFinite(amount)) {
+      return 0;
+    }
+    return Math.round(amount * Math.pow(10, decimals));
+  };
   
   // Debug: log balance changes
   useEffect(() => {
@@ -109,12 +226,29 @@ export const SwapInterface = () => {
 
   // Fetch real quote from Jupiter API
   const fetchRealQuote = useCallback(async () => {
-    if (!inputAmount || inputAmount === "" || parseFloat(inputAmount) <= 0) {
+    const amountValue = parseFloat(inputAmount);
+    if (!inputAmount || inputAmount === "" || !Number.isFinite(amountValue) || amountValue <= 0) {
       setOutputAmount("");
       setRouteInfo(null);
       setRouteOptions([]);
       return;
     }
+
+    const fetchSource = "classic-auto";
+    const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+
+    trackRouteRequest({
+      inputToken,
+      outputToken,
+      inputAmount: amountValue,
+      walletConnected: Boolean(walletAddress),
+      routerPreference: selectedRouter,
+      mevProtection: false,
+      priorityLevel: "medium",
+      routingStrategy: "classic-ui",
+      executionChannel: "public",
+      source: fetchSource,
+    });
 
     console.log("🚀 [REAL DATA] Fetching real quote from Jupiter API...");
     setLoading(true);
@@ -131,9 +265,9 @@ export const SwapInterface = () => {
                        outputToken; // For custom tokens
 
       // Convert amount to lamports/smallest unit
-      const amountInLamports = inputToken === "SOL" ? parseFloat(inputAmount) * 1e9 :
-                              inputToken === "USDC" || inputToken === "USDT" ? parseFloat(inputAmount) * 1e6 :
-                              parseFloat(inputAmount); // Assume 1e6 for other tokens
+      const amountInLamports = inputToken === "SOL" ? amountValue * 1e9 :
+              inputToken === "USDC" || inputToken === "USDT" ? amountValue * 1e6 :
+              amountValue; // Assume 1e6 for other tokens
 
       console.log("📊 Request params:", { inputToken, outputToken, inputAmount, amountInLamports });
 
@@ -163,7 +297,22 @@ export const SwapInterface = () => {
 
       if (data.success && data.quote) {
         const quote = data.quote;
-        // const routeInfo = data.routeInfo; // Not used for now
+        const routePlan = Array.isArray(quote.routePlan) ? quote.routePlan : [];
+        const normalizedRouteSteps: RouteStep[] = routePlan
+          .map((step: { swapInfo?: JupiterSwapInfo }) => step?.swapInfo)
+          .filter((swapInfo): swapInfo is JupiterSwapInfo => Boolean(swapInfo))
+          .map((swapInfo) => ({
+            label: swapInfo.label ?? "Venue",
+            inputMint: swapInfo.inputMint ?? "",
+            outputMint: swapInfo.outputMint ?? "",
+            inAmount: swapInfo.inAmount ?? "0",
+            outAmount: swapInfo.outAmount ?? "0",
+            fee: swapInfo.fee ?? swapInfo.feeAmount ?? "0",
+          }));
+        const routeVenues = normalizedRouteSteps.map((step) => step.label);
+        const priceImpactRaw = typeof quote.priceImpactPct === "string"
+          ? parseFloat(quote.priceImpactPct)
+          : quote.priceImpactPct ?? 0;
 
         // Set output amount
         const outputAmountValue = parseFloat(quote.outAmount) /
@@ -181,7 +330,8 @@ export const SwapInterface = () => {
           rebate: outputAmountValue * 0.0015, // 0.15% rebate
           burn: outputAmountValue * 0.0005, // 0.05% burn
           fees: outputAmountValue * 0.001, // 0.1% fees
-          priceImpact: parseFloat(quote.priceImpactPct) * 100,
+          priceImpact: priceImpactRaw * 100,
+          route: normalizedRouteSteps,
         });
 
         // Generate route options based on real quote
@@ -222,14 +372,52 @@ export const SwapInterface = () => {
         const change24h = (Math.random() - 0.5) * 10;
         setPriceChange24h(change24h);
 
+        const finishedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+        trackRouteResult({
+          inputToken,
+          outputToken,
+          inputAmount: amountValue,
+          routerUsed: selectedRouter,
+          bestVenue: routeVenues[0] ?? null,
+          priceImpactPct: priceImpactRaw,
+          nativeProvider: data.nativeRoute?.provider ?? null,
+          nativeShareTokens: data.nativeRoute?.npiShareTokens ?? null,
+          usedFallback: data.usedMultiSourceFallback ?? false,
+          routePlanLength: routePlan.length,
+          quoteSources: Array.isArray(data.multiSourceQuotes) ? data.multiSourceQuotes.length : undefined,
+          mevRisk: priceImpactRaw > 3 ? "high" : priceImpactRaw > 1 ? "medium" : "low",
+          routeVenues,
+          source: fetchSource,
+          latencyMs: finishedAt - startedAt,
+          success: true,
+        });
+
       } else {
         console.error("❌ Invalid response structure:", data);
         throw new Error(data.error || 'Failed to get quote');
       }
     } catch (error) {
       console.error("❌ Error fetching real quote:", error);
+      const finishedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+      const normalizedError = error instanceof Error ? error : new Error(String(error));
+      trackRouteResult({
+        inputToken,
+        outputToken,
+        inputAmount: amountValue,
+        routerUsed: selectedRouter,
+        source: fetchSource,
+        latencyMs: finishedAt - startedAt,
+        success: false,
+        errorMessage: normalizedError.message,
+      });
+      trackError(normalizedError, {
+        stage: "classic-route-fetch",
+        source: fetchSource,
+        inputToken,
+        outputToken,
+      });
       // Show error to user
-      toast.error(`Impossible d'obtenir un prix réel: ${error instanceof Error ? error.message : 'Erreur réseau'}`);
+      toast.error(`Impossible d'obtenir un prix réel: ${normalizedError.message}`);
       // Fallback to mock data if API fails
       console.log("🔄 Falling back to mock data due to API error");
       
@@ -249,7 +437,7 @@ export const SwapInterface = () => {
     } finally {
       setLoading(false);
     }
-  }, [inputAmount, inputToken, outputToken]);
+  }, [inputAmount, inputToken, outputToken, selectedRouter, walletAddress]);
 
 
   // Simulate price calculation with debounce
@@ -275,6 +463,72 @@ export const SwapInterface = () => {
     setOutputToken(tempToken);
     setInputAmount(outputAmount);
     setOutputAmount(tempAmount);
+  };
+
+  const handleRouterSelection = (
+    router: "swapback" | "jupiter",
+    source: string
+  ) => {
+    if (router === selectedRouter) {
+      return;
+    }
+
+    trackRouterSelection({
+      router,
+      previousRouter: selectedRouter,
+      source,
+      priceImpactPct: routeInfo?.priceImpact,
+      nativeProvider: routeInfo?.route?.[0]?.label ?? null,
+      economicsAvailable: Boolean((routeInfo?.rebate ?? 0) > 0 || (routeInfo?.npi ?? 0) > 0),
+    });
+
+    setSelectedRouter(router);
+  };
+
+  const handleToggleRouteComparison = () => {
+    if (!showRouteComparison && routeComparisonSummary) {
+      trackRouterComparisonViewed({
+        currentRouter: selectedRouter,
+        recommendedRouter: routeComparisonSummary.recommendedRouter,
+        inputToken,
+        outputToken,
+        inputAmount: parseFloat(inputAmount) || 0,
+        swapbackOutput: routeComparisonSummary.swapbackOutput,
+        jupiterOutput: routeComparisonSummary.jupiterOutput,
+        difference: routeComparisonSummary.difference,
+        percentDifference: routeComparisonSummary.percentDifference,
+        hasEconomics: routeComparisonSummary.hasEconomics,
+        priceImpact: routeInfo?.priceImpact,
+        source: CLASSIC_COMPARISON_SOURCE,
+      });
+    }
+
+    setShowRouteComparison((prev) => !prev);
+  };
+
+  const handleRouteOptionClick = (route: RouteOption) => {
+    if (!routeComparisonSummary) {
+      return;
+    }
+
+    const routeRouter = inferRouterFromRouteName(route.name);
+
+    trackRouterComparisonAction({
+      currentRouter: selectedRouter,
+      recommendedRouter: routeComparisonSummary.recommendedRouter,
+      selectedRouter: routeRouter === "other" ? selectedRouter : routeRouter,
+      actionSource: "card",
+      inputToken,
+      outputToken,
+      inputAmount: parseFloat(inputAmount) || 0,
+      swapbackOutput: routeComparisonSummary.swapbackOutput,
+      jupiterOutput: routeComparisonSummary.jupiterOutput,
+      difference: routeComparisonSummary.difference,
+      percentDifference: routeComparisonSummary.percentDifference,
+      hasEconomics: routeComparisonSummary.hasEconomics,
+      priceImpact: routeInfo?.priceImpact,
+      source: CLASSIC_COMPARISON_SOURCE,
+    });
   };
 
   const setMaxBalance = () => {
@@ -304,59 +558,98 @@ export const SwapInterface = () => {
   const executeSwap = async () => {
     setLoading(true);
     setBuybackDeposit(null); // Reset previous result
-    
+
+    const inputDecimals = getTokenDecimals(inputToken);
+    const outputDecimals = getTokenDecimals(outputToken);
+    const parsedInputAmount = parseFloat(inputAmount) || 0;
+    const parsedOutputAmount = parseFloat(outputAmount) || 0;
+    const inputAmountBase = toBaseUnits(parsedInputAmount, inputDecimals);
+    const outputAmountBase = toBaseUnits(parsedOutputAmount, outputDecimals);
+    const swapFee = Math.round(inputAmountBase * 0.003);
+    const slippageBps = Math.max(1, Math.round(slippage * 100));
+    const routeVenues = routeInfo?.route?.map((step) => step.label) ?? [];
+    const priceImpactBps =
+      routeInfo?.priceImpact !== undefined ? Math.round(routeInfo.priceImpact * 100) : undefined;
+
+    const emitSwapAnalytics = (success: boolean, opts?: { errorMessage?: string; buyback?: number }) => {
+      trackSwap({
+        inputToken,
+        outputToken,
+        inputAmount: inputAmountBase,
+        outputAmount: outputAmountBase,
+        fee: swapFee,
+        route: selectedRouter,
+        buybackDeposit: opts?.buyback ?? buybackDeposit?.amount ?? 0,
+        walletAddress,
+        router: selectedRouter,
+        swapMethod: "legacy",
+        priceImpactBps,
+        mevProtection: false,
+        savingsUsd:
+          routeInfo && outputTokenData.usdPrice
+            ? routeInfo.rebate * outputTokenData.usdPrice
+            : undefined,
+        routeVenues,
+        inputDecimals,
+        outputDecimals,
+        slippageBps,
+        executionChannel: "public",
+        priorityLevel: "medium",
+        success,
+        errorMessage: opts?.errorMessage,
+      });
+    };
+
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Simulate swap fee calculation (0.3% of input amount)
-      const swapFee = parseFloat(inputAmount) * 0.003 * 1e6; // Convert to lamports
-      
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
       // Try to deposit 25% of fees to buyback vault (non-blocking)
       if (connection && wallet && swapFee > 0) {
         try {
           const depositResult = await depositToBuybackVault(connection, wallet, swapFee);
           setBuybackDeposit(depositResult);
-          
+
           if (!depositResult.skipped) {
             toast.success(
               `🔥 Buyback: ${(depositResult.amount / 1e6).toFixed(2)} USDC deposited!`,
               { duration: 5000 }
             );
           }
+
+          emitSwapAnalytics(true, { buyback: depositResult.amount });
         } catch (error) {
-          console.warn('Buyback deposit error (non-blocking):', error);
+          console.warn("Buyback deposit error (non-blocking):", error);
+          const fallbackAmount = Math.floor(swapFee * 0.25);
           setBuybackDeposit({
             skipped: true,
-            amount: Math.floor(swapFee * 0.25),
-            reason: 'Failed to execute deposit',
+            amount: fallbackAmount,
+            reason: "Failed to execute deposit",
           });
+          emitSwapAnalytics(true, { buyback: fallbackAmount });
         }
+      } else {
+        emitSwapAnalytics(true);
       }
-      
+
       toast.success(
         `✅ Swap successful!\n${inputAmount} ${inputToken} → ${outputAmount} ${outputToken}`,
         { duration: 4000 }
       );
 
-      // Track swap analytics
-      trackSwap({
-        inputToken,
-        outputToken,
-        inputAmount: parseFloat(inputAmount) * 1e6,
-        outputAmount: parseFloat(outputAmount) * 1e6,
-        fee: swapFee,
-        route: selectedRouter,
-        buybackDeposit: buybackDeposit?.amount || 0,
-        walletAddress: wallet.publicKey?.toString(),
-      });
-      
       setInputAmount("");
       setOutputAmount("");
       setRouteInfo(null);
       setShowPriceImpactModal(false);
     } catch (error) {
       console.error("Error:", error);
-      toast.error('❌ Swap failed');
+      const normalizedError = error instanceof Error ? error : new Error(String(error));
+      toast.error("❌ Swap failed");
+      emitSwapAnalytics(false, { errorMessage: normalizedError.message });
+      trackError(normalizedError, {
+        stage: "classic-swap-execution",
+        router: selectedRouter,
+        routeVenues,
+      });
     } finally {
       setLoading(false);
     }
@@ -389,7 +682,7 @@ export const SwapInterface = () => {
           {/* Router Tabs - Style moderne comme Uniswap */}
           <div className="flex gap-2 p-1.5 bg-black/60 backdrop-blur-sm border-2 border-[var(--primary)]/20 rounded">
             <button
-              onClick={() => setSelectedRouter("swapback")}
+              onClick={() => handleRouterSelection("swapback", "classic-toggle")}
               className={`flex-1 py-3 px-4 font-bold terminal-text uppercase tracking-wider transition-all border-2 rounded ${
                 selectedRouter === "swapback"
                   ? "bg-[var(--primary)] border-[var(--primary)] text-black hover:bg-[var(--primary-hover)]"
@@ -402,7 +695,7 @@ export const SwapInterface = () => {
               </div>
             </button>
             <button
-              onClick={() => setSelectedRouter("jupiter")}
+              onClick={() => handleRouterSelection("jupiter", "classic-toggle")}
               className={`flex-1 py-3 px-4 font-bold terminal-text uppercase tracking-wider transition-all border-2 rounded ${
                 selectedRouter === "jupiter"
                   ? "bg-[var(--secondary)] border-[var(--secondary)] text-black hover:opacity-90"
@@ -645,7 +938,7 @@ export const SwapInterface = () => {
           {routeOptions.length > 0 && (
             <div className="mt-3 space-y-2">
               <button
-                onClick={() => setShowRouteComparison(!showRouteComparison)}
+                onClick={handleToggleRouteComparison}
                 className="w-full flex items-center justify-between p-3 bg-black/40 border-2 border-[var(--secondary)]/20 hover:border-[var(--secondary)]/40 transition-all"
               >
                 <div className="flex items-center gap-2">
@@ -662,6 +955,7 @@ export const SwapInterface = () => {
                   {routeOptions.map((route, index) => (
                     <div 
                       key={index} 
+                      onClick={() => handleRouteOptionClick(route)}
                       className="p-3 bg-black/40 border-2 border-[var(--primary)]/20 hover:border-[var(--primary)]/40 transition-all cursor-pointer group"
                     >
                       <div className="flex items-start justify-between mb-2">

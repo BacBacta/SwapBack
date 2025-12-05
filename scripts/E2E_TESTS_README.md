@@ -126,7 +126,7 @@ export SWAP_AMOUNT=0.01
 ### Program IDs (Devnet)
 
 ```javascript
-BUYBACK_PROGRAM_ID = 'F8S1r81FXZ9wJkbQwp3ZfVfjmwx12f5NpfN4xrA3pump'
+BUYBACK_PROGRAM_ID = '4cyYvpjwERF67UDpd5euYzZ6xZ5tcDL6XrByBaZbVVjK'
 CNFT_PROGRAM_ID = '9MjuF4Vjxr6sYB2kFpjdwqyMcKgcAvkz7mQEaG2bvQRN'
 ```
 

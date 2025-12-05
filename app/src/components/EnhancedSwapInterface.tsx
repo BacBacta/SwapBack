@@ -13,10 +13,11 @@ import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useSwapStore } from "@/store/swapStore";
 import { useSwapWebSocket } from "@/hooks/useSwapWebSocket";
 import { useHaptic } from "@/hooks/useHaptic";
-import { useSwapRouter, DerivedSwapAccounts } from "@/hooks/useSwapRouter";
+import { useSwapRouter, DerivedSwapAccounts, type SwapRequest } from "@/hooks/useSwapRouter";
 import { ORCA_WHIRLPOOL_PROGRAM_ID } from "@/sdk/config/orca-pools";
 import { RAYDIUM_AMM_PROGRAM_ID } from "@/sdk/config/raydium-pools";
 import { getExplorerUrl } from "@/config/constants";
+import { useInstrumentedFetchRoutes } from "@/hooks/useInstrumentedFetchRoutes";
 import dynamic from "next/dynamic";
 import { ClockIcon, ExclamationTriangleIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import { motion, AnimatePresence } from "framer-motion";
@@ -40,6 +41,18 @@ import { RouteIntentsList } from "@/components/RouteIntentsList";
 import type { RoutingStrategy } from "@/lib/routing/hybridRouting";
 import { debounce } from "lodash";
 import { ClientOnlyConnectionStatus } from "./ClientOnlyConnectionStatus";
+import { buildNativeRouteInsights, formatTokenAmount as formatNativeTokenAmount, lamportsToTokens } from "@/lib/routing/nativeRouteInsights";
+import { NativeRouteCard } from "@/components/NativeRouteCard";
+import {
+  trackRouteRequest,
+  trackRouteResult,
+  trackRouterSelection,
+  trackSwapPreview,
+  trackSwap,
+  trackError,
+  trackPageView,
+  trackRouterComparisonViewed,
+} from "@/lib/analytics";
 
 const SwapPreviewModal = dynamic(() => import("./SwapPreviewModal").then((mod) => ({ default: mod.SwapPreviewModal })), {
   ssr: false,
@@ -50,15 +63,9 @@ const LoadingProgress = dynamic(() => import("./LoadingProgress").then((mod) => 
 const RecentSwapsSidebar = dynamic(() => import("./RecentSwapsSidebar").then((mod) => ({ default: mod.RecentSwapsSidebar })), {
   ssr: false,
 });
-
-interface RouteStep {
-  label: string;
-  inputMint: string;
-  outputMint: string;
-  inAmount: string;
-  outAmount: string;
-  fee: string;
-}
+const RouterComparisonModal = dynamic(() => import("./RouterComparisonModal").then((mod) => ({ default: mod.RouterComparisonModal })), {
+  ssr: false,
+});
 
 type JupiterRoutePlanStep = {
   swapInfo?: {
@@ -240,6 +247,7 @@ export function EnhancedSwapInterface() {
   const { connection } = useConnection();
   const { swapWithRouter, swapWithRouterVersioned, executeJupiterSwap } = useSwapRouter();
   const haptic = useHaptic();
+  const walletAddress = publicKey?.toBase58() ?? null;
 
   // Store
   const {
@@ -285,6 +293,7 @@ export function EnhancedSwapInterface() {
   const [loadingStep, setLoadingStep] = useState<'fetching' | 'routing' | 'building' | 'signing' | 'confirming'>('fetching');
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [showRecentSwaps, setShowRecentSwaps] = useState(false);
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
   const [recentSwaps, setRecentSwaps] = useState<Array<{
     id: string;
     fromToken: string;
@@ -305,28 +314,40 @@ export function EnhancedSwapInterface() {
   const [errorType, setErrorType] = useState<ErrorType | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const instrumentedFetchRoutes = useInstrumentedFetchRoutes({
+    swap,
+    routingStrategy,
+    selectedRouter,
+    walletAddress,
+    fetchRoutes,
+  });
+
+  useEffect(() => {
+    trackPageView("enhanced-swap", typeof document !== "undefined" ? document.referrer || undefined : undefined);
+  }, []);
+
   // ✅ Reset routes when router changes
   useEffect(() => {
     clearRoutes();
     setHasSearchedRoute(false);
     if (swap.inputToken && swap.outputToken && parseFloat(swap.inputAmount) > 0) {
-      fetchRoutes({ userPublicKey: publicKey?.toBase58() ?? null }).catch((err) => {
+      instrumentedFetchRoutes("router-change").catch((err) => {
         console.debug('[Router change] Auto-fetch failed:', err);
       });
     }
-  }, [selectedRouter, clearRoutes, fetchRoutes, swap.inputToken, swap.outputToken, swap.inputAmount, publicKey]);
+  }, [selectedRouter, clearRoutes, instrumentedFetchRoutes, swap.inputToken, swap.outputToken, swap.inputAmount]);
 
   // ✅ AUTO-FETCH activé avec debounce pour éviter trop d'appels API
   const debouncedFetchRoutes = useCallback(
     debounce((inputToken: typeof swap.inputToken, outputToken: typeof swap.outputToken, inputAmount: string) => {
       const amount = parseFloat(inputAmount);
       if (inputToken && outputToken && amount > 0) {
-        fetchRoutes({ userPublicKey: publicKey?.toBase58() ?? null }).catch((err) => {
+        instrumentedFetchRoutes("input-change").catch((err) => {
           console.debug('[Auto-fetch] Failed:', err);
         });
       }
     }, 800),
-    [fetchRoutes, publicKey]
+    [instrumentedFetchRoutes]
   );
 
   // Fetch routes when inputs change
@@ -365,8 +386,7 @@ export function EnhancedSwapInterface() {
         if (prev <= 1) {
           // Auto-refresh route
           if (swap.inputToken && swap.outputToken && parseFloat(swap.inputAmount) > 0) {
-            fetchRoutes({ userPublicKey: publicKey?.toBase58() ?? null }).catch((err) => {
-              // Silent catch for auto-refresh - errors handled in UI via routes state
+            instrumentedFetchRoutes("auto-refresh").catch((err) => {
               console.debug('[Auto-refresh] Route fetch failed:', err);
             });
           }
@@ -377,7 +397,7 @@ export function EnhancedSwapInterface() {
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [hasSearchedRoute, routes.isLoading, swap.inputToken, swap.outputToken, swap.inputAmount, publicKey, fetchRoutes]);
+  }, [hasSearchedRoute, routes.isLoading, swap.inputToken, swap.outputToken, swap.inputAmount, instrumentedFetchRoutes]);
 
   // Handlers
   const handleInputChange = (value: string) => {
@@ -441,7 +461,7 @@ export function EnhancedSwapInterface() {
   const handleRoutingStrategyChange = (strategy: RoutingStrategy) => {
     setRoutingStrategy(strategy);
     if (swap.inputToken && swap.outputToken && parseFloat(swap.inputAmount) > 0) {
-      fetchRoutes({ userPublicKey: publicKey?.toBase58() ?? null }).catch((err) =>
+      instrumentedFetchRoutes("strategy-change").catch((err) =>
         console.debug("[Routing strategy] fetch failed", err)
       );
     }
@@ -794,10 +814,16 @@ export function EnhancedSwapInterface() {
       try {
         setLoadingProgress(30);
         setLoadingStep('routing');
-        await fetchRoutes({ userPublicKey: publicKey?.toBase58() ?? null });
-        setLoadingProgress(100);
-        setHasSearchedRoute(true);
-        setPriceRefreshCountdown(10);
+        const success = await instrumentedFetchRoutes("manual");
+        if (success) {
+          setLoadingProgress(100);
+          setHasSearchedRoute(true);
+          setPriceRefreshCountdown(10);
+        } else {
+          setRouteError("No route found. Try adjusting the amount or selecting different tokens.");
+          setHasSearchedRoute(false);
+          setLoadingProgress(0);
+        }
       } catch (error) {
         setRouteError("No route found. Try adjusting the amount or selecting different tokens.");
         setHasSearchedRoute(false);
@@ -812,6 +838,18 @@ export function EnhancedSwapInterface() {
   const handleExecuteSwap = async () => {
     // Show preview modal first
     if (!showPreviewModal) {
+      if (swap.inputToken && swap.outputToken) {
+        trackSwapPreview({
+          router: selectedRouter,
+          inputToken: swap.inputToken.symbol,
+          outputToken: swap.outputToken.symbol,
+          inputAmount: parseFloat(swap.inputAmount) || 0,
+          outputAmount: parseFloat(swap.outputAmount) || 0,
+          nativeMode: shouldAttemptNativeExecution,
+          provider: nativeProviderLabel,
+          priceImpactPct: priceImpact,
+        });
+      }
       setShowPreviewModal(true);
       return;
     }
@@ -835,6 +873,24 @@ export function EnhancedSwapInterface() {
       return;
     }
     
+    let useNativeExecution = shouldAttemptNativeExecution;
+    let nativeAccountsBuilderFactory: ((params: { derived: DerivedSwapAccounts }) => AccountMeta[]) | null = null;
+
+    if (useNativeExecution) {
+      try {
+        console.log(
+          `⚙️ [NativeExecution] Provider ${nativeProviderLabel ?? "SwapBack"} sélectionné (raison: ${nativeExecutionDecision.reason}).`
+        );
+        nativeAccountsBuilderFactory = await createRemainingAccountsBuilder();
+      } catch (builderError) {
+        console.warn(
+          "⚠️ [NativeExecution] Impossible de préparer les comptes natifs, bascule sur Jupiter CPI",
+          builderError
+        );
+        useNativeExecution = false;
+      }
+    }
+    
     // Check if mock mode - can't execute real swaps
     if (routes.isMock) {
       setSwapError("Mode simulation actif (devnet). Les swaps réels ne sont pas disponibles. Connectez-vous au mainnet pour exécuter des swaps.");
@@ -847,10 +903,10 @@ export function EnhancedSwapInterface() {
       if (publicKey) {
         console.log("🔄 Re-fetching routes with wallet for swap instructions...");
         setSwapError(null);
-        await fetchRoutes({ userPublicKey: publicKey.toBase58() });
+        const success = await instrumentedFetchRoutes("swap-fallback");
         // Récupérer les nouvelles routes après le fetch
         const updatedRoutes = useSwapStore.getState().routes;
-        if (!updatedRoutes.jupiterCpi || !updatedRoutes.jupiterCpi.swapInstruction) {
+        if (!success || !updatedRoutes.jupiterCpi || !updatedRoutes.jupiterCpi.swapInstruction) {
           setSwapError("Impossible d'obtenir les instructions de swap. Veuillez réessayer.");
           return;
         }
@@ -946,94 +1002,120 @@ export function EnhancedSwapInterface() {
     };
     setRecentSwaps(prev => [tempSwap, ...prev]);
 
+    let signature: string | null = null;
+    let swapMethod: 'native' | 'versioned' | 'legacy' | 'jupiter-direct' = 'versioned';
+
     try {
       setLoadingProgress(40);
       setLoadingStep('signing');
 
-      let signature: string | null = null;
-      let swapMethod: 'versioned' | 'legacy' | 'jupiter-direct' = 'versioned';
+      const buildNativeRemainingAccounts = nativeAccountsBuilderFactory
+        ? async ({ derived }: { derived: DerivedSwapAccounts; request: SwapRequest }) =>
+            nativeAccountsBuilderFactory({ derived })
+        : null;
 
-      // If we can't use Router CPI (no instructionData), go directly to Jupiter
-      if (!canUseRouterCpi || !jupiterRoutePayload) {
-        console.log('📦 Router CPI not available, using Jupiter direct...');
-        if (routes.jupiterCpi?.swapInstruction) {
-          signature = await executeJupiterSwap(
-            routes.jupiterCpi.swapInstruction,
-            {
-              lastValidBlockHeight: routes.jupiterCpi.lastValidBlockHeight,
-              skipPreflight: false,
-            }
-          );
-          swapMethod = 'jupiter-direct';
-          toast.info('Swap exécuté via Jupiter direct (rebates différées)');
-        } else {
-          throw new Error('No Jupiter swap instruction available');
-        }
-      } else {
-        // Strategy: Try versioned (ALT) first → Legacy → Jupiter direct
+      if (useNativeExecution && nativeAccountsBuilderFactory && buildNativeRemainingAccounts) {
         try {
-          // 1. First try with Versioned Transaction + ALT (optimal)
-          console.log('🚀 Trying swap with Versioned Transaction + ALT...');
+          console.log('🛠️ Attempting native on-chain execution via router');
           signature = await swapWithRouterVersioned({
             tokenIn: new PublicKey(swap.inputToken.mint),
             tokenOut: new PublicKey(swap.outputToken.mint),
             amountIn: amountInLamports,
             minOut: minOutLamports,
             slippageBps,
-            remainingAccounts: staticRemainingAccounts ?? undefined,
-            jupiterRoute: {
-              ...jupiterRoutePayload,
-              addressTableLookups: routes.jupiterCpi?.addressTableLookups,
-            },
+            buildRemainingAccounts: buildNativeRemainingAccounts ?? undefined,
+            jupiterRoute: null,
           });
-          swapMethod = 'versioned';
-        } catch (versionedError) {
-          const errorMsg = versionedError instanceof Error ? versionedError.message : '';
-          console.warn('⚠️ Versioned swap failed:', errorMsg);
-          
-          // 2. If ALT not available or still too large, try legacy
-          if (errorMsg.includes('ALT') || errorMsg.includes('not set')) {
-            console.log('📦 ALT not available, trying legacy transaction...');
-            try {
-              signature = await swapWithRouter({
-                tokenIn: new PublicKey(swap.inputToken.mint),
-                tokenOut: new PublicKey(swap.outputToken.mint),
-                amountIn: amountInLamports,
-                minOut: minOutLamports,
-                slippageBps,
-                remainingAccounts: staticRemainingAccounts ?? undefined,
-                jupiterRoute: jupiterRoutePayload,
-              });
-              swapMethod = 'legacy';
-            } catch (legacyError) {
-              const legacyMsg = legacyError instanceof Error ? legacyError.message : '';
-              if (legacyMsg.includes('Transaction too large') || legacyMsg.includes('1232')) {
-                // Fall through to Jupiter direct
+          swapMethod = 'native';
+        } catch (nativeError) {
+          console.warn('⚠️ Native execution failed, enabling Jupiter CPI fallback', nativeError);
+          signature = null;
+        }
+      }
+
+      if (!signature) {
+        // If we can't use Router CPI (no instructionData), go directly to Jupiter
+        if (!canUseRouterCpi || !jupiterRoutePayload) {
+          console.log('📦 Router CPI not available, using Jupiter direct...');
+          if (routes.jupiterCpi?.swapInstruction) {
+            signature = await executeJupiterSwap(
+              routes.jupiterCpi.swapInstruction,
+              {
+                lastValidBlockHeight: routes.jupiterCpi.lastValidBlockHeight,
+                skipPreflight: false,
+              }
+            );
+            swapMethod = 'jupiter-direct';
+            toast.info('Swap exécuté via Jupiter direct (rebates différées)');
+          } else {
+            throw new Error('No Jupiter swap instruction available');
+          }
+        } else {
+          // Strategy: Try versioned (ALT) first → Legacy → Jupiter direct
+          try {
+            // 1. First try with Versioned Transaction + ALT (optimal)
+            console.log('🚀 Trying swap with Versioned Transaction + ALT...');
+            signature = await swapWithRouterVersioned({
+              tokenIn: new PublicKey(swap.inputToken.mint),
+              tokenOut: new PublicKey(swap.outputToken.mint),
+              amountIn: amountInLamports,
+              minOut: minOutLamports,
+              slippageBps,
+              remainingAccounts: staticRemainingAccounts ?? undefined,
+              jupiterRoute: {
+                ...jupiterRoutePayload,
+                addressTableLookups: routes.jupiterCpi?.addressTableLookups,
+              },
+            });
+            swapMethod = 'versioned';
+          } catch (versionedError) {
+            const errorMsg = versionedError instanceof Error ? versionedError.message : '';
+            console.warn('⚠️ Versioned swap failed:', errorMsg);
+            
+            // 2. If ALT not available or still too large, try legacy
+            if (errorMsg.includes('ALT') || errorMsg.includes('not set')) {
+              console.log('📦 ALT not available, trying legacy transaction...');
+              try {
+                signature = await swapWithRouter({
+                  tokenIn: new PublicKey(swap.inputToken.mint),
+                  tokenOut: new PublicKey(swap.outputToken.mint),
+                  amountIn: amountInLamports,
+                  minOut: minOutLamports,
+                  slippageBps,
+                  remainingAccounts: staticRemainingAccounts ?? undefined,
+                  jupiterRoute: jupiterRoutePayload,
+                });
+                swapMethod = 'legacy';
+              } catch (legacyError) {
+                const legacyMsg = legacyError instanceof Error ? legacyError.message : '';
+                if (legacyMsg.includes('Transaction too large') || legacyMsg.includes('1232')) {
+                  // Fall through to Jupiter direct
+                  throw legacyError;
+                }
                 throw legacyError;
               }
-              throw legacyError;
-            }
-          } else if (errorMsg.includes('Transaction too large') || errorMsg.includes('1232')) {
-            // 3. Last resort: Jupiter direct (no router rebates)
-            console.log('📦 Transaction still too large, using Jupiter direct...');
-            if (routes.jupiterCpi?.swapInstruction) {
-              signature = await executeJupiterSwap(
-                routes.jupiterCpi.swapInstruction,
-                {
-                  lastValidBlockHeight: routes.jupiterCpi.lastValidBlockHeight,
-                  skipPreflight: false,
-                }
-              );
-              swapMethod = 'jupiter-direct';
-              toast.info('Swap exécuté via Jupiter direct (rebates différées)');
+            } else if (errorMsg.includes('Transaction too large') || errorMsg.includes('1232')) {
+              // 3. Last resort: Jupiter direct (no router rebates)
+              console.log('📦 Transaction still too large, using Jupiter direct...');
+              if (routes.jupiterCpi?.swapInstruction) {
+                signature = await executeJupiterSwap(
+                  routes.jupiterCpi.swapInstruction,
+                  {
+                    lastValidBlockHeight: routes.jupiterCpi.lastValidBlockHeight,
+                    skipPreflight: false,
+                  }
+                );
+                swapMethod = 'jupiter-direct';
+                toast.info('Swap exécuté via Jupiter direct (rebates différées)');
+              } else {
+                throw new Error('No Jupiter swap instruction available');
+              }
             } else {
-              throw new Error('No Jupiter swap instruction available');
+              throw versionedError;
             }
-          } else {
-            throw versionedError;
           }
         }
-      } // End of canUseRouterCpi else block
+      }
 
       setLoadingProgress(70);
       setLoadingStep('confirming');
@@ -1072,15 +1154,47 @@ export function EnhancedSwapInterface() {
             ? { ...s, status: 'success' as const, txSignature: signature }
             : s
         ));
+
+        if (swap.inputToken && swap.outputToken) {
+          const buybackDepositLamports = routes.npiOpportunity?.shareLamports
+            ? Number(routes.npiOpportunity.shareLamports)
+            : 0;
+
+          trackSwap({
+            inputToken: swap.inputToken.symbol,
+            outputToken: swap.outputToken.symbol,
+            inputAmount: Number(amountInLamports.toString()),
+            outputAmount: Number(expectedOutLamports.toString()),
+            fee: 0,
+            route: selectedRouter,
+            buybackDeposit: buybackDepositLamports,
+            walletAddress,
+            router: selectedRouter,
+            swapMethod,
+            nativeProvider: nativeProviderLabel,
+            usedFallback: routes.usedMultiSourceFallback,
+            priceImpactBps: Math.round(priceImpact * 100),
+            mevProtection: swap.useMEVProtection,
+            routeVenues: routes.selectedRoute?.venues ?? [],
+            inputDecimals: swap.inputToken.decimals ?? 9,
+            outputDecimals: swap.outputToken.decimals ?? 9,
+            slippageBps,
+            executionChannel: swap.executionChannel,
+            priorityLevel: swap.priorityLevel,
+            success: true,
+          });
+        }
       }
     } catch (error) {
       haptic.error();
-      const errorMsg = error instanceof Error ? error.message : "Swap échoué";
+      const normalizedError = error instanceof Error ? error : new Error(String(error));
+      const errorMsg = normalizedError.message || "Swap échoué";
       setSwapError(errorMsg);
       setLoadingProgress(0);
       
       // Detect error type and show intelligent feedback
       const detectedType = detectErrorType(errorMsg);
+      setErrorType(detectedType);
       setErrorMessage(errorMsg);
       
       // Update swap status to failed
@@ -1089,6 +1203,14 @@ export function EnhancedSwapInterface() {
             ? { ...s, status: 'failed' as const }
             : s
       ));
+
+      trackError(normalizedError, {
+        stage: "swap-execution",
+        router: selectedRouter,
+        swapMethod,
+        nativePreferred: shouldAttemptNativeExecution,
+        routeVenues: routes.selectedRoute?.venues ?? [],
+      });
     } finally {
       setIsSwapping(false);
     }
@@ -1204,48 +1326,80 @@ export function EnhancedSwapInterface() {
   const displayInputAmount = inputAmount > 0 ? formatNumberWithCommas(inputAmount) : '';
   const displayOutputAmount = outputAmount > 0 ? formatNumberWithCommas(outputAmount) : '';
 
-  const mockRouteInfo = routes.selectedRoute
-    ? {
-        type: "Aggregator" as const,
-        estimatedOutput: outputAmount,
-        nonOptimizedOutput: outputAmount * 0.98,
-        npi: outputAmount * 0.02,
-        rebate: outputAmount * 0.012,
-        burn: outputAmount * 0.004,
-        fees: outputAmount * 0.004,
-        priceImpact: priceImpact,
-        route: routes.selectedRoute.venues.map((venue) => ({
-          label: venue,
-          inputMint: swap.inputToken?.mint || "",
-          outputMint: swap.outputToken?.mint || "",
-          inAmount: (inputAmount * 1000000).toString(),
-          outAmount: (
-            (outputAmount * 1000000) /
-            routes.selectedRoute!.venues.length
-          ).toString(),
-          fee: "1000",
-        })) as RouteStep[],
-      }
-    : null;
+  const nativeRouteMeta = routes.nativeRoute;
+  const npiOpportunity = routes.npiOpportunity;
+  const multiSourceQuotes = routes.multiSourceQuotes ?? [];
+  const usedMultiSourceFallback = routes.usedMultiSourceFallback;
+  const selectedRouteVenues = routes.selectedRoute?.venues ?? [];
+
+  const { insights: nativeRouteInsights, comparison: routerComparisonData } = buildNativeRouteInsights({
+    nativeRoute: nativeRouteMeta,
+    npiOpportunity: npiOpportunity ?? undefined,
+    usedFallback: usedMultiSourceFallback,
+    outputDecimals: swap.outputToken?.decimals ?? 9,
+    outputAmountTokens: outputAmount,
+    priceImpact,
+    selectedRouteVenues,
+  });
+  const nativeProviderLabel = nativeRouteInsights.provider;
+  const nativeRouteFromCache = nativeRouteInsights.fromCache;
+  const nativeRouteUsedFallback = nativeRouteInsights.usedFallback;
+
+  const handleRouterSelection = (nextRouter: "swapback" | "jupiter", source: string) => {
+    if (nextRouter === selectedRouter) {
+      return;
+    }
+
+    trackRouterSelection({
+      router: nextRouter,
+      previousRouter: selectedRouter,
+      source,
+      priceImpactPct: priceImpact,
+      nativeProvider: nativeProviderLabel ?? null,
+      economicsAvailable: Boolean(npiOpportunity?.available && npiOpportunity.shareTokens > 0),
+    });
+
+    setSelectedRouter(nextRouter);
+  };
+
+  const candidateInstructions = routes.selectedRoute?.instructions;
+  const hasDexCompatiblePlan = Boolean(
+    (routes.selectedRoutePlan?.length ?? 0) > 0 ||
+      (Array.isArray(candidateInstructions) && candidateInstructions.length > 0)
+  );
+
+  const nativeExecutionDecision = (() => {
+    if (!nativeRouteInsights.provider) {
+      return { mode: "router-cpi" as const, reason: "missing-provider" };
+    }
+    if (nativeRouteUsedFallback) {
+      return { mode: "router-cpi" as const, reason: "fallback-route" };
+    }
+    if (!swap.inputToken || !swap.outputToken) {
+      return { mode: "router-cpi" as const, reason: "tokens-missing" };
+    }
+    if (!hasDexCompatiblePlan) {
+      return { mode: "router-cpi" as const, reason: "no-dex-plan" };
+    }
+    if (!nativeRouteInsights.quoteTokens || nativeRouteInsights.quoteTokens <= 0) {
+      return { mode: "router-cpi" as const, reason: "invalid-quote" };
+    }
+    return { mode: "native" as const, reason: "provider-eligible" };
+  })();
+
+  const shouldAttemptNativeExecution = nativeExecutionDecision.mode === "native";
+
+  const formatTokenAmount = (value?: number | null, precision = 6) =>
+    formatNumberWithCommas(formatNativeTokenAmount(value, precision));
+
+  const lamportsToTokensFloat = (lamports?: string | null) => {
+    if (!swap.outputToken?.decimals) {
+      return null;
+    }
+    return lamportsToTokens(lamports, swap.outputToken.decimals);
+  };
 
   const explorerUrl = swapSignature ? getExplorerUrl("tx", swapSignature) : null;
-
-  const usdPerOutputToken =
-    outputAmount > 0 && inputAmount > 0 ? inputAmount / outputAmount : 0;
-
-  const npiUsd =
-    mockRouteInfo && mockRouteInfo.npi > 0
-      ? usdPerOutputToken > 0
-        ? mockRouteInfo.npi * usdPerOutputToken
-        : mockRouteInfo.npi
-      : 0;
-
-  const platformFeeUsd =
-    mockRouteInfo && mockRouteInfo.fees > 0
-      ? usdPerOutputToken > 0
-        ? mockRouteInfo.fees * usdPerOutputToken
-        : mockRouteInfo.fees
-      : 0;
 
   const canExecuteSwap =
     selectedRouter === "swapback" &&
@@ -1329,7 +1483,7 @@ export function EnhancedSwapInterface() {
             <button
               onClick={() => {
                 haptic.medium();
-                setSelectedRouter("swapback");
+                handleRouterSelection("swapback", "primary-toggle");
               }}
               className={`flex-1 py-2 px-3 rounded-lg font-semibold transition-all relative active:scale-95 min-h-[40px] text-sm ${
                 selectedRouter === "swapback"
@@ -1346,7 +1500,7 @@ export function EnhancedSwapInterface() {
             <button
               onClick={() => {
                 haptic.medium();
-                setSelectedRouter("jupiter");
+                handleRouterSelection("jupiter", "primary-toggle");
               }}
               className={`flex-1 py-2 px-3 rounded-lg font-semibold transition-all relative active:scale-95 min-h-[40px] text-sm ${
                 selectedRouter === "jupiter"
@@ -1497,7 +1651,8 @@ export function EnhancedSwapInterface() {
                     type="button"
                     onClick={() => {
                       haptic.light();
-                      setSelectedRouter(selectedRouter === 'swapback' ? 'jupiter' : 'swapback');
+                      const nextRouter = selectedRouter === 'swapback' ? 'jupiter' : 'swapback';
+                      handleRouterSelection(nextRouter, 'alt-router-cta');
                     }}
                     className="px-3 py-2 rounded-xl border border-white/10 text-xs uppercase tracking-wide text-gray-400 hover:text-white hover:border-white/30 transition-colors"
                   >
@@ -1827,6 +1982,21 @@ export function EnhancedSwapInterface() {
               </div>
             )}
 
+            {usedMultiSourceFallback && (
+              <div
+                className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-2 text-[11px] text-amber-200"
+                role="status"
+                aria-live="polite"
+              >
+                Jupiter est indisponible — exécution via route native
+                {" "}
+                <span className="font-semibold text-amber-100">
+                  {nativeProviderLabel ?? "SwapBack"}
+                </span>
+                .
+              </div>
+            )}
+
             {isMinimalLayout ? (
               <div className="bg-white/5 border border-white/10 rounded-lg p-2">
                 <div className="flex justify-between text-xs text-gray-400">
@@ -1920,6 +2090,45 @@ export function EnhancedSwapInterface() {
                         </button>
                       </div>
                     </div>
+                    {routerComparisonData && (
+                      <div className="pt-2">
+                        <button
+                          onClick={() => {
+                            haptic.medium();
+                            if (routerComparisonData) {
+                              const diff =
+                                routerComparisonData.swapback.outputAmount -
+                                routerComparisonData.jupiter.outputAmount;
+                              const percentDiff =
+                                routerComparisonData.jupiter.outputAmount !== 0
+                                  ? (diff / routerComparisonData.jupiter.outputAmount) * 100
+                                  : 0;
+
+                              trackRouterComparisonViewed({
+                                currentRouter: selectedRouter,
+                                recommendedRouter: diff >= 0 ? "swapback" : "jupiter",
+                                inputToken: swap.inputToken?.symbol,
+                                outputToken: swap.outputToken?.symbol,
+                                inputAmount: parseFloat(swap.inputAmount) || 0,
+                                swapbackOutput: routerComparisonData.swapback.outputAmount,
+                                jupiterOutput: routerComparisonData.jupiter.outputAmount,
+                                difference: diff,
+                                percentDifference: percentDiff,
+                                hasEconomics:
+                                  routerComparisonData.swapback.rebateAmount > 0 ||
+                                  routerComparisonData.swapback.burnAmount > 0,
+                                priceImpact: routerComparisonData.swapback.priceImpact,
+                                source: "detail-card",
+                              });
+                            }
+                            setShowComparisonModal(true);
+                          }}
+                          className="w-full text-xs font-semibold text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg py-1.5 transition-all active:scale-95"
+                        >
+                          Comparer avec Jupiter
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </>
@@ -1977,32 +2186,49 @@ export function EnhancedSwapInterface() {
             transition={{ duration: 0.2 }}
             className="w-full lg:w-72 space-y-3"
           >
-            {/* SwapBack Savings */}
-            {selectedRouter === "swapback" && mockRouteInfo && (
-              <div className="bg-gradient-to-br from-emerald-500/10 to-blue-500/10 border border-emerald-500/20 rounded-xl p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-base">⚡</span>
-                  <div className="text-xs font-semibold text-emerald-400">SwapBack Savings</div>
+            {/* Native Route & NPI */}
+            {selectedRouter === "swapback" && (nativeRouteMeta || npiOpportunity || usedMultiSourceFallback) && (
+              <NativeRouteCard
+                insights={nativeRouteInsights}
+                providerLabel={nativeProviderLabel}
+                outputSymbol={swap.outputToken?.symbol}
+                fromCache={nativeRouteFromCache}
+                usedFallback={usedMultiSourceFallback}
+              />
+            )}
+
+            {/* Multi-source diagnostics */}
+            {selectedRouter === "swapback" && multiSourceQuotes.length > 0 && (
+              <div className="bg-black/40 border border-white/10 rounded-xl p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-semibold text-gray-300">Diagnostics multi-source</div>
+                  <div className="text-[10px] text-gray-500">
+                    {multiSourceQuotes.filter((quote) => quote.ok).length}/{multiSourceQuotes.length} ok
+                  </div>
                 </div>
-                <div className="space-y-1.5 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Optimization</span>
-                    <span className="text-emerald-400 font-medium">+{mockRouteInfo.npi.toFixed(4)} {swap.outputToken?.symbol}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">BACK Rebate</span>
-                    <span className="text-emerald-400 font-medium">+{mockRouteInfo.rebate.toFixed(4)} {swap.outputToken?.symbol}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">BACK Burn</span>
-                    <span className="text-orange-400 font-medium">{mockRouteInfo.burn.toFixed(4)} BACK 🔥</span>
-                  </div>
-                  <div className="border-t border-white/10 pt-1.5 mt-1.5">
-                    <div className="flex justify-between font-semibold">
-                      <span className="text-white text-xs">Total Saved</span>
-                      <span className="text-emerald-400">+{(mockRouteInfo.npi + mockRouteInfo.rebate).toFixed(4)} {swap.outputToken?.symbol}</span>
-                    </div>
-                  </div>
+                <div className="space-y-1.5">
+                  {multiSourceQuotes.map((quote, idx) => {
+                    const quoteTokens = lamportsToTokensFloat(quote.outAmount);
+                    const statusColor = quote.ok ? "text-emerald-300" : "text-red-300";
+                    return (
+                      <div
+                        key={`${quote.source}-${idx}`}
+                        className="flex items-center justify-between gap-2 text-[11px] bg-white/5 border border-white/10 rounded-lg px-2 py-1.5"
+                      >
+                        <div>
+                          <div className="text-white/90 font-medium">{quote.source}</div>
+                          <div className={statusColor}>
+                            {quote.ok && quoteTokens !== null
+                              ? `${formatTokenAmount(quoteTokens, 4)} ${swap.outputToken?.symbol}`
+                              : quote.error ?? "Aucune donnée"}
+                          </div>
+                        </div>
+                        <div className={statusColor}>
+                          {typeof quote.latencyMs === "number" ? `${Math.round(quote.latencyMs)} ms` : "—"}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -2091,6 +2317,25 @@ export function EnhancedSwapInterface() {
             networkFee="0.000005 SOL"
             platformFee="0.00"
             route={routes.selectedRoute.venues}
+            nativeRouteInsights={nativeRouteInsights}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showComparisonModal && routerComparisonData && (
+          <RouterComparisonModal
+            isOpen={showComparisonModal}
+            onClose={() => setShowComparisonModal(false)}
+            onSelectRouter={(router) => handleRouterSelection(router, "comparison-modal")}
+            currentRouter={selectedRouter}
+            swapbackData={routerComparisonData.swapback}
+            jupiterData={routerComparisonData.jupiter}
+            inputToken={{
+              symbol: swap.inputToken?.symbol || "TOKEN",
+              amount: swap.inputAmount || "0",
+            }}
+            outputToken={{ symbol: swap.outputToken?.symbol || "TOKEN" }}
           />
         )}
       </AnimatePresence>

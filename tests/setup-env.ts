@@ -1,8 +1,43 @@
 import path from "path";
 import fs from "fs";
 import bs58 from "bs58";
-import { vi } from "vitest";
+import { vi, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import BN from "bn.js";
+
+function loadEnvFromFile(key: string) {
+  if (process.env[key]) {
+    return process.env[key];
+  }
+
+  const devnetEnvPath = path.resolve(process.cwd(), ".env.devnet");
+  if (!fs.existsSync(devnetEnvPath)) {
+    return undefined;
+  }
+
+  const lines = fs.readFileSync(devnetEnvPath, "utf-8").split(/\r?\n/);
+  for (const line of lines) {
+    if (!line || line.trim().startsWith("#")) {
+      continue;
+    }
+    const [envKey, ...rest] = line.split("=");
+    if (envKey === key) {
+      const value = rest.join("=").trim();
+      process.env[key] = value;
+      return value;
+    }
+  }
+  return undefined;
+}
+
+loadEnvFromFile("SWAPBACK_DEVNET_SECRET_BASE58");
+
+if (!process.env.JUPITER_API_URL) {
+  process.env.JUPITER_API_URL = "https://public.jupiterapi.com";
+}
+
+if (!process.env.JUPITER_API) {
+  process.env.JUPITER_API = process.env.JUPITER_API_URL;
+}
 
 const walletCacheDir = path.resolve(__dirname, ".cache");
 const walletPath = path.join(walletCacheDir, "devnet-wallet.json");
@@ -152,3 +187,19 @@ vi.mock("@orca-so/whirlpools-sdk", () => ({
     estimatedFeeAmount: new BN(1_000),
   })),
 }));
+
+// ---------------------------------------------------------------------------
+// Mocha compatibility layer (legacy tests expect global before/after hooks)
+// ---------------------------------------------------------------------------
+
+const mochaGlobals = globalThis as typeof globalThis & {
+  before?: typeof beforeAll;
+  after?: typeof afterAll;
+  beforeEach?: typeof beforeEach;
+  afterEach?: typeof afterEach;
+};
+
+mochaGlobals.before ??= beforeAll;
+mochaGlobals.after ??= afterAll;
+mochaGlobals.beforeEach ??= beforeEach;
+mochaGlobals.afterEach ??= afterEach;

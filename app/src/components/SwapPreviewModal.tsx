@@ -2,6 +2,21 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { XMarkIcon, ArrowRightIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { formatNumberWithCommas } from "@/utils/formatNumber";
+
+interface NativeRouteInsights {
+  provider?: string | null;
+  quoteTokens?: number | null;
+  baseTokens?: number | null;
+  improvedTokens?: number | null;
+  improvementBps?: number;
+  userShareTokens?: number;
+  totalGainTokens?: number;
+  sharePercent?: number | null;
+  explanation?: string | null;
+  hasEconomics?: boolean;
+  usedFallback?: boolean;
+}
 
 interface SwapPreviewModalProps {
   isOpen: boolean;
@@ -16,6 +31,7 @@ interface SwapPreviewModalProps {
   networkFee: string;
   platformFee: string;
   route?: string[];
+  nativeRouteInsights?: NativeRouteInsights | null;
 }
 
 export function SwapPreviewModal({
@@ -30,12 +46,27 @@ export function SwapPreviewModal({
   slippage,
   networkFee,
   platformFee,
-  route = []
+  route = [],
+  nativeRouteInsights,
 }: SwapPreviewModalProps) {
   if (!isOpen) return null;
 
   const isPriceImpactHigh = priceImpact > 5;
   const isPriceImpactVeryHigh = priceImpact > 10;
+  const formatTokens = (value?: number | null, precision = 6) => {
+    if (value === null || value === undefined || Number.isNaN(value)) {
+      return "--";
+    }
+    return formatNumberWithCommas(value.toFixed(precision));
+  };
+  const showNativeCard = Boolean(
+    nativeRouteInsights &&
+      (
+        nativeRouteInsights.quoteTokens !== null ||
+        nativeRouteInsights.hasEconomics ||
+        nativeRouteInsights.usedFallback
+      )
+  );
 
   return (
     <AnimatePresence>
@@ -105,6 +136,80 @@ export function SwapPreviewModal({
                     )}
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {showNativeCard && nativeRouteInsights && (
+            <div className="mb-3 sm:mb-4 p-3 sm:p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs font-semibold text-emerald-300">Route native SwapBack</div>
+                {nativeRouteInsights.usedFallback && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-200 uppercase tracking-wide">
+                    Fallback
+                  </span>
+                )}
+              </div>
+              <div className="space-y-1 text-xs">
+                {nativeRouteInsights.provider && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Provider</span>
+                    <span className="text-white font-medium">{nativeRouteInsights.provider}</span>
+                  </div>
+                )}
+                {nativeRouteInsights.quoteTokens !== null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Quote</span>
+                    <span className="text-white font-medium">
+                      {formatTokens(nativeRouteInsights.quoteTokens, 4)} {toToken.symbol}
+                    </span>
+                  </div>
+                )}
+                {nativeRouteInsights.baseTokens !== null && nativeRouteInsights.improvedTokens !== null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Comparatif</span>
+                    <span className="text-white font-medium">
+                      {formatTokens(nativeRouteInsights.baseTokens, 4)} → {formatTokens(nativeRouteInsights.improvedTokens, 4)} {toToken.symbol}
+                    </span>
+                  </div>
+                )}
+                {typeof nativeRouteInsights.improvementBps === "number" && nativeRouteInsights.improvementBps > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Amélioration</span>
+                    <span className="text-emerald-400 font-semibold">+{nativeRouteInsights.improvementBps.toFixed(2)} bps</span>
+                  </div>
+                )}
+                {nativeRouteInsights.hasEconomics ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">
+                        Part utilisateur{nativeRouteInsights.sharePercent ? ` (${nativeRouteInsights.sharePercent.toFixed(1)}%)` : ""}
+                      </span>
+                      <span className="text-emerald-300 font-medium">
+                        +{formatTokens(nativeRouteInsights.userShareTokens, 6)} {toToken.symbol}
+                      </span>
+                    </div>
+                    {nativeRouteInsights.totalGainTokens !== undefined && nativeRouteInsights.totalGainTokens > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Gain total</span>
+                        <span className="text-emerald-200 font-medium">
+                          +{formatTokens(nativeRouteInsights.totalGainTokens, 6)} {toToken.symbol}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  nativeRouteInsights.explanation && (
+                    <div className="text-[11px] text-gray-400">
+                      {nativeRouteInsights.explanation}
+                    </div>
+                  )
+                )}
+                {nativeRouteInsights.explanation && nativeRouteInsights.hasEconomics && (
+                  <div className="text-[11px] text-white/80 border-t border-white/10 pt-1 mt-1">
+                    {nativeRouteInsights.explanation}
+                  </div>
+                )}
               </div>
             </div>
           )}

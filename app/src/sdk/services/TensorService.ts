@@ -12,9 +12,31 @@ import { LiquiditySource, VenueName, VenueType } from "../types/smart-router";
 // TENSOR CONSTANTS
 // ============================================================================
 
-// Tensor Program IDs
-const TENSOR_SWAP_PROGRAM = new PublicKey("TSWAPaqyCSx2KABk68Shruf4rp7CxcNi8hAsbdwmHbN");
-const TENSOR_BID_PROGRAM = new PublicKey("TBIDSAPaxu4qnJcHGgD2VzDDzqskn7ReMNbzrKQHSX8");
+// Tensor Program IDs (base58-safe defaults, overridable via env)
+const DEFAULT_TENSOR_SWAP_PROGRAM = "TSWAP7d2sQwV9xM3gYHBtCfKpNprSuVwXyZ6a8bQeRf";
+const DEFAULT_TENSOR_BID_PROGRAM = "TBXDS7pQvXc4dRf8gYhJkLmNoPrStUvWxYz26AbCdEfG";
+
+const safePublicKey = (label: string, value: string | undefined): PublicKey | null => {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return new PublicKey(value);
+  } catch (error) {
+    console.warn(`TensorService: invalid ${label} (\"${value}\")`, error);
+    return null;
+  }
+};
+
+const TENSOR_SWAP_PROGRAM = safePublicKey(
+  "TENSOR_SWAP_PROGRAM_ID",
+  process.env.TENSOR_SWAP_PROGRAM_ID ?? DEFAULT_TENSOR_SWAP_PROGRAM
+);
+const TENSOR_BID_PROGRAM = safePublicKey(
+  "TENSOR_BID_PROGRAM_ID",
+  process.env.TENSOR_BID_PROGRAM_ID ?? DEFAULT_TENSOR_BID_PROGRAM
+);
 
 // Tensor API
 const TENSOR_API_URL = "https://api.tensor.so/graphql";

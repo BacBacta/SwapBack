@@ -8,7 +8,7 @@ const anchor = require('@coral-xyz/anchor');
 const fs = require('fs');
 const path = require('path');
 
-const BUYBACK_PROGRAM_ID = new anchor.web3.PublicKey('F8S1r81FcTsSBb9vP3jFNuVoTMYNrxaCptbvkzSXcEce');
+const BUYBACK_PROGRAM_ID = new anchor.web3.PublicKey('4cyYvpjwERF67UDpd5euYzZ6xZ5tcDL6XrByBaZbVVjK');
 const BACK_MINT = new anchor.web3.PublicKey('862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux');
 const USDC_MINT = new anchor.web3.PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
 

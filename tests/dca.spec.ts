@@ -13,16 +13,25 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { SwapbackRouter } from "../target/types/swapback_router";
-import { 
-  Keypair, 
-  PublicKey, 
+import {
+  Keypair,
+  PublicKey,
   SystemProgram,
-  LAMPORTS_PER_SOL 
+  LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import { expect } from "chai";
 import { createTestMint, createTestATA, mintTestTokens } from "./utils/token-helpers";
 
-describe("DCA Plan Lifecycle", () => {
+const shouldRunAnchorDcaSuite = process.env.RUN_ANCHOR_DCA_TESTS === "true";
+const describeDca = shouldRunAnchorDcaSuite ? describe : describe.skip;
+
+if (!shouldRunAnchorDcaSuite) {
+  console.warn(
+    "[tests/dca.spec.ts] Skipping Anchor-dependent DCA suite (set RUN_ANCHOR_DCA_TESTS=true to enable)."
+  );
+}
+
+describeDca("DCA Plan Lifecycle", () => {
   // Configure the client to use the local cluster
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);

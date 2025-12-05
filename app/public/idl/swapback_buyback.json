@@ -1,5 +1,5 @@
 {
-  "address": "746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6",
+  "address": "4cyYvpjwERF67UDpd5euYzZ6xZ5tcDL6XrByBaZbVVjK",
   "metadata": {
     "name": "swapback_buyback",
     "version": "0.1.0",
@@ -141,6 +141,9 @@
           }
         },
         {
+          "name": "usdc_mint"
+        },
+        {
           "name": "depositor",
           "signer": true
         },
@@ -158,9 +161,9 @@
     {
       "name": "distribute_buyback",
       "docs": [
-        "Distribue une portion des tokens buyback à un utilisateur proportionnellement à son boost",
-        "Ratio: 50% distribution, 50% burn",
-        "Formula: user_share = (user_boost / total_community_boost) * (buyback_tokens * 50%)"
+        "DEPRECATED: Cette fonction n'est plus utilisée (100% burn désormais)",
+        "Anciennement: Distribuait une portion des tokens aux holders",
+        "Maintenant: Tous les tokens sont brûlés directement"
       ],
       "discriminator": [
         250,
@@ -321,6 +324,9 @@
           }
         },
         {
+          "name": "back_mint"
+        },
+        {
           "name": "back_vault",
           "writable": true
         },
@@ -344,20 +350,20 @@
       ]
     },
     {
-      "name": "execute_buyback",
+      "name": "finalize_buyback",
       "docs": [
-        "Exécute un buyback de $BACK avec les USDC accumulés",
-        "Utilise Pyth Oracle pour obtenir le prix BACK/USDC et calculer le swap"
+        "Finalise un buyback après swap Jupiter off-chain",
+        "Vérifie que les BACK ont été reçus et met à jour l'état"
       ],
       "discriminator": [
-        47,
-        32,
-        19,
-        100,
-        184,
-        96,
-        144,
-        49
+        54,
+        63,
+        117,
+        10,
+        204,
+        69,
+        240,
+        90
       ],
       "accounts": [
         {
@@ -387,53 +393,21 @@
           }
         },
         {
-          "name": "usdc_vault",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  117,
-                  115,
-                  100,
-                  99,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ]
-              }
-            ]
-          }
-        },
-        {
           "name": "back_vault",
           "writable": true
         },
         {
-          "name": "price_update",
-          "docs": [
-            "Pyth Price Feed Account pour $BACK/USD"
-          ]
-        },
-        {
           "name": "authority",
           "signer": true
-        },
-        {
-          "name": "token_program"
         }
       ],
       "args": [
         {
-          "name": "max_usdc_amount",
+          "name": "usdc_spent",
           "type": "u64"
         },
         {
-          "name": "min_back_amount",
+          "name": "back_received",
           "type": "u64"
         }
       ]
@@ -534,6 +508,83 @@
       ]
     },
     {
+      "name": "initiate_buyback",
+      "docs": [
+        "Initie un buyback (autorisation uniquement)",
+        "Le keeper Jupiter exécutera le swap off-chain"
+      ],
+      "discriminator": [
+        14,
+        58,
+        55,
+        156,
+        210,
+        89,
+        147,
+        156
+      ],
+      "accounts": [
+        {
+          "name": "buyback_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  121,
+                  98,
+                  97,
+                  99,
+                  107,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  100,
+                  99,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "max_usdc_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "update_params",
       "docs": [
         "Met à jour les paramètres du buyback"
@@ -618,19 +669,6 @@
       ]
     },
     {
-      "name": "PriceUpdateV2",
-      "discriminator": [
-        34,
-        241,
-        35,
-        99,
-        157,
-        126,
-        244,
-        205
-      ]
-    },
-    {
       "name": "UserNft",
       "discriminator": [
         118,
@@ -682,6 +720,19 @@
         24,
         38,
         189
+      ]
+    },
+    {
+      "name": "BuybackInitiated",
+      "discriminator": [
+        250,
+        42,
+        208,
+        33,
+        124,
+        0,
+        233,
+        102
       ]
     },
     {
@@ -741,13 +792,28 @@
     },
     {
       "code": 6008,
-      "name": "InvalidPrice",
-      "msg": "Prix invalide depuis l'oracle"
+      "name": "InvalidVaultOwner",
+      "msg": "Propriétaire du vault invalide"
     },
     {
       "code": 6009,
-      "name": "SlippageExceeded",
-      "msg": "Slippage dépassé - prix trop défavorable"
+      "name": "InvalidVaultMint",
+      "msg": "Mint du vault invalide"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidSwapAmounts",
+      "msg": "Montants de swap invalides"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidBackReceived",
+      "msg": "Tokens BACK reçus invalides"
+    },
+    {
+      "code": 6012,
+      "name": "SuspiciousPriceRatio",
+      "msg": "Ratio de prix suspicieux détecté"
     }
   ],
   "types": [
@@ -824,6 +890,22 @@
       }
     },
     {
+      "name": "BuybackInitiated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "usdc_amount",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "BuybackState",
       "type": {
         "kind": "struct",
@@ -834,6 +916,10 @@
           },
           {
             "name": "back_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "usdc_mint",
             "type": "pubkey"
           },
           {
@@ -911,114 +997,6 @@
       }
     },
     {
-      "name": "PriceFeedMessage",
-      "repr": {
-        "kind": "c"
-      },
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "feed_id",
-            "docs": [
-              "`FeedId` but avoid the type alias because of compatibility issues with Anchor's `idl-build` feature."
-            ],
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "price",
-            "type": "i64"
-          },
-          {
-            "name": "conf",
-            "type": "u64"
-          },
-          {
-            "name": "exponent",
-            "type": "i32"
-          },
-          {
-            "name": "publish_time",
-            "docs": [
-              "The timestamp of this price update in seconds"
-            ],
-            "type": "i64"
-          },
-          {
-            "name": "prev_publish_time",
-            "docs": [
-              "The timestamp of the previous price update. This field is intended to allow users to",
-              "identify the single unique price update for any moment in time:",
-              "for any time t, the unique update is the one such that prev_publish_time < t <= publish_time.",
-              "",
-              "Note that there may not be such an update while we are migrating to the new message-sending logic,",
-              "as some price updates on pythnet may not be sent to other chains (because the message-sending",
-              "logic may not have triggered). We can solve this problem by making the message-sending mandatory",
-              "(which we can do once publishers have migrated over).",
-              "",
-              "Additionally, this field may be equal to publish_time if the message is sent on a slot where",
-              "where the aggregation was unsuccesful. This problem will go away once all publishers have",
-              "migrated over to a recent version of pyth-agent."
-            ],
-            "type": "i64"
-          },
-          {
-            "name": "ema_price",
-            "type": "i64"
-          },
-          {
-            "name": "ema_conf",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "PriceUpdateV2",
-      "docs": [
-        "A price update account. This account is used by the Pyth Receiver program to store a verified price update from a Pyth price feed.",
-        "It contains:",
-        "- `write_authority`: The write authority for this account. This authority can close this account to reclaim rent or update the account to contain a different price update.",
-        "- `verification_level`: The [`VerificationLevel`] of this price update. This represents how many Wormhole guardian signatures have been verified for this price update.",
-        "- `price_message`: The actual price update.",
-        "- `posted_slot`: The slot at which this price update was posted."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "write_authority",
-            "type": "pubkey"
-          },
-          {
-            "name": "verification_level",
-            "type": {
-              "defined": {
-                "name": "VerificationLevel"
-              }
-            }
-          },
-          {
-            "name": "price_message",
-            "type": {
-              "defined": {
-                "name": "PriceFeedMessage"
-              }
-            }
-          },
-          {
-            "name": "posted_slot",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
       "name": "USDCDeposited",
       "type": {
         "kind": "struct",
@@ -1078,39 +1056,6 @@
           {
             "name": "bump",
             "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "VerificationLevel",
-      "docs": [
-        "Pyth price updates are bridged to all blockchains via Wormhole.",
-        "Using the price updates on another chain requires verifying the signatures of the Wormhole guardians.",
-        "The usual process is to check the signatures for two thirds of the total number of guardians, but this can be cumbersome on Solana because of the transaction size limits,",
-        "so we also allow for partial verification.",
-        "",
-        "This enum represents how much a price update has been verified:",
-        "- If `Full`, we have verified the signatures for two thirds of the current guardians.",
-        "- If `Partial`, only `num_signatures` guardian signatures have been checked.",
-        "",
-        "# Warning",
-        "Using partially verified price updates is dangerous, as it lowers the threshold of guardians that need to collude to produce a malicious price update."
-      ],
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Partial",
-            "fields": [
-              {
-                "name": "num_signatures",
-                "type": "u8"
-              }
-            ]
-          },
-          {
-            "name": "Full"
           }
         ]
       }

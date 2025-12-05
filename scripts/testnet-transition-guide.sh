@@ -10,7 +10,7 @@ echo ""
 
 # Configuration
 TESTNET_RPC="https://api.testnet.solana.com"
-BUYBACK_PROGRAM_ID="F8S1r81FcTsSBb9vP3jFNuVoTMYNrxaCptbvkzSXcEce"
+BUYBACK_PROGRAM_ID="4cyYvpjwERF67UDpd5euYzZ6xZ5tcDL6XrByBaZbVVjK"
 
 echo "📋 Pre-flight Checklist:"
 echo ""
@@ -76,7 +76,7 @@ echo "------------------------------------"
 echo "   Note: Programs need to be deployed to testnet if not already"
 echo "   Current devnet IDs:"
 echo "   - Router:  9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh"
-echo "   - Buyback: F8S1r81FcTsSBb9vP3jFNuVoTMYNrxaCptbvkzSXcEce"
+echo "   - Buyback: 4cyYvpjwERF67UDpd5euYzZ6xZ5tcDL6XrByBaZbVVjK"
 echo "   - cNFT:    EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP"
 echo ""
 echo "   If testnet deployment needed:"

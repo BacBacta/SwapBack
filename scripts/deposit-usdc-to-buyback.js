@@ -9,7 +9,7 @@ const { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } = require('@solana/spl-tok
 const fs = require('fs');
 const path = require('path');
 
-const BUYBACK_PROGRAM_ID = new anchor.web3.PublicKey('F8S1r81FcTsSBb9vP3jFNuVoTMYNrxaCptbvkzSXcEce');
+const BUYBACK_PROGRAM_ID = new anchor.web3.PublicKey('4cyYvpjwERF67UDpd5euYzZ6xZ5tcDL6XrByBaZbVVjK');
 const USDC_MINT = new anchor.web3.PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
 const RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com';
 

@@ -209,7 +209,7 @@ section "PHASE 5: PROGRAM VERIFICATION"
 
 echo "🔍 Verifying on-chain programs..."
 
-BUYBACK_PROGRAM="F8S1r81FcTsSBb9vP3jFNuVoTMYNrxaCptbvkzSXcEce"
+BUYBACK_PROGRAM="4cyYvpjwERF67UDpd5euYzZ6xZ5tcDL6XrByBaZbVVjK"
 CNFT_PROGRAM="9MjuF4Vj4pZeHJejsQtzmo9wTdkjJfa9FbJRSLxHFezw"
 
 if command -v solana &> /dev/null; then

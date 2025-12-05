@@ -16,6 +16,21 @@ interface SwapEvent {
   route: string;
   buybackDeposit: number;
   walletAddress?: string;
+  router?: "swapback" | "jupiter";
+  swapMethod?: "native" | "versioned" | "legacy" | "jupiter-direct";
+  nativeProvider?: string | null;
+  usedFallback?: boolean;
+  priceImpactBps?: number;
+  mevProtection?: boolean;
+  savingsUsd?: number;
+  routeVenues?: string[];
+  inputDecimals?: number;
+  outputDecimals?: number;
+  slippageBps?: number;
+  executionChannel?: string;
+  priorityLevel?: string;
+  success?: boolean;
+  errorMessage?: string;
 }
 
 interface BuybackEvent {
@@ -29,6 +44,82 @@ interface PageViewEvent {
   page: string;
   referrer?: string;
   timestamp: number;
+}
+
+interface RouteRequestEvent {
+  inputToken?: string;
+  outputToken?: string;
+  inputAmount: number;
+  walletConnected: boolean;
+  routerPreference: "swapback" | "jupiter";
+  mevProtection: boolean;
+  priorityLevel?: string;
+  routingStrategy?: string;
+  executionChannel?: string;
+  source?: string;
+}
+
+interface RouteResultEvent {
+  inputToken?: string;
+  outputToken?: string;
+  inputAmount: number;
+  routerUsed: "swapback" | "jupiter";
+  bestVenue?: string | null;
+  priceImpactPct?: number;
+  nativeProvider?: string | null;
+  nativeShareTokens?: number | null;
+  usedFallback?: boolean;
+  routePlanLength?: number;
+  quoteSources?: number;
+  mevRisk?: string | null;
+  routeVenues?: string[];
+  source?: string;
+  latencyMs?: number;
+  success?: boolean;
+  errorMessage?: string;
+}
+
+interface RouterSelectionEvent {
+  router: "swapback" | "jupiter";
+  previousRouter?: "swapback" | "jupiter";
+  source?: string;
+  priceImpactPct?: number;
+  nativeProvider?: string | null;
+  economicsAvailable?: boolean;
+  totalSavingsUsd?: number;
+}
+
+interface SwapPreviewEvent {
+  router: "swapback" | "jupiter";
+  inputToken?: string;
+  outputToken?: string;
+  inputAmount: number;
+  outputAmount: number;
+  nativeMode: boolean;
+  provider?: string | null;
+  priceImpactPct?: number;
+}
+
+type RouterComparisonActionSource = "card" | "cta";
+
+interface RouterComparisonViewEvent {
+  currentRouter: "swapback" | "jupiter";
+  recommendedRouter: "swapback" | "jupiter";
+  inputToken?: string;
+  outputToken?: string;
+  inputAmount?: number;
+  swapbackOutput: number;
+  jupiterOutput: number;
+  difference: number;
+  percentDifference?: number;
+  hasEconomics?: boolean;
+  priceImpact?: number;
+  source?: string;
+}
+
+interface RouterComparisonActionEvent extends RouterComparisonViewEvent {
+  selectedRouter: "swapback" | "jupiter";
+  actionSource: RouterComparisonActionSource;
 }
 
 export class Analytics {
@@ -75,15 +166,31 @@ export class Analytics {
   trackSwap(event: SwapEvent) {
     if (!this.enabled) return;
 
+    const inputDivisor = Math.pow(10, event.inputDecimals ?? 6);
+    const outputDivisor = Math.pow(10, event.outputDecimals ?? 6);
+
     const eventData = {
       input_token: event.inputToken,
       output_token: event.outputToken,
-      input_amount: event.inputAmount / 1e6,
-      output_amount: event.outputAmount / 1e6,
+      input_amount: event.inputAmount / inputDivisor,
+      output_amount: event.outputAmount / outputDivisor,
       fee: event.fee / 1e6,
       buyback_contribution: event.buybackDeposit / 1e6,
       route: event.route,
       wallet: event.walletAddress,
+      router: event.router,
+      swap_method: event.swapMethod,
+      native_provider: event.nativeProvider,
+      used_fallback: event.usedFallback,
+      price_impact_bps: event.priceImpactBps,
+      mev_protection: event.mevProtection,
+      savings_usd: event.savingsUsd,
+      route_venues: event.routeVenues,
+      slippage_bps: event.slippageBps,
+      execution_channel: event.executionChannel,
+      priority_level: event.priorityLevel,
+      success: event.success ?? true,
+      error_message: event.errorMessage,
     };
 
     console.log('📊 Analytics: Swap', {
@@ -92,6 +199,8 @@ export class Analytics {
       fee: `${eventData.fee.toFixed(4)} USDC`,
       buyback: `${eventData.buyback_contribution.toFixed(4)} USDC`,
       route: event.route,
+      router: event.router,
+      method: event.swapMethod,
     });
 
     if (this.mixpanelInitialized) {
@@ -213,6 +322,78 @@ export class Analytics {
       mixpanel.people.set(properties);
     }
   }
+
+  trackRouteRequest(event: RouteRequestEvent) {
+    if (!this.enabled) return;
+
+    console.log('📊 Analytics: Route Request', event);
+
+    if (this.mixpanelInitialized) {
+      mixpanel.track('Route Requested', {
+        ...event,
+      });
+    }
+  }
+
+  trackRouteResult(event: RouteResultEvent) {
+    if (!this.enabled) return;
+
+    console.log('📊 Analytics: Route Result', event);
+
+    if (this.mixpanelInitialized) {
+      mixpanel.track('Route Result', {
+        ...event,
+      });
+    }
+  }
+
+  trackRouterSelection(event: RouterSelectionEvent) {
+    if (!this.enabled) return;
+
+    console.log('📊 Analytics: Router Selected', event);
+
+    if (this.mixpanelInitialized) {
+      mixpanel.track('Router Selected', {
+        ...event,
+      });
+    }
+  }
+
+  trackSwapPreview(event: SwapPreviewEvent) {
+    if (!this.enabled) return;
+
+    console.log('📊 Analytics: Swap Preview', event);
+
+    if (this.mixpanelInitialized) {
+      mixpanel.track('Swap Preview', {
+        ...event,
+      });
+    }
+  }
+
+  trackRouterComparisonView(event: RouterComparisonViewEvent) {
+    if (!this.enabled) return;
+
+    console.log('📊 Analytics: Router Comparison Viewed', event);
+
+    if (this.mixpanelInitialized) {
+      mixpanel.track('Router Comparison Viewed', {
+        ...event,
+      });
+    }
+  }
+
+  trackRouterComparisonAction(event: RouterComparisonActionEvent) {
+    if (!this.enabled) return;
+
+    console.log('📊 Analytics: Router Comparison Action', event);
+
+    if (this.mixpanelInitialized) {
+      mixpanel.track('Router Comparison Action', {
+        ...event,
+      });
+    }
+  }
 }
 
 // Export singleton instance
@@ -229,3 +410,11 @@ export const trackWalletConnect = (walletAddress: string) =>
 export const trackWalletDisconnect = () => analytics.trackWalletDisconnect();
 export const trackError = (error: Error, context?: Record<string, unknown>) => 
   analytics.trackError(error, context);
+export const trackRouteRequest = (event: RouteRequestEvent) => analytics.trackRouteRequest(event);
+export const trackRouteResult = (event: RouteResultEvent) => analytics.trackRouteResult(event);
+export const trackRouterSelection = (event: RouterSelectionEvent) => analytics.trackRouterSelection(event);
+export const trackSwapPreview = (event: SwapPreviewEvent) => analytics.trackSwapPreview(event);
+export const trackRouterComparisonViewed = (event: RouterComparisonViewEvent) =>
+  analytics.trackRouterComparisonView(event);
+export const trackRouterComparisonAction = (event: RouterComparisonActionEvent) =>
+  analytics.trackRouterComparisonAction(event);

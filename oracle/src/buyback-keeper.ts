@@ -29,7 +29,7 @@ const RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.so
 const JUPITER_API = 'https://quote-api.jup.ag/v6';
 
 // Program IDs
-const BUYBACK_PROGRAM_ID = new PublicKey('F8S1r81FcTsSBb9vP3jFNuVoTMYNrxaCptbvkzSXcEce'); // Nouveau après upgrade
+const BUYBACK_PROGRAM_ID = new PublicKey('4cyYvpjwERF67UDpd5euYzZ6xZ5tcDL6XrByBaZbVVjK'); // Nouveau après upgrade
 
 // Token Mints
 const USDC_MINT = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'); // Devnet

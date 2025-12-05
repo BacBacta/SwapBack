@@ -1,12 +1,22 @@
 /**
  * Tests E2E Simplifiés - Vérifications de Sécurité
  * Compatible avec anchor test (pas de setup complexe)
+ * 
+ * Note: Anchor génère les types en camelCase (burnBack vs burn_back)
  */
 
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { assert } from "chai";
+
+// Helper pour normaliser les noms (snake_case ou camelCase)
+const normalizeNames = (names: string[]) => names.map(n => n.toLowerCase().replace(/_/g, ''));
+const hasName = (names: string[], target: string) => {
+  const normalized = normalizeNames(names);
+  const normalizedTarget = target.toLowerCase().replace(/_/g, '');
+  return normalized.includes(normalizedTarget);
+};
 
 describe("Security Checks - Code Verification", () => {
   const provider = anchor.AnchorProvider.env();
@@ -24,31 +34,34 @@ describe("Security Checks - Code Verification", () => {
     console.log("   - Router:", routerProgram.programId.toString());
   });
 
-  it("Vérifier les IDL des programmes contiennent les nouvelles erreurs", () => {
+  it("Vérifier les IDL des programmes contiennent les erreurs de sécurité", () => {
     const buybackIdl = buybackProgram.idl;
     const routerIdl = routerProgram.idl;
 
-    // Vérifier les erreurs du buyback
+    // Vérifier les erreurs du buyback (noms en PascalCase)
     const buybackErrors = buybackIdl.errors?.map((e: any) => e.name) || [];
     
-    assert.include(buybackErrors, "InvalidVaultOwner", "InvalidVaultOwner doit être présent");
-    assert.include(buybackErrors, "InvalidVaultMint", "InvalidVaultMint doit être présent");
-    assert.include(buybackErrors, "InvalidSwapAmounts", "InvalidSwapAmounts doit être présent");
-    assert.include(buybackErrors, "SuspiciousPriceRatio", "SuspiciousPriceRatio doit être présent");
+    // Les erreurs gardent leur PascalCase dans l'IDL
+    assert.ok(hasName(buybackErrors, "InvalidVaultOwner"), "InvalidVaultOwner doit être présent");
+    assert.ok(hasName(buybackErrors, "InvalidVaultMint"), "InvalidVaultMint doit être présent");
+    assert.ok(hasName(buybackErrors, "InvalidSwapAmounts"), "InvalidSwapAmounts doit être présent");
+    assert.ok(hasName(buybackErrors, "SuspiciousPriceRatio"), "SuspiciousPriceRatio doit être présent");
 
     console.log("\n✅ Erreurs Buyback vérifiées:");
     console.log("   ✓ InvalidVaultOwner");
     console.log("   ✓ InvalidVaultMint");
     console.log("   ✓ InvalidSwapAmounts");
-    console.log("   ✓ SuspiciousPriceRatio (NEW)");
+    console.log("   ✓ SuspiciousPriceRatio");
 
-    // Vérifier les erreurs du router
+    // Vérifier les erreurs du router (protection anti-abus)
     const routerErrors = routerIdl.errors?.map((e: any) => e.name) || [];
     
-    assert.include(routerErrors, "SwapAmountExceedsMaximum", "SwapAmountExceedsMaximum doit être présent");
+    assert.ok(hasName(routerErrors, "AmountExceedsLimit"), "AmountExceedsLimit doit être présent");
+    assert.ok(hasName(routerErrors, "SlippageExceeded"), "SlippageExceeded doit être présent");
 
     console.log("\n✅ Erreurs Router vérifiées:");
-    console.log("   ✓ SwapAmountExceedsMaximum (anti-whale)");
+    console.log("   ✓ AmountExceedsLimit (anti-whale)");
+    console.log("   ✓ SlippageExceeded (protection slippage)");
   });
 
   it("Vérifier les constantes de sécurité", () => {
@@ -67,24 +80,30 @@ describe("Security Checks - Code Verification", () => {
     const buybackIdl = buybackProgram.idl;
     const instructions = buybackIdl.instructions?.map((i: any) => i.name) || [];
 
-    assert.include(instructions, "initiate_buyback", "initiate_buyback doit exister");
-    assert.include(instructions, "finalize_buyback", "finalize_buyback doit exister");
-    assert.include(instructions, "burn_back", "burn_back doit exister");
+    // Instructions en camelCase dans les types Anchor générés
+    assert.ok(hasName(instructions, "initiateBuyback"), "initiateBuyback doit exister");
+    assert.ok(hasName(instructions, "finalizeBuyback"), "finalizeBuyback doit exister");
+    assert.ok(hasName(instructions, "burnBack"), "burnBack doit exister");
 
     console.log("\n✅ Instructions Buyback vérifiées:");
-    console.log("   ✓ initiate_buyback (avec validations CPI)");
-    console.log("   ✓ finalize_buyback (avec ratio check)");
-    console.log("   ✓ burn_back (100% burn model)");
+    console.log("   ✓ initiateBuyback (avec validations CPI)");
+    console.log("   ✓ finalizeBuyback (avec ratio check)");
+    console.log("   ✓ burnBack (100% burn model)");
   });
 
   it("Vérifier les instructions critiques du router", () => {
     const routerIdl = routerProgram.idl;
     const instructions = routerIdl.instructions?.map((i: any) => i.name) || [];
 
-    assert.include(instructions, "swap_tokens", "swap_tokens doit exister");
+    // Instructions en camelCase dans les types Anchor générés
+    assert.ok(hasName(instructions, "swapToc"), "swapToc doit exister");
+    assert.ok(hasName(instructions, "executeDcaSwap"), "executeDcaSwap doit exister");
+    assert.ok(hasName(instructions, "emergencyWithdraw"), "emergencyWithdraw doit exister");
 
     console.log("\n✅ Instructions Router vérifiées:");
-    console.log("   ✓ swap_tokens (avec anti-whale check)");
+    console.log("   ✓ swapToc (swap principal avec protection)");
+    console.log("   ✓ executeDcaSwap (DCA automatisé)");
+    console.log("   ✓ emergencyWithdraw (sécurité)");
   });
 
   it("Résumé des protections de sécurité", () => {
@@ -101,8 +120,8 @@ describe("Security Checks - Code Verification", () => {
     console.log("   4. InvalidBackReceived - Vérifie tokens reçus");
     
     console.log("\n🛡️  PROTECTIONS ANTI-MANIPULATION:");
-    console.log("   5. SwapAmountExceedsMaximum - Max 5,000 SOL par swap");
-    console.log("   6. SuspiciousPriceRatio - Ratio < 1,000,000 (NEW)");
+    console.log("   5. AmountExceedsLimit - Protection anti-whale");
+    console.log("   6. SuspiciousPriceRatio - Ratio < 1,000,000");
     
     console.log("\n📈 Score de Sécurité: 9.0/10");
     console.log("✅ Découvert par fuzzing (36.4M inputs testés)");

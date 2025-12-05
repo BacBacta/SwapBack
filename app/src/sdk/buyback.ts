@@ -289,7 +289,9 @@ export async function executeBuyback(
     // Create and send transaction
     const transaction = new Transaction().add(instruction);
     transaction.feePayer = authority.publicKey;
-    transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
+    transaction.recentBlockhash = (
+      await connection.getLatestBlockhash("confirmed")
+    ).blockhash;
 
     const signature = await connection.sendTransaction(transaction, [authority], {
       skipPreflight: false,
@@ -349,7 +351,9 @@ export async function initializeBuyback(
 
     const transaction = new Transaction().add(instruction);
     transaction.feePayer = authority.publicKey;
-    transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
+    transaction.recentBlockhash = (
+      await connection.getLatestBlockhash("confirmed")
+    ).blockhash;
 
     const signature = await connection.sendTransaction(transaction, [authority]);
     await connection.confirmTransaction(signature);
@@ -429,7 +433,9 @@ export async function depositUsdc(
 
     const transaction = new Transaction().add(instruction);
     transaction.feePayer = payer.publicKey;
-    transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
+    transaction.recentBlockhash = (
+      await connection.getLatestBlockhash("confirmed")
+    ).blockhash;
 
     // Sign and send
     let signature: string;

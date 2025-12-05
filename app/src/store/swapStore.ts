@@ -9,6 +9,7 @@ import { RouteCandidate } from "@/../../sdk/src/types/smart-router";
 import { getApiUrl, API_ENDPOINTS } from "@/config/api";
 import { buildHybridIntents, type HybridRouteIntent, type RoutingStrategy } from "@/lib/routing/hybridRouting";
 import type { RouterReliabilitySummary } from "@/types/router";
+import type { NpiOpportunity } from "@/lib/rebates/npiEngine";
 
 type JupiterRoutePlanStep = {
   swapInfo?: {
@@ -29,6 +30,26 @@ type JupiterCpiMeta = {
   isSigner: boolean;
   isWritable: boolean;
 };
+
+export interface NativeRouteMeta {
+  provider: string;
+  outAmount?: string;
+  improvementBps?: number;
+  npiShareLamports?: string;
+  npiShareTokens?: number;
+  explanation?: string;
+  available?: boolean;
+  fromCache?: boolean;
+  fallback?: boolean;
+}
+
+export interface MultiSourceQuoteSummary {
+  source: string;
+  latencyMs: number;
+  ok: boolean;
+  outAmount: string | null;
+  error: string | null;
+}
 
 export type JupiterCpiState = {
   expectedInputAmount: string;
@@ -72,6 +93,10 @@ export interface RouteState {
   selectedRoute: RouteCandidate | null;
   selectedRoutePlan: JupiterRoutePlanStep[] | null;
   jupiterCpi: JupiterCpiState;
+  nativeRoute: NativeRouteMeta | null;
+  npiOpportunity: NpiOpportunity | null;
+  multiSourceQuotes: MultiSourceQuoteSummary[];
+  usedMultiSourceFallback: boolean;
   isMock: boolean; // Indicates if using mock data (devnet/test)
   isLoading: boolean;
   error: string | null;
@@ -158,6 +183,10 @@ const initialRouteState: RouteState = {
   selectedRoute: null,
   selectedRoutePlan: null,
   jupiterCpi: null,
+  nativeRoute: null,
+  npiOpportunity: null,
+  multiSourceQuotes: [],
+  usedMultiSourceFallback: false,
   isMock: false,
   isLoading: false,
   error: null,
@@ -244,13 +273,6 @@ export const useSwapStore = create<SwapStore>()(
         // Route State
         routes: initialRouteState,
 
-        clearRoutes: () =>
-          set((state) => ({
-            routes: {
-              ...initialRouteState,
-            },
-          })),
-
         fetchRoutes: async (options) => {
           const { swap, routingStrategy } = get();
           
@@ -298,6 +320,10 @@ export const useSwapStore = create<SwapStore>()(
             }
 
             const data = await response.json();
+            const nativeRoute = data.nativeRoute ?? null;
+            const npiOpportunity = data.npiOpportunity ?? null;
+            const multiSourceQuotes = Array.isArray(data.multiSourceQuotes) ? data.multiSourceQuotes : [];
+            const usedMultiSourceFallback = data.usedMultiSourceFallback === true;
             
             // API returns {success: true, quote: {...}, routeInfo: {...}}
             if (!data.success || !data.quote) {
@@ -369,6 +395,10 @@ export const useSwapStore = create<SwapStore>()(
                   selectedRoute: route,
                   selectedRoutePlan: routePlan,
                   jupiterCpi: data.jupiterCpi ?? null,
+                   nativeRoute,
+                   npiOpportunity,
+                   multiSourceQuotes,
+                   usedMultiSourceFallback,
                   isMock: data.mock === true,
                   isLoading: false,
                   intents,
@@ -387,6 +417,10 @@ export const useSwapStore = create<SwapStore>()(
                 error: error instanceof Error ? error.message : "Unknown error",
                 selectedRoutePlan: null,
                 jupiterCpi: null,
+                nativeRoute: null,
+                npiOpportunity: null,
+                multiSourceQuotes: [],
+                usedMultiSourceFallback: false,
                 isMock: false,
                 intents: [],
                 reliability: null,
@@ -407,14 +441,9 @@ export const useSwapStore = create<SwapStore>()(
           })),
 
         clearRoutes: () =>
-          set((state) => ({
+          set(() => ({
             routes: {
-              ...state.routes,
-              routes: [],
-              selectedRoute: null,
-              selectedRoutePlan: null,
-              jupiterCpi: null,
-              isMock: false,
+              ...initialRouteState,
             },
           })),
 

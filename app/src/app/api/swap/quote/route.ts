@@ -17,7 +17,12 @@ import {
 import { recordRouterMetric, getRouterReliabilitySummary } from "@/lib/routerMetrics";
 import { buildHybridIntents, type RoutingStrategy } from "@/lib/routing/hybridRouting";
 import { getCircuit, retryWithBackoff, CircuitOpenError } from "@/lib/resilience";
+import { getQuoteAggregator } from "@/lib/quotes/multiSourceAggregator";
+import type { QuoteResult } from "@/lib/quotes/multiSourceAggregator";
+import { calculateNpiOpportunity } from "@/lib/rebates/npiEngine";
+import { getTokenByMint } from "@/constants/tokens";
 import type { JupiterQuoteResponse, JupiterRoutePlanStep } from "@/types/router";
+import { trackServerEvent } from "@/lib/serverAnalytics";
 
 const PRIMARY_JUPITER_API = process.env.JUPITER_API_URL || "https://quote-api.jup.ag/v6";
 
@@ -293,6 +298,8 @@ const isNetworkResolutionError = (error: unknown) => {
  * Get a quote from Jupiter API
  */
 export async function POST(request: NextRequest) {
+  const requestStartedAt = Date.now();
+  let analyticsId = "swapback-server";
   try {
     const body = await request.json();
     const {
@@ -313,6 +320,10 @@ export async function POST(request: NextRequest) {
 
     // Validate inputs
     if (!inputMint || !outputMint || !amount) {
+      trackServerEvent("Quote API Validation Error", {
+        distinctId: analyticsId,
+        reason: "missing-fields",
+      });
       return NextResponse.json(
         { error: "Missing required fields: inputMint, outputMint, amount" },
         withNoStore({ status: 400 })
@@ -322,13 +333,54 @@ export async function POST(request: NextRequest) {
     // Validate amount
     const parsedAmount = typeof amount === "string" ? parseFloat(amount) : amount;
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      trackServerEvent("Quote API Validation Error", {
+        distinctId: analyticsId,
+        reason: "invalid-amount",
+      });
       return NextResponse.json(
         { error: "Invalid amount: must be a positive number" },
         withNoStore({ status: 400 })
       );
     }
 
+    analyticsId = userPublicKey ?? "swapback-server";
+
+    trackServerEvent("Quote API Requested", {
+      distinctId: analyticsId,
+      inputMint,
+      outputMint,
+      amount: parsedAmount,
+      routingStrategy,
+      slippageBps,
+      hasWallet: Boolean(userPublicKey),
+    });
+
     const amountLamports = Math.floor(parsedAmount);
+
+    // Token metadata (decimals) for accurate conversions
+    const inputTokenMeta = getTokenByMint(inputMint);
+    const outputTokenMeta = getTokenByMint(outputMint);
+    const inputDecimals = inputTokenMeta?.decimals ?? 9;
+    const outputDecimals = outputTokenMeta?.decimals ?? 9;
+    const amountTokens = amountLamports / Math.pow(10, inputDecimals);
+
+    // Kick off multi-source aggregator in parallel (Raydium / Orca / cache)
+    const aggregator = getQuoteAggregator();
+    const aggregatedQuotePromise = aggregator
+      .getBestQuote({
+        inputMint,
+        outputMint,
+        amountTokens,
+        amountLamports,
+        inputDecimals,
+        outputDecimals,
+        slippageBps,
+        userPublicKey: userPublicKey ?? undefined,
+      })
+      .catch((aggError) => {
+        console.warn("⚠️ Multi-source aggregator failed", aggError);
+        return null;
+      });
 
     // Build Jupiter API URL
     const params = new URLSearchParams({
@@ -347,15 +399,97 @@ export async function POST(request: NextRequest) {
       amount: parsedAmount,
     });
 
-    // Fetch quote from Jupiter
-    let response: Response;
+    // Fetch quote from Jupiter (primary path)
+    let quote: JupiterQuoteResponse | null = null;
+    let jupiterFetchError: unknown = null;
     try {
-      response = await fetchFromJupiter(endpointPath, {
+      const response = await fetchFromJupiter(endpointPath, {
         method: "GET",
       });
+
+      console.log("📡 Jupiter response:", {
+        status: response.status,
+        ok: response.ok,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ Jupiter API error:", response.status, errorText);
+        jupiterFetchError = new Error(`Jupiter responded ${response.status}`);
+      } else {
+        quote = (await response.json()) as JupiterQuoteResponse;
+        console.log("✅ Quote received:", {
+          inAmount: quote.inAmount,
+          outAmount: quote.outAmount,
+          priceImpact: quote.priceImpactPct,
+          routes: quote.routePlan?.length || 0,
+        });
+      }
     } catch (fetchError) {
-      if (isNetworkResolutionError(fetchError)) {
-        console.warn("🌐 Jupiter DNS lookup failed, sending 503", fetchError);
+      jupiterFetchError = fetchError;
+      console.warn("⚠️ Jupiter fetch failed", fetchError);
+    }
+
+    const aggregatedQuote = await aggregatedQuotePromise;
+
+    if (!quote?.outAmount) {
+      if (aggregatedQuote?.bestQuote) {
+        const fallbackQuote = aggregatedQuote.bestQuote;
+        const fallbackRouteInfo = parseRouteInfo(fallbackQuote);
+        const fallbackReliability = getRouterReliabilitySummary();
+        const fallbackIntents = buildHybridIntents({
+          quote: fallbackQuote,
+          strategy: routingStrategy,
+          amountLamports,
+          slippageBps,
+          priceImpactPct: fallbackRouteInfo.priceImpactPct ?? 0,
+        });
+
+        console.warn("⚠️ Using multi-source fallback route", {
+          provider: aggregatedQuote.source,
+          fromCache: aggregatedQuote.fromCache,
+        });
+
+        trackServerEvent("Quote API Fallback", {
+          distinctId: analyticsId,
+          latencyMs: Date.now() - requestStartedAt,
+          provider: aggregatedQuote.source,
+          fromCache: aggregatedQuote.fromCache,
+          routingStrategy,
+          priceImpactPct: fallbackRouteInfo.priceImpactPct ?? null,
+        });
+
+        return NextResponse.json(
+          {
+            success: true,
+            quote: fallbackQuote,
+            routeInfo: fallbackRouteInfo,
+            intents: fallbackIntents,
+            reliability: fallbackReliability,
+            routingStrategy,
+            jupiterCpi: null,
+            timestamp: Date.now(),
+            nativeRoute: {
+              provider: aggregatedQuote.source,
+              improvementBps: 0,
+              available: true,
+              fromCache: aggregatedQuote.fromCache,
+              fallback: true,
+              explanation: "Route native SwapBack (Jupiter indisponible)",
+            },
+            multiSourceQuotes: summarizeQuoteResults(aggregatedQuote.alternativeQuotes),
+            usedMultiSourceFallback: true,
+          },
+          withNoStore()
+        );
+      }
+
+      if (jupiterFetchError && isNetworkResolutionError(jupiterFetchError)) {
+        trackServerEvent("Quote API Error", {
+          distinctId: analyticsId,
+          latencyMs: Date.now() - requestStartedAt,
+          reason: "jupiter-dns",
+        });
         return NextResponse.json(
           {
             error: "Jupiter indisponible (résolution DNS). Réessayez dans quelques instants.",
@@ -363,43 +497,9 @@ export async function POST(request: NextRequest) {
           withNoStore({ status: 503 })
         );
       }
-      throw fetchError;
+
+      throw jupiterFetchError ?? new Error("Invalid quote response from Jupiter");
     }
-
-    console.log("📡 Jupiter response:", {
-      status: response.status,
-      ok: response.ok,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ Jupiter API error:", response.status, errorText);
-      
-      return NextResponse.json(
-        {
-          error: "Jupiter API error",
-          details: errorText,
-          status: response.status,
-        },
-        withNoStore({ status: response.status >= 500 ? 502 : response.status })
-      );
-    }
-
-    const quote = await response.json() as JupiterQuoteResponse;
-
-    if (!quote || !quote.outAmount) {
-      return NextResponse.json(
-        { error: "Invalid quote response from Jupiter" },
-        withNoStore({ status: 502 })
-      );
-    }
-
-    console.log("✅ Quote received:", {
-      inAmount: quote.inAmount,
-      outAmount: quote.outAmount,
-      priceImpact: quote.priceImpactPct,
-      routes: quote.routePlan?.length || 0,
-    });
 
     // Parse route information
     const routeInfo = parseRouteInfo(quote);
@@ -411,6 +511,40 @@ export async function POST(request: NextRequest) {
       slippageBps,
       priceImpactPct: routeInfo.priceImpactPct ?? 0,
     });
+
+    let nativeRoute: Record<string, unknown> | null = null;
+    let npiOpportunity = null;
+    const multiSourceQuotes = aggregatedQuote
+      ? summarizeQuoteResults(aggregatedQuote.alternativeQuotes)
+      : [];
+
+    if (aggregatedQuote?.bestQuote) {
+      nativeRoute = {
+        provider: aggregatedQuote.source,
+        fromCache: aggregatedQuote.fromCache,
+        outAmount: aggregatedQuote.bestQuote.outAmount,
+      };
+
+      if (aggregatedQuote.source !== "jupiter") {
+        const opportunity = calculateNpiOpportunity({
+          primary: quote,
+          alternative: aggregatedQuote.bestQuote,
+          source: aggregatedQuote.source,
+          outputDecimals,
+        });
+
+        if (opportunity.available) {
+          npiOpportunity = opportunity;
+          nativeRoute = {
+            ...nativeRoute,
+            improvementBps: opportunity.improvementBps,
+            npiShareLamports: opportunity.shareLamports,
+            npiShareTokens: opportunity.shareTokens,
+            explanation: opportunity.explanation,
+          };
+        }
+      }
+    }
 
     // Si userPublicKey est fourni, récupérer les instructions de swap + comptes pour le router
     let jupiterCpi = null;
@@ -485,21 +619,42 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        quote,
-        routeInfo,
-        intents,
-        reliability: reliabilitySummary,
-        routingStrategy,
-        jupiterCpi,
-        timestamp: Date.now(),
-      },
-      withNoStore()
-    );
+    const responsePayload = {
+      success: true,
+      quote,
+      routeInfo,
+      intents,
+      reliability: reliabilitySummary,
+      routingStrategy,
+      jupiterCpi,
+      nativeRoute,
+      npiOpportunity,
+      multiSourceQuotes,
+      usedMultiSourceFallback: false,
+      timestamp: Date.now(),
+    };
+
+    trackServerEvent("Quote API Success", {
+      distinctId: analyticsId,
+      latencyMs: Date.now() - requestStartedAt,
+      routingStrategy,
+      priceImpactPct: routeInfo.priceImpactPct ?? null,
+      routePlanLength: routeInfo.totalSteps,
+      nativeProvider: (nativeRoute as any)?.provider ?? null,
+      hasNpiOpportunity: Boolean(npiOpportunity?.available),
+      hasJupiterCpi: Boolean(jupiterCpi),
+      multiSourceCandidates: multiSourceQuotes.length,
+    });
+
+    return NextResponse.json(responsePayload, withNoStore());
   } catch (error) {
     console.error("❌ Error in /api/swap/quote:", error);
+
+    trackServerEvent("Quote API Error", {
+      distinctId: analyticsId,
+      latencyMs: Date.now() - requestStartedAt,
+      message: error instanceof Error ? error.message : "Unknown",
+    });
 
     return NextResponse.json(
       {
@@ -509,6 +664,18 @@ export async function POST(request: NextRequest) {
       withNoStore({ status: 500 })
     );
   }
+}
+
+function summarizeQuoteResults(results?: QuoteResult[]) {
+  if (!results?.length) return [];
+
+  return results.map((result) => ({
+    source: result.source,
+    latencyMs: result.latencyMs,
+    ok: Boolean(result.quote),
+    outAmount: result.quote?.outAmount ?? null,
+    error: result.error ?? null,
+  }));
 }
 
 /**
