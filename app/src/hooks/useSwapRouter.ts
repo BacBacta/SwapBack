@@ -276,6 +276,10 @@ export function useSwapRouter() {
     }
 
     try {
+      // Get fresh blockhash BEFORE processing transaction
+      const { blockhash, lastValidBlockHeight } = 
+        await connection.getLatestBlockhash('confirmed');
+      
       // Decode the base64 transaction from Jupiter
       const swapTransactionBuf = Buffer.from(swapTransactionBase64, 'base64');
       
@@ -283,9 +287,20 @@ export function useSwapRouter() {
       let transaction: VersionedTransaction | Transaction;
       try {
         transaction = VersionedTransaction.deserialize(swapTransactionBuf);
+        
+        // Update the blockhash in the versioned transaction message
+        // This is critical to avoid "block height exceeded" errors
+        const message = transaction.message;
+        message.recentBlockhash = blockhash;
+        
+        console.log("🔄 Updated blockhash for VersionedTransaction");
       } catch {
         // Fallback to legacy Transaction
         transaction = Transaction.from(swapTransactionBuf);
+        transaction.recentBlockhash = blockhash;
+        transaction.feePayer = wallet.publicKey;
+        
+        console.log("🔄 Updated blockhash for legacy Transaction");
       }
 
       // Sign the transaction
@@ -296,28 +311,22 @@ export function useSwapRouter() {
         signedTx = await wallet.signTransaction(transaction);
       }
 
-      // Get blockhash info for confirmation
-      const { blockhash, lastValidBlockHeight: currentBlockHeight } = 
-        await connection.getLatestBlockhash('confirmed');
-      
-      const blockHeightForConfirmation = options?.lastValidBlockHeight ?? currentBlockHeight;
-
       // Send the transaction
       const rawTx = signedTx.serialize();
       const txSig = await connection.sendRawTransaction(rawTx, {
         skipPreflight: options?.skipPreflight ?? false,
         preflightCommitment: 'confirmed',
-        maxRetries: 3,
+        maxRetries: 5,
       });
 
       console.log("🚀 Jupiter swap sent:", txSig);
 
-      // Confirm the transaction
+      // Confirm the transaction with the fresh blockhash
       await connection.confirmTransaction(
         { 
           signature: txSig, 
           blockhash, 
-          lastValidBlockHeight: blockHeightForConfirmation 
+          lastValidBlockHeight 
         }, 
         'confirmed'
       );
