@@ -238,7 +238,7 @@ function decodeBase64ToUint8Array(data: string): Uint8Array {
 export function EnhancedSwapInterface() {
   const { connected, publicKey } = useWallet();
   const { connection } = useConnection();
-  const { swapWithRouter } = useSwapRouter();
+  const { swapWithRouter, executeJupiterSwap } = useSwapRouter();
   const haptic = useHaptic();
 
   // Store
@@ -940,15 +940,43 @@ export function EnhancedSwapInterface() {
       setLoadingProgress(40);
       setLoadingStep('signing');
 
-      const signature = await swapWithRouter({
-        tokenIn: new PublicKey(swap.inputToken.mint),
-        tokenOut: new PublicKey(swap.outputToken.mint),
-        amountIn: amountInLamports,
-        minOut: minOutLamports,
-        slippageBps,
-        remainingAccounts: staticRemainingAccounts ?? undefined,
-        jupiterRoute: jupiterRoutePayload,
-      });
+      let signature: string | null = null;
+      let useDirectJupiter = false;
+
+      // Try router first, fallback to direct Jupiter if transaction too large
+      try {
+        signature = await swapWithRouter({
+          tokenIn: new PublicKey(swap.inputToken.mint),
+          tokenOut: new PublicKey(swap.outputToken.mint),
+          amountIn: amountInLamports,
+          minOut: minOutLamports,
+          slippageBps,
+          remainingAccounts: staticRemainingAccounts ?? undefined,
+          jupiterRoute: jupiterRoutePayload,
+        });
+      } catch (routerError) {
+        const errorMsg = routerError instanceof Error ? routerError.message : '';
+        
+        // If transaction too large, use direct Jupiter swap
+        if (errorMsg.includes('Transaction too large') || errorMsg.includes('1232')) {
+          console.log('📦 Transaction trop grande, utilisation directe de Jupiter...');
+          useDirectJupiter = true;
+          toast.info('Swap optimisé via Jupiter direct');
+        } else {
+          throw routerError;
+        }
+      }
+
+      // Fallback to direct Jupiter execution if router failed due to size
+      if (useDirectJupiter && routes.jupiterCpi?.swapInstruction) {
+        signature = await executeJupiterSwap(
+          routes.jupiterCpi.swapInstruction,
+          {
+            lastValidBlockHeight: routes.jupiterCpi.lastValidBlockHeight,
+            skipPreflight: false,
+          }
+        );
+      }
 
       setLoadingProgress(70);
       setLoadingStep('confirming');
