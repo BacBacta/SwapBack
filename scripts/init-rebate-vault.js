@@ -8,7 +8,7 @@
 
 const anchor = require("@coral-xyz/anchor");
 const { Connection, Keypair, PublicKey, SystemProgram } = require("@solana/web3.js");
-const { TOKEN_PROGRAM_ID } = require("@solana/spl-token");
+const { TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync, ASSOCIATED_TOKEN_PROGRAM_ID } = require("@solana/spl-token");
 const fs = require("fs");
 const path = require("path");
 
@@ -23,7 +23,7 @@ async function main() {
     (programArgIndex !== -1 && args[programArgIndex + 1]) ||
       process.env.ROUTER_PROGRAM_ID ||
       process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID ||
-        "9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh"
+        "5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf"
   );
 
   const usdcMint = new PublicKey(
@@ -33,10 +33,14 @@ async function main() {
       "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
   );
 
-  const rpcUrl = process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.devnet.solana.com";
+  const rpcUrl = process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
   const connection = new Connection(rpcUrl, "confirmed");
 
-  const walletPath = path.join(process.env.HOME || ".", ".config/solana/id.json");
+  // Try mainnet keypair first, fallback to default
+  let walletPath = path.join(process.cwd(), "mainnet-deploy-keypair.json");
+  if (!fs.existsSync(walletPath)) {
+    walletPath = path.join(process.env.HOME || ".", ".config/solana/id.json");
+  }
   const secret = JSON.parse(fs.readFileSync(walletPath, "utf8"));
   const authority = Keypair.fromSecretKey(Uint8Array.from(secret));
 
@@ -52,9 +56,12 @@ async function main() {
   );
   anchor.setProvider(provider);
 
+  // Load IDL - handle both old and new Anchor IDL formats
   const idlPath = path.join(__dirname, "../target/idl/swapback_router.json");
-  const idl = JSON.parse(fs.readFileSync(idlPath, "utf8"));
-  const program = new anchor.Program(idl, routerProgramId, provider);
+  const idlJson = JSON.parse(fs.readFileSync(idlPath, "utf8"));
+  
+  // For Anchor 0.30+, we need to use the Program constructor differently
+  const program = new anchor.Program(idlJson, provider);
 
   const [routerState] = PublicKey.findProgramAddressSync([
     Buffer.from("router_state"),
@@ -67,6 +74,17 @@ async function main() {
 
   console.log(`🧠 RouterState PDA: ${routerState.toBase58()}`);
   console.log(`🏛️  Rebate vault PDA: ${rebateVault.toBase58()}`);
+  
+  // Check if rebate vault already exists
+  const existingAccount = await connection.getAccountInfo(rebateVault);
+  if (existingAccount) {
+    console.log("\n✅ Le rebate vault existe déjà!");
+    console.log(`   Lamports: ${existingAccount.lamports}`);
+    console.log(`   Owner: ${existingAccount.owner.toBase58()}`);
+    return;
+  }
+
+  console.log("\n⏳ Création du rebate vault...");
 
   const tx = await program.methods
     .initializeRebateVault()
@@ -83,7 +101,7 @@ async function main() {
 
   console.log("\n✅ Rebate vault initialisé!");
   console.log(`   Transaction: ${tx}`);
-  console.log(`   Explorer: https://explorer.solana.com/tx/${tx}?cluster=devnet\n`);
+  console.log(`   Explorer: https://explorer.solana.com/tx/${tx}\n`);
 }
 
 main().catch((err) => {

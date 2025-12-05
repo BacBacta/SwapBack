@@ -30,17 +30,21 @@ async function main() {
     process.exit(1);
   }
 
-  const rpcUrl = process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.devnet.solana.com";
+  const rpcUrl = process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
   const connection = new Connection(rpcUrl, "confirmed");
 
-  const walletPath = path.join(process.env.HOME || ".", ".config/solana/id.json");
+  // Try mainnet keypair first, fallback to default
+  let walletPath = path.join(process.cwd(), "mainnet-deploy-keypair.json");
+  if (!fs.existsSync(walletPath)) {
+    walletPath = path.join(process.env.HOME || ".", ".config/solana/id.json");
+  }
   const secret = JSON.parse(fs.readFileSync(walletPath, "utf8"));
   const authority = Keypair.fromSecretKey(Uint8Array.from(secret));
 
   const routerProgramId = new PublicKey(
     process.env.ROUTER_PROGRAM_ID ||
       process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID ||
-      "9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh"
+      "5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf"
   );
 
   const [routerState] = PublicKey.findProgramAddressSync([
@@ -80,7 +84,7 @@ async function main() {
 
     const tx = new Transaction().add(ix);
     const sig = await sendAndConfirmTransaction(connection, tx, [authority]);
-    console.log(`   ➜ TX: https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    console.log(`   ➜ TX: https://explorer.solana.com/tx/${sig}`);
   }
 
   console.log("\n🎉 Tous les vaults sont prêts!\n");
