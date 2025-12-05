@@ -148,6 +148,16 @@ export function useSwapRouter() {
         primaryOracleAccount: oracleFeeds.primary,
         fallbackOracleAccount: oracleFeeds.fallback ?? null,
         jupiterRoute: normalizedJupiterRoute,
+        // New fields required by updated IDL
+        jupiterSwapIxData: null, // Will be populated by keeper if needed
+        liquidityEstimate: null,
+        volatilityBps: null,
+        minVenueScore: null,
+        slippagePerVenue: null,
+        tokenADecimals: null,
+        tokenBDecimals: null,
+        maxStalenessOverride: null,
+        jitoBundle: null,
       } as const;
 
       const accounts = {
