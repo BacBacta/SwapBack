@@ -1,96 +1,48 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
-import { useBuybackState } from '@/hooks/useBuybackState';
-import BuybackStats from './components/BuybackStats';
-import BuybackProgressBar from './components/BuybackProgressBar';
-import ExecuteBuybackButton from './components/ExecuteBuybackButton';
-import BuybackChart from './components/BuybackChart';
-import RecentBuybacks from './components/RecentBuybacks';
 
-export default function BuybackPage() {
-  const { buybackState, isLoading, error } = useBuybackState();
-
-  if (error) {
-    return (
-      <div className="max-w-3xl mx-auto px-4">
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
-          <p className="text-red-400 text-sm">Error: {error.message}</p>
+// Lazy load SimpleBuybackCard (nouvelle interface épurée)
+const SimpleBuybackCard = dynamic(
+  () => import('@/components/SimpleBuybackCard').then(mod => ({ default: mod.SimpleBuybackCard })),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="w-full max-w-lg mx-auto">
+        <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6">
+          <div className="flex items-center justify-center py-8">
+            <div className="w-8 h-8 border-2 border-orange-500/20 border-t-orange-500 rounded-full animate-spin" />
+          </div>
         </div>
       </div>
-    );
+    )
   }
+);
 
-  if (isLoading || !buybackState) {
-    return (
-      <div className="max-w-3xl mx-auto px-4 space-y-4 animate-pulse">
-        <div className="h-20 bg-white/5 rounded-xl" />
-        <div className="h-32 bg-white/5 rounded-xl" />
-        <div className="h-32 bg-white/5 rounded-xl" />
-      </div>
-    );
-  }
-
+export default function BuybackPage() {
   return (
-    <div className="max-w-3xl mx-auto px-4 space-y-6">
-      {/* Minimal Header */}
+    <div className="max-w-lg mx-auto px-4 py-6">
+      {/* Header Minimal */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center pt-4"
+        transition={{ duration: 0.2 }}
+        className="text-center mb-6"
       >
-        <div className="inline-flex items-center gap-2 mb-3">
-          <span className="text-3xl">🔥</span>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white/90">
-            Buyback
-          </h1>
-        </div>
-        <p className="text-sm text-gray-500">
-          Automated token burn mechanism
+        <h1 className="text-xl font-semibold text-white">Buyback & Burn</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Mécanisme de rachat automatique
         </p>
       </motion.div>
 
-      {/* Content */}
+      {/* Interface Buyback Simplifiée */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="space-y-4"
+        transition={{ duration: 0.2 }}
       >
-        {/* Stats */}
-        <div className="bg-white/5 border border-white/10 rounded-xl p-4 sm:p-6">
-          <BuybackStats
-            totalUsdcSpent={buybackState.totalUsdcSpent}
-            totalBackBurned={buybackState.totalBackBurned}
-            buybackCount={buybackState.buybackCount}
-          />
-        </div>
-
-        {/* Progress */}
-        <div className="bg-white/5 border border-white/10 rounded-xl p-4 sm:p-6">
-          <BuybackProgressBar
-            currentBalance={buybackState.vaultBalance || 0}
-            threshold={buybackState.minBuybackAmount}
-            progressPercent={buybackState.progressPercent || 0}
-          />
-        </div>
-
-        {/* Execute Button */}
-        {buybackState.canExecute && (
-          <div className="bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/30 rounded-xl p-4 sm:p-6">
-            <ExecuteBuybackButton />
-          </div>
-        )}
-
-        {/* Chart */}
-        <div className="bg-white/5 border border-white/10 rounded-xl p-4 sm:p-6">
-          <BuybackChart />
-        </div>
-
-        {/* Recent */}
-        <div className="bg-white/5 border border-white/10 rounded-xl p-4 sm:p-6">
-          <RecentBuybacks />
-        </div>
+        <SimpleBuybackCard />
       </motion.div>
     </div>
   );
