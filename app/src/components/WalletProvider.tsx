@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, ReactNode, useMemo, useCallback } from "react";
+import { FC, ReactNode, useMemo, useCallback, useState, useEffect } from "react";
 import {
   ConnectionProvider,
   WalletProvider as SolanaWalletProvider,
@@ -17,7 +17,16 @@ import { monitor } from "@/lib/protocolMonitor";
 // Import des styles du wallet adapter
 import "@solana/wallet-adapter-react-ui/styles.css";
 
+// Fallback RPC endpoints pour mainnet (gratuits avec limitations)
+const MAINNET_FALLBACK_RPCS = [
+  "https://api.mainnet-beta.solana.com", // Official Solana RPC
+  "https://solana-mainnet.g.alchemy.com/v2/demo", // Alchemy demo
+];
+
 export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  const [rpcIndex, setRpcIndex] = useState(0);
+  const [rpcError, setRpcError] = useState(false);
+  
   // Configuration du réseau - MAINNET pour production
   // Le réseau est déterminé par NEXT_PUBLIC_SOLANA_NETWORK dans .env.local
   const networkEnv = (process.env.NEXT_PUBLIC_SOLANA_NETWORK || DEFAULT_SOLANA_NETWORK).toLowerCase();
@@ -38,17 +47,68 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
   };
   
   const network = getNetwork();
-  const endpoint = useMemo(() => {
-    // Utiliser la RPC URL de l'environnement si disponible
+  
+  // Build list of RPC endpoints with fallbacks
+  const rpcEndpoints = useMemo(() => {
+    const endpoints: string[] = [];
+    
+    // Primary: environment RPC
     const rpcFromEnv = process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
     if (rpcFromEnv && rpcFromEnv.trim() !== "") {
-      return rpcFromEnv;
+      endpoints.push(rpcFromEnv);
     }
-    if (network === WalletAdapterNetwork.Devnet) {
-      return DEFAULT_SOLANA_RPC_URL;
+    
+    // Add fallbacks for mainnet
+    if (network === WalletAdapterNetwork.Mainnet) {
+      endpoints.push(...MAINNET_FALLBACK_RPCS);
+    } else if (network === WalletAdapterNetwork.Devnet) {
+      endpoints.push(DEFAULT_SOLANA_RPC_URL);
+      endpoints.push("https://api.devnet.solana.com");
     }
-    return clusterApiUrl(network);
+    
+    // Final fallback
+    endpoints.push(clusterApiUrl(network));
+    
+    return [...new Set(endpoints)]; // Remove duplicates
   }, [network]);
+  
+  const endpoint = useMemo(() => {
+    return rpcEndpoints[rpcIndex] || rpcEndpoints[0];
+  }, [rpcEndpoints, rpcIndex]);
+  
+  // Test RPC connection and fallback if needed
+  useEffect(() => {
+    const testConnection = async () => {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 'test',
+            method: 'getHealth',
+          }),
+        });
+        
+        if (response.status === 403 || response.status === 429) {
+          console.warn(`RPC ${endpoint} returned ${response.status}, trying fallback...`);
+          setRpcError(true);
+          if (rpcIndex < rpcEndpoints.length - 1) {
+            setRpcIndex(rpcIndex + 1);
+          }
+        } else {
+          setRpcError(false);
+        }
+      } catch (error) {
+        console.warn(`RPC ${endpoint} failed, trying fallback...`);
+        if (rpcIndex < rpcEndpoints.length - 1) {
+          setRpcIndex(rpcIndex + 1);
+        }
+      }
+    };
+    
+    testConnection();
+  }, [endpoint, rpcIndex, rpcEndpoints]);
 
   // Configuration des wallets supportés
   // Sur mobile, les wallets injectent window.solana
