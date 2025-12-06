@@ -9,7 +9,7 @@
  * - Tooltips pour les paramètres
  */
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Settings, 
@@ -34,31 +34,57 @@ interface SettingsState {
 const SLIPPAGE_PRESETS = [0.1, 0.5, 1.0, 3.0];
 
 export function SimpleSettingsCard() {
-  const [settings, setSettings] = useState<SettingsState>({
-    slippage: 0.5,
-    deadline: 20,
-    txAlerts: true,
-    dcaAlerts: true,
-    expertMode: false,
-    mevProtection: true,
-    priorityFee: "auto",
+  const [settings, setSettings] = useState<SettingsState>(() => {
+    // Load settings from localStorage on init
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem("swapback_settings");
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch {
+          // Ignore parse errors
+        }
+      }
+    }
+    return {
+      slippage: 0.5,
+      deadline: 20,
+      txAlerts: true,
+      dcaAlerts: true,
+      expertMode: false,
+      mevProtection: true,
+      priorityFee: "auto",
+    };
   });
   
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [customSlippage, setCustomSlippage] = useState("");
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState(true); // Start as saved since we loaded from storage
 
-  const updateSetting = <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => {
+  // Auto-save on settings change (debounced)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const timer = setTimeout(() => {
+      localStorage.setItem("swapback_settings", JSON.stringify(settings));
+      setSaved(true);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [settings]);
+
+  const updateSetting = useCallback(<K extends keyof SettingsState>(key: K, value: SettingsState[K]) => {
     setSettings(prev => ({ ...prev, [key]: value }));
     setSaved(false);
-  };
+  }, []);
 
-  const handleSave = () => {
-    // TODO: Persist settings
-    localStorage.setItem("swapback_settings", JSON.stringify(settings));
+  const handleSave = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem("swapback_settings", JSON.stringify(settings));
+    }
     toast.success("Paramètres sauvegardés");
     setSaved(true);
-  };
+  }, [settings]);
 
   const handleSlippagePreset = (value: number) => {
     updateSetting("slippage", value);

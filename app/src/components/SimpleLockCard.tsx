@@ -9,7 +9,7 @@
  * - Avantages en section collapsible
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Lock, 
@@ -23,6 +23,7 @@ import {
   Coins
 } from "lucide-react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useBoostSystem } from "@/hooks/useBoostSystem";
 import toast from "react-hot-toast";
 
 type TabId = "lock" | "unlock";
@@ -44,18 +45,31 @@ const DURATION_OPTIONS = [
 
 export function SimpleLockCard() {
   const { connected, publicKey } = useWallet();
+  const { 
+    userLock, 
+    lockTokens, 
+    unlockTokens, 
+    loading: boostLoading,
+    error: boostError,
+    refreshData
+  } = useBoostSystem();
+  
   const [activeTab, setActiveTab] = useState<TabId>("lock");
   const [amount, setAmount] = useState("");
   const [duration, setDuration] = useState(30);
   const [loading, setLoading] = useState(false);
   const [showBenefits, setShowBenefits] = useState(false);
   
-  // Mock data - à remplacer par les vraies données on-chain
-  const [lockedPositions] = useState<LockPosition[]>([
-    // { amount: 1000, duration: 30, endDate: new Date('2025-01-05'), rewards: 15.5, tier: 'Silver' }
-  ]);
+  // Derive locked position from on-chain data
+  const lockedPosition: LockPosition | null = userLock?.isActive ? {
+    amount: userLock.amountLocked / 1e9, // Convert from lamports
+    duration: Math.floor(userLock.lockDuration / 86400), // Convert seconds to days
+    endDate: new Date((userLock.lockTime + userLock.lockDuration) * 1000),
+    rewards: userLock.boost / 100, // Convert bps to %
+    tier: userLock.level.charAt(0).toUpperCase() + userLock.level.slice(1)
+  } : null;
   
-  const totalLocked = lockedPositions.reduce((sum, p) => sum + p.amount, 0);
+  const totalLocked = lockedPosition?.amount || 0;
 
   const handleLock = async () => {
     if (!connected) {
@@ -69,13 +83,18 @@ export function SimpleLockCard() {
     }
 
     setLoading(true);
+    const toastId = toast.loading("Verrouillage en cours...");
     try {
-      // TODO: Implémenter le lock on-chain
-      await new Promise(r => setTimeout(r, 2000));
-      toast.success(`${amount} BACK verrouillés pour ${duration} jours`);
+      const signature = await lockTokens({
+        amount: parseFloat(amount),
+        durationDays: duration
+      });
+      toast.success(`${amount} BACK verrouillés pour ${duration} jours`, { id: toastId });
       setAmount("");
+      await refreshData();
     } catch (error) {
-      toast.error("Erreur lors du verrouillage");
+      const message = error instanceof Error ? error.message : "Erreur lors du verrouillage";
+      toast.error(message, { id: toastId });
     } finally {
       setLoading(false);
     }
@@ -83,12 +102,14 @@ export function SimpleLockCard() {
 
   const handleUnlock = async (position: LockPosition) => {
     setLoading(true);
+    const toastId = toast.loading("Déverrouillage en cours...");
     try {
-      // TODO: Implémenter le unlock on-chain
-      await new Promise(r => setTimeout(r, 2000));
-      toast.success(`${position.amount} BACK déverrouillés`);
+      const signature = await unlockTokens();
+      toast.success(`${position.amount} BACK déverrouillés`, { id: toastId });
+      await refreshData();
     } catch (error) {
-      toast.error("Erreur lors du déverrouillage");
+      const message = error instanceof Error ? error.message : "Erreur lors du déverrouillage";
+      toast.error(message, { id: toastId });
     } finally {
       setLoading(false);
     }

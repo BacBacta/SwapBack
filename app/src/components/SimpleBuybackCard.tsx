@@ -25,29 +25,39 @@ import {
   Zap
 } from "lucide-react";
 import { useBuybackState } from "@/hooks/useBuybackState";
+import { useExecuteBuyback } from "@/hooks/useExecuteBuyback";
+import { useBuybackHistory } from "@/hooks/useBuybackHistory";
 import toast from "react-hot-toast";
 
 type SectionId = "history" | "faq" | "how";
 
 export function SimpleBuybackCard() {
   const { buybackState, isLoading, error } = useBuybackState();
+  const { execute: executeBuyback, isExecuting } = useExecuteBuyback();
   const [expandedSection, setExpandedSection] = useState<SectionId | null>(null);
-  const [executing, setExecuting] = useState(false);
 
   const toggleSection = (id: SectionId) => {
     setExpandedSection(expandedSection === id ? null : id);
   };
 
   const handleExecuteBuyback = async () => {
-    setExecuting(true);
+    if (!buybackState?.pendingUsdc || buybackState.pendingUsdc <= 0) {
+      toast.error("Aucun USDC en attente pour le buyback");
+      return;
+    }
+
     try {
-      // TODO: Implement actual buyback execution
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      toast.success("Buyback exécuté avec succès !");
+      const result = await executeBuyback({
+        usdcAmount: buybackState.pendingUsdc,
+        minBackAmount: 0 // No slippage protection for simplicity
+      });
+      
+      if (result) {
+        toast.success(`Buyback exécuté ! ${result.backBurned.toLocaleString()} BACK brûlés`);
+      }
     } catch (err) {
-      toast.error("Erreur lors de l'exécution");
-    } finally {
-      setExecuting(false);
+      console.error("Buyback error:", err);
+      // Error toast is handled by the hook
     }
   };
 
@@ -156,10 +166,10 @@ export function SimpleBuybackCard() {
           {canExecute ? (
             <button
               onClick={handleExecuteBuyback}
-              disabled={executing}
+              disabled={isExecuting}
               className="w-full py-4 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all"
             >
-              {executing ? (
+              {isExecuting ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
                   Exécution...
@@ -341,14 +351,25 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
   );
 }
 
-// Recent buybacks list (placeholder)
+// Recent buybacks list with real data
 function RecentBuybacksList() {
-  // TODO: Fetch real data
-  const recentBuybacks = [
-    { date: "2025-12-05", amount: 1250, burned: 4500 },
-    { date: "2025-12-03", amount: 980, burned: 3200 },
-    { date: "2025-11-28", amount: 1100, burned: 3800 },
-  ];
+  const { buybacks, isLoading } = useBuybackHistory();
+  
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-6">
+        <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
+      </div>
+    );
+  }
+
+  // Map buyback history to display format
+  const recentBuybacks = buybacks.slice(0, 5).map(bb => ({
+    date: new Date(bb.timestamp * 1000).toLocaleDateString('fr-FR'),
+    amount: bb.usdcAmount,
+    burned: bb.backBurned,
+    signature: bb.signature
+  }));
 
   if (recentBuybacks.length === 0) {
     return (
