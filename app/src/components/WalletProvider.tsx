@@ -17,10 +17,14 @@ import { monitor } from "@/lib/protocolMonitor";
 // Import des styles du wallet adapter
 import "@solana/wallet-adapter-react-ui/styles.css";
 
-// Fallback RPC endpoints pour mainnet (gratuits avec limitations)
+// Fallback RPC endpoints pour mainnet
+// NOTE: Most free public RPCs block browser requests (CORS)
+// You MUST use a proper RPC provider with API key for production
 const MAINNET_FALLBACK_RPCS = [
-  "https://api.mainnet-beta.solana.com", // Official Solana RPC
-  "https://solana-mainnet.g.alchemy.com/v2/demo", // Alchemy demo
+  // Free public RPCs that support CORS (with rate limits)
+  "https://rpc.ankr.com/solana", // Ankr - supports CORS, 30 req/sec
+  "https://solana.publicnode.com", // PublicNode - supports CORS
+  "https://solana-mainnet.rpc.extrnode.com", // ExtrNode - supports CORS
 ];
 
 export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
@@ -66,9 +70,6 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
       endpoints.push("https://api.devnet.solana.com");
     }
     
-    // Final fallback
-    endpoints.push(clusterApiUrl(network));
-    
     return [...new Set(endpoints)]; // Remove duplicates
   }, [network]);
   
@@ -76,39 +77,57 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
     return rpcEndpoints[rpcIndex] || rpcEndpoints[0];
   }, [rpcEndpoints, rpcIndex]);
   
-  // Test RPC connection and fallback if needed
+  // Test RPC connection and fallback if needed (only once per endpoint)
   useEffect(() => {
+    let isMounted = true;
+    
     const testConnection = async () => {
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             jsonrpc: '2.0',
-            id: 'test',
+            id: 'health-check',
             method: 'getHealth',
           }),
+          signal: controller.signal,
         });
         
+        clearTimeout(timeoutId);
+        
+        if (!isMounted) return;
+        
         if (response.status === 403 || response.status === 429) {
-          console.warn(`RPC ${endpoint} returned ${response.status}, trying fallback...`);
+          console.warn(`RPC ${endpoint.substring(0, 50)}... returned ${response.status}, trying fallback...`);
           setRpcError(true);
           if (rpcIndex < rpcEndpoints.length - 1) {
-            setRpcIndex(rpcIndex + 1);
+            setRpcIndex(prev => prev + 1);
+          } else {
+            console.error("All RPC endpoints failed. Please configure a valid RPC in .env.local");
           }
         } else {
+          console.log(`✅ Connected to RPC: ${endpoint.substring(0, 50)}...`);
           setRpcError(false);
         }
       } catch (error) {
-        console.warn(`RPC ${endpoint} failed, trying fallback...`);
+        if (!isMounted) return;
+        console.warn(`RPC ${endpoint.substring(0, 50)}... failed, trying fallback...`);
         if (rpcIndex < rpcEndpoints.length - 1) {
-          setRpcIndex(rpcIndex + 1);
+          setRpcIndex(prev => prev + 1);
+        } else {
+          console.error("All RPC endpoints failed. Please configure a valid RPC in .env.local");
         }
       }
     };
     
     testConnection();
-  }, [endpoint, rpcIndex, rpcEndpoints]);
+    
+    return () => { isMounted = false; };
+  }, [endpoint, rpcIndex, rpcEndpoints.length]);
 
   // Configuration des wallets supportés
   // Sur mobile, les wallets injectent window.solana
