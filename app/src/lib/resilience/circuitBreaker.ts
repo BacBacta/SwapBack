@@ -233,6 +233,36 @@ export function resetAllCircuits(): void {
 }
 
 /**
+ * Vérifie si une erreur est une erreur réseau/DNS transitoire
+ */
+export function isTransientNetworkError(error: Error): boolean {
+  const message = error.message.toLowerCase();
+  const code = (error as any)?.code ?? (error as any)?.cause?.code;
+  
+  return (
+    // Erreurs DNS
+    code === "ENOTFOUND" ||
+    code === "EAI_AGAIN" ||
+    code === "ECONNRESET" ||
+    code === "ECONNREFUSED" ||
+    code === "ETIMEDOUT" ||
+    code === "EPIPE" ||
+    // Erreurs réseau génériques
+    message.includes("fetch") ||
+    message.includes("network") ||
+    message.includes("dns") ||
+    message.includes("socket") ||
+    message.includes("timeout") ||
+    message.includes("aborted") ||
+    // Erreurs HTTP 5xx
+    message.includes("http 5") ||
+    message.includes("502") ||
+    message.includes("503") ||
+    message.includes("504")
+  );
+}
+
+/**
  * Helper pour créer un fetch avec retry + circuit breaker
  */
 export function createResilientFetch(
@@ -257,14 +287,7 @@ export function createResilientFetch(
       circuit,
       {
         ...retryConfig,
-        retryableErrors: (error) => {
-          // Retry sur erreurs réseau et 5xx
-          return (
-            error.message.includes("fetch") ||
-            error.message.includes("network") ||
-            error.message.includes("HTTP 5")
-          );
-        },
+        retryableErrors: isTransientNetworkError,
       }
     );
   };

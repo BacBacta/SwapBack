@@ -16,7 +16,7 @@ import {
 } from "@solana/web3.js";
 import { recordRouterMetric, getRouterReliabilitySummary } from "@/lib/routerMetrics";
 import { buildHybridIntents, type RoutingStrategy } from "@/lib/routing/hybridRouting";
-import { getCircuit, retryWithBackoff, CircuitOpenError } from "@/lib/resilience";
+import { getCircuit, retryWithBackoff, CircuitOpenError, isTransientNetworkError } from "@/lib/resilience";
 import { getQuoteAggregator } from "@/lib/quotes/multiSourceAggregator";
 import type { QuoteResult } from "@/lib/quotes/multiSourceAggregator";
 import { calculateNpiOpportunity } from "@/lib/rebates/npiEngine";
@@ -277,8 +277,11 @@ async function fetchFromJupiter(path: string, init?: RequestInit) {
       maxDelayMs: 5000,
       jitter: true,
       retryableErrors: (error) => {
-        // Ne pas retry sur les erreurs client (4xx)
-        return !error.message.includes("responded 4");
+        // Retry sur erreurs réseau/DNS transitoires, mais pas sur 4xx
+        if (error.message.includes("responded 4")) {
+          return false;
+        }
+        return isTransientNetworkError(error);
       },
     }
   );
