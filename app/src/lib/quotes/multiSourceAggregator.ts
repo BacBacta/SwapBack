@@ -5,7 +5,21 @@
 
 import type { JupiterQuoteResponse } from "@/types/router";
 import { getQuoteCache } from "../cache/quoteCache";
-import { retryWithBackoff } from "../resilience/circuitBreaker";
+import { retryWithBackoff, CircuitBreaker } from "../resilience/circuitBreaker";
+
+// === Circuit Breakers par source ===
+const sourceCircuitBreakers = new Map<string, CircuitBreaker>();
+
+function getCircuitBreaker(sourceName: string): CircuitBreaker {
+  if (!sourceCircuitBreakers.has(sourceName)) {
+    sourceCircuitBreakers.set(sourceName, new CircuitBreaker(sourceName, {
+      failureThreshold: 3,
+      resetTimeoutMs: 30000,
+      successThreshold: 2,
+    }));
+  }
+  return sourceCircuitBreakers.get(sourceName)!;
+}
 
 export interface QuoteSource {
   name: string;
@@ -224,6 +238,13 @@ export class MultiSourceQuoteAggregator {
   }
 
   /**
+   * Retourne la liste des sources configurées
+   */
+  getSources(): QuoteSource[] {
+    return [...this.sources];
+  }
+
+  /**
    * Active/désactive une source
    */
   setSourceEnabled(name: string, enabled: boolean): void {
@@ -235,6 +256,7 @@ export class MultiSourceQuoteAggregator {
 
   /**
    * Récupère le meilleur quote de toutes les sources
+   * Intègre circuit breaker par source pour la résilience
    */
   async getBestQuote(params: QuoteParams): Promise<AggregatedQuote> {
     const startTime = Date.now();
@@ -251,29 +273,75 @@ export class MultiSourceQuoteAggregator {
       };
     }
 
-    // 2. Fetch en parallèle de toutes les sources activées
-    const enabledSources = this.sources.filter(s => s.enabled);
+    // 2. Filtrer les sources activées ET dont le circuit breaker est fermé
+    const enabledSources = this.sources.filter(s => {
+      if (!s.enabled) return false;
+      const cb = getCircuitBreaker(s.name);
+      return cb.canExecute();
+    });
+
+    if (enabledSources.length === 0) {
+      throw new Error("Toutes les sources sont désactivées ou en circuit ouvert");
+    }
+
+    // 3. Fetch en parallèle avec gestion du circuit breaker
     const results = await Promise.all(
-      enabledSources.map(source => source.fetchQuote(params))
+      enabledSources.map(async source => {
+        const cb = getCircuitBreaker(source.name);
+        try {
+          const result = await source.fetchQuote(params);
+          if (result.quote) {
+            cb.recordSuccess();
+          } else {
+            cb.recordFailure();
+          }
+          return result;
+        } catch (error) {
+          cb.recordFailure();
+          return {
+            source: source.name,
+            quote: null,
+            latencyMs: Date.now() - startTime,
+            error: error instanceof Error ? error.message : "Unknown error",
+          };
+        }
+      })
     );
 
-    // 3. Filtrer les quotes valides
+    // 4. Filtrer les quotes valides
     const validResults = results.filter(r => r.quote !== null);
 
     if (validResults.length === 0) {
       throw new Error("Aucune source de quote disponible");
     }
 
-    // 4. Trouver le meilleur quote (output le plus élevé)
+    // 5. Trouver le quote Jupiter comme référence
+    const jupiterResult = validResults.find(r => r.source === "jupiter");
+    const jupiterOutAmount = jupiterResult?.quote ? BigInt(jupiterResult.quote.outAmount) : 0n;
+
+    // 6. Calculer l'improvement par rapport à Jupiter pour chaque source
+    for (const result of validResults) {
+      if (result.quote && jupiterOutAmount > 0n) {
+        const outAmount = BigInt(result.quote.outAmount);
+        if (outAmount > jupiterOutAmount) {
+          result.improvementBps = Number((outAmount - jupiterOutAmount) * 10000n / jupiterOutAmount);
+        } else {
+          result.improvementBps = -Number((jupiterOutAmount - outAmount) * 10000n / jupiterOutAmount);
+        }
+      }
+    }
+
+    // 7. Trier par netOutAmount (si disponible) sinon outAmount
     validResults.sort((a, b) => {
-      const outA = BigInt(a.quote!.outAmount);
-      const outB = BigInt(b.quote!.outAmount);
-      return outB > outA ? 1 : outB < outA ? -1 : 0;
+      // Préférer netOutAmount pour un classement après frais
+      const netA = a.netOutAmount ? BigInt(a.netOutAmount) : BigInt(a.quote!.outAmount);
+      const netB = b.netOutAmount ? BigInt(b.netOutAmount) : BigInt(b.quote!.outAmount);
+      return netB > netA ? 1 : netB < netA ? -1 : 0;
     });
 
     const best = validResults[0];
 
-    // 5. Mettre en cache
+    // 8. Mettre en cache
     this.cache.set(params.inputMint, params.outputMint, params.amountTokens, best.quote!);
 
     return {

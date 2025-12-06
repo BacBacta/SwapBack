@@ -1,8 +1,9 @@
 import type { JupiterQuoteResponse } from "@/types/router";
+import type { QuoteResult } from "@/lib/quotes/multiSourceAggregator";
 
 export type RoutingStrategy = "smart" | "aggressive" | "defensive";
 
-export type HybridIntentType = "jupiter_best" | "twap_plan" | "internal_liquidity";
+export type HybridIntentType = "jupiter_best" | "twap_plan" | "internal_liquidity" | "dex_direct";
 
 export interface HybridRouteIntent {
   id: string;
@@ -13,6 +14,8 @@ export interface HybridRouteIntent {
   channel: "public" | "jito" | "private-rpc";
   description: string;
   slices?: number;
+  dexSource?: string;
+  improvementBps?: number;
 }
 
 const INTERNAL_LIQUIDITY_MINTS = new Set([
@@ -31,12 +34,21 @@ interface BuildIntentParams {
   amountLamports: number;
   slippageBps: number;
   priceImpactPct: number;
+  alternativeQuotes?: QuoteResult[];
 }
 
 export function buildHybridIntents(params: BuildIntentParams): HybridRouteIntent[] {
-  const { quote, strategy, amountLamports, slippageBps, priceImpactPct } = params;
+  const { quote, strategy, amountLamports, priceImpactPct, alternativeQuotes } = params;
   const intents: HybridRouteIntent[] = [];
   const isLargeOrder = amountLamports > 2_000_000_000; // ~2000 units for 9 decimals
+
+  // Trouver le meilleur DEX non-Jupiter
+  const bestAlternative = alternativeQuotes?.find(q => 
+    q.quote !== null && 
+    q.source !== "jupiter" && 
+    q.improvementBps !== undefined &&
+    q.improvementBps > 5
+  );
 
   // Base Jupiter route
   intents.push({
@@ -48,6 +60,21 @@ export function buildHybridIntents(params: BuildIntentParams): HybridRouteIntent
     channel: "public",
     description: "Route agrégée via Jupiter avec meilleur prix temps réel.",
   });
+
+  // Ajouter la meilleure alternative si elle bat Jupiter de plus de 5 bps
+  if (bestAlternative && bestAlternative.improvementBps) {
+    intents.push({
+      id: createId("dex"),
+      type: "dex_direct",
+      label: `${bestAlternative.source.charAt(0).toUpperCase() + bestAlternative.source.slice(1)} Direct`,
+      percentage: 0.25,
+      etaSeconds: 4,
+      channel: "public",
+      description: `Route directe ${bestAlternative.source} (+${bestAlternative.improvementBps} bps vs Jupiter).`,
+      dexSource: bestAlternative.source,
+      improvementBps: bestAlternative.improvementBps,
+    });
+  }
 
   const shouldAddTwap = strategy !== "aggressive" && (isLargeOrder || priceImpactPct > 1);
   if (shouldAddTwap) {

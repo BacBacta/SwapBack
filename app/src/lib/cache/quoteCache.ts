@@ -217,6 +217,110 @@ export class QuoteCache {
   clear(): void {
     this.cache.clear();
     this.pairStats.clear();
+    this.clearPersistentStorage();
+  }
+
+  /**
+   * Persiste les statistiques des paires dans localStorage
+   * (pour reprendre le warm-up après refresh)
+   */
+  persistPairStats(): void {
+    if (typeof window === "undefined") return;
+    try {
+      const stats = Array.from(this.pairStats.entries()).slice(0, 50); // Max 50 paires
+      localStorage.setItem("swapback_pair_stats", JSON.stringify(stats));
+    } catch {
+      // localStorage plein ou non disponible
+    }
+  }
+
+  /**
+   * Restaure les statistiques des paires depuis localStorage
+   */
+  restorePairStats(): void {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = localStorage.getItem("swapback_pair_stats");
+      if (stored) {
+        const stats = JSON.parse(stored) as Array<[string, { hits: number; lastAmount: number }]>;
+        for (const [key, value] of stats) {
+          this.pairStats.set(key, value);
+        }
+      }
+    } catch {
+      // Ignore les erreurs de parsing
+    }
+  }
+
+  /**
+   * Efface le stockage persistant
+   */
+  private clearPersistentStorage(): void {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.removeItem("swapback_pair_stats");
+    } catch {
+      // Ignore
+    }
+  }
+
+  /**
+   * Persiste les quotes chauds pour un démarrage rapide
+   */
+  persistHotQuotes(): void {
+    if (typeof window === "undefined") return;
+    try {
+      const hotQuotes: Array<[string, CachedQuote]> = [];
+      for (const [key, cached] of this.cache) {
+        if (cached.hits >= 2) {
+          hotQuotes.push([key, cached]);
+        }
+      }
+      // Limiter à 20 quotes max
+      const limited = hotQuotes.slice(0, 20);
+      localStorage.setItem("swapback_hot_quotes", JSON.stringify(limited));
+    } catch {
+      // localStorage plein
+    }
+  }
+
+  /**
+   * Restaure les quotes chauds depuis localStorage
+   * (utile pour le premier chargement)
+   */
+  restoreHotQuotes(): void {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = localStorage.getItem("swapback_hot_quotes");
+      if (stored) {
+        const quotes = JSON.parse(stored) as Array<[string, CachedQuote]>;
+        const now = Date.now();
+        for (const [key, cached] of quotes) {
+          // Ne restaurer que si moins de 30 secondes (quotes stale OK pour affichage initial)
+          if (now - cached.timestamp < 30000) {
+            this.cache.set(key, { ...cached, timestamp: now - 1500 }); // Marqué comme proche expiration
+          }
+        }
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  /**
+   * Initialise le cache avec persistance
+   */
+  initWithPersistence(): void {
+    this.restorePairStats();
+    this.restoreHotQuotes();
+    
+    // Persister périodiquement
+    if (typeof window !== "undefined") {
+      setInterval(() => {
+        this.persistPairStats();
+        this.persistHotQuotes();
+      }, 10000); // Toutes les 10 secondes
+    }
   }
 }
 
@@ -226,6 +330,7 @@ let globalQuoteCache: QuoteCache | null = null;
 export function getQuoteCache(): QuoteCache {
   if (!globalQuoteCache) {
     globalQuoteCache = new QuoteCache();
+    globalQuoteCache.initWithPersistence();
   }
   return globalQuoteCache;
 }

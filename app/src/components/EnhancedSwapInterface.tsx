@@ -17,7 +17,7 @@ import { useSwapRouter, DerivedSwapAccounts, type SwapRequest } from "@/hooks/us
 import { ORCA_WHIRLPOOL_PROGRAM_ID } from "@/sdk/config/orca-pools";
 import { RAYDIUM_AMM_PROGRAM_ID } from "@/sdk/config/raydium-pools";
 import { getExplorerUrl } from "@/config/constants";
-import { useInstrumentedFetchRoutes } from "@/hooks/useInstrumentedFetchRoutes";
+import { useInstrumentedFetchRoutes, runInstrumentedFetchRoutes } from "@/hooks/useInstrumentedFetchRoutes";
 import dynamic from "next/dynamic";
 import { ClockIcon, ExclamationTriangleIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import { motion, AnimatePresence } from "framer-motion";
@@ -331,11 +331,16 @@ export function EnhancedSwapInterface() {
   const lastFetchParamsRef = useRef<string>("");
 
   // ✅ Single debounced fetch function with duplicate prevention
+  // Uses fresh state from store to avoid stale closures and infinite loops
   const debouncedFetchRoutes = useMemo(
     () =>
       debounce(async (source: string) => {
+        // Get fresh state from store to avoid stale closure issues
+        const currentState = useSwapStore.getState();
+        const currentSwap = currentState.swap;
+        
         // Create a unique key for current params
-        const currentParams = `${swap.inputToken?.mint}-${swap.outputToken?.mint}-${swap.inputAmount}-${selectedRouter}-${routingStrategy}`;
+        const currentParams = `${currentSwap.inputToken?.mint}-${currentSwap.outputToken?.mint}-${currentSwap.inputAmount}-${selectedRouter}-${routingStrategy}`;
         
         // Skip if already fetching with same params
         if (isFetchingRef.current && currentParams === lastFetchParamsRef.current) {
@@ -343,8 +348,8 @@ export function EnhancedSwapInterface() {
           return;
         }
 
-        const amount = parseFloat(swap.inputAmount);
-        if (!swap.inputToken || !swap.outputToken || !Number.isFinite(amount) || amount <= 0) {
+        const amount = parseFloat(currentSwap.inputAmount);
+        if (!currentSwap.inputToken || !currentSwap.outputToken || !Number.isFinite(amount) || amount <= 0) {
           return;
         }
 
@@ -352,7 +357,16 @@ export function EnhancedSwapInterface() {
         lastFetchParamsRef.current = currentParams;
         
         try {
-          await instrumentedFetchRoutes(source as "input-change" | "router-change" | "auto-refresh");
+          await runInstrumentedFetchRoutes(
+            {
+              swap: currentSwap,
+              routingStrategy,
+              selectedRouter,
+              walletAddress,
+              fetchRoutes,
+            },
+            source as "input-change" | "router-change" | "auto-refresh"
+          );
           setHasSearchedRoute(true);
         } catch (err) {
           console.debug(`[${source}] Route fetch failed:`, err);
@@ -360,7 +374,7 @@ export function EnhancedSwapInterface() {
           isFetchingRef.current = false;
         }
       }, 800), // 800ms debounce
-    [swap.inputToken, swap.outputToken, swap.inputAmount, selectedRouter, routingStrategy, instrumentedFetchRoutes]
+    [selectedRouter, routingStrategy, walletAddress, fetchRoutes, setHasSearchedRoute]
   );
 
   // Cleanup debounce on unmount
@@ -371,15 +385,20 @@ export function EnhancedSwapInterface() {
   }, [debouncedFetchRoutes]);
 
   // ✅ Consolidated: Fetch routes when any relevant input changes
+  // Use stable references (mint addresses) to avoid unnecessary re-fetches
+  const inputTokenMint = swap.inputToken?.mint;
+  const outputTokenMint = swap.outputToken?.mint;
+  const currentInputAmount = swap.inputAmount;
+  
   useEffect(() => {
-    if (swap.inputToken && swap.outputToken && parseFloat(swap.inputAmount) > 0) {
+    if (inputTokenMint && outputTokenMint && parseFloat(currentInputAmount) > 0) {
       debouncedFetchRoutes("input-change");
     } else {
       // Clear routes if inputs are invalid
       clearRoutes();
       setHasSearchedRoute(false);
     }
-  }, [swap.inputToken, swap.outputToken, swap.inputAmount, selectedRouter, routingStrategy, debouncedFetchRoutes, clearRoutes]);
+  }, [inputTokenMint, outputTokenMint, currentInputAmount, selectedRouter, routingStrategy, debouncedFetchRoutes, clearRoutes, setHasSearchedRoute]);
 
   // Calculate price impact and suggest slippage
   useEffect(() => {

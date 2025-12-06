@@ -1,5 +1,5 @@
 {
-  "address": "7wCCwRXxWvMY2DJDRrnhFg3b8jVPb5vVPxLH5YAGL6eJ",
+  "address": "Fx6yfXhqq1i3CJjocwnLXMw3VMLFt5mfoLtWPJzSRQvn",
   "metadata": {
     "name": "swapback_buyback",
     "version": "0.1.0",
@@ -916,6 +916,10 @@
           },
           {
             "name": "back_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "usdc_mint",
             "type": "pubkey"
           },
           {

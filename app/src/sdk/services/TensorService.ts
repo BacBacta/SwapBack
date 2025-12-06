@@ -24,7 +24,7 @@ const safePublicKey = (label: string, value: string | undefined): PublicKey | nu
   try {
     return new PublicKey(value);
   } catch (error) {
-    console.warn(`TensorService: invalid ${label} (\"${value}\")`, error);
+    console.warn(`TensorService: invalid ${label} ("${value}")`, error);
     return null;
   }
 };
