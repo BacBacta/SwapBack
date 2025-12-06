@@ -4,6 +4,12 @@
  */
 
 import type { JupiterQuoteResponse } from "@/types/router";
+import {
+  DEFAULT_QUOTE_CACHE_CONFIG,
+  HOT_PAIRS,
+  PRELOAD_AMOUNTS,
+  type QuoteCacheConfig,
+} from "@/config/quote-cache";
 
 interface CachedQuote {
   quote: JupiterQuoteResponse;
@@ -11,31 +17,9 @@ interface CachedQuote {
   hits: number;
 }
 
-interface QuoteCacheConfig {
-  /** TTL en ms (défaut: 2000ms pour quotes volatiles) */
-  ttlMs: number;
-  /** Taille max du cache */
-  maxSize: number;
-  /** Seuil de hits pour prédiction */
-  predictionThreshold: number;
-  /** Intervalle de refresh prédictif */
-  predictionRefreshMs: number;
-}
-
-const DEFAULT_CONFIG: QuoteCacheConfig = {
-  ttlMs: 2000, // 2 secondes - quotes très frais
-  maxSize: 100,
-  predictionThreshold: 3,
-  predictionRefreshMs: 1500,
-};
-
-// Paires les plus tradées sur Solana
-const HOT_PAIRS = [
-  { input: "So11111111111111111111111111111111111111112", output: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" }, // SOL/USDC
-  { input: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", output: "So11111111111111111111111111111111111111112" }, // USDC/SOL
-  { input: "So11111111111111111111111111111111111111112", output: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB" }, // SOL/USDT
-  { input: "So11111111111111111111111111111111111111112", output: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN" }, // SOL/JUP
-];
+// Clés de stockage persistant (peuvent être configurées)
+const PAIR_STATS_STORAGE_KEY = "swapback_pair_stats";
+const HOT_QUOTES_STORAGE_KEY = "swapback_hot_quotes";
 
 type QuoteFetcher = (inputMint: string, outputMint: string, amount: number) => Promise<JupiterQuoteResponse>;
 
@@ -44,10 +28,16 @@ export class QuoteCache {
   private config: QuoteCacheConfig;
   private fetcher: QuoteFetcher | null = null;
   private predictionInterval: NodeJS.Timeout | null = null;
+  private persistInterval: NodeJS.Timeout | null = null;
   private pairStats = new Map<string, { hits: number; lastAmount: number }>();
 
   constructor(config: Partial<QuoteCacheConfig> = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.config = { ...DEFAULT_QUOTE_CACHE_CONFIG, ...config };
+    
+    // Log de la configuration en mode développement
+    if (typeof process !== "undefined" && process.env.NODE_ENV === "development") {
+      console.log("[QuoteCache] Initialized with config:", this.config);
+    }
   }
 
   private makeKey(inputMint: string, outputMint: string, amount: number): string {
@@ -160,10 +150,9 @@ export class QuoteCache {
   private async refreshHotPairs(): Promise<void> {
     if (!this.fetcher) return;
 
-    const amounts = [0.1, 1, 10, 100]; // Montants typiques
-
+    // Utilise les montants de pré-chargement de la configuration
     for (const pair of HOT_PAIRS) {
-      for (const amount of amounts) {
+      for (const amount of PRELOAD_AMOUNTS) {
         try {
           const quote = await this.fetcher(pair.input, pair.output, amount);
           this.set(pair.input, pair.output, amount, quote);
@@ -227,8 +216,8 @@ export class QuoteCache {
   persistPairStats(): void {
     if (typeof window === "undefined") return;
     try {
-      const stats = Array.from(this.pairStats.entries()).slice(0, 50); // Max 50 paires
-      localStorage.setItem("swapback_pair_stats", JSON.stringify(stats));
+      const stats = Array.from(this.pairStats.entries()).slice(0, this.config.maxPairStats);
+      localStorage.setItem(PAIR_STATS_STORAGE_KEY, JSON.stringify(stats));
     } catch {
       // localStorage plein ou non disponible
     }
@@ -240,7 +229,7 @@ export class QuoteCache {
   restorePairStats(): void {
     if (typeof window === "undefined") return;
     try {
-      const stored = localStorage.getItem("swapback_pair_stats");
+      const stored = localStorage.getItem(PAIR_STATS_STORAGE_KEY);
       if (stored) {
         const stats = JSON.parse(stored) as Array<[string, { hits: number; lastAmount: number }]>;
         for (const [key, value] of stats) {
@@ -258,7 +247,8 @@ export class QuoteCache {
   private clearPersistentStorage(): void {
     if (typeof window === "undefined") return;
     try {
-      localStorage.removeItem("swapback_pair_stats");
+      localStorage.removeItem(PAIR_STATS_STORAGE_KEY);
+      localStorage.removeItem(HOT_QUOTES_STORAGE_KEY);
     } catch {
       // Ignore
     }
@@ -276,9 +266,9 @@ export class QuoteCache {
           hotQuotes.push([key, cached]);
         }
       }
-      // Limiter à 20 quotes max
-      const limited = hotQuotes.slice(0, 20);
-      localStorage.setItem("swapback_hot_quotes", JSON.stringify(limited));
+      // Limiter selon la configuration
+      const limited = hotQuotes.slice(0, this.config.maxHotQuotes);
+      localStorage.setItem(HOT_QUOTES_STORAGE_KEY, JSON.stringify(limited));
     } catch {
       // localStorage plein
     }
@@ -291,13 +281,13 @@ export class QuoteCache {
   restoreHotQuotes(): void {
     if (typeof window === "undefined") return;
     try {
-      const stored = localStorage.getItem("swapback_hot_quotes");
+      const stored = localStorage.getItem(HOT_QUOTES_STORAGE_KEY);
       if (stored) {
         const quotes = JSON.parse(stored) as Array<[string, CachedQuote]>;
         const now = Date.now();
         for (const [key, cached] of quotes) {
-          // Ne restaurer que si moins de 30 secondes (quotes stale OK pour affichage initial)
-          if (now - cached.timestamp < 30000) {
+          // Ne restaurer que si moins de hotQuoteMaxAgeMs (configurable)
+          if (now - cached.timestamp < this.config.hotQuoteMaxAgeMs) {
             this.cache.set(key, { ...cached, timestamp: now - 1500 }); // Marqué comme proche expiration
           }
         }
@@ -314,13 +304,31 @@ export class QuoteCache {
     this.restorePairStats();
     this.restoreHotQuotes();
     
-    // Persister périodiquement
+    // Persister périodiquement selon la configuration
     if (typeof window !== "undefined") {
-      setInterval(() => {
+      this.persistInterval = setInterval(() => {
         this.persistPairStats();
         this.persistHotQuotes();
-      }, 10000); // Toutes les 10 secondes
+      }, this.config.persistIntervalMs);
     }
+  }
+
+  /**
+   * Arrête tous les intervalles (pour les tests)
+   */
+  destroy(): void {
+    this.stopPredictiveRefresh();
+    if (this.persistInterval) {
+      clearInterval(this.persistInterval);
+      this.persistInterval = null;
+    }
+  }
+
+  /**
+   * Retourne la configuration actuelle (pour debug/tests)
+   */
+  getConfig(): QuoteCacheConfig {
+    return { ...this.config };
   }
 }
 
