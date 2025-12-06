@@ -5,6 +5,7 @@
 /* Import custom animations */
 @import '../styles/animations.css';
 @import '../styles/responsive-layout.css';
+@import '../styles/theme-light.css';
 
 :root {
   /* Modern Professional Theme Colors */
