@@ -29,6 +29,7 @@
     "lint": "eslint . --ext .ts,.tsx --max-warnings 300",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "bench:ab": "npx tsx sdk/scripts/bench_ab.ts",
+    "benchmark": "npx tsx scripts/performanceComparison.ts",
     "capture:bn-error": "tsx scripts/capture-bn-error.ts"
   },
   "devDependencies": {
