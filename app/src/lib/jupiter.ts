@@ -11,8 +11,10 @@
 import { Connection, PublicKey, VersionedTransaction, TransactionInstruction } from '@solana/web3.js';
 import { logger } from '@/lib/logger';
 
-// Jupiter V6 API base URL
-const JUPITER_API_BASE = 'https://quote-api.jup.ag/v6';
+// Jupiter V6 API - Use local proxy to avoid CORS issues in browser
+const JUPITER_API_BASE = typeof window !== 'undefined' 
+  ? '/api/swap'  // Browser: use Next.js API proxy
+  : 'https://quote-api.jup.ag/v6'; // Server-side: direct access
 
 // ============================================================================
 // TYPES
@@ -116,34 +118,60 @@ export class JupiterService {
    * Récupère une quote Jupiter pour un swap
    */
   async getQuote(params: JupiterQuoteRequest): Promise<JupiterQuoteResponse> {
-    const url = new URL(`${JUPITER_API_BASE}/quote`);
+    const isBrowser = typeof window !== 'undefined';
     
-    url.searchParams.set('inputMint', params.inputMint);
-    url.searchParams.set('outputMint', params.outputMint);
-    url.searchParams.set('amount', params.amount.toString());
-    url.searchParams.set('slippageBps', (params.slippageBps ?? 50).toString());
-    url.searchParams.set('swapMode', params.swapMode ?? 'ExactIn');
-    
-    if (params.onlyDirectRoutes !== undefined) {
-      url.searchParams.set('onlyDirectRoutes', params.onlyDirectRoutes.toString());
-    }
-    if (params.asLegacyTransaction !== undefined) {
-      url.searchParams.set('asLegacyTransaction', params.asLegacyTransaction.toString());
-    }
-    if (params.maxAccounts !== undefined) {
-      url.searchParams.set('maxAccounts', params.maxAccounts.toString());
-    }
-
     logger.info('JupiterService', 'Fetching quote', { 
       inputMint: params.inputMint, 
       outputMint: params.outputMint, 
-      amount: params.amount 
+      amount: params.amount,
+      isBrowser
     });
 
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' }
-    });
+    let response: Response;
+
+    if (isBrowser) {
+      // Browser: use POST to Next.js API proxy to avoid CORS
+      response = await fetch('/api/swap/quote', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json' 
+        },
+        body: JSON.stringify({
+          inputMint: params.inputMint,
+          outputMint: params.outputMint,
+          amount: params.amount,
+          slippageBps: params.slippageBps ?? 50,
+          swapMode: params.swapMode ?? 'ExactIn',
+          onlyDirectRoutes: params.onlyDirectRoutes,
+          asLegacyTransaction: params.asLegacyTransaction,
+          maxAccounts: params.maxAccounts,
+        }),
+      });
+    } else {
+      // Server-side: direct GET to Jupiter API
+      const url = new URL('https://quote-api.jup.ag/v6/quote');
+      url.searchParams.set('inputMint', params.inputMint);
+      url.searchParams.set('outputMint', params.outputMint);
+      url.searchParams.set('amount', params.amount.toString());
+      url.searchParams.set('slippageBps', (params.slippageBps ?? 50).toString());
+      url.searchParams.set('swapMode', params.swapMode ?? 'ExactIn');
+      
+      if (params.onlyDirectRoutes !== undefined) {
+        url.searchParams.set('onlyDirectRoutes', params.onlyDirectRoutes.toString());
+      }
+      if (params.asLegacyTransaction !== undefined) {
+        url.searchParams.set('asLegacyTransaction', params.asLegacyTransaction.toString());
+      }
+      if (params.maxAccounts !== undefined) {
+        url.searchParams.set('maxAccounts', params.maxAccounts.toString());
+      }
+
+      response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -151,7 +179,15 @@ export class JupiterService {
       throw new Error(`Jupiter quote failed: ${response.status} - ${errorText}`);
     }
 
-    const quote = await response.json() as JupiterQuoteResponse;
+    const data = await response.json();
+    
+    // Handle response from our API proxy (wraps quote in { success, quote })
+    const quote: JupiterQuoteResponse = data.quote || data;
+    
+    if (!quote.inAmount || !quote.outAmount) {
+      logger.error('JupiterService', 'Invalid quote response', { data });
+      throw new Error('Invalid quote response from Jupiter');
+    }
     
     logger.info('JupiterService', 'Quote received', { 
       inAmount: quote.inAmount, 
@@ -166,12 +202,14 @@ export class JupiterService {
    * Construit une transaction de swap depuis une quote
    */
   async buildSwapTransaction(params: JupiterSwapRequest): Promise<JupiterSwapResponse> {
-    const url = `${JUPITER_API_BASE}/swap`;
+    const isBrowser = typeof window !== 'undefined';
+    const url = isBrowser ? '/api/swap/transaction' : 'https://quote-api.jup.ag/v6/swap';
 
     logger.info('JupiterService', 'Building swap transaction', { 
       userPublicKey: params.userPublicKey,
       inAmount: params.quoteResponse.inAmount,
-      outAmount: params.quoteResponse.outAmount
+      outAmount: params.quoteResponse.outAmount,
+      isBrowser
     });
 
     const response = await fetch(url, {
