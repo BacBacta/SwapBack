@@ -9,11 +9,13 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
 import { ArrowDownUp, Settings, Loader2, ChevronRight, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TokenSelectorModal } from "./TokenSelectorModal";
 import { AdvancedOptionsPanel } from "./AdvancedOptionsPanel";
 import { useTokenData } from "../hooks/useTokenData";
+import { useSwapWithBoost } from "../hooks/useSwapWithBoost";
 import { getApiUrl, API_ENDPOINTS } from "@/config/api";
 import toast from "react-hot-toast";
 
@@ -62,6 +64,9 @@ const TOKENS: Record<string, TokenInfo> = {
 export function SimpleSwapCard() {
   const { connected, publicKey } = useWallet();
   const wallet = useWallet();
+  
+  // Hook pour exécuter les swaps
+  const { executeSwap, loading: swapLoading, error: swapError } = useSwapWithBoost();
 
   // État principal
   const [inputToken, setInputToken] = useState<TokenInfo>(TOKENS.SOL);
@@ -160,18 +165,48 @@ export function SimpleSwapCard() {
 
   // Exécuter le swap
   const handleSwap = async () => {
-    if (!connected || !quote) {
+    if (!connected || !publicKey) {
       toast.error("Connectez votre wallet pour swapper");
       return;
     }
 
+    if (!quote || !amountInBaseUnits) {
+      toast.error("Entrez un montant valide");
+      return;
+    }
+
     setSwapping(true);
+    const toastId = toast.loading("Préparation du swap...");
+    
     try {
-      // TODO: Implémenter l'exécution du swap
-      toast.success("Swap exécuté avec succès !");
+      const result = await executeSwap(
+        {
+          inputMint: new PublicKey(inputToken.mint),
+          outputMint: new PublicKey(outputToken.mint),
+          amount: amountInBaseUnits,
+          slippage: slippage,
+        },
+        0 // userBoostBP - could be fetched from user's lock status
+      );
+
+      if (result) {
+        toast.success(
+          `Swap réussi ! ${result.outputAmount.toLocaleString()} ${outputToken.symbol} reçus`,
+          { id: toastId }
+        );
+        
+        // Reset form après succès
+        setInputAmount("");
+        setQuote(null);
+      } else {
+        toast.error(swapError || "Erreur lors du swap", { id: toastId });
+      }
     } catch (error) {
-      toast.error("Erreur lors du swap");
-      console.error(error);
+      console.error("Swap error:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Erreur lors du swap",
+        { id: toastId }
+      );
     } finally {
       setSwapping(false);
     }
