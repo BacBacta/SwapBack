@@ -116,8 +116,8 @@ export function useBuyback() {
   useEffect(() => {
     fetchBuybackData();
     
-    // Refresh every 15 seconds
-    const interval = setInterval(fetchBuybackData, 15000);
+    // Refresh every 60 seconds (reduced from 15s to avoid rate limiting)
+    const interval = setInterval(fetchBuybackData, 60000);
     
     return () => clearInterval(interval);
   }, [fetchBuybackData]);

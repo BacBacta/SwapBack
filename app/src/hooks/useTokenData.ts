@@ -122,8 +122,8 @@ export const useTokenData = (tokenMint: string) => {
 
     fetchBalance();
 
-    // Rafraîchir toutes les 10 secondes
-    const interval = setInterval(fetchBalance, 10000);
+    // Rafraîchir toutes les 30 secondes (reduced from 10s to avoid rate limiting)
+    const interval = setInterval(fetchBalance, 30000);
     return () => clearInterval(interval);
   }, [connection, publicKey, tokenMint, connected]);
 

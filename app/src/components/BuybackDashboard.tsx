@@ -110,7 +110,7 @@ export default function BuybackDashboard() {
 
   useEffect(() => {
     loadBuybackState();
-    const interval = setInterval(loadBuybackState, 10000); // Refresh toutes les 10s
+    const interval = setInterval(loadBuybackState, 60000); // Refresh toutes les 60s (reduced to avoid rate limiting)
     return () => clearInterval(interval);
   }, [connection]);
 
