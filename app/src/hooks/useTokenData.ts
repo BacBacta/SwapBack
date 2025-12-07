@@ -138,7 +138,7 @@ export const useTokenData = (tokenMint: string) => {
     };
   }, [connection, publicKey, tokenMint, connected, refreshTrigger]);
 
-  // Récupérer le prix USD en temps réel via Jupiter Price API
+  // Récupérer le prix USD en temps réel via plusieurs APIs
   useEffect(() => {
     const fetchPrice = async () => {
       if (!tokenMint) {
@@ -146,67 +146,118 @@ export const useTokenData = (tokenMint: string) => {
         return;
       }
 
+      // Mapping des tokens connus vers leurs IDs CoinGecko
+      const coingeckoIds: { [key: string]: string } = {
+        'So11111111111111111111111111111111111111112': 'solana',
+        'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 'usd-coin',
+        'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': 'tether',
+        'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So': 'msol',
+        'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN': 'jupiter-exchange-solana',
+        'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263': 'bonk',
+        'jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL': 'jito-governance-token',
+        'rndrizKT3MK1iimdxRdWabcF7Zg7AR5T4nud4EkHBof': 'marinade-staked-sol',
+      };
+
       try {
-        // Utiliser Jupiter Price API v2 pour obtenir les prix en temps réel
-        // Documentation: https://station.jup.ag/docs/apis/price-api
-        const response = await fetch(
+        // Essayer d'abord Jupiter Price API v2
+        const jupiterResponse = await fetch(
           `https://api.jup.ag/price/v2?ids=${tokenMint}`,
           {
-            headers: {
-              'Accept': 'application/json',
-            },
+            headers: { 'Accept': 'application/json' },
+            signal: AbortSignal.timeout(5000), // 5s timeout
           }
         );
 
-        if (response.ok) {
-          const data = await response.json();
-          
-          if (data.data && data.data[tokenMint]) {
-            const price = parseFloat(data.data[tokenMint].price) || 0;
-            setUsdPrice(price);
-            console.log(
-              `💰 Prix temps réel pour ${tokenMint.substring(0, 8)}... = $${price.toFixed(4)}`
-            );
+        if (jupiterResponse.ok) {
+          const data = await jupiterResponse.json();
+          if (data.data && data.data[tokenMint] && data.data[tokenMint].price) {
+            const price = parseFloat(data.data[tokenMint].price);
+            if (price > 0) {
+              setUsdPrice(price);
+              console.log(`💰 Jupiter: ${tokenMint.substring(0, 8)}... = $${price.toFixed(4)}`);
+              return;
+            }
+          }
+        }
+      } catch (jupiterError) {
+        console.warn('Jupiter Price API failed:', jupiterError);
+      }
+
+      // Fallback: CoinGecko API (gratuit, pas de clé requise)
+      const coingeckoId = coingeckoIds[tokenMint];
+      if (coingeckoId) {
+        try {
+          const cgResponse = await fetch(
+            `https://api.coingecko.com/api/v3/simple/price?ids=${coingeckoId}&vs_currencies=usd`,
+            {
+              headers: { 'Accept': 'application/json' },
+              signal: AbortSignal.timeout(5000),
+            }
+          );
+
+          if (cgResponse.ok) {
+            const cgData = await cgResponse.json();
+            if (cgData[coingeckoId] && cgData[coingeckoId].usd) {
+              const price = cgData[coingeckoId].usd;
+              setUsdPrice(price);
+              console.log(`💰 CoinGecko: ${tokenMint.substring(0, 8)}... = $${price.toFixed(4)}`);
+              return;
+            }
+          }
+        } catch (cgError) {
+          console.warn('CoinGecko API failed:', cgError);
+        }
+      }
+
+      // Fallback: Birdeye API (via proxy pour éviter CORS)
+      try {
+        const birdeyeResponse = await fetch(
+          `/api/price?mint=${tokenMint}`,
+          {
+            headers: { 'Accept': 'application/json' },
+            signal: AbortSignal.timeout(5000),
+          }
+        );
+
+        if (birdeyeResponse.ok) {
+          const birdeyeData = await birdeyeResponse.json();
+          if (birdeyeData.price && birdeyeData.price > 0) {
+            setUsdPrice(birdeyeData.price);
+            console.log(`💰 Birdeye: ${tokenMint.substring(0, 8)}... = $${birdeyeData.price.toFixed(4)}`);
             return;
           }
         }
-
-        // Fallback: prix statiques pour les tokens non supportés
-        const fallbackPrices: { [key: string]: number } = {
-          EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v: 1.0, // USDC
-          Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB: 1.0, // USDT
-          "3y4dCqwWuYx1B97YEDmgq9qjuNE1eyEwGx2eLgz6Rc6G": 1.0, // USDC Test
-          BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR: 1.0, // USDC Testnet
-        };
-
-        const fallbackPrice = fallbackPrices[tokenMint] || 0;
-        setUsdPrice(fallbackPrice);
-        
-        if (fallbackPrice > 0) {
-          console.log(
-            `💰 Prix fallback pour ${tokenMint.substring(0, 8)}... = $${fallbackPrice.toFixed(2)}`
-          );
-        } else {
-          console.warn(
-            `⚠️ Pas de prix pour ${tokenMint.substring(0, 8)}...`
-          );
-        }
-      } catch (error) {
-        console.error("Error fetching price:", error);
-        // En cas d'erreur, essayer les prix fallback
-        const fallbackPrices: { [key: string]: number } = {
-          So11111111111111111111111111111111111111112: 230.0, // SOL estimation
-          EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v: 1.0, // USDC
-          Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB: 1.0, // USDT
-        };
-        setUsdPrice(fallbackPrices[tokenMint] || 0);
+      } catch (birdeyeError) {
+        // Silently fail, try next fallback
       }
+
+      // Dernier fallback: prix statiques pour stablecoins
+      const stablecoinPrices: { [key: string]: number } = {
+        'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 1.0, // USDC
+        'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': 1.0, // USDT
+        'USDH1SM1ojwWUga67PGrgFWUHibbjqMvuMaDkRJTgkX': 1.0, // USDH
+        '7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj': 1.0, // stSOL (approx)
+        '3y4dCqwWuYx1B97YEDmgq9qjuNE1eyEwGx2eLgz6Rc6G': 1.0, // USDC Test
+        'BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR': 1.0, // USDC Testnet
+      };
+
+      const stablePrice = stablecoinPrices[tokenMint];
+      if (stablePrice) {
+        setUsdPrice(stablePrice);
+        console.log(`💰 Stablecoin: ${tokenMint.substring(0, 8)}... = $${stablePrice.toFixed(2)}`);
+        return;
+      }
+
+      // Aucun prix trouvé
+      console.warn(`⚠️ Aucun prix trouvé pour ${tokenMint.substring(0, 8)}...`);
+      setUsdPrice(0);
     };
 
+    // Fetch immédiatement
     fetchPrice();
 
-    // Rafraîchir toutes les 30 secondes pour avoir des prix à jour
-    const interval = setInterval(fetchPrice, 30000);
+    // Rafraîchir toutes les 15 secondes pour avoir des prix à jour
+    const interval = setInterval(fetchPrice, 15000);
     return () => clearInterval(interval);
   }, [tokenMint]);
 
