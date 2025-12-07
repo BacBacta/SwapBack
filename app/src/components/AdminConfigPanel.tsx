@@ -68,7 +68,7 @@ interface ConfigStatus {
 }
 
 export function AdminConfigPanel() {
-  const { publicKey, connected, signTransaction } = useWallet();
+  const { publicKey, connected, sendTransaction } = useWallet();
   const { connection } = useConnection();
   
   const [loading, setLoading] = useState(true);
@@ -225,7 +225,7 @@ export function AdminConfigPanel() {
 
   // ========== STEP 1: Update Wallets ==========
   const handleUpdateWallets = async () => {
-    if (!publicKey || !signTransaction || !routerStatePda) return;
+    if (!publicKey || !sendTransaction || !routerStatePda) return;
     
     setActionLoading("wallets");
     const toastId = toast.loading("Configuration des wallets...");
@@ -272,8 +272,8 @@ export function AdminConfigPanel() {
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = publicKey;
 
-      const signedTx = await signTransaction(transaction);
-      const signature = await connection.sendRawTransaction(signedTx.serialize());
+      // Use sendTransaction instead of signTransaction for better wallet compatibility
+      const signature = await sendTransaction(transaction, connection);
       await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight });
 
       toast.success("Wallets configurés!", { id: toastId });
@@ -289,7 +289,7 @@ export function AdminConfigPanel() {
 
   // ========== STEP 2: Initialize Config ==========
   const handleInitializeConfig = async () => {
-    if (!publicKey || !signTransaction || !routerStatePda || !routerConfigPda) return;
+    if (!publicKey || !sendTransaction || !routerStatePda || !routerConfigPda) return;
     
     setActionLoading("config");
     const toastId = toast.loading("Initialisation de la configuration...");
@@ -311,8 +311,8 @@ export function AdminConfigPanel() {
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = publicKey;
 
-      const signedTx = await signTransaction(transaction);
-      const signature = await connection.sendRawTransaction(signedTx.serialize());
+      // Use sendTransaction for better wallet compatibility
+      const signature = await sendTransaction(transaction, connection);
       await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight });
 
       toast.success("Configuration initialisée! (70% rebate, 15% treasury, 15% boost)", { id: toastId });
@@ -328,7 +328,7 @@ export function AdminConfigPanel() {
 
   // ========== STEP 3: Initialize Rebate Vault ==========
   const handleInitializeRebateVault = async () => {
-    if (!publicKey || !signTransaction || !routerStatePda || !rebateVaultPda) return;
+    if (!publicKey || !sendTransaction || !routerStatePda || !rebateVaultPda) return;
     
     setActionLoading("vault");
     const toastId = toast.loading("Création du Rebate Vault USDC...");
@@ -353,8 +353,8 @@ export function AdminConfigPanel() {
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = publicKey;
 
-      const signedTx = await signTransaction(transaction);
-      const signature = await connection.sendRawTransaction(signedTx.serialize());
+      // Use sendTransaction for better wallet compatibility
+      const signature = await sendTransaction(transaction, connection);
       await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight });
 
       toast.success("Rebate Vault créé!", { id: toastId });
