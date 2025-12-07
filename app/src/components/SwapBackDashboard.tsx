@@ -175,8 +175,8 @@ export const SwapBackDashboard = () => {
 
     fetchPlans();
 
-    // Refresh toutes les 30 secondes
-    const interval = setInterval(fetchPlans, 30000);
+    // Refresh toutes les 60 secondes (increased to avoid rate limiting)
+    const interval = setInterval(fetchPlans, 60000);
     return () => clearInterval(interval);
   }, [connection, publicKey, connected]);
 

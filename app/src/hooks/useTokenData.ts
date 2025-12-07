@@ -120,11 +120,15 @@ export const useTokenData = (tokenMint: string) => {
       }
     };
 
-    fetchBalance();
+    // Initial fetch with delay to avoid burst requests
+    const initialTimeout = setTimeout(fetchBalance, 500);
 
-    // Rafraîchir toutes les 30 secondes (reduced from 10s to avoid rate limiting)
-    const interval = setInterval(fetchBalance, 30000);
-    return () => clearInterval(interval);
+    // Rafraîchir toutes les 60 secondes (increased to avoid rate limiting)
+    const interval = setInterval(fetchBalance, 60000);
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
   }, [connection, publicKey, tokenMint, connected]);
 
   // Récupérer le prix USD
@@ -171,8 +175,8 @@ export const useTokenData = (tokenMint: string) => {
 
     fetchPrice();
 
-    // Rafraîchir toutes les 60 secondes
-    const interval = setInterval(fetchPrice, 60000);
+    // Rafraîchir toutes les 120 secondes (prices don't change that fast)
+    const interval = setInterval(fetchPrice, 120000);
     return () => clearInterval(interval);
   }, [tokenMint]);
 

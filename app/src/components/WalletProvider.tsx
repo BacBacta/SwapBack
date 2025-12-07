@@ -17,14 +17,16 @@ import { monitor } from "@/lib/protocolMonitor";
 // Import des styles du wallet adapter
 import "@solana/wallet-adapter-react-ui/styles.css";
 
-// Fallback RPC endpoints pour mainnet
-// NOTE: Most free public RPCs block browser requests (CORS)
-// You MUST use a proper RPC provider with API key for production
+// Fallback RPC endpoints pour mainnet - ordered by reliability
+// NOTE: Avoid Helius public endpoints (rate limited)
 const MAINNET_FALLBACK_RPCS = [
-  // Free public RPCs that support CORS (with rate limits)
+  // Primary: Solana official (most reliable, no rate limits for basic usage)
+  "https://api.mainnet-beta.solana.com",
+  // Fallbacks with CORS support
   "https://rpc.ankr.com/solana", // Ankr - supports CORS, 30 req/sec
   "https://solana.publicnode.com", // PublicNode - supports CORS
   "https://solana-mainnet.rpc.extrnode.com", // ExtrNode - supports CORS
+  "https://solana-rpc.publicnode.com", // PublicNode alt
 ];
 
 export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {

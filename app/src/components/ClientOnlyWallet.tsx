@@ -100,8 +100,8 @@ export const ClientOnlyWallet = () => {
     };
     fetchBalance();
     
-    // Refresh balance every 30s
-    const interval = setInterval(fetchBalance, 30000);
+    // Refresh balance every 60s (increased to avoid rate limiting)
+    const interval = setInterval(fetchBalance, 60000);
     return () => clearInterval(interval);
   }, [connected, publicKey, connection]);
 

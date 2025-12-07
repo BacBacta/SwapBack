@@ -114,7 +114,7 @@ export const SwapBackInterface = () => {
     };
 
     fetchPrice();
-    const interval = setInterval(fetchPrice, 30000); // Refresh toutes les 30s (reduced to avoid rate limiting)
+    const interval = setInterval(fetchPrice, 60000); // Refresh toutes les 60s (increased to avoid rate limiting)
     return () => clearInterval(interval);
   }, [connection]);
 
