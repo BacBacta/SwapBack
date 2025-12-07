@@ -234,9 +234,11 @@ export function SimpleSwapCard() {
         setTxStatus('confirmed');
         setTxSignature(result.signature || null);
         
-        // Mettre à jour avec le montant réel reçu
-        const actualOutput = result.outputAmount ? result.outputAmount.toLocaleString() : lastSwapOutput;
-        setLastSwapOutput(actualOutput);
+        // Mettre à jour avec le montant réel reçu (convertir depuis les unités de base)
+        if (result.outputAmount) {
+          const formattedOutput = result.outputAmount / Math.pow(10, outputToken.decimals);
+          setLastSwapOutput(formatAmount(formattedOutput));
+        }
         
         // Reset form après succès
         setInputAmount("");
