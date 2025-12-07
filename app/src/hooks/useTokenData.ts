@@ -1,7 +1,7 @@
 "use client";
 
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
@@ -12,11 +12,18 @@ export const useTokenData = (tokenMint: string) => {
   const [balance, setBalance] = useState<number>(0);
   const [usdPrice, setUsdPrice] = useState<number>(0);
   const [loading, setLoading] = useState(true); // Start as loading
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Debug: log the tokenMint on mount/change
   useEffect(() => {
     console.log(`🎯 useTokenData: tokenMint="${tokenMint}", connected=${connected}, publicKey=${publicKey?.toString()?.substring(0,8) || 'null'}`);
   }, [tokenMint, connected, publicKey]);
+
+  // Fonction de rafraîchissement exposée
+  const refetch = useCallback(() => {
+    console.log(`🔄 useTokenData: Refetch triggered for ${tokenMint?.substring(0, 8) || 'unknown'}...`);
+    setRefreshTrigger(prev => prev + 1);
+  }, [tokenMint]);
 
     // Récupérer le solde du token
   useEffect(() => {
@@ -129,7 +136,7 @@ export const useTokenData = (tokenMint: string) => {
       clearTimeout(initialTimeout);
       clearInterval(interval);
     };
-  }, [connection, publicKey, tokenMint, connected]);
+  }, [connection, publicKey, tokenMint, connected, refreshTrigger]);
 
   // Récupérer le prix USD
   useEffect(() => {
@@ -185,5 +192,6 @@ export const useTokenData = (tokenMint: string) => {
     usdPrice,
     usdValue: balance * usdPrice,
     loading,
+    refetch,
   };
 };

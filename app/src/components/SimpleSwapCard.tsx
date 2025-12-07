@@ -10,7 +10,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { ArrowDownUp, Settings, Loader2, ChevronRight, Sparkles } from "lucide-react";
+import { ArrowDownUp, Settings, Loader2, ChevronRight, Sparkles, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TokenSelectorModal } from "./TokenSelectorModal";
 import { AdvancedOptionsPanel } from "./AdvancedOptionsPanel";
@@ -88,6 +88,10 @@ export function SimpleSwapCard() {
   // Token data
   const inputTokenData = useTokenData(inputToken.mint);
   const outputTokenData = useTokenData(outputToken.mint);
+
+  // Vérifier si le solde est insuffisant
+  const inputAmountNum = parseFloat(inputAmount) || 0;
+  const hasInsufficientBalance = inputAmountNum > 0 && inputTokenData.balance !== null && inputAmountNum > inputTokenData.balance;
 
   // Calculer le montant en unités de base
   const amountInBaseUnits = useMemo(() => {
@@ -175,6 +179,12 @@ export function SimpleSwapCard() {
       return;
     }
 
+    // Vérifier le solde avant d'exécuter
+    if (hasInsufficientBalance) {
+      toast.error(`Solde ${inputToken.symbol} insuffisant. Disponible: ${inputTokenData.balance?.toFixed(4) || 0}`);
+      return;
+    }
+
     setSwapping(true);
     const toastId = toast.loading("Préparation du swap...");
     
@@ -198,6 +208,13 @@ export function SimpleSwapCard() {
         // Reset form après succès
         setInputAmount("");
         setQuote(null);
+        
+        // Rafraîchir les soldes après un swap réussi (avec délai pour laisser la blockchain se mettre à jour)
+        setTimeout(() => {
+          console.log("🔄 Refreshing balances after successful swap...");
+          inputTokenData.refetch();
+          outputTokenData.refetch();
+        }, 2000);
       } else {
         toast.error(swapError || "Erreur lors du swap", { id: toastId });
       }
@@ -371,13 +388,23 @@ export function SimpleSwapCard() {
               </motion.div>
             )}
 
+            {/* Message solde insuffisant */}
+            {hasInsufficientBalance && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-400 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                <span>
+                  Solde insuffisant. Disponible: {inputTokenData.balance?.toFixed(4) || 0} {inputToken.symbol}
+                </span>
+              </div>
+            )}
+
             {/* Bouton Swap */}
             <button
               onClick={handleSwap}
-              disabled={!connected || !quote || swapping}
+              disabled={!connected || !quote || swapping || hasInsufficientBalance}
               className={`
                 w-full py-4 rounded-xl font-semibold text-lg transition-all
-                ${connected && quote && !swapping
+                ${connected && quote && !swapping && !hasInsufficientBalance
                   ? "btn-simple"
                   : "bg-zinc-800 text-gray-400 cursor-not-allowed"
                 }
@@ -392,6 +419,8 @@ export function SimpleSwapCard() {
                 "Connecter le wallet"
               ) : !inputAmount || parseFloat(inputAmount) === 0 ? (
                 "Entrez un montant"
+              ) : hasInsufficientBalance ? (
+                "Solde insuffisant"
               ) : !quote ? (
                 "Calcul du prix..."
               ) : (
