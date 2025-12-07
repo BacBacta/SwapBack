@@ -1198,6 +1198,11 @@ export function EnhancedSwapInterface() {
             : s
         ));
 
+        // 🔄 Refresh balances after successful swap (with delay for blockchain confirmation)
+        setTimeout(() => {
+          refreshBalances();
+        }, 2000);
+
         if (swap.inputToken && swap.outputToken) {
           const buybackDepositLamports = routes.npiOpportunity?.shareLamports
             ? Number(routes.npiOpportunity.shareLamports)
@@ -1269,9 +1274,45 @@ export function EnhancedSwapInterface() {
     setShowTokenSelector(true);
   };
 
+  // 🔄 Refresh token balances function
+  const refreshBalances = useCallback(async () => {
+    if (!publicKey || !connection) return;
+    
+    console.log('🔄 [EnhancedSwap] Refreshing token balances...');
+    
+    // Refresh input token balance
+    if (swap.inputToken) {
+      const inputBalance = await fetchTokenBalance(swap.inputToken.mint, swap.inputToken.decimals);
+      console.log(`🔄 [EnhancedSwap] Input ${swap.inputToken.symbol} balance: ${inputBalance}`);
+      setInputToken({ ...swap.inputToken, balance: inputBalance });
+    }
+    
+    // Refresh output token balance
+    if (swap.outputToken) {
+      const outputBalance = await fetchTokenBalance(swap.outputToken.mint, swap.outputToken.decimals);
+      console.log(`🔄 [EnhancedSwap] Output ${swap.outputToken.symbol} balance: ${outputBalance}`);
+      setOutputToken({ ...swap.outputToken, balance: outputBalance });
+    }
+  }, [publicKey, connection, swap.inputToken, swap.outputToken, setInputToken, setOutputToken]);
+
+  // 🔄 Refresh balances when wallet connects/changes
+  useEffect(() => {
+    if (publicKey && connection) {
+      // Small delay to ensure wallet is fully connected
+      const timer = setTimeout(() => {
+        refreshBalances();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [publicKey, connection, refreshBalances]);
+
   // Fetch token balance from blockchain
   const fetchTokenBalance = async (mintAddress: string, decimals: number): Promise<number> => {
     if (!publicKey || !connection) return 0;
+    
+    // Validate decimals - default to 9 if invalid
+    const safeDecimals = typeof decimals === 'number' && !isNaN(decimals) && decimals >= 0 ? decimals : 9;
+    console.log(`🔍 [fetchTokenBalance] mint: ${mintAddress.substring(0,8)}..., decimals: ${decimals}, safeDecimals: ${safeDecimals}`);
     
     try {
       // Native SOL
@@ -1282,19 +1323,29 @@ export function EnhancedSwapInterface() {
         return balance;
       }
       
-      // SPL Token
+      // SPL Token - Use getTokenAccountBalance for accurate decimals
       const { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID } = await import("@solana/spl-token");
       const mintPubkey = new PublicKey(mintAddress);
       
       // Try standard token program first
       try {
         const ata = await getAssociatedTokenAddress(mintPubkey, publicKey, false, TOKEN_PROGRAM_ID);
-        const accountInfo = await connection.getAccountInfo(ata);
-        if (accountInfo && accountInfo.data.length >= 72) {
-          const amount = accountInfo.data.readBigUInt64LE(64);
-          const balance = Number(amount) / Math.pow(10, decimals);
-          console.log(`✅ [EnhancedSwap] Token ${mintAddress.substring(0,8)}... balance: ${balance}`);
+        
+        // Use getTokenAccountBalance which returns the correct UI amount
+        try {
+          const tokenBalance = await connection.getTokenAccountBalance(ata);
+          const balance = tokenBalance.value.uiAmount ?? 0;
+          console.log(`✅ [EnhancedSwap] Token ${mintAddress.substring(0,8)}... balance: ${balance} (decimals from chain: ${tokenBalance.value.decimals})`);
           return balance;
+        } catch {
+          // Fallback to manual parsing if getTokenAccountBalance fails
+          const accountInfo = await connection.getAccountInfo(ata);
+          if (accountInfo && accountInfo.data.length >= 72) {
+            const amount = accountInfo.data.readBigUInt64LE(64);
+            const balance = Number(amount) / Math.pow(10, safeDecimals);
+            console.log(`✅ [EnhancedSwap] Token ${mintAddress.substring(0,8)}... balance (manual): ${balance}, rawAmount: ${amount.toString()}, decimals: ${safeDecimals}`);
+            return balance;
+          }
         }
       } catch (e) {
         console.log(`⚠️ [EnhancedSwap] SPL token not found, trying Token-2022...`);
@@ -1303,12 +1354,22 @@ export function EnhancedSwapInterface() {
       // Try Token-2022
       try {
         const ata = await getAssociatedTokenAddress(mintPubkey, publicKey, false, TOKEN_2022_PROGRAM_ID);
-        const accountInfo = await connection.getAccountInfo(ata);
-        if (accountInfo && accountInfo.data.length >= 72) {
-          const amount = accountInfo.data.readBigUInt64LE(64);
-          const balance = Number(amount) / Math.pow(10, decimals);
+        
+        // Use getTokenAccountBalance for accurate decimals
+        try {
+          const tokenBalance = await connection.getTokenAccountBalance(ata);
+          const balance = tokenBalance.value.uiAmount ?? 0;
           console.log(`✅ [EnhancedSwap] Token-2022 ${mintAddress.substring(0,8)}... balance: ${balance}`);
           return balance;
+        } catch {
+          // Fallback to manual parsing
+          const accountInfo = await connection.getAccountInfo(ata);
+          if (accountInfo && accountInfo.data.length >= 72) {
+            const amount = accountInfo.data.readBigUInt64LE(64);
+            const balance = Number(amount) / Math.pow(10, safeDecimals);
+            console.log(`✅ [EnhancedSwap] Token-2022 ${mintAddress.substring(0,8)}... balance (manual): ${balance}`);
+            return balance;
+          }
         }
       } catch (e) {
         console.log(`⚠️ [EnhancedSwap] Token-2022 not found either`);
