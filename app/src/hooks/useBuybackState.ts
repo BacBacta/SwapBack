@@ -3,12 +3,67 @@ import { useQuery } from '@tanstack/react-query';
 import { PublicKey } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
 import { lamportsToUiSafe, bnToNumberWithFallback } from '@/lib/bnUtils';
-import { getBackTokenMint, TOKEN_DECIMALS } from '@/config/constants';
+import { TOKEN_DECIMALS, DEFAULT_BACK_MINT } from '@/config/constants';
 
-// Buyback Program addresses (devnet)
-export const BUYBACK_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || '746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6'
-);
+// Buyback Program addresses - use safe defaults
+const BUYBACK_PROGRAM_ID_STR = process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || '746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6';
+const USDC_MINT_STR = process.env.NEXT_PUBLIC_USDC_MINT || 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+const BACK_MINT_STR = process.env.NEXT_PUBLIC_BACK_MINT || DEFAULT_BACK_MINT;
+
+// Lazy-loaded PublicKeys to avoid SSR issues
+let _buybackProgramId: PublicKey | null = null;
+let _buybackStatePda: PublicKey | null = null;
+let _usdcVaultPda: PublicKey | null = null;
+let _usdcMint: PublicKey | null = null;
+let _backTokenMint: PublicKey | null = null;
+
+export function getBuybackProgramId(): PublicKey {
+  if (!_buybackProgramId) {
+    _buybackProgramId = new PublicKey(BUYBACK_PROGRAM_ID_STR);
+  }
+  return _buybackProgramId;
+}
+
+export function getBuybackStatePda(): PublicKey {
+  if (!_buybackStatePda) {
+    [_buybackStatePda] = PublicKey.findProgramAddressSync(
+      [Buffer.from('buyback_state')],
+      getBuybackProgramId()
+    );
+  }
+  return _buybackStatePda;
+}
+
+export function getUsdcVaultPda(): PublicKey {
+  if (!_usdcVaultPda) {
+    [_usdcVaultPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from('usdc_vault')],
+      getBuybackProgramId()
+    );
+  }
+  return _usdcVaultPda;
+}
+
+export function getUsdcMint(): PublicKey {
+  if (!_usdcMint) {
+    _usdcMint = new PublicKey(USDC_MINT_STR);
+  }
+  return _usdcMint;
+}
+
+export function getBackMint(): PublicKey {
+  if (!_backTokenMint) {
+    _backTokenMint = new PublicKey(BACK_MINT_STR);
+  }
+  return _backTokenMint;
+}
+
+// Backwards compatibility exports (deprecated - use functions instead)
+export const BUYBACK_PROGRAM_ID = new PublicKey(BUYBACK_PROGRAM_ID_STR);
+export const USDC_MINT = new PublicKey(USDC_MINT_STR);
+export const BACK_TOKEN_MINT = new PublicKey(BACK_MINT_STR);
+
+// PDAs - also computed at module level for backwards compatibility
 export const [BUYBACK_STATE_PDA] = PublicKey.findProgramAddressSync(
   [Buffer.from('buyback_state')],
   BUYBACK_PROGRAM_ID
@@ -17,10 +72,6 @@ export const [USDC_VAULT_PDA] = PublicKey.findProgramAddressSync(
   [Buffer.from('usdc_vault')],
   BUYBACK_PROGRAM_ID
 );
-export const USDC_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_USDC_MINT || 'BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR'
-);
-export const BACK_TOKEN_MINT = getBackTokenMint();
 
 export interface BuybackState {
   authority: PublicKey;
