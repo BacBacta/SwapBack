@@ -4,7 +4,6 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useEffect, useState } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { TOKEN_DECIMALS } from "@/config/constants";
 
 export const useTokenData = (tokenMint: string) => {
   const { connection } = useConnection();
@@ -59,7 +58,7 @@ export const useTokenData = (tokenMint: string) => {
           // SPL Token or Token-2022
           const mintPubkey = new PublicKey(tokenMint);
           
-          // Try standard SPL Token first (BACK mint is on standard program)
+          // Try standard SPL Token first
           try {
             const ata = await getAssociatedTokenAddress(
               mintPubkey,
@@ -69,16 +68,16 @@ export const useTokenData = (tokenMint: string) => {
             );
             
             console.log(`🔍 Checking SPL Token ATA: ${ata.toBase58()}`);
-            const accountInfo = await connection.getAccountInfo(ata);
             
-            if (accountInfo && accountInfo.data.length >= 72) {
-              const amount = accountInfo.data.readBigUInt64LE(64);
-              const tokenBalance = Number(amount) / Math.pow(10, TOKEN_DECIMALS);
-              console.log(`✅ SPL Token ${tokenMint.substring(0, 8)}... balance: ${tokenBalance.toFixed(TOKEN_DECIMALS)} (raw: ${amount}, decimals: ${TOKEN_DECIMALS})`);
-              setBalance(tokenBalance);
+            // Use getTokenAccountBalance to get correct decimals from chain
+            try {
+              const tokenBalance = await connection.getTokenAccountBalance(ata);
+              const balance = tokenBalance.value.uiAmount ?? 0;
+              console.log(`✅ SPL Token ${tokenMint.substring(0, 8)}... balance: ${balance} (decimals: ${tokenBalance.value.decimals})`);
+              setBalance(balance);
               return;
-            } else {
-              console.log(`⚠️ SPL Token account exists but invalid size: ${accountInfo?.data.length || 0} bytes`);
+            } catch (balanceError) {
+              console.log(`⚠️ SPL Token getTokenAccountBalance failed:`, balanceError);
             }
           } catch (splError) {
             console.log(`⚠️ SPL Token account not found for ${tokenMint.substring(0, 8)}..., error:`, splError);
@@ -94,16 +93,16 @@ export const useTokenData = (tokenMint: string) => {
             );
             
             console.log(`🔍 Checking Token-2022 ATA: ${ata.toBase58()}`);
-            const accountInfo = await connection.getAccountInfo(ata);
             
-            if (accountInfo && accountInfo.data.length >= 72) {
-              const amount = accountInfo.data.readBigUInt64LE(64);
-              const tokenBalance = Number(amount) / Math.pow(10, TOKEN_DECIMALS);
-              console.log(`✅ Token-2022 ${tokenMint.substring(0, 8)}... balance: ${tokenBalance.toFixed(TOKEN_DECIMALS)} (raw: ${amount})`);
-              setBalance(tokenBalance);
+            // Use getTokenAccountBalance for Token-2022 as well
+            try {
+              const tokenBalance = await connection.getTokenAccountBalance(ata);
+              const balance = tokenBalance.value.uiAmount ?? 0;
+              console.log(`✅ Token-2022 ${tokenMint.substring(0, 8)}... balance: ${balance} (decimals: ${tokenBalance.value.decimals})`);
+              setBalance(balance);
               return;
-            } else {
-              console.log(`⚠️ Token-2022 account exists but invalid size: ${accountInfo?.data.length || 0} bytes`);
+            } catch (balanceError) {
+              console.log(`⚠️ Token-2022 getTokenAccountBalance failed:`, balanceError);
             }
           } catch (token2022Error) {
             console.log(`⚠️ Token-2022 account not found for ${tokenMint.substring(0, 8)}..., error:`, token2022Error);
