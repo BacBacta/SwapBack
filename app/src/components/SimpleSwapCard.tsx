@@ -547,6 +547,8 @@ export function SimpleSwapCard() {
         outputToken={outputToken}
         inputAmount={lastSwapInput || inputAmount || "0"}
         outputAmount={lastSwapOutput || "0"}
+        inputUsdValue={parseFloat(lastSwapInput || inputAmount || "0") * inputTokenData.usdPrice}
+        outputUsdValue={parseFloat(lastSwapOutput || "0") * outputTokenData.usdPrice}
         onClose={() => {
           setShowTxModal(false);
           setTxStatus('idle');

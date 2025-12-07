@@ -19,6 +19,8 @@ interface TransactionStatusModalProps {
   outputToken: { symbol: string; logoURI?: string };
   inputAmount: string;
   outputAmount: string;
+  inputUsdValue?: number;
+  outputUsdValue?: number;
   onClose: () => void;
   errorMessage?: string;
 }
@@ -31,6 +33,8 @@ export function TransactionStatusModal({
   outputToken,
   inputAmount,
   outputAmount,
+  inputUsdValue,
+  outputUsdValue,
   onClose,
   errorMessage,
 }: TransactionStatusModalProps) {
@@ -194,6 +198,11 @@ export function TransactionStatusModal({
                       {isSuccess ? `+${outputAmount}` : outputAmount}
                     </span>
                     <span className="text-gray-400 text-sm">{outputToken.symbol}</span>
+                    {outputUsdValue !== undefined && outputUsdValue > 0 && (
+                      <span className="text-gray-500 text-xs mt-0.5">
+                        ≈ ${outputUsdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -208,6 +217,11 @@ export function TransactionStatusModal({
                     <p className="text-2xl font-bold text-white">
                       {outputAmount} <span className="text-emerald-400">{outputToken.symbol}</span>
                     </p>
+                    {outputUsdValue !== undefined && outputUsdValue > 0 && (
+                      <p className="text-sm text-gray-400 mt-1">
+                        ≈ ${outputUsdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                      </p>
+                    )}
                   </motion.div>
                 )}
 
