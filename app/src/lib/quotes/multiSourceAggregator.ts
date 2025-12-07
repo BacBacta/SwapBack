@@ -173,8 +173,9 @@ export interface AggregatedQuote {
 // === Sources de quotes ===
 
 const JUPITER_ENDPOINTS = [
-  "https://quote-api.jup.ag/v6",
-  "https://quote-api.jup.ag/v6", // backup identique, mais avec retry
+  "https://public.jupiterapi.com",  // Primary: resolves better
+  "https://api.jup.ag/v6",          // Fallback
+  "https://quote-api.jup.ag/v6",    // May have DNS issues in some environments
 ];
 
 async function fetchJupiterQuote(params: QuoteParams, endpoint: string): Promise<JupiterQuoteResponse> {

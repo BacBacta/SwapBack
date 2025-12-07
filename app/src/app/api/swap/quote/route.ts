@@ -24,14 +24,15 @@ import { getTokenByMint } from "@/constants/tokens";
 import type { JupiterQuoteResponse, JupiterRoutePlanStep } from "@/types/router";
 import { trackServerEvent } from "@/lib/serverAnalytics";
 
-const PRIMARY_JUPITER_API = process.env.JUPITER_API_URL || "https://quote-api.jup.ag/v6";
+const PRIMARY_JUPITER_API = process.env.JUPITER_API_URL || "https://public.jupiterapi.com";
 
-// Jupiter API endpoints (primary + fallbacks)
+// Jupiter API endpoints (primary + fallbacks) - public.jupiterapi.com resolves better
 const JUPITER_ENDPOINTS = [
-  PRIMARY_JUPITER_API,
   "https://public.jupiterapi.com",
+  PRIMARY_JUPITER_API,
   "https://api.jup.ag/v6",
-].filter(Boolean);
+  "https://quote-api.jup.ag/v6",
+].filter((url, index, arr) => arr.indexOf(url) === index);
 
 // ========================================
 // Rate Limiting & Caching

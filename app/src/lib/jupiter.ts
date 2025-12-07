@@ -14,7 +14,7 @@ import { logger } from '@/lib/logger';
 // Jupiter V6 API - Use local proxy to avoid CORS issues in browser
 const JUPITER_API_BASE = typeof window !== 'undefined' 
   ? '/api/swap'  // Browser: use Next.js API proxy
-  : 'https://quote-api.jup.ag/v6'; // Server-side: direct access
+  : 'https://public.jupiterapi.com'; // Server-side: direct access (public.jupiterapi.com resolves better)
 
 // ============================================================================
 // TYPES
@@ -149,8 +149,8 @@ export class JupiterService {
         }),
       });
     } else {
-      // Server-side: direct GET to Jupiter API
-      const url = new URL('https://quote-api.jup.ag/v6/quote');
+      // Server-side: direct GET to Jupiter API (public.jupiterapi.com resolves better)
+      const url = new URL('https://public.jupiterapi.com/quote');
       url.searchParams.set('inputMint', params.inputMint);
       url.searchParams.set('outputMint', params.outputMint);
       url.searchParams.set('amount', params.amount.toString());
@@ -203,7 +203,7 @@ export class JupiterService {
    */
   async buildSwapTransaction(params: JupiterSwapRequest): Promise<JupiterSwapResponse> {
     const isBrowser = typeof window !== 'undefined';
-    const url = isBrowser ? '/api/swap/transaction' : 'https://quote-api.jup.ag/v6/swap';
+    const url = isBrowser ? '/api/swap/transaction' : 'https://public.jupiterapi.com/swap';
 
     logger.info('JupiterService', 'Building swap transaction', { 
       userPublicKey: params.userPublicKey,

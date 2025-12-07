@@ -18,11 +18,11 @@ const DEFAULT_RPC_ENDPOINT =
   "https://api.devnet.solana.com";
 
 const JUPITER_ENDPOINTS = [
+  "https://public.jupiterapi.com",  // Primary: resolves better in most environments
   process.env.JUPITER_API_URL,
-  "https://public.jupiterapi.com",
-  "https://quote-api.jup.ag/v6",
   "https://api.jup.ag/v6",
-].filter(Boolean) as string[];
+  "https://quote-api.jup.ag/v6",   // Fallback: may have DNS issues in some environments
+].filter((url, index, arr) => url && arr.indexOf(url) === index) as string[];
 
 async function fetchFromJupiter(path: string, init?: RequestInit) {
   let lastError: unknown = null;
