@@ -13,10 +13,10 @@ import * as path from 'path';
 import { createProgramWithProvider } from '@/lib/program';
 
 import {
-  BUYBACK_PROGRAM_ID,
-  BUYBACK_STATE_PDA,
-  USDC_VAULT_PDA,
-  BACK_TOKEN_MINT,
+  getBuybackProgramId,
+  getBuybackStatePda,
+  getUsdcVaultPda,
+  getBackMint,
 } from './useBuybackState';
 
 interface ExecuteBuybackParams {
@@ -51,11 +51,11 @@ export function useExecuteBuyback() {
       );
 
       // Initialize program
-      const program = createProgramWithProvider(idl, BUYBACK_PROGRAM_ID, provider);
+      const program = createProgramWithProvider(idl, getBuybackProgramId(), provider);
 
       // Get user's $BACK token account
       const userBackAccount = await getAssociatedTokenAddress(
-        BACK_TOKEN_MINT,
+        getBackMint(),
         wallet.publicKey,
         false,
         TOKEN_2022_PROGRAM_ID
@@ -83,9 +83,9 @@ export function useExecuteBuyback() {
       const signature = await (program.methods as unknown as BuybackMethods)
         .executeBuyback(usdcAmountBN, minBackAmountBN)
         .accounts({
-          buybackState: BUYBACK_STATE_PDA,
-          usdcVault: USDC_VAULT_PDA,
-          backMint: BACK_TOKEN_MINT,
+          buybackState: getBuybackStatePda(),
+          usdcVault: getUsdcVaultPda(),
+          backMint: getBackMint(),
           userBackAccount,
           executor: wallet.publicKey,
           tokenProgram: TOKEN_2022_PROGRAM_ID,

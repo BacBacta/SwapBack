@@ -58,20 +58,13 @@ export function getBackMint(): PublicKey {
   return _backTokenMint;
 }
 
-// Backwards compatibility exports (deprecated - use functions instead)
-export const BUYBACK_PROGRAM_ID = new PublicKey(BUYBACK_PROGRAM_ID_STR);
-export const USDC_MINT = new PublicKey(USDC_MINT_STR);
-export const BACK_TOKEN_MINT = new PublicKey(BACK_MINT_STR);
-
-// PDAs - also computed at module level for backwards compatibility
-export const [BUYBACK_STATE_PDA] = PublicKey.findProgramAddressSync(
-  [Buffer.from('buyback_state')],
-  BUYBACK_PROGRAM_ID
-);
-export const [USDC_VAULT_PDA] = PublicKey.findProgramAddressSync(
-  [Buffer.from('usdc_vault')],
-  BUYBACK_PROGRAM_ID
-);
+// DEPRECATED: These constants cause SSR issues - use functions above instead
+// Keeping for backwards compatibility but marked for removal
+// export const BUYBACK_PROGRAM_ID = getBuybackProgramId();
+// export const USDC_MINT = getUsdcMint();
+// export const BACK_TOKEN_MINT = getBackMint();
+// export const BUYBACK_STATE_PDA = getBuybackStatePda();
+// export const USDC_VAULT_PDA = getUsdcVaultPda();
 
 export interface BuybackState {
   authority: PublicKey;
@@ -95,10 +88,11 @@ export function useBuybackState() {
   const { connection } = useConnection();
 
   // Fetch buyback state account data
+  const buybackStatePda = getBuybackStatePda();
   const { data: buybackState, isLoading: isLoadingState, error: stateError } = useQuery({
-    queryKey: ['buyback-state', BUYBACK_STATE_PDA.toBase58()],
+    queryKey: ['buyback-state', buybackStatePda.toBase58()],
     queryFn: async (): Promise<Omit<BuybackState, 'vaultBalance' | 'canExecute' | 'progressPercent'>> => {
-      const accountInfo = await connection.getAccountInfo(BUYBACK_STATE_PDA);
+      const accountInfo = await connection.getAccountInfo(buybackStatePda);
       if (!accountInfo) {
         throw new Error('Buyback state account not found');
       }
@@ -132,11 +126,12 @@ export function useBuybackState() {
   });
 
   // Fetch USDC vault balance separately
+  const usdcVaultPda = getUsdcVaultPda();
   const { data: vaultBalance, isLoading: isLoadingVault } = useQuery({
-    queryKey: ['vault-balance', USDC_VAULT_PDA.toBase58()],
+    queryKey: ['vault-balance', usdcVaultPda.toBase58()],
     queryFn: async (): Promise<number> => {
       try {
-        const balance = await connection.getTokenAccountBalance(USDC_VAULT_PDA);
+        const balance = await connection.getTokenAccountBalance(usdcVaultPda);
         return balance.value.uiAmount || 0;
       } catch (error) {
         console.error('Error fetching vault balance:', error);
