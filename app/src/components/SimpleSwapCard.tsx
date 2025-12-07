@@ -10,10 +10,11 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { ArrowDownUp, Settings, Loader2, ChevronRight, Sparkles, AlertTriangle, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { ArrowDownUp, Settings, Loader2, ChevronRight, Sparkles, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TokenSelectorModal } from "./TokenSelectorModal";
 import { AdvancedOptionsPanel } from "./AdvancedOptionsPanel";
+import { TransactionStatusModal, TransactionStatus } from "./TransactionStatusModal";
 import { useTokenData } from "../hooks/useTokenData";
 import { useSwapWithBoost } from "../hooks/useSwapWithBoost";
 import { getApiUrl, API_ENDPOINTS } from "@/config/api";
@@ -86,8 +87,11 @@ export function SimpleSwapCard() {
   const [mevProtection, setMevProtection] = useState(false);
 
   // État de la transaction
-  const [txStatus, setTxStatus] = useState<'idle' | 'preparing' | 'signing' | 'sending' | 'confirming' | 'confirmed' | 'error'>('idle');
+  const [txStatus, setTxStatus] = useState<TransactionStatus>('idle');
   const [txSignature, setTxSignature] = useState<string | null>(null);
+  const [txError, setTxError] = useState<string | null>(null);
+  const [showTxModal, setShowTxModal] = useState(false);
+  const [lastSwapOutput, setLastSwapOutput] = useState<string>("");
 
   // Token data
   const inputTokenData = useTokenData(inputToken.mint);
@@ -192,6 +196,9 @@ export function SimpleSwapCard() {
     setSwapping(true);
     setTxStatus('preparing');
     setTxSignature(null);
+    setTxError(null);
+    setShowTxModal(true);
+    setLastSwapOutput("");
     
     try {
       // Étape 1: Préparation et signature
@@ -222,9 +229,7 @@ export function SimpleSwapCard() {
         
         setTxStatus('confirmed');
         setTxSignature(result.signature || null);
-        toast.success(
-          `Swap réussi ! ${result.outputAmount.toLocaleString()} ${outputToken.symbol} reçus`
-        );
+        setLastSwapOutput(result.outputAmount.toLocaleString());
         
         // Reset form après succès
         setInputAmount("");
@@ -238,21 +243,14 @@ export function SimpleSwapCard() {
         }, 2000);
       } else {
         setTxStatus('error');
-        toast.error(swapError || "Erreur lors du swap");
+        setTxError(swapError || "Erreur lors du swap");
       }
     } catch (error) {
       console.error("Swap error:", error);
       setTxStatus('error');
-      toast.error(
-        error instanceof Error ? error.message : "Erreur lors du swap"
-      );
+      setTxError(error instanceof Error ? error.message : "Erreur lors du swap");
     } finally {
       setSwapping(false);
-      // Reset transaction status after a delay (5 secondes pour laisser l'utilisateur voir le résultat)
-      setTimeout(() => {
-        setTxStatus('idle');
-        setTxSignature(null);
-      }, 5000);
     }
   };
 
@@ -391,10 +389,10 @@ export function SimpleSwapCard() {
                       {quote ? formatAmount(quote.outputAmountFormatted) : "0"}
                     </span>
                   )}
-                  {/* Valeur USD output */}
-                  {quote && outputTokenData.usdPrice > 0 && (
+                  {/* Valeur USD output - basée sur la valeur de l'input */}
+                  {quote && inputAmountNum > 0 && inputTokenData.usdPrice > 0 && (
                     <div className="text-xs text-gray-500 mt-0.5">
-                      ≈ ${(quote.outputAmountFormatted * outputTokenData.usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                      ≈ ${(inputAmountNum * inputTokenData.usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
                     </div>
                   )}
                 </div>
@@ -466,107 +464,6 @@ export function SimpleSwapCard() {
                 "Swap"
               )}
             </button>
-
-            {/* Indicateur d'état de transaction */}
-            <AnimatePresence>
-              {txStatus !== 'idle' && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className={`
-                    rounded-xl p-4 mt-3 border
-                    ${txStatus === 'confirmed' ? 'bg-emerald-500/10 border-emerald-500/30' : 
-                      txStatus === 'error' ? 'bg-red-500/10 border-red-500/30' : 
-                      'bg-blue-500/10 border-blue-500/30'}
-                  `}>
-                    {/* Étapes de la transaction */}
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-medium text-white">
-                        {txStatus === 'confirmed' ? '✅ Transaction confirmée' :
-                         txStatus === 'error' ? '❌ Échec de la transaction' :
-                         '🔄 Transaction en cours...'}
-                      </span>
-                      {txStatus !== 'confirmed' && txStatus !== 'error' && (
-                        <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
-                      )}
-                    </div>
-
-                    {/* Barre de progression */}
-                    <div className="flex items-center gap-2 text-xs">
-                      {/* Préparation */}
-                      <div className={`flex items-center gap-1 ${
-                        txStatus === 'preparing' ? 'text-blue-400' :
-                        ['signing', 'sending', 'confirming', 'confirmed'].includes(txStatus) ? 'text-emerald-400' :
-                        'text-gray-500'
-                      }`}>
-                        {['signing', 'sending', 'confirming', 'confirmed'].includes(txStatus) ? (
-                          <CheckCircle2 className="w-3 h-3" />
-                        ) : txStatus === 'preparing' ? (
-                          <Clock className="w-3 h-3 animate-pulse" />
-                        ) : (
-                          <div className="w-3 h-3 rounded-full border border-current" />
-                        )}
-                        <span>Préparation</span>
-                      </div>
-
-                      <div className="flex-1 h-px bg-gray-600" />
-
-                      {/* Signature */}
-                      <div className={`flex items-center gap-1 ${
-                        txStatus === 'signing' ? 'text-blue-400' :
-                        ['sending', 'confirming', 'confirmed'].includes(txStatus) ? 'text-emerald-400' :
-                        'text-gray-500'
-                      }`}>
-                        {['sending', 'confirming', 'confirmed'].includes(txStatus) ? (
-                          <CheckCircle2 className="w-3 h-3" />
-                        ) : txStatus === 'signing' ? (
-                          <Clock className="w-3 h-3 animate-pulse" />
-                        ) : (
-                          <div className="w-3 h-3 rounded-full border border-current" />
-                        )}
-                        <span>Signature</span>
-                      </div>
-
-                      <div className="flex-1 h-px bg-gray-600" />
-
-                      {/* Confirmation */}
-                      <div className={`flex items-center gap-1 ${
-                        txStatus === 'confirming' ? 'text-blue-400' :
-                        txStatus === 'confirmed' ? 'text-emerald-400' :
-                        txStatus === 'error' ? 'text-red-400' :
-                        'text-gray-500'
-                      }`}>
-                        {txStatus === 'confirmed' ? (
-                          <CheckCircle2 className="w-3 h-3" />
-                        ) : txStatus === 'error' ? (
-                          <XCircle className="w-3 h-3" />
-                        ) : txStatus === 'confirming' ? (
-                          <Clock className="w-3 h-3 animate-pulse" />
-                        ) : (
-                          <div className="w-3 h-3 rounded-full border border-current" />
-                        )}
-                        <span>Confirmée</span>
-                      </div>
-                    </div>
-
-                    {/* Lien vers l'explorateur */}
-                    {txSignature && txStatus === 'confirmed' && (
-                      <a
-                        href={`https://solscan.io/tx/${txSignature}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-3 text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
-                      >
-                        Voir sur Solscan →
-                      </a>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
 
           {/* Footer - Options avancées (minimisé) */}
@@ -622,6 +519,24 @@ export function SimpleSwapCard() {
         quote={quote}
         inputToken={inputToken}
         outputToken={outputToken}
+      />
+
+      {/* Modal d'état de transaction */}
+      <TransactionStatusModal
+        isOpen={showTxModal}
+        status={txStatus}
+        signature={txSignature}
+        inputToken={inputToken}
+        outputToken={outputToken}
+        inputAmount={inputAmount || "0"}
+        outputAmount={lastSwapOutput || (quote ? formatAmount(quote.outputAmountFormatted) : "0")}
+        onClose={() => {
+          setShowTxModal(false);
+          setTxStatus('idle');
+          setTxSignature(null);
+          setTxError(null);
+        }}
+        errorMessage={txError || undefined}
       />
     </>
   );
