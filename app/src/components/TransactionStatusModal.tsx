@@ -179,15 +179,41 @@ export function TransactionStatusModal({
                           {outputToken.symbol.charAt(0)}
                         </div>
                       )}
+                      {/* Badge de succès sur le token output */}
+                      {isSuccess && (
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center border-2 border-[#191B1F]"
+                        >
+                          <Check className="w-3 h-3 text-white" />
+                        </motion.div>
+                      )}
                     </div>
-                    <span className="text-white font-medium mt-2">{outputAmount}</span>
+                    <span className={`font-medium mt-2 ${isSuccess ? 'text-emerald-400 text-lg' : 'text-white'}`}>
+                      {isSuccess ? `+${outputAmount}` : outputAmount}
+                    </span>
                     <span className="text-gray-400 text-sm">{outputToken.symbol}</span>
                   </div>
                 </div>
 
+                {/* Montant reçu mis en valeur pour le succès */}
+                {isSuccess && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mb-4 text-center"
+                  >
+                    <p className="text-sm text-emerald-400 mb-1">Vous avez reçu</p>
+                    <p className="text-2xl font-bold text-white">
+                      {outputAmount} <span className="text-emerald-400">{outputToken.symbol}</span>
+                    </p>
+                  </motion.div>
+                )}
+
                 {/* Status text */}
                 <div className="text-center mb-4">
-                  <p className={`text-sm ${isError ? 'text-red-400' : 'text-gray-400'}`}>
+                  <p className={`text-sm ${isError ? 'text-red-400' : isSuccess ? 'text-emerald-400' : 'text-gray-400'}`}>
                     {getStatusText()}
                   </p>
                   {isError && errorMessage && (

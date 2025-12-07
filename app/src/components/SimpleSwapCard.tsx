@@ -91,6 +91,7 @@ export function SimpleSwapCard() {
   const [txSignature, setTxSignature] = useState<string | null>(null);
   const [txError, setTxError] = useState<string | null>(null);
   const [showTxModal, setShowTxModal] = useState(false);
+  const [lastSwapInput, setLastSwapInput] = useState<string>("");
   const [lastSwapOutput, setLastSwapOutput] = useState<string>("");
 
   // Token data
@@ -197,8 +198,11 @@ export function SimpleSwapCard() {
     setTxStatus('preparing');
     setTxSignature(null);
     setTxError(null);
+    
+    // Sauvegarder les montants pour l'affichage dans le modal
+    setLastSwapInput(inputAmount);
+    setLastSwapOutput(quote ? formatAmount(quote.outputAmountFormatted) : "0");
     setShowTxModal(true);
-    setLastSwapOutput("");
     
     try {
       // Étape 1: Préparation et signature
@@ -229,7 +233,10 @@ export function SimpleSwapCard() {
         
         setTxStatus('confirmed');
         setTxSignature(result.signature || null);
-        setLastSwapOutput(result.outputAmount.toLocaleString());
+        
+        // Mettre à jour avec le montant réel reçu
+        const actualOutput = result.outputAmount ? result.outputAmount.toLocaleString() : lastSwapOutput;
+        setLastSwapOutput(actualOutput);
         
         // Reset form après succès
         setInputAmount("");
@@ -349,9 +356,13 @@ export function SimpleSwapCard() {
                 </button>
               </div>
               {/* Valeur USD */}
-              {inputAmountNum > 0 && inputTokenData.usdPrice > 0 && (
+              {inputAmountNum > 0 && (
                 <div className="text-xs text-gray-500 mt-1">
-                  ≈ ${(inputAmountNum * inputTokenData.usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                  {inputTokenData.usdPrice > 0 ? (
+                    <>≈ ${(inputAmountNum * inputTokenData.usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</>
+                  ) : inputTokenData.loading ? (
+                    <span className="animate-pulse">Chargement du prix...</span>
+                  ) : null}
                 </div>
               )}
             </div>
@@ -390,9 +401,13 @@ export function SimpleSwapCard() {
                     </span>
                   )}
                   {/* Valeur USD output - utilise le prix du token output */}
-                  {quote && quote.outputAmountFormatted > 0 && outputTokenData.usdPrice > 0 && (
+                  {quote && quote.outputAmountFormatted > 0 && (
                     <div className="text-xs text-gray-500 mt-0.5">
-                      ≈ ${(quote.outputAmountFormatted * outputTokenData.usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                      {outputTokenData.usdPrice > 0 ? (
+                        <>≈ ${(quote.outputAmountFormatted * outputTokenData.usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</>
+                      ) : outputTokenData.loading ? (
+                        <span className="animate-pulse">Chargement...</span>
+                      ) : null}
                     </div>
                   )}
                 </div>
@@ -528,8 +543,8 @@ export function SimpleSwapCard() {
         signature={txSignature}
         inputToken={inputToken}
         outputToken={outputToken}
-        inputAmount={inputAmount || "0"}
-        outputAmount={lastSwapOutput || (quote ? formatAmount(quote.outputAmountFormatted) : "0")}
+        inputAmount={lastSwapInput || inputAmount || "0"}
+        outputAmount={lastSwapOutput || "0"}
         onClose={() => {
           setShowTxModal(false);
           setTxStatus('idle');
