@@ -262,6 +262,7 @@ export class JupiterService {
 
   /**
    * Exécute un swap complet : quote → build → sign → send
+   * Avec retry automatique en cas d'expiration du blockhash
    */
   async executeSwap(
     inputMint: string,
@@ -272,64 +273,112 @@ export class JupiterService {
     options?: {
       slippageBps?: number;
       priorityFee?: number | 'auto';
+      maxRetries?: number;
     }
   ): Promise<SwapResult> {
-    // 1. Get quote
-    const quote = await this.getQuote({
-      inputMint,
-      outputMint,
-      amount,
-      slippageBps: options?.slippageBps ?? 100 // 1% default slippage
-    });
+    const maxRetries = options?.maxRetries ?? 2;
+    let lastError: Error | null = null;
 
-    // 2. Build swap transaction
-    const swapResponse = await this.buildSwapTransaction({
-      quoteResponse: quote,
-      userPublicKey,
-      prioritizationFeeLamports: options?.priorityFee ?? 'auto',
-      dynamicComputeUnitLimit: true
-    });
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          logger.info('JupiterService', `Retry attempt ${attempt}/${maxRetries}`);
+        }
 
-    // 3. Deserialize transaction
-    const transaction = this.deserializeTransaction(swapResponse.swapTransaction);
+        // 1. Get fresh quote for each attempt
+        const quote = await this.getQuote({
+          inputMint,
+          outputMint,
+          amount,
+          slippageBps: options?.slippageBps ?? 100 // 1% default slippage
+        });
 
-    // 4. Sign transaction
-    const signedTransaction = await signTransaction(transaction);
+        // 2. Build swap transaction with fresh blockhash
+        const swapResponse = await this.buildSwapTransaction({
+          quoteResponse: quote,
+          userPublicKey,
+          prioritizationFeeLamports: options?.priorityFee ?? 'auto',
+          dynamicComputeUnitLimit: true
+        });
 
-    // 5. Send transaction
-    const rawTransaction = signedTransaction.serialize();
-    
-    const signature = await this.connection.sendRawTransaction(rawTransaction, {
-      skipPreflight: false,
-      preflightCommitment: 'confirmed',
-      maxRetries: 3
-    });
+        // 3. Deserialize transaction
+        const transaction = this.deserializeTransaction(swapResponse.swapTransaction);
 
-    logger.info('JupiterService', 'Transaction sent', { signature });
+        // 4. Sign transaction
+        const signedTransaction = await signTransaction(transaction);
 
-    // 6. Confirm transaction
-    const confirmation = await this.connection.confirmTransaction({
-      signature,
-      blockhash: transaction.message.recentBlockhash,
-      lastValidBlockHeight: swapResponse.lastValidBlockHeight
-    }, 'confirmed');
+        // 5. Send transaction with optimized settings
+        const rawTransaction = signedTransaction.serialize();
+        
+        const signature = await this.connection.sendRawTransaction(rawTransaction, {
+          skipPreflight: true, // Skip preflight for faster submission
+          preflightCommitment: 'processed',
+          maxRetries: 0 // We handle retries ourselves
+        });
 
-    if (confirmation.value.err) {
-      throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+        logger.info('JupiterService', 'Transaction sent', { signature, attempt });
+
+        // 6. Confirm transaction with timeout
+        const confirmationPromise = this.connection.confirmTransaction({
+          signature,
+          blockhash: transaction.message.recentBlockhash,
+          lastValidBlockHeight: swapResponse.lastValidBlockHeight
+        }, 'confirmed');
+
+        // Add a 60 second timeout
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Transaction confirmation timeout')), 60000);
+        });
+
+        const confirmation = await Promise.race([confirmationPromise, timeoutPromise]);
+
+        if (confirmation.value.err) {
+          throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+        }
+
+        logger.info('JupiterService', 'Swap completed successfully', { signature });
+
+        // Extract route labels
+        const routeLabels = quote.routePlan.map(step => step.swapInfo.label);
+
+        return {
+          signature,
+          inputAmount: parseInt(quote.inAmount),
+          outputAmount: parseInt(quote.outAmount),
+          priceImpact: parseFloat(quote.priceImpactPct),
+          route: routeLabels
+        };
+
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        const errorMessage = lastError.message;
+
+        // Retry only on blockhash expiration or timeout errors
+        const isRetryable = 
+          errorMessage.includes('block height exceeded') ||
+          errorMessage.includes('blockhash not found') ||
+          errorMessage.includes('Blockhash not found') ||
+          errorMessage.includes('confirmation timeout') ||
+          errorMessage.includes('Transaction confirmation timeout');
+
+        if (isRetryable && attempt < maxRetries) {
+          logger.warn('JupiterService', `Retryable error, will retry`, { 
+            error: errorMessage, 
+            attempt,
+            maxRetries 
+          });
+          // Small delay before retry
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          continue;
+        }
+
+        // Not retryable or max retries reached
+        throw lastError;
+      }
     }
 
-    logger.info('JupiterService', 'Swap completed successfully', { signature });
-
-    // Extract route labels
-    const routeLabels = quote.routePlan.map(step => step.swapInfo.label);
-
-    return {
-      signature,
-      inputAmount: parseInt(quote.inAmount),
-      outputAmount: parseInt(quote.outAmount),
-      priceImpact: parseFloat(quote.priceImpactPct),
-      route: routeLabels
-    };
+    // Should not reach here, but just in case
+    throw lastError || new Error('Swap failed after all retries');
   }
 
   /**

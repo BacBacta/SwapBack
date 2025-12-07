@@ -206,8 +206,14 @@ export function useSwapWithBoost() {
           message = "Solde insuffisant pour effectuer le transfert. Vérifiez votre solde SOL.";
         } else if (message.includes('slippage')) {
           message = "Le prix a changé au-delà du slippage autorisé. Réessayez ou augmentez le slippage.";
+        } else if (message.includes('block height exceeded') || message.includes('has expired')) {
+          message = "Transaction expirée (réseau congestionné). Le système a fait plusieurs tentatives. Veuillez réessayer.";
         } else if (message.includes('blockhash')) {
           message = "Transaction expirée. Veuillez réessayer.";
+        } else if (message.includes('timeout') || message.includes('Timeout')) {
+          message = "Délai de confirmation dépassé. La transaction peut avoir réussi, vérifiez votre wallet.";
+        } else if (message.includes('User rejected')) {
+          message = "Transaction annulée par l'utilisateur.";
         }
         
         logger.error('useSwapWithBoost', 'Swap error', { error: message });
