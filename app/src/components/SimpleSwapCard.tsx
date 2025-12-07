@@ -389,10 +389,10 @@ export function SimpleSwapCard() {
                       {quote ? formatAmount(quote.outputAmountFormatted) : "0"}
                     </span>
                   )}
-                  {/* Valeur USD output - basée sur la valeur de l'input */}
-                  {quote && inputAmountNum > 0 && inputTokenData.usdPrice > 0 && (
+                  {/* Valeur USD output - utilise le prix du token output */}
+                  {quote && quote.outputAmountFormatted > 0 && outputTokenData.usdPrice > 0 && (
                     <div className="text-xs text-gray-500 mt-0.5">
-                      ≈ ${(inputAmountNum * inputTokenData.usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                      ≈ ${(quote.outputAmountFormatted * outputTokenData.usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
                     </div>
                   )}
                 </div>
