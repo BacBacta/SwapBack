@@ -61,24 +61,28 @@ export const ClientOnlyWallet = () => {
     }
   }, [visible, isMobile, setVisible]);
 
-  // Detect network from RPC endpoint
+  // Detect network from RPC endpoint (NO RPC CALL - just parse endpoint URL)
   useEffect(() => {
-    const detectNetwork = async () => {
+    const detectNetwork = () => {
       try {
         const endpoint = connection.rpcEndpoint;
+        console.log('[ClientOnlyWallet] RPC endpoint:', endpoint);
+        
         if (endpoint.includes("devnet")) {
           setNetwork("devnet");
         } else if (endpoint.includes("testnet")) {
           setNetwork("testnet");
-        } else if (endpoint.includes("mainnet")) {
+        } else if (endpoint.includes("mainnet") || endpoint.includes("ankr") || endpoint.includes("publicnode")) {
           setNetwork("mainnet-beta");
         }
         
         // Check if connected to wrong network
-        const expectedNetwork = process.env.NEXT_PUBLIC_SOLANA_NETWORK || "testnet";
-        setIsWrongNetwork(network !== expectedNetwork);
+        const expectedNetwork = process.env.NEXT_PUBLIC_SOLANA_NETWORK || "mainnet-beta";
+        const wrongNetwork = network !== expectedNetwork;
+        console.log('[ClientOnlyWallet] Network:', network, '| Expected:', expectedNetwork, '| Wrong?', wrongNetwork);
+        setIsWrongNetwork(wrongNetwork);
       } catch (error) {
-        console.error("Network detection error:", error);
+        console.error("[ClientOnlyWallet] Network detection error:", error);
       }
     };
     detectNetwork();
@@ -88,21 +92,38 @@ export const ClientOnlyWallet = () => {
   useEffect(() => {
     const fetchBalance = async () => {
       if (connected && publicKey) {
+        const startTime = Date.now();
+        console.log('[ClientOnlyWallet] Fetching balance for:', publicKey.toBase58().substring(0, 8) + '...');
+        console.log('[ClientOnlyWallet] Using RPC:', connection.rpcEndpoint);
+        
         try {
           const bal = await connection.getBalance(publicKey);
+          console.log('[ClientOnlyWallet] Balance fetched:', bal / 1e9, 'SOL in', Date.now() - startTime, 'ms');
           setBalance(bal / 1e9); // Convert lamports to SOL
-        } catch (error) {
-          console.error("Error fetching balance:", error);
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error("[ClientOnlyWallet] ERROR fetching balance:");
+          console.error("[ClientOnlyWallet] Error:", errorMessage);
+          console.error("[ClientOnlyWallet] RPC:", connection.rpcEndpoint);
+          
+          if (errorMessage.includes('429')) {
+            console.error("[ClientOnlyWallet] ⚠️ RATE LIMITED (429)");
+          }
         }
       } else {
         setBalance(null);
       }
     };
-    fetchBalance();
+    
+    // Delay initial fetch to stagger RPC calls
+    const timeoutId = setTimeout(fetchBalance, 500);
     
     // Refresh balance every 60s (increased to avoid rate limiting)
     const interval = setInterval(fetchBalance, 60000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timeoutId);
+      clearInterval(interval);
+    };
   }, [connected, publicKey, connection]);
 
   // Toast notifications for wallet events

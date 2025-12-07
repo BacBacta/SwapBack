@@ -58,22 +58,33 @@ export function SimpleRebatesCard() {
   useEffect(() => {
     const fetchData = async () => {
       if (!connected || !publicKey) {
+        console.log('[SimpleRebatesCard] Not connected or no publicKey');
         setRebateData(null);
         setLoading(false);
         return;
       }
 
+      console.log('[SimpleRebatesCard] Starting fetchData...');
+      console.log('[SimpleRebatesCard] RPC endpoint:', connection.rpcEndpoint);
+      console.log('[SimpleRebatesCard] Wallet:', publicKey.toBase58().substring(0, 8) + '...');
+      
       setLoading(true);
+      const startTime = Date.now();
+      
       try {
         // Derive UserRebate PDA
         const [userRebatePDA] = PublicKey.findProgramAddressSync(
           [Buffer.from("user_rebate"), publicKey.toBuffer()],
           ROUTER_PROGRAM_ID
         );
+        console.log('[SimpleRebatesCard] UserRebate PDA:', userRebatePDA.toBase58().substring(0, 8) + '...');
 
+        console.log('[SimpleRebatesCard] Calling getAccountInfo...');
         const accountInfo = await connection.getAccountInfo(userRebatePDA);
+        console.log('[SimpleRebatesCard] getAccountInfo completed in', Date.now() - startTime, 'ms');
 
         if (accountInfo && accountInfo.data.length >= 80) {
+          console.log('[SimpleRebatesCard] Account found, parsing data...');
           // Parse UserRebate account data
           // Layout: discriminator(8) + user(32) + unclaimed(8) + total_claimed(8) + total_swaps(8) + ...
           const data = accountInfo.data;
@@ -92,6 +103,8 @@ export function SimpleRebatesCard() {
           // Estimate volume from rebates (0.1% rebate rate)
           const totalVolume = (unclaimedRebate + totalClaimed) * 1000;
 
+          console.log('[SimpleRebatesCard] Parsed data:', { unclaimedRebate, totalClaimed, totalSwaps, totalVolume });
+          
           setRebateData({
             unclaimedRebate,
             totalClaimed,
@@ -99,6 +112,7 @@ export function SimpleRebatesCard() {
             totalSwaps,
           });
         } else {
+          console.log('[SimpleRebatesCard] No account found or insufficient data length');
           // No account - user has never swapped
           setRebateData({
             unclaimedRebate: 0,
@@ -111,15 +125,36 @@ export function SimpleRebatesCard() {
         // Fetch claim history from signatures (simplified)
         // In production, use proper indexer
         setClaimHistory([]);
-      } catch (error) {
-        console.error("Error fetching rebate data:", error);
+        console.log('[SimpleRebatesCard] fetchData completed successfully in', Date.now() - startTime, 'ms');
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorName = error instanceof Error ? error.name : 'Unknown';
+        
+        console.error('[SimpleRebatesCard] ERROR in fetchData:');
+        console.error('[SimpleRebatesCard] Error name:', errorName);
+        console.error('[SimpleRebatesCard] Error message:', errorMessage);
+        console.error('[SimpleRebatesCard] RPC endpoint:', connection.rpcEndpoint);
+        console.error('[SimpleRebatesCard] Time elapsed:', Date.now() - startTime, 'ms');
+        
+        // Check for specific error types
+        if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests')) {
+          console.error('[SimpleRebatesCard] ⚠️ RATE LIMITED (429) - RPC is blocking requests');
+        }
+        if (errorMessage.includes('fetch failed') || errorMessage.includes('network')) {
+          console.error('[SimpleRebatesCard] ⚠️ NETWORK ERROR - Check RPC endpoint');
+        }
+        
+        console.error('[SimpleRebatesCard] Full error:', error);
         setRebateData(null);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    // Delay initial fetch to avoid burst of requests on page load
+    const timeoutId = setTimeout(fetchData, 300);
+    
+    return () => clearTimeout(timeoutId);
   }, [connected, publicKey, connection, ROUTER_PROGRAM_ID]);
 
   const handleClaim = async () => {
