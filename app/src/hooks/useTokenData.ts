@@ -138,36 +138,53 @@ export const useTokenData = (tokenMint: string) => {
     };
   }, [connection, publicKey, tokenMint, connected, refreshTrigger]);
 
-  // Récupérer le prix USD
+  // Récupérer le prix USD en temps réel via Jupiter Price API
   useEffect(() => {
     const fetchPrice = async () => {
-      try {
-        // Prix pour tokens mainnet (utilisés en production)
-        const mainnetPrices: { [key: string]: number } = {
-          // Native SOL
-          So11111111111111111111111111111111111111112: 218.50, // SOL prix actuel ~$218
+      if (!tokenMint) {
+        setUsdPrice(0);
+        return;
+      }
 
-          // Mainnet tokens
+      try {
+        // Utiliser Jupiter Price API v2 pour obtenir les prix en temps réel
+        // Documentation: https://station.jup.ag/docs/apis/price-api
+        const response = await fetch(
+          `https://api.jup.ag/price/v2?ids=${tokenMint}`,
+          {
+            headers: {
+              'Accept': 'application/json',
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          
+          if (data.data && data.data[tokenMint]) {
+            const price = parseFloat(data.data[tokenMint].price) || 0;
+            setUsdPrice(price);
+            console.log(
+              `💰 Prix temps réel pour ${tokenMint.substring(0, 8)}... = $${price.toFixed(4)}`
+            );
+            return;
+          }
+        }
+
+        // Fallback: prix statiques pour les tokens non supportés
+        const fallbackPrices: { [key: string]: number } = {
           EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v: 1.0, // USDC
           Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB: 1.0, // USDT
-          DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263: 0.00002, // BONK
-          "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux": 0.001, // $BACK
-          mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So: 240.0, // mSOL
-          JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN: 0.85, // JUP
-          "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr": 2.5, // JTO
-          
-          // Testnet deployed tokens (fallback)
           "3y4dCqwWuYx1B97YEDmgq9qjuNE1eyEwGx2eLgz6Rc6G": 1.0, // USDC Test
           BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR: 1.0, // USDC Testnet
         };
 
-        // Utiliser le prix ou 0
-        const price = mainnetPrices[tokenMint] || 0;
-        setUsdPrice(price);
-
-        if (price > 0) {
+        const fallbackPrice = fallbackPrices[tokenMint] || 0;
+        setUsdPrice(fallbackPrice);
+        
+        if (fallbackPrice > 0) {
           console.log(
-            `💰 Prix pour ${tokenMint.substring(0, 8)}... = $${price.toFixed(2)}`
+            `💰 Prix fallback pour ${tokenMint.substring(0, 8)}... = $${fallbackPrice.toFixed(2)}`
           );
         } else {
           console.warn(
@@ -176,14 +193,20 @@ export const useTokenData = (tokenMint: string) => {
         }
       } catch (error) {
         console.error("Error fetching price:", error);
-        setUsdPrice(0);
+        // En cas d'erreur, essayer les prix fallback
+        const fallbackPrices: { [key: string]: number } = {
+          So11111111111111111111111111111111111111112: 230.0, // SOL estimation
+          EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v: 1.0, // USDC
+          Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB: 1.0, // USDT
+        };
+        setUsdPrice(fallbackPrices[tokenMint] || 0);
       }
     };
 
     fetchPrice();
 
-    // Rafraîchir toutes les 120 secondes (prices don't change that fast)
-    const interval = setInterval(fetchPrice, 120000);
+    // Rafraîchir toutes les 30 secondes pour avoir des prix à jour
+    const interval = setInterval(fetchPrice, 30000);
     return () => clearInterval(interval);
   }, [tokenMint]);
 
