@@ -1,7 +1,15 @@
 import { createRequire } from 'node:module';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import webpack from 'webpack';
 
 const require = createRequire(import.meta.url);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const RPC_WEBSOCKETS_SHIM_PATH = path.resolve(
+  __dirname,
+  'src/lib/rpc-websockets-shim.js'
+);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -87,8 +95,8 @@ const nextConfig = {
         crypto: require.resolve('crypto-browserify'),
         stream: require.resolve('stream-browserify'),
         // Fix rpc-websockets v9.x export issues - redirect old paths to shim
-        'rpc-websockets/dist/lib/client': require.resolve('./src/lib/rpc-websockets-shim.js'),
-        'rpc-websockets/dist/lib/client/websocket.browser': require.resolve('./src/lib/rpc-websockets-shim.js'),
+        'rpc-websockets/dist/lib/client': RPC_WEBSOCKETS_SHIM_PATH,
+        'rpc-websockets/dist/lib/client/websocket.browser': RPC_WEBSOCKETS_SHIM_PATH,
       };
 
       config.plugins = config.plugins || [];
