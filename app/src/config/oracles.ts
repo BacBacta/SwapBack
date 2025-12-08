@@ -12,14 +12,14 @@ export interface OracleFeedConfig {
 type OraclePair = `${string}/${string}`;
 
 const ORACLE_FEED_CONFIGS: Record<OraclePair, { primary: string; fallback?: string }> = {
-  // SOL ⇄ USDC
+  // SOL ⇄ USDC - Utiliser Pyth en primaire (plus fiable sur mainnet)
   "So11111111111111111111111111111111111111112/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": {
-    primary: "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR", // Switchboard SOL/USD (devnet)
-    fallback: "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG", // Pyth SOL/USD
+    primary: "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG", // Pyth SOL/USD mainnet
+    fallback: "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR", // Switchboard SOL/USD
   },
   "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/So11111111111111111111111111111111111111112": {
-    primary: "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR",
-    fallback: "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG",
+    primary: "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG", // Pyth SOL/USD mainnet
+    fallback: "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR", // Switchboard SOL/USD
   },
 
   // USDT ⇄ USDC

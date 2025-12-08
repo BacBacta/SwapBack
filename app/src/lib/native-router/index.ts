@@ -28,6 +28,7 @@ import {
 } from "@solana/spl-token";
 import { BN, Program, AnchorProvider, type Idl } from "@coral-xyz/anchor";
 import { logger } from "@/lib/logger";
+import { getOracleFeedsForPair } from "@/config/oracles";
 import { getTokenPrice, getSolPrice } from "@/lib/price-service";
 
 // ============================================================================
@@ -56,8 +57,9 @@ export const DEX_PROGRAMS = {
 export const SOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
 export const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 
-// Default oracle (Switchboard SOL/USD)
-export const DEFAULT_ORACLE = new PublicKey("GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR");
+// Default oracle (Pyth SOL/USD mainnet)
+export const PYTH_SOL_USD_MAINNET = new PublicKey("H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG");
+export const DEFAULT_ORACLE = PYTH_SOL_USD_MAINNET; // Fallback si getOracleFeedsForPair échoue
 
 // Jito MEV Protection (mainnet tip accounts)
 export const JITO_BLOCK_ENGINE_URL = "https://mainnet.block-engine.jito.wtf/api/v1/bundles";
@@ -1573,6 +1575,28 @@ export class NativeRouterService {
       venueScoreExists,
     });
     
+    // Obtenir les oracles pour cette paire de tokens
+    let primaryOracle = DEFAULT_ORACLE;
+    let fallbackOracle: PublicKey | null = null;
+    
+    try {
+      const oracleConfig = getOracleFeedsForPair(inputMint.toBase58(), outputMint.toBase58());
+      primaryOracle = oracleConfig.primary;
+      fallbackOracle = oracleConfig.fallback || null;
+      
+      logger.debug("NativeRouter", "Using oracles for pair", {
+        inputMint: inputMint.toBase58(),
+        outputMint: outputMint.toBase58(),
+        primary: primaryOracle.toBase58(),
+        fallback: fallbackOracle?.toBase58() || "none",
+      });
+    } catch (e) {
+      logger.warn("NativeRouter", "No oracle config for pair, using default Pyth SOL/USD", {
+        inputMint: inputMint.toBase58(),
+        outputMint: outputMint.toBase58(),
+      });
+    }
+    
     // Comptes selon l'ordre de l'IDL swap_toc:
     // Pour les comptes optionnels qui n'existent pas, on utilise le program ID du router
     // Anchor traite cela comme "None" pour Option<Account>
@@ -1583,10 +1607,10 @@ export class NativeRouterService {
       { pubkey: accounts.routerState, isSigner: false, isWritable: true },
       // 2. user
       { pubkey: userPublicKey, isSigner: true, isWritable: true },
-      // 3. primary_oracle
-      { pubkey: DEFAULT_ORACLE, isSigner: false, isWritable: false },
-      // 4. fallback_oracle (optional - None)
-      { pubkey: NONE_ACCOUNT, isSigner: false, isWritable: false },
+      // 3. primary_oracle (Pyth ou Switchboard selon la paire)
+      { pubkey: primaryOracle, isSigner: false, isWritable: false },
+      // 4. fallback_oracle (optional - utiliser si disponible)
+      { pubkey: fallbackOracle || NONE_ACCOUNT, isSigner: false, isWritable: false },
       // 5. user_token_account_a
       { pubkey: accounts.userTokenAccountA, isSigner: false, isWritable: true },
       // 6. user_token_account_b
