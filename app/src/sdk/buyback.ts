@@ -18,6 +18,7 @@ import {
 } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token';
 import { BN } from '@coral-xyz/anchor';
+import { getTokenPrice } from '@/lib/price-service';
 
 // Program IDs
 export const BUYBACK_PROGRAM_ID = new PublicKey('46UWFYdksvkGhTPy9cTSJGa3d5nqzpY766rtJeuxtMgU');
@@ -218,9 +219,21 @@ async function estimateBuybackWithJupiter(usdcAmount: number): Promise<number> {
     const quote = await response.json();
     return parseInt(quote.outAmount) / 1e9; // Convert to $BACK UI amount
   } catch (error) {
-    console.warn('Jupiter quote failed, using fallback estimate:', error);
-    // Fallback: assume 1 USDC = 250 $BACK (adjust based on real market price)
-    return usdcAmount * 250;
+    console.warn('Jupiter quote failed, using real-time price fallback:', error);
+    
+    // Fallback: utiliser le prix en temps réel de $BACK
+    try {
+      const backPrice = await getTokenPrice(BACK_MINT.toBase58());
+      if (backPrice.price > 0) {
+        // 1 USDC / prix $BACK = nombre de $BACK
+        return usdcAmount / backPrice.price;
+      }
+    } catch (priceError) {
+      console.warn('Price service fallback failed:', priceError);
+    }
+    
+    // Dernier fallback: estimer à $0.004 (valeur approximative)
+    return usdcAmount / 0.004;
   }
 }
 

@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { Connection } from "@solana/web3.js";
 import { trackServerEvent } from "@/lib/serverAnalytics";
+import { getTokenPrices } from "@/lib/price-service";
 
 const DEFAULT_JUPITER_API = process.env.JUPITER_API_URL ?? "https://public.jupiterapi.com";
 const DEFAULT_RPC_ENDPOINT =
@@ -156,9 +157,28 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
       }
 
+      // Utiliser les prix en temps réel pour calculer les outputs même en mode test
+      const prices = await getTokenPrices([inputMint, outputMint]);
+      const inputPrice = prices.get(inputMint) || 0;
+      const outputPrice = prices.get(outputMint) || 0;
+      
+      let swapbackOutput: number;
+      let jupiterOutput: number;
+      
+      if (inputPrice > 0 && outputPrice > 0) {
+        // Calculer le taux de change réel
+        const exchangeRate = inputPrice / outputPrice;
+        // SwapBack: 0.1% de frais (99.9% du taux)
+        swapbackOutput = parsedTestAmount * exchangeRate * 0.999;
+        // Jupiter: 0.15% de frais (99.85% du taux)
+        jupiterOutput = parsedTestAmount * exchangeRate * 0.9985;
+      } else {
+        // Fallback si les prix ne sont pas disponibles
+        swapbackOutput = parsedTestAmount * 0.99;
+        jupiterOutput = parsedTestAmount * 0.985;
+      }
+
       const preferredMevRisk = useMEVProtection ? "low" : "medium";
-      const swapbackOutput = parsedTestAmount * 0.99;
-      const jupiterOutput = parsedTestAmount * 0.985;
 
       const routes = [
         {
