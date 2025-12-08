@@ -30,9 +30,23 @@ interface SupplyData {
   burnHistory: BurnEvent[];
 }
 
-// Program IDs
-const BUYBACK_PROGRAM_ID = new PublicKey('7wCCwRXxWvMY2DJDRrnhFg3b8jVPb5vVPxLH5YAGL6eJ');
-const BACK_MINT = new PublicKey('862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux');
+// Lazy-loaded Program IDs to avoid SSR issues
+let _buybackProgramId: PublicKey | null = null;
+function getBuybackProgramId(): PublicKey {
+  if (!_buybackProgramId) {
+    _buybackProgramId = new PublicKey('7wCCwRXxWvMY2DJDRrnhFg3b8jVPb5vVPxLH5YAGL6eJ');
+  }
+  return _buybackProgramId;
+}
+
+let _backMint: PublicKey | null = null;
+function getBackMint(): PublicKey {
+  if (!_backMint) {
+    _backMint = new PublicKey('862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux');
+  }
+  return _backMint;
+}
+
 const INITIAL_SUPPLY = 1_000_000_000; // 1B tokens (adjust based on actual)
 
 export default function BurnVisualization() {
@@ -54,7 +68,7 @@ export default function BurnVisualization() {
 
       // Fetch signatures for the buyback program
       const signatures: ConfirmedSignatureInfo[] = await connection.getSignaturesForAddress(
-        BUYBACK_PROGRAM_ID,
+        getBuybackProgramId(),
         { limit: 100 }
       );
 
@@ -105,12 +119,13 @@ export default function BurnVisualization() {
           if (tx.meta?.postTokenBalances && tx.meta?.preTokenBalances) {
             const preBalances = tx.meta.preTokenBalances;
             const postBalances = tx.meta.postTokenBalances;
+            const backMintStr = getBackMint().toString();
 
             for (const pre of preBalances) {
-              if (pre.mint === BACK_MINT.toString()) {
+              if (pre.mint === backMintStr) {
                 const post = postBalances.find(p => 
                   p.accountIndex === pre.accountIndex && 
-                  p.mint === BACK_MINT.toString()
+                  p.mint === backMintStr
                 );
 
                 if (post) {
@@ -155,7 +170,7 @@ export default function BurnVisualization() {
     
     try {
       // Fetch current mint supply
-      const mintInfo = await connection.getTokenSupply(BACK_MINT);
+      const mintInfo = await connection.getTokenSupply(getBackMint());
       const currentSupply = Number(mintInfo.value.amount) / 1e9; // Assuming 9 decimals
 
       // Calculate burned amount

@@ -33,9 +33,23 @@ import {
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import toast from "react-hot-toast";
 
-// Constants
-const PROGRAM_ID = new PublicKey(process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf");
-const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+// Lazy-loaded Constants to avoid SSR issues
+let _programId: PublicKey | null = null;
+function getProgramId(): PublicKey {
+  if (!_programId) {
+    _programId = new PublicKey(process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf");
+  }
+  return _programId;
+}
+
+let _usdcMint: PublicKey | null = null;
+function getUsdcMint(): PublicKey {
+  if (!_usdcMint) {
+    _usdcMint = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+  }
+  return _usdcMint;
+}
+
 const ADMIN_AUTHORITY = process.env.NEXT_PUBLIC_ADMIN_AUTHORITY || "";
 
 // Discriminators from IDL
@@ -104,17 +118,18 @@ export function AdminConfigPanel() {
     
     if (isAdminWallet) {
       // Derive PDAs
+      const programId = getProgramId();
       const [statePda] = PublicKey.findProgramAddressSync(
         [Buffer.from("router_state")],
-        PROGRAM_ID
+        programId
       );
       const [configPda] = PublicKey.findProgramAddressSync(
         [Buffer.from("router_config")],
-        PROGRAM_ID
+        programId
       );
       const [vaultPda] = PublicKey.findProgramAddressSync(
         [Buffer.from("rebate_vault"), statePda.toBuffer()],
-        PROGRAM_ID
+        programId
       );
       
       setRouterStatePda(statePda);
@@ -259,7 +274,7 @@ export function AdminConfigPanel() {
       targetWallet.toBuffer().copy(data, offset); offset += 32;
       
       const instruction = new TransactionInstruction({
-        programId: PROGRAM_ID,
+        programId: getProgramId(),
         keys: [
           { pubkey: routerStatePda, isSigner: false, isWritable: true },
           { pubkey: publicKey, isSigner: true, isWritable: false },
@@ -296,7 +311,7 @@ export function AdminConfigPanel() {
     
     try {
       const instruction = new TransactionInstruction({
-        programId: PROGRAM_ID,
+        programId: getProgramId(),
         keys: [
           { pubkey: routerConfigPda, isSigner: false, isWritable: true },
           { pubkey: routerStatePda, isSigner: false, isWritable: true },
@@ -335,11 +350,11 @@ export function AdminConfigPanel() {
     
     try {
       const instruction = new TransactionInstruction({
-        programId: PROGRAM_ID,
+        programId: getProgramId(),
         keys: [
           { pubkey: routerStatePda, isSigner: false, isWritable: true },
           { pubkey: rebateVaultPda, isSigner: false, isWritable: true },
-          { pubkey: USDC_MINT, isSigner: false, isWritable: false },
+          { pubkey: getUsdcMint(), isSigner: false, isWritable: false },
           { pubkey: publicKey, isSigner: true, isWritable: true },
           { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
           { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },

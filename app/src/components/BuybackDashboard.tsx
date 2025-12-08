@@ -10,12 +10,47 @@ import { getExplorerAddressUrl } from '@/utils/explorer';
 import { bnToNumberWithFallback, lamportsToUiSafe } from '@/lib/bnUtils';
 import { getBackTokenMint, TOKEN_DECIMALS } from '@/config/constants';
 
-// Program IDs et constants
-const BUYBACK_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || '746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6'
-);
-const BACK_TOKEN_MINT = getBackTokenMint();
-const USDC_MINT = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
+// Lazy-loaded Program IDs to avoid SSR issues
+let _buybackProgramId: PublicKey | null = null;
+function getBuybackProgramId(): PublicKey {
+  if (!_buybackProgramId) {
+    _buybackProgramId = new PublicKey(
+      process.env.NEXT_PUBLIC_BUYBACK_PROGRAM_ID || '746EPwDbanWC32AmuH6aqSzgWmLvAYfUYz7ER1LNAvc6'
+    );
+  }
+  return _buybackProgramId;
+}
+
+let _usdcMint: PublicKey | null = null;
+function getUsdcMint(): PublicKey {
+  if (!_usdcMint) {
+    _usdcMint = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
+  }
+  return _usdcMint;
+}
+
+// Lazy-loaded PDAs
+let _buybackStatePDA: PublicKey | null = null;
+function getBuybackStatePDA(): PublicKey {
+  if (!_buybackStatePDA) {
+    [_buybackStatePDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from('buyback_state')],
+      getBuybackProgramId()
+    );
+  }
+  return _buybackStatePDA;
+}
+
+let _usdcVaultPDA: PublicKey | null = null;
+function getUsdcVaultPDA(): PublicKey {
+  if (!_usdcVaultPDA) {
+    [_usdcVaultPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from('usdc_vault')],
+      getBuybackProgramId()
+    );
+  }
+  return _usdcVaultPDA;
+}
 
 // Discriminators
 const DEPOSIT_USDC_DISCRIMINATOR = Buffer.from([242, 35, 198, 137, 82, 225, 242, 182]);
@@ -43,16 +78,9 @@ export default function BuybackDashboard() {
   const [loading, setLoading] = useState(false);
   const [txStatus, setTxStatus] = useState<string>('');
 
-  // Calculer les PDAs
-  const [buybackStatePDA] = PublicKey.findProgramAddressSync(
-    [Buffer.from('buyback_state')],
-    BUYBACK_PROGRAM_ID
-  );
-
-  const [usdcVaultPDA] = PublicKey.findProgramAddressSync(
-    [Buffer.from('usdc_vault')],
-    BUYBACK_PROGRAM_ID
-  );
+  // Get PDAs using lazy-loaded functions
+  const buybackStatePDA = getBuybackStatePDA();
+  const usdcVaultPDA = getUsdcVaultPDA();
 
   // Load buyback state
   const loadBuybackState = async () => {
@@ -144,7 +172,7 @@ export default function BuybackDashboard() {
           { pubkey: publicKey, isSigner: true, isWritable: false },
           { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
         ],
-        programId: BUYBACK_PROGRAM_ID,
+        programId: getBuybackProgramId(),
         data,
       });
 
@@ -183,7 +211,7 @@ export default function BuybackDashboard() {
       
       // Get user's $BACK token account
       const userBackAccount = await getAssociatedTokenAddress(
-        BACK_TOKEN_MINT,
+        getBackTokenMint(),
         publicKey
       );
 
@@ -197,12 +225,12 @@ export default function BuybackDashboard() {
         keys: [
           { pubkey: buybackStatePDA, isSigner: false, isWritable: true },
           { pubkey: usdcVaultPDA, isSigner: false, isWritable: true },
-          { pubkey: BACK_TOKEN_MINT, isSigner: false, isWritable: true },
+          { pubkey: getBackTokenMint(), isSigner: false, isWritable: true },
           { pubkey: userBackAccount, isSigner: false, isWritable: true },
           { pubkey: publicKey, isSigner: true, isWritable: false },
           { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
         ],
-        programId: BUYBACK_PROGRAM_ID,
+        programId: getBuybackProgramId(),
         data,
       });
 
@@ -369,7 +397,7 @@ export default function BuybackDashboard() {
       {/* Program Info */}
       <div className="mt-4 text-center">
         <a 
-          href={getExplorerAddressUrl(BUYBACK_PROGRAM_ID.toBase58())}
+          href={getExplorerAddressUrl(getBuybackProgramId().toBase58())}
           target="_blank"
           rel="noopener noreferrer"
           className="text-blue-400 hover:text-blue-300 text-sm"

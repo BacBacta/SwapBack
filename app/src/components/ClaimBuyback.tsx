@@ -34,15 +34,27 @@ interface ClaimableRewards {
   hasActiveLock: boolean;
 }
 
-// Program IDs from environment
-const CNFT_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP"
-);
+// Lazy-loaded Program IDs to avoid SSR issues
+let _cnftProgramId: PublicKey | null = null;
+function getCnftProgramId(): PublicKey {
+  if (!_cnftProgramId) {
+    _cnftProgramId = new PublicKey(
+      process.env.NEXT_PUBLIC_CNFT_PROGRAM_ID || "EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP"
+    );
+  }
+  return _cnftProgramId;
+}
 
-// NPI token mint (USDC on devnet for now)
-const NPI_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_NPI_MINT || "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
-);
+// Lazy-loaded NPI token mint
+let _npiMint: PublicKey | null = null;
+function getNpiMint(): PublicKey {
+  if (!_npiMint) {
+    _npiMint = new PublicKey(
+      process.env.NEXT_PUBLIC_NPI_MINT || "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
+    );
+  }
+  return _npiMint;
+}
 
 // Seeds pour les PDAs
 const GLOBAL_STATE_SEED = "global_state";
@@ -67,24 +79,26 @@ export default function ClaimBuyback() {
    * Dérive les PDAs nécessaires
    */
   const derivePDAs = useCallback((userPubkey: PublicKey) => {
+    const programId = getCnftProgramId();
+    
     const [globalState] = PublicKey.findProgramAddressSync(
       [Buffer.from(GLOBAL_STATE_SEED)],
-      CNFT_PROGRAM_ID
+      programId
     );
 
     const [userLock] = PublicKey.findProgramAddressSync(
       [Buffer.from(USER_LOCK_SEED), userPubkey.toBuffer()],
-      CNFT_PROGRAM_ID
+      programId
     );
 
     const [userNpiBalance] = PublicKey.findProgramAddressSync(
       [Buffer.from(USER_NPI_BALANCE_SEED), userPubkey.toBuffer()],
-      CNFT_PROGRAM_ID
+      programId
     );
 
     const [npiVaultAuthority] = PublicKey.findProgramAddressSync(
       [Buffer.from(NPI_VAULT_AUTHORITY_SEED)],
-      CNFT_PROGRAM_ID
+      programId
     );
 
     return { globalState, userLock, userNpiBalance, npiVaultAuthority };
@@ -316,17 +330,18 @@ export default function ClaimBuyback() {
 
     try {
       const { globalState, userLock, userNpiBalance, npiVaultAuthority } = derivePDAs(publicKey);
+      const npiMint = getNpiMint();
 
       // Derive vault ATA (owned by npiVaultAuthority)
       const npiVault = await getAssociatedTokenAddress(
-        NPI_MINT,
+        npiMint,
         npiVaultAuthority,
         true // allowOwnerOffCurve for PDA
       );
 
       // Get or create user's NPI token account
       const userNpiTokenAccount = await getAssociatedTokenAddress(
-        NPI_MINT,
+        npiMint,
         publicKey
       );
 
@@ -342,7 +357,7 @@ export default function ClaimBuyback() {
             publicKey, // payer
             userNpiTokenAccount, // ata
             publicKey, // owner
-            NPI_MINT // mint
+            npiMint // mint
           )
         );
       }
@@ -359,7 +374,7 @@ export default function ClaimBuyback() {
       // 8. token_program
       // 9. system_program
       const claimInstruction = new TransactionInstruction({
-        programId: CNFT_PROGRAM_ID,
+        programId: getCnftProgramId(),
         keys: [
           { pubkey: globalState, isSigner: false, isWritable: true },
           { pubkey: userLock, isSigner: false, isWritable: false },

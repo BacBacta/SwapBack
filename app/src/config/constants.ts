@@ -65,7 +65,25 @@ export function getBackTokenMint(): PublicKey {
   return _backTokenMint;
 }
 
-// Tokens communs sur Solana (hardcoded, safe to export)
+// Lazy-loaded common token mints (safe from SSR issues)
+let _solMint: PublicKey | null = null;
+export function getSolMint(): PublicKey {
+  if (!_solMint) {
+    _solMint = new PublicKey('So11111111111111111111111111111111111111112');
+  }
+  return _solMint;
+}
+
+let _usdcMint: PublicKey | null = null;
+export function getUsdcMint(): PublicKey {
+  if (!_usdcMint) {
+    _usdcMint = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+  }
+  return _usdcMint;
+}
+
+// DEPRECATED: Use getSolMint() and getUsdcMint() instead
+// Keeping for backwards compatibility but these may cause SSR issues
 export const SOL_MINT = new PublicKey(
   'So11111111111111111111111111111111111111112'
 );
