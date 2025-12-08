@@ -138,6 +138,13 @@ export interface NativeSwapParams {
   useJitoBundle?: boolean;
   /** Boost NFT level (0 si pas de NFT) */
   boostBps?: number;
+  /** 
+   * Override du seuil de staleness oracle (en secondes)
+   * Par défaut: 300s (5 min)
+   * Min: 10s, Max: 300s (clampé par le programme on-chain)
+   * Augmenter pour les actifs peu liquides
+   */
+  maxStalenessSecs?: number;
 }
 
 export interface NativeSwapResult {
@@ -1506,7 +1513,8 @@ export class NativeRouterService {
       amountIn,
       minAmountOut,
       venueWeights,
-      route.venues[0] // Meilleure venue
+      route.venues[0], // Meilleure venue
+      params.maxStalenessSecs // Optionnel: override staleness
     );
     
     instructions.push(swapInstruction);
@@ -1536,7 +1544,8 @@ export class NativeRouterService {
     amountIn: number,
     minAmountOut: number,
     venueWeights: { venue: PublicKey; weight: number }[],
-    bestVenue: VenueQuote
+    bestVenue: VenueQuote,
+    maxStalenessSecs?: number
   ): Promise<TransactionInstruction> {
     // Charger l'IDL
     const idlResponse = await fetch("/idl/swapback_router.json");
@@ -1553,8 +1562,9 @@ export class NativeRouterService {
       slippageTolerance: 50, // 0.5%
       useDynamicPlan: false,
       useBundle: false,
-      primaryOracleAccount: DEFAULT_ORACLE,
+      primaryOracleAccount: PYTH_SOL_USD_MAINNET, // Sera overridé par les oracles dans keys
       venues: venueWeights,
+      maxStalenessOverride: maxStalenessSecs,
     });
     
     const data = Buffer.concat([discriminator, argsBuffer]);
@@ -1576,7 +1586,8 @@ export class NativeRouterService {
     });
     
     // Obtenir les oracles pour cette paire de tokens
-    let primaryOracle = DEFAULT_ORACLE;
+    // IMPORTANT: Ne PAS fallback silencieusement sur DEFAULT_ORACLE
+    let primaryOracle: PublicKey;
     let fallbackOracle: PublicKey | null = null;
     
     try {
@@ -1584,17 +1595,25 @@ export class NativeRouterService {
       primaryOracle = oracleConfig.primary;
       fallbackOracle = oracleConfig.fallback || null;
       
-      logger.debug("NativeRouter", "Using oracles for pair", {
-        inputMint: inputMint.toBase58(),
-        outputMint: outputMint.toBase58(),
-        primary: primaryOracle.toBase58(),
-        fallback: fallbackOracle?.toBase58() || "none",
+      logger.info("NativeRouter", "Using oracles for pair", {
+        inputMint: inputMint.toBase58().slice(0, 8),
+        outputMint: outputMint.toBase58().slice(0, 8),
+        primary: primaryOracle.toBase58().slice(0, 8),
+        fallback: fallbackOracle?.toBase58().slice(0, 8) || "none",
       });
     } catch (e) {
-      logger.warn("NativeRouter", "No oracle config for pair, using default Pyth SOL/USD", {
+      // NE PAS fallback silencieusement - renvoyer une erreur explicite
+      const errorMsg = e instanceof Error ? e.message : "Unknown error";
+      logger.error("NativeRouter", "No oracle configured for pair", {
         inputMint: inputMint.toBase58(),
         outputMint: outputMint.toBase58(),
+        error: errorMsg,
       });
+      throw new Error(
+        `Swap impossible: aucun oracle configuré pour la paire ` +
+        `${inputMint.toBase58().slice(0, 8)}.../${outputMint.toBase58().slice(0, 8)}... ` +
+        `Veuillez contacter le support ou utiliser une autre paire.`
+      );
     }
     
     // Comptes selon l'ordre de l'IDL swap_toc:
@@ -1667,6 +1686,7 @@ export class NativeRouterService {
     useBundle: boolean;
     primaryOracleAccount: PublicKey;
     venues: { venue: PublicKey; weight: number }[];
+    maxStalenessOverride?: number; // En secondes (10-300)
   }): Buffer {
     // Sérialisation manuelle selon le format Anchor
     const buffers: Buffer[] = [];
@@ -1727,7 +1747,19 @@ export class NativeRouterService {
     buffers.push(Buffer.from([0])); // None
     
     // max_staleness_override: Option<i64>
-    buffers.push(Buffer.from([0])); // None
+    // Si fourni, permet d'augmenter le seuil de staleness (10-300s)
+    if (args.maxStalenessOverride && args.maxStalenessOverride > 0) {
+      // Clamp entre 10 et 300 secondes côté client aussi
+      const clampedStaleness = Math.max(10, Math.min(300, args.maxStalenessOverride));
+      const stalenessBuf = Buffer.alloc(9);
+      stalenessBuf.writeUInt8(1, 0); // Some
+      // i64 little-endian
+      const bn = new BN(clampedStaleness);
+      bn.toArrayLike(Buffer, "le", 8).copy(stalenessBuf, 1);
+      buffers.push(stalenessBuf);
+    } else {
+      buffers.push(Buffer.from([0])); // None - utiliser défaut (300s)
+    }
     
     // jito_bundle: Option<...>
     buffers.push(Buffer.from([0])); // None

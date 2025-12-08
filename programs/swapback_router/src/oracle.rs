@@ -15,8 +15,10 @@ pub struct OracleObservation {
     pub feed: Pubkey,
 }
 
-// Confidence maximale autorisée (2% = 200 bps) - Pyth seulement
-const MAX_CONFIDENCE_BPS: u128 = 200;
+// Confidence maximale autorisée (5% = 500 bps) - Pyth seulement
+// Augmenté de 200 à 500 pour supporter les actifs volatils (memecoins)
+// Pour les paires majeures (SOL/USDC), la confidence est typiquement < 50 bps
+const MAX_CONFIDENCE_BPS: u128 = 500;
 
 /// Read oracle price with configurable staleness threshold
 /// For volatile markets, use lower values (30-60s)
