@@ -132,20 +132,6 @@ export function useSwapWithBoost() {
       setError(null);
 
       try {
-        // 0. Vérifier le solde SOL pour les frais de transaction
-        const MIN_SOL_FOR_FEES = 0.005; // 5000000 lamports minimum
-        const solBalance = await connection.getBalance(publicKey);
-        const solBalanceInSol = solBalance / 1e9;
-        
-        if (solBalanceInSol < MIN_SOL_FOR_FEES) {
-          const errorMsg = `Solde SOL insuffisant pour les frais. Vous avez ${solBalanceInSol.toFixed(4)} SOL, minimum requis: ${MIN_SOL_FOR_FEES} SOL`;
-          logger.error('useSwapWithBoost', 'Insufficient SOL for fees', {
-            balance: solBalanceInSol,
-            required: MIN_SOL_FOR_FEES,
-          });
-          throw new Error(errorMsg);
-        }
-
         // 1. Obtenir la quote
         const quote = await getSwapQuote(params, userBoostBP);
         if (!quote) {
@@ -156,7 +142,6 @@ export function useSwapWithBoost() {
           inputAmount: quote.inputAmount,
           outputAmount: quote.outputAmount,
           boostBP: userBoostBP,
-          solBalance: solBalanceInSol,
         });
 
         // 2. Exécuter le swap via Jupiter V6 API
@@ -197,45 +182,8 @@ export function useSwapWithBoost() {
         setLastSwapResult(result);
         return result;
       } catch (err) {
-        // Extraire le message d'erreur proprement
-        let message: string;
-        if (err instanceof Error) {
-          message = err.message;
-        } else if (typeof err === 'string') {
-          message = err;
-        } else if (err && typeof err === 'object') {
-          // Handle object errors (e.g., from RPC)
-          const errObj = err as Record<string, unknown>;
-          message = errObj.message as string || 
-                    errObj.error as string || 
-                    JSON.stringify(err);
-        } else {
-          message = "Erreur lors du swap";
-        }
-        
-        // Améliorer les messages d'erreur pour les cas courants
-        if (message.includes('insufficient lamports')) {
-          message = "Solde SOL insuffisant pour payer les frais de transaction. Veuillez ajouter du SOL à votre wallet.";
-        } else if (message.includes('0x1') && message.includes('Transfer')) {
-          message = "Solde insuffisant pour effectuer le transfert. Vérifiez votre solde SOL.";
-        } else if (message.includes('Custom') && message.includes('1')) {
-          message = "Solde insuffisant. Vérifiez que vous avez assez de SOL pour les frais.";
-        } else if (message.includes('slippage')) {
-          message = "Le prix a changé au-delà du slippage autorisé. Réessayez ou augmentez le slippage.";
-        } else if (message.includes('block height exceeded') || message.includes('has expired')) {
-          message = "Transaction expirée (réseau congestionné). Le système a fait plusieurs tentatives. Veuillez réessayer.";
-        } else if (message.includes('blockhash')) {
-          message = "Transaction expirée. Veuillez réessayer.";
-        } else if (message.includes('timeout') || message.includes('Timeout')) {
-          message = "Délai de confirmation dépassé. La transaction peut avoir réussi, vérifiez votre wallet.";
-        } else if (message.includes('User rejected')) {
-          message = "Transaction annulée par l'utilisateur.";
-        } else if (message.includes('403') || message.includes('Forbidden')) {
-          message = "Erreur RPC (403). Le réseau est congestionné, veuillez réessayer.";
-        } else if (message.includes('[object Object]')) {
-          message = "Erreur de swap. Veuillez réessayer.";
-        }
-        
+        const message =
+          err instanceof Error ? err.message : "Erreur lors du swap";
         logger.error('useSwapWithBoost', 'Swap error', { error: message });
         setError(message);
         return null;

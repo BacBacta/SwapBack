@@ -1,17 +1,12 @@
 import { Connection, ConnectionConfig } from '@solana/web3.js';
 
-// RPC endpoints ordered by reliability
-// Priority: User-configured > Free public RPCs with good limits
+// RPC endpoints ordered by reliability (avoid Helius - rate limited)
 const RPC_ENDPOINTS = [
-  // User-configured RPC (from env) - highest priority
-  process.env.NEXT_PUBLIC_SOLANA_RPC_URL,
-  // Reliable free RPCs (December 2025)
-  'https://solana-mainnet.g.alchemy.com/v2/demo', // Alchemy demo (limited but works)
-  'https://rpc.helius.xyz/?api-key=1d8740dc-e5f4-421c-b823-e1bad1889eff', // Helius free tier
-  'https://mainnet.helius-rpc.com/?api-key=1d8740dc-e5f4-421c-b823-e1bad1889eff',
+  'https://api.mainnet-beta.solana.com',
+  'https://rpc.ankr.com/solana',
   'https://solana.publicnode.com',
-  'https://api.mainnet-beta.solana.com', // Official (heavily rate-limited)
-].filter(Boolean) as string[]; // Remove undefined entries
+  'https://solana-mainnet.rpc.extrnode.com',
+];
 
 // Cache for connection instance
 let cachedConnection: Connection | null = null;
@@ -64,7 +59,6 @@ export async function withRpcRetry<T>(
   delayMs = 1000
 ): Promise<T> {
   let lastError: Error | null = null;
-  const endpointsTried = new Set<number>();
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
@@ -82,24 +76,12 @@ export async function withRpcRetry<T>(
       lastError = error as Error;
       const errorMessage = lastError.message || '';
       
-      // Check for rate limit or access forbidden errors
-      const isRateLimited = errorMessage.includes('429') || errorMessage.includes('Too Many Requests');
-      const isForbidden = errorMessage.includes('403') || errorMessage.includes('Access forbidden') || errorMessage.includes('Forbidden');
-      
-      if (isRateLimited || isForbidden) {
-        console.warn(`[RPC] ${isRateLimited ? 'Rate limited (429)' : 'Forbidden (403)'}, switching endpoint...`);
-        endpointsTried.add(currentEndpointIndex);
+      // Check for 429 rate limit error
+      if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests')) {
+        console.warn(`[RPC] Rate limited (429), switching endpoint...`);
         lastError429Time = Date.now();
         switchToNextEndpoint();
-        
-        // If we've tried all endpoints, wait longer before cycling
-        if (endpointsTried.size >= RPC_ENDPOINTS.length) {
-          console.warn(`[RPC] All endpoints tried, waiting before retry...`);
-          await sleep(delayMs * 3);
-          endpointsTried.clear();
-        } else {
-          await sleep(delayMs * (attempt + 1)); // Exponential backoff
-        }
+        await sleep(delayMs * (attempt + 1)); // Exponential backoff
         continue;
       }
       

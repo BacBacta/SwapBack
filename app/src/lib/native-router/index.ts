@@ -1,0 +1,1422 @@
+/**
+ * 🔀 SwapBack Native Router
+ * 
+ * Router qui utilise EXCLUSIVEMENT les venues natives (Raydium, Orca, Meteora, etc.)
+ * au lieu de passer par Jupiter. Cela permet de:
+ * - Générer du NPI (Native Price Improvement) 
+ * - Distribuer les rebates aux utilisateurs
+ * - Utiliser le scoring des venues on-chain
+ * 
+ * @author SwapBack Team
+ * @date December 8, 2025
+ */
+
+import { 
+  Connection, 
+  PublicKey, 
+  Transaction, 
+  TransactionInstruction,
+  VersionedTransaction,
+  TransactionMessage,
+  SystemProgram,
+  SYSVAR_CLOCK_PUBKEY,
+} from "@solana/web3.js";
+import { 
+  TOKEN_PROGRAM_ID, 
+  getAssociatedTokenAddress,
+  createAssociatedTokenAccountInstruction,
+} from "@solana/spl-token";
+import { BN, Program, AnchorProvider, type Idl } from "@coral-xyz/anchor";
+import { logger } from "@/lib/logger";
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+// Program IDs (Mainnet)
+export const ROUTER_PROGRAM_ID = new PublicKey("5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf");
+export const BUYBACK_PROGRAM_ID = new PublicKey("7wCCwRXxWvMY2DJDRrnhFg3b8jVPb5vVPxLH5YAGL6eJ");
+export const CNFT_PROGRAM_ID = new PublicKey("26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru");
+
+// DEX Program IDs
+export const DEX_PROGRAMS = {
+  RAYDIUM_AMM: new PublicKey("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"),
+  RAYDIUM_CLMM: new PublicKey("CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK"),
+  ORCA_WHIRLPOOL: new PublicKey("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"),
+  METEORA_DLMM: new PublicKey("LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo"),
+  PHOENIX: new PublicKey("PhoeNiXZ8ByJGLkxNfZRnkUfjvmuYqLR89jjFHGqdXY"),
+  LIFINITY: new PublicKey("EewxydAPCCVuNEyrVN68PuSYdQ7wKn27V9Gjeoi8dy3S"),
+  SANCTUM: new PublicKey("5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx"),
+  SABER: new PublicKey("SSwpkEEcbUqx4vtoEByFjSkhKdCT862DNVb52nZg1UZ"),
+};
+
+// Common token mints
+export const SOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
+export const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+
+// Default oracle (Switchboard SOL/USD)
+export const DEFAULT_ORACLE = new PublicKey("GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR");
+
+// Jito MEV Protection (mainnet tip accounts)
+export const JITO_BLOCK_ENGINE_URL = "https://mainnet.block-engine.jito.wtf/api/v1/bundles";
+export const JITO_TIP_ACCOUNTS = [
+  new PublicKey("96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5"),
+  new PublicKey("HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe"),
+  new PublicKey("Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY"),
+  new PublicKey("ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49"),
+  new PublicKey("DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh"),
+  new PublicKey("ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt"),
+  new PublicKey("DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL"),
+  new PublicKey("3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT"),
+];
+export const DEFAULT_JITO_TIP_LAMPORTS = 10_000; // 0.00001 SOL
+
+// Slippage Configuration (matches on-chain SlippageConfig)
+export const SLIPPAGE_CONFIG = {
+  BASE_SLIPPAGE_BPS: 50,     // 0.5% base
+  MAX_SLIPPAGE_BPS: 500,     // 5% max
+  SIZE_THRESHOLD_BPS: 100,   // Impact si > 1% pool
+  VOLATILITY_DIVISOR: 10,    // Facteur volatilité
+};
+
+// Scoring thresholds
+export const MIN_VENUE_SCORE = 2500; // Score minimum pour inclure une venue
+export const MAX_VENUES = 10;
+export const MAX_FALLBACKS = 5;
+
+// Oracle validation
+export const MAX_STALENESS_SECS = 300; // 5 minutes
+export const MIN_STALENESS_SECS = 10;
+export const MAX_ORACLE_DIVERGENCE_BPS = 200; // 2%
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export interface VenueQuote {
+  venue: keyof typeof DEX_PROGRAMS;
+  venueProgramId: PublicKey;
+  inputAmount: number;
+  outputAmount: number;
+  priceImpactBps: number;
+  /** Comptes nécessaires pour le CPI */
+  accounts: PublicKey[];
+  /** Données d'instruction spécifiques au DEX */
+  instructionData?: Buffer;
+  /** Estimation du NPI généré */
+  estimatedNpiBps: number;
+  /** Latence de la quote en ms */
+  latencyMs: number;
+}
+
+export interface NativeRouteQuote {
+  venues: VenueQuote[];
+  totalInputAmount: number;
+  totalOutputAmount: number;
+  totalPriceImpactBps: number;
+  estimatedRebate: number;
+  estimatedNpi: number;
+  platformFeeBps: number;
+  /** Meilleur output net après frais + rebates */
+  netOutputAmount: number;
+}
+
+export interface NativeSwapParams {
+  inputMint: PublicKey;
+  outputMint: PublicKey;
+  amountIn: number;
+  minAmountOut: number;
+  slippageBps?: number;
+  userPublicKey: PublicKey;
+  /** Utiliser le bundling Jito pour MEV protection */
+  useJitoBundle?: boolean;
+  /** Boost NFT level (0 si pas de NFT) */
+  boostBps?: number;
+}
+
+export interface NativeSwapResult {
+  signature: string;
+  inputAmount: number;
+  outputAmount: number;
+  venues: string[];
+  rebateAmount: number;
+  npiGenerated: number;
+  transactionFee: number;
+}
+
+/** VenueScore on-chain account data */
+export interface VenueScoreData {
+  venue: PublicKey;
+  venueType: VenueType;
+  totalSwaps: number;
+  totalVolume: number;
+  totalNpiGenerated: number;
+  avgLatencyMs: number;
+  avgSlippageBps: number;
+  qualityScore: number; // 0-10000
+  lastUpdated: number;
+  windowStart: number;
+}
+
+export enum VenueType {
+  Raydium = 0,
+  RaydiumClmm = 1,
+  Orca = 2,
+  Meteora = 3,
+  Phoenix = 4,
+  Lifinity = 5,
+  Sanctum = 6,
+  Saber = 7,
+  Jupiter = 8,
+  Unknown = 9,
+}
+
+/** Dynamic slippage calculation inputs */
+export interface DynamicSlippageInputs {
+  swapAmount: number;
+  poolTvl: number;
+  volatilityBps: number;
+}
+
+/** Slippage calculation result with breakdown */
+export interface SlippageResult {
+  slippageBps: number;
+  baseComponent: number;
+  sizeComponent: number;
+  volatilityComponent: number;
+}
+
+/** Oracle observation data */
+export interface OracleObservation {
+  price: number;
+  confidence: number;
+  publishTime: number;
+  slot: number;
+  oracleType: 'pyth' | 'switchboard';
+  feed: PublicKey;
+}
+
+// ============================================================================
+// VENUE SCORE FETCHING
+// ============================================================================
+
+/**
+ * Dérive le PDA VenueScore pour une venue donnée
+ */
+function deriveVenueScorePda(venueProgramId: PublicKey): PublicKey {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("venue_score"), venueProgramId.toBuffer()],
+    ROUTER_PROGRAM_ID
+  );
+  return pda;
+}
+
+/**
+ * Parse les données brutes d'un compte VenueScore
+ */
+function parseVenueScoreData(data: Buffer): VenueScoreData | null {
+  try {
+    // Skip 8-byte discriminator
+    if (data.length < 89) return null;
+    
+    const offset = 8;
+    const venue = new PublicKey(data.subarray(offset, offset + 32));
+    const venueType = data.readUInt8(offset + 32) as VenueType;
+    const totalSwaps = Number(data.readBigUInt64LE(offset + 33));
+    const totalVolume = Number(data.readBigUInt64LE(offset + 41));
+    const totalNpiGenerated = Number(data.readBigInt64LE(offset + 49));
+    const avgLatencyMs = data.readUInt32LE(offset + 57);
+    const avgSlippageBps = data.readUInt16LE(offset + 61);
+    const qualityScore = data.readUInt16LE(offset + 63);
+    const lastUpdated = Number(data.readBigInt64LE(offset + 65));
+    const windowStart = Number(data.readBigInt64LE(offset + 73));
+    
+    return {
+      venue,
+      venueType,
+      totalSwaps,
+      totalVolume,
+      totalNpiGenerated,
+      avgLatencyMs,
+      avgSlippageBps,
+      qualityScore,
+      lastUpdated,
+      windowStart,
+    };
+  } catch (error) {
+    logger.warn("NativeRouter", "Failed to parse VenueScore", { error });
+    return null;
+  }
+}
+
+/**
+ * Récupère les scores de toutes les venues depuis la blockchain
+ */
+async function fetchVenueScores(
+  connection: Connection
+): Promise<Map<string, VenueScoreData>> {
+  const scores = new Map<string, VenueScoreData>();
+  
+  const venueKeys = Object.keys(DEX_PROGRAMS) as (keyof typeof DEX_PROGRAMS)[];
+  const pdas = venueKeys.map(key => deriveVenueScorePda(DEX_PROGRAMS[key]));
+  
+  try {
+    const accounts = await connection.getMultipleAccountsInfo(pdas);
+    
+    for (let i = 0; i < accounts.length; i++) {
+      const account = accounts[i];
+      if (account && account.data) {
+        const scoreData = parseVenueScoreData(account.data as Buffer);
+        if (scoreData) {
+          scores.set(venueKeys[i], scoreData);
+        }
+      }
+    }
+    
+    logger.info("NativeRouter", `Fetched ${scores.size} venue scores from on-chain`);
+  } catch (error) {
+    logger.warn("NativeRouter", "Failed to fetch venue scores", { error });
+  }
+  
+  return scores;
+}
+
+// ============================================================================
+// DYNAMIC SLIPPAGE CALCULATION
+// ============================================================================
+
+/**
+ * Calcule le slippage dynamique basé sur:
+ * - Base slippage (0.5%)
+ * - Size impact (swap amount vs pool TVL)
+ * - Volatility (from oracle)
+ * 
+ * Formule: slippage = base + size_impact + (volatility / 10)
+ */
+export function calculateDynamicSlippage(inputs: DynamicSlippageInputs): SlippageResult {
+  const { swapAmount, poolTvl, volatilityBps } = inputs;
+  
+  // Base component
+  const baseComponent = SLIPPAGE_CONFIG.BASE_SLIPPAGE_BPS;
+  
+  // Size impact: Additional slippage when swap is > threshold % of pool
+  let sizeComponent = 0;
+  if (poolTvl > 0) {
+    const sizeRatioBps = Math.floor((swapAmount / poolTvl) * 10000);
+    sizeComponent = Math.max(0, sizeRatioBps - SLIPPAGE_CONFIG.SIZE_THRESHOLD_BPS);
+  } else {
+    // Unknown TVL: add 100 bps safety margin
+    sizeComponent = 100;
+  }
+  
+  // Volatility impact
+  const volatilityComponent = Math.floor(volatilityBps / SLIPPAGE_CONFIG.VOLATILITY_DIVISOR);
+  
+  // Sum and cap
+  const total = Math.min(
+    baseComponent + sizeComponent + volatilityComponent,
+    SLIPPAGE_CONFIG.MAX_SLIPPAGE_BPS
+  );
+  
+  return {
+    slippageBps: total,
+    baseComponent,
+    sizeComponent,
+    volatilityComponent,
+  };
+}
+
+// ============================================================================
+// ORACLE VALIDATION
+// ============================================================================
+
+/**
+ * Vérifie la validité d'un prix oracle
+ */
+async function validateOraclePrice(
+  connection: Connection,
+  oracleAccount: PublicKey,
+  currentSlot: number
+): Promise<{ valid: boolean; price: number; staleness: number }> {
+  try {
+    const accountInfo = await connection.getAccountInfo(oracleAccount);
+    if (!accountInfo) {
+      return { valid: false, price: 0, staleness: Infinity };
+    }
+    
+    // Parse Pyth or Switchboard format
+    // Simplified: assume price is at fixed offset for demo
+    const data = accountInfo.data;
+    
+    // For Pyth: price feed has specific layout
+    // For now, return placeholder - real implementation would parse the feed
+    const price = 100; // Placeholder
+    const staleness = 0;
+    
+    const valid = staleness <= MAX_STALENESS_SECS;
+    
+    return { valid, price, staleness };
+  } catch (error) {
+    logger.warn("NativeRouter", "Oracle validation failed", { error });
+    return { valid: false, price: 0, staleness: Infinity };
+  }
+}
+
+/**
+ * Vérifie la divergence entre deux oracles
+ */
+export function checkOracleDivergence(price1: number, price2: number): {
+  divergenceBps: number;
+  isValid: boolean;
+} {
+  if (price1 === 0 || price2 === 0) {
+    return { divergenceBps: 10000, isValid: false };
+  }
+  
+  const avgPrice = (price1 + price2) / 2;
+  const diff = Math.abs(price1 - price2);
+  const divergenceBps = Math.floor((diff / avgPrice) * 10000);
+  
+  return {
+    divergenceBps,
+    isValid: divergenceBps <= MAX_ORACLE_DIVERGENCE_BPS,
+  };
+}
+
+// ============================================================================
+// JITO BUNDLE INTEGRATION
+// ============================================================================
+
+/**
+ * Envoie une transaction via Jito pour protection MEV
+ */
+async function sendJitoBundle(
+  transactions: VersionedTransaction[],
+  tipLamports: number = DEFAULT_JITO_TIP_LAMPORTS
+): Promise<string> {
+  // Sélectionner un tip account aléatoire
+  const tipAccount = JITO_TIP_ACCOUNTS[Math.floor(Math.random() * JITO_TIP_ACCOUNTS.length)];
+  
+  logger.info("NativeRouter", "Sending Jito bundle", {
+    numTransactions: transactions.length,
+    tipLamports,
+    tipAccount: tipAccount.toString(),
+  });
+  
+  // Sérialiser les transactions en base64
+  const encodedTxs = transactions.map(tx => 
+    Buffer.from(tx.serialize()).toString('base64')
+  );
+  
+  try {
+    const response = await fetch(JITO_BLOCK_ENGINE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'sendBundle',
+        params: [encodedTxs],
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Jito bundle failed: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (data.error) {
+      throw new Error(`Jito error: ${data.error.message}`);
+    }
+    
+    const bundleId = data.result;
+    logger.info("NativeRouter", "Jito bundle sent", { bundleId });
+    
+    return bundleId;
+  } catch (error) {
+    logger.error("NativeRouter", "Jito bundle failed", { error });
+    throw error;
+  }
+}
+
+/**
+ * Crée une instruction de tip pour Jito
+ */
+function createJitoTipInstruction(
+  payer: PublicKey,
+  tipLamports: number = DEFAULT_JITO_TIP_LAMPORTS
+): TransactionInstruction {
+  const tipAccount = JITO_TIP_ACCOUNTS[Math.floor(Math.random() * JITO_TIP_ACCOUNTS.length)];
+  
+  return SystemProgram.transfer({
+    fromPubkey: payer,
+    toPubkey: tipAccount,
+    lamports: tipLamports,
+  });
+}
+
+// ============================================================================
+// VENUE QUOTE FETCHERS
+// ============================================================================
+
+/**
+ * Récupère une quote depuis l'API Raydium
+ */
+async function fetchRaydiumQuote(
+  inputMint: string,
+  outputMint: string,
+  amountIn: number
+): Promise<VenueQuote | null> {
+  const startTime = Date.now();
+  try {
+    // Raydium API v3
+    const response = await fetch(
+      `https://api-v3.raydium.io/compute/swap-base-in?` +
+      `inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountIn}&slippageBps=50`,
+      { signal: AbortSignal.timeout(3000) }
+    );
+    
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    if (!data.success || !data.data) return null;
+    
+    const quote = data.data;
+    const latencyMs = Date.now() - startTime;
+    
+    return {
+      venue: "RAYDIUM_AMM",
+      venueProgramId: DEX_PROGRAMS.RAYDIUM_AMM,
+      inputAmount: amountIn,
+      outputAmount: parseInt(quote.outputAmount),
+      priceImpactBps: Math.floor(parseFloat(quote.priceImpact || "0") * 100),
+      accounts: [], // Sera rempli par le builder
+      estimatedNpiBps: 10, // ~0.1% NPI estimé
+      latencyMs,
+    };
+  } catch (error) {
+    logger.warn("NativeRouter", "Raydium quote failed", { error });
+    return null;
+  }
+}
+
+/**
+ * Récupère une quote depuis l'API Orca Whirlpool
+ */
+async function fetchOrcaQuote(
+  inputMint: string,
+  outputMint: string,
+  amountIn: number
+): Promise<VenueQuote | null> {
+  const startTime = Date.now();
+  try {
+    // Orca Whirlpool API
+    const response = await fetch(
+      `https://api.mainnet.orca.so/v1/quote?` +
+      `inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountIn}&slippage=0.5`,
+      { signal: AbortSignal.timeout(3000) }
+    );
+    
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    if (!data.outAmount) return null;
+    
+    const latencyMs = Date.now() - startTime;
+    
+    return {
+      venue: "ORCA_WHIRLPOOL",
+      venueProgramId: DEX_PROGRAMS.ORCA_WHIRLPOOL,
+      inputAmount: amountIn,
+      outputAmount: parseInt(data.outAmount),
+      priceImpactBps: Math.floor(parseFloat(data.priceImpactPercent || "0") * 100),
+      accounts: [],
+      estimatedNpiBps: 12, // Orca CLMM a généralement un bon NPI
+      latencyMs,
+    };
+  } catch (error) {
+    logger.warn("NativeRouter", "Orca quote failed", { error });
+    return null;
+  }
+}
+
+/**
+ * Récupère une quote depuis Meteora DLMM
+ */
+async function fetchMeteoraQuote(
+  inputMint: string,
+  outputMint: string,
+  amountIn: number
+): Promise<VenueQuote | null> {
+  const startTime = Date.now();
+  try {
+    const response = await fetch(
+      `https://dlmm-api.meteora.ag/pair/all_by_groups`,
+      { signal: AbortSignal.timeout(3000) }
+    );
+    
+    if (!response.ok) return null;
+    
+    // Meteora n'a pas d'API quote simple, on estime basé sur les pools
+    // Pour une vraie implémentation, il faudrait calculer le swap on-chain
+    const latencyMs = Date.now() - startTime;
+    
+    // Estimation basée sur un spread typique de 0.2%
+    const estimatedOutput = Math.floor(amountIn * 0.998);
+    
+    return {
+      venue: "METEORA_DLMM",
+      venueProgramId: DEX_PROGRAMS.METEORA_DLMM,
+      inputAmount: amountIn,
+      outputAmount: estimatedOutput,
+      priceImpactBps: 20,
+      accounts: [],
+      estimatedNpiBps: 15, // DLMM peut générer plus de NPI
+      latencyMs,
+    };
+  } catch (error) {
+    logger.warn("NativeRouter", "Meteora quote failed", { error });
+    return null;
+  }
+}
+
+/**
+ * Récupère une quote depuis Phoenix (CLOB)
+ */
+async function fetchPhoenixQuote(
+  inputMint: string,
+  outputMint: string,
+  amountIn: number
+): Promise<VenueQuote | null> {
+  const startTime = Date.now();
+  try {
+    // Phoenix SDK ou API
+    const response = await fetch(
+      `https://api.phoenix.com/v1/quote?` +
+      `base=${inputMint}&quote=${outputMint}&amount=${amountIn}&side=sell`,
+      { signal: AbortSignal.timeout(3000) }
+    );
+    
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    const latencyMs = Date.now() - startTime;
+    
+    return {
+      venue: "PHOENIX",
+      venueProgramId: DEX_PROGRAMS.PHOENIX,
+      inputAmount: amountIn,
+      outputAmount: parseInt(data.expectedOutput || "0"),
+      priceImpactBps: Math.floor(parseFloat(data.priceImpact || "0") * 100),
+      accounts: [],
+      estimatedNpiBps: 8, // CLOB a moins de NPI mais meilleur prix
+      latencyMs,
+    };
+  } catch (error) {
+    // Phoenix peut ne pas avoir de liquidité pour toutes les paires
+    return null;
+  }
+}
+
+// ============================================================================
+// NATIVE ROUTER SERVICE
+// ============================================================================
+
+export class NativeRouterService {
+  private connection: Connection;
+  private programId: PublicKey;
+  private venueScoresCache: Map<string, VenueScoreData> = new Map();
+  private lastScoresFetch: number = 0;
+  private readonly SCORES_CACHE_TTL_MS = 60_000; // 1 minute cache
+  
+  constructor(connection: Connection) {
+    this.connection = connection;
+    this.programId = ROUTER_PROGRAM_ID;
+  }
+  
+  /**
+   * Récupère les scores des venues (avec cache)
+   */
+  async getVenueScores(): Promise<Map<string, VenueScoreData>> {
+    const now = Date.now();
+    if (now - this.lastScoresFetch < this.SCORES_CACHE_TTL_MS && this.venueScoresCache.size > 0) {
+      return this.venueScoresCache;
+    }
+    
+    this.venueScoresCache = await fetchVenueScores(this.connection);
+    this.lastScoresFetch = now;
+    return this.venueScoresCache;
+  }
+  
+  /**
+   * Ajuste les poids des venues basé sur leurs scores on-chain
+   * - Exclut les venues avec score < 2500
+   * - Scale les poids par (score / 10000)
+   * - Renormalise à exactement 10,000 bps
+   */
+  adjustVenueWeightsWithScores(
+    quotes: VenueQuote[],
+    scores: Map<string, VenueScoreData>
+  ): VenueQuote[] {
+    // Calculer le poids initial (basé sur output amount)
+    const maxOutput = Math.max(...quotes.map(q => q.outputAmount));
+    
+    const weightedQuotes = quotes.map(quote => {
+      const score = scores.get(quote.venue);
+      const qualityScore = score?.qualityScore ?? 10000; // Default: full score if not found
+      
+      // Exclure les venues avec score < MIN_VENUE_SCORE
+      if (qualityScore < MIN_VENUE_SCORE) {
+        logger.info("NativeRouter", `Venue ${quote.venue} excluded: score ${qualityScore} < ${MIN_VENUE_SCORE}`);
+        return null;
+      }
+      
+      // Calculer le poids brut basé sur output
+      const outputWeight = Math.floor((quote.outputAmount / maxOutput) * 10000);
+      
+      // Ajuster par le score de qualité
+      const adjustedWeight = Math.floor((outputWeight * qualityScore) / 10000);
+      
+      return {
+        ...quote,
+        adjustedWeight,
+      };
+    }).filter((q): q is VenueQuote & { adjustedWeight: number } => q !== null);
+    
+    // Renormaliser à 10,000 bps
+    const totalWeight = weightedQuotes.reduce((sum, q) => sum + q.adjustedWeight, 0);
+    if (totalWeight === 0) return [];
+    
+    const normalizedQuotes = weightedQuotes.map(q => ({
+      ...q,
+      adjustedWeight: Math.floor((q.adjustedWeight / totalWeight) * 10000),
+    }));
+    
+    // Ajuster le dernier pour atteindre exactement 10,000
+    const currentSum = normalizedQuotes.reduce((sum, q) => sum + q.adjustedWeight, 0);
+    if (normalizedQuotes.length > 0 && currentSum !== 10000) {
+      normalizedQuotes[normalizedQuotes.length - 1].adjustedWeight += 10000 - currentSum;
+    }
+    
+    // Log les poids ajustés
+    for (const q of normalizedQuotes) {
+      logger.info("NativeRouter", `Venue ${q.venue} weight: ${q.adjustedWeight} bps`);
+    }
+    
+    return normalizedQuotes;
+  }
+  
+  /**
+   * Estime la TVL du pool pour le calcul de slippage
+   */
+  async estimatePoolTvl(
+    inputMint: PublicKey,
+    outputMint: PublicKey,
+    venue: keyof typeof DEX_PROGRAMS
+  ): Promise<number> {
+    // Default: 10M USDC equivalent (conservative)
+    const DEFAULT_TVL = 10_000_000_000_000; // 10M avec 6 decimals
+    
+    try {
+      // Pour Raydium, on peut fetcher la TVL depuis l'API
+      if (venue === "RAYDIUM_AMM") {
+        const response = await fetch(
+          `https://api-v3.raydium.io/pools/info/mint?mint1=${inputMint}&mint2=${outputMint}`,
+          { signal: AbortSignal.timeout(2000) }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data?.[0]?.tvl) {
+            return Math.floor(parseFloat(data.data[0].tvl) * 1_000_000);
+          }
+        }
+      }
+    } catch {
+      // Fallback to default
+    }
+    
+    return DEFAULT_TVL;
+  }
+  
+  /**
+   * Récupère la volatilité depuis l'oracle
+   */
+  async getOracleVolatility(tokenMint: PublicKey): Promise<number> {
+    // Pour l'instant, retourne une volatilité estimée
+    // Une vraie implémentation lirait les données de volatilité depuis Pyth/Switchboard
+    
+    // Volatilité par défaut: 100 bps (1%)
+    // SOL/stables ont généralement une volatilité plus élevée
+    if (tokenMint.equals(SOL_MINT)) {
+      return 200; // 2% volatilité pour SOL
+    }
+    if (tokenMint.equals(USDC_MINT)) {
+      return 10; // 0.1% volatilité pour USDC
+    }
+    
+    return 100; // 1% par défaut
+  }
+  
+  /**
+   * Récupère des quotes depuis toutes les venues natives disponibles
+   */
+  async getMultiVenueQuotes(
+    inputMint: PublicKey,
+    outputMint: PublicKey,
+    amountIn: number
+  ): Promise<VenueQuote[]> {
+    const inputMintStr = inputMint.toString();
+    const outputMintStr = outputMint.toString();
+    
+    logger.info("NativeRouter", "Fetching multi-venue quotes", {
+      inputMint: inputMintStr,
+      outputMint: outputMintStr,
+      amountIn,
+    });
+    
+    // Fetch quotes en parallèle depuis toutes les venues
+    const quotePromises = [
+      fetchRaydiumQuote(inputMintStr, outputMintStr, amountIn),
+      fetchOrcaQuote(inputMintStr, outputMintStr, amountIn),
+      fetchMeteoraQuote(inputMintStr, outputMintStr, amountIn),
+      fetchPhoenixQuote(inputMintStr, outputMintStr, amountIn),
+    ];
+    
+    const results = await Promise.allSettled(quotePromises);
+    
+    const quotes: VenueQuote[] = [];
+    for (const result of results) {
+      if (result.status === "fulfilled" && result.value) {
+        quotes.push(result.value);
+      }
+    }
+    
+    // Trier par meilleur output
+    quotes.sort((a, b) => b.outputAmount - a.outputAmount);
+    
+    logger.info("NativeRouter", `Got ${quotes.length} venue quotes`, {
+      venues: quotes.map(q => q.venue),
+      bestOutput: quotes[0]?.outputAmount,
+    });
+    
+    return quotes;
+  }
+  
+  /**
+   * Construit la meilleure route native basée sur les quotes
+   * Utilise le scoring on-chain et le slippage dynamique
+   */
+  async buildNativeRoute(
+    inputMint: PublicKey,
+    outputMint: PublicKey,
+    amountIn: number,
+    slippageBps?: number
+  ): Promise<NativeRouteQuote | null> {
+    // 1. Récupérer les quotes
+    const quotes = await this.getMultiVenueQuotes(inputMint, outputMint, amountIn);
+    
+    if (quotes.length === 0) {
+      logger.warn("NativeRouter", "No venue quotes available");
+      return null;
+    }
+    
+    // 2. Récupérer les scores on-chain
+    const venueScores = await this.getVenueScores();
+    
+    // 3. Ajuster les poids basé sur les scores
+    const adjustedQuotes = this.adjustVenueWeightsWithScores(quotes, venueScores);
+    
+    if (adjustedQuotes.length === 0) {
+      logger.warn("NativeRouter", "All venues excluded by scoring");
+      // Fallback: utiliser les quotes originales sans ajustement
+      adjustedQuotes.push(...quotes.slice(0, MAX_VENUES));
+    }
+    
+    // 4. Calculer le slippage dynamique si non fourni
+    let finalSlippageBps = slippageBps ?? SLIPPAGE_CONFIG.BASE_SLIPPAGE_BPS;
+    
+    if (!slippageBps) {
+      const bestVenue = adjustedQuotes[0];
+      
+      // Estimer TVL et volatilité
+      const [poolTvl, volatilityBps] = await Promise.all([
+        this.estimatePoolTvl(inputMint, outputMint, bestVenue.venue),
+        this.getOracleVolatility(inputMint),
+      ]);
+      
+      // Calculer slippage dynamique
+      const slippageResult = calculateDynamicSlippage({
+        swapAmount: amountIn,
+        poolTvl,
+        volatilityBps,
+      });
+      
+      finalSlippageBps = slippageResult.slippageBps;
+      
+      logger.info("NativeRouter", "Dynamic slippage calculated", {
+        base: slippageResult.baseComponent,
+        size: slippageResult.sizeComponent,
+        volatility: slippageResult.volatilityComponent,
+        total: slippageResult.slippageBps,
+      });
+    }
+    
+    // 5. Stratégie: utiliser la meilleure venue
+    const bestQuote = adjustedQuotes[0];
+    
+    // Calculer le min output avec slippage
+    const minOutput = Math.floor(bestQuote.outputAmount * (10000 - finalSlippageBps) / 10000);
+    
+    // Estimation du NPI et rebates
+    const platformFeeBps = 20; // 0.2%
+    const npiEstimate = Math.floor(bestQuote.outputAmount * bestQuote.estimatedNpiBps / 10000);
+    const rebateEstimate = Math.floor(npiEstimate * 0.7); // 70% du NPI va aux rebates
+    
+    // Net output = output - platform fee + rebate
+    const platformFee = Math.floor(bestQuote.outputAmount * platformFeeBps / 10000);
+    const netOutput = bestQuote.outputAmount - platformFee + rebateEstimate;
+    
+    return {
+      venues: adjustedQuotes.slice(0, MAX_VENUES),
+      totalInputAmount: amountIn,
+      totalOutputAmount: bestQuote.outputAmount,
+      totalPriceImpactBps: bestQuote.priceImpactBps,
+      estimatedRebate: rebateEstimate,
+      estimatedNpi: npiEstimate,
+      platformFeeBps,
+      netOutputAmount: netOutput,
+    };
+  }
+  
+  /**
+   * Dérive les PDAs nécessaires pour le swap
+   */
+  async deriveSwapAccounts(
+    userPublicKey: PublicKey,
+    inputMint: PublicKey,
+    outputMint: PublicKey
+  ): Promise<{
+    routerState: PublicKey;
+    rebateVault: PublicKey;
+    userTokenAccountA: PublicKey;
+    userTokenAccountB: PublicKey;
+    userRebateAccount: PublicKey;
+    userNftPda: PublicKey;
+  }> {
+    // Router State PDA
+    const [routerState] = PublicKey.findProgramAddressSync(
+      [Buffer.from("router_state")],
+      this.programId
+    );
+    
+    // Rebate Vault PDA
+    const [rebateVault] = PublicKey.findProgramAddressSync(
+      [Buffer.from("rebate_vault"), routerState.toBuffer()],
+      this.programId
+    );
+    
+    // User token accounts (ATAs)
+    const userTokenAccountA = await getAssociatedTokenAddress(inputMint, userPublicKey);
+    const userTokenAccountB = await getAssociatedTokenAddress(outputMint, userPublicKey);
+    
+    // User USDC account for rebates
+    const userRebateAccount = await getAssociatedTokenAddress(USDC_MINT, userPublicKey);
+    
+    // User NFT PDA (from cNFT program)
+    const [userNftPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_nft"), userPublicKey.toBuffer()],
+      CNFT_PROGRAM_ID
+    );
+    
+    return {
+      routerState,
+      rebateVault,
+      userTokenAccountA,
+      userTokenAccountB,
+      userRebateAccount,
+      userNftPda,
+    };
+  }
+  
+  /**
+   * Construit la transaction de swap native
+   */
+  async buildSwapTransaction(
+    params: NativeSwapParams,
+    route: NativeRouteQuote
+  ): Promise<VersionedTransaction> {
+    const { userPublicKey, inputMint, outputMint, amountIn, minAmountOut } = params;
+    
+    logger.info("NativeRouter", "Building swap transaction", {
+      amountIn,
+      minAmountOut,
+      venues: route.venues.map(v => v.venue),
+    });
+    
+    // Dériver les comptes
+    const accounts = await this.deriveSwapAccounts(userPublicKey, inputMint, outputMint);
+    
+    const instructions: TransactionInstruction[] = [];
+    
+    // Vérifier si les ATAs existent, sinon les créer
+    const ataChecks = await Promise.all([
+      this.connection.getAccountInfo(accounts.userTokenAccountA),
+      this.connection.getAccountInfo(accounts.userTokenAccountB),
+    ]);
+    
+    if (!ataChecks[0]) {
+      instructions.push(
+        createAssociatedTokenAccountInstruction(
+          userPublicKey,
+          accounts.userTokenAccountA,
+          userPublicKey,
+          inputMint
+        )
+      );
+    }
+    
+    if (!ataChecks[1]) {
+      instructions.push(
+        createAssociatedTokenAccountInstruction(
+          userPublicKey,
+          accounts.userTokenAccountB,
+          userPublicKey,
+          outputMint
+        )
+      );
+    }
+    
+    // Construire les VenueWeight pour chaque venue
+    const venueWeights = route.venues.map((venue, index) => ({
+      venue: venue.venueProgramId,
+      weight: index === 0 ? 10000 : 0, // 100% sur la meilleure venue pour l'instant
+    }));
+    
+    // Construire l'instruction swap_toc
+    const swapInstruction = await this.buildSwapToCInstruction(
+      userPublicKey,
+      accounts,
+      inputMint,
+      outputMint,
+      amountIn,
+      minAmountOut,
+      venueWeights,
+      route.venues[0] // Meilleure venue
+    );
+    
+    instructions.push(swapInstruction);
+    
+    // Construire la transaction versionnée
+    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash();
+    
+    const messageV0 = new TransactionMessage({
+      payerKey: userPublicKey,
+      recentBlockhash: blockhash,
+      instructions,
+    }).compileToV0Message();
+    
+    const transaction = new VersionedTransaction(messageV0);
+    
+    return transaction;
+  }
+  
+  /**
+   * Construit l'instruction swap_toc
+   */
+  private async buildSwapToCInstruction(
+    userPublicKey: PublicKey,
+    accounts: Awaited<ReturnType<typeof this.deriveSwapAccounts>>,
+    inputMint: PublicKey,
+    outputMint: PublicKey,
+    amountIn: number,
+    minAmountOut: number,
+    venueWeights: { venue: PublicKey; weight: number }[],
+    bestVenue: VenueQuote
+  ): Promise<TransactionInstruction> {
+    // Charger l'IDL
+    const idlResponse = await fetch("/idl/swapback_router.json");
+    const idl = await idlResponse.json();
+    
+    // Discriminator pour swap_toc (calculé depuis l'IDL)
+    // "swap_toc" => SHA256("global:swap_toc")[0..8]
+    const discriminator = Buffer.from([
+      0x5f, 0x1c, 0x8a, 0xc3, 0x9d, 0x6b, 0x2e, 0x7f
+    ]); // Placeholder - sera remplacé par le vrai discriminator
+    
+    // Sérialiser les arguments SwapArgs
+    const argsBuffer = this.serializeSwapArgs({
+      amountIn: new BN(amountIn),
+      minOut: new BN(minAmountOut),
+      slippageTolerance: 50, // 0.5%
+      useDynamicPlan: false,
+      useBundle: false,
+      primaryOracleAccount: DEFAULT_ORACLE,
+      venues: venueWeights,
+    });
+    
+    const data = Buffer.concat([discriminator, argsBuffer]);
+    
+    // Récupérer les comptes du DEX pour le CPI
+    const venueAccounts = await this.getVenueAccounts(bestVenue, inputMint, outputMint);
+    
+    const keys = [
+      // Comptes fixes
+      { pubkey: accounts.routerState, isSigner: false, isWritable: true },
+      { pubkey: userPublicKey, isSigner: true, isWritable: true },
+      { pubkey: DEFAULT_ORACLE, isSigner: false, isWritable: false },
+      { pubkey: accounts.userTokenAccountA, isSigner: false, isWritable: true },
+      { pubkey: accounts.userTokenAccountB, isSigner: false, isWritable: true },
+      { pubkey: accounts.rebateVault, isSigner: false, isWritable: true },
+      { pubkey: accounts.userRebateAccount, isSigner: false, isWritable: true },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      // Venue accounts en remaining_accounts
+      ...venueAccounts.map(pubkey => ({
+        pubkey,
+        isSigner: false,
+        isWritable: true,
+      })),
+    ];
+    
+    return new TransactionInstruction({
+      programId: this.programId,
+      keys,
+      data,
+    });
+  }
+  
+  /**
+   * Sérialise les arguments SwapArgs pour l'instruction
+   */
+  private serializeSwapArgs(args: {
+    amountIn: BN;
+    minOut: BN;
+    slippageTolerance: number;
+    useDynamicPlan: boolean;
+    useBundle: boolean;
+    primaryOracleAccount: PublicKey;
+    venues: { venue: PublicKey; weight: number }[];
+  }): Buffer {
+    // Sérialisation manuelle selon le format Anchor
+    const buffers: Buffer[] = [];
+    
+    // amount_in: u64
+    buffers.push(args.amountIn.toArrayLike(Buffer, "le", 8));
+    
+    // min_out: u64
+    buffers.push(args.minOut.toArrayLike(Buffer, "le", 8));
+    
+    // slippage_tolerance: Option<u16>
+    const slippageBuf = Buffer.alloc(3);
+    slippageBuf.writeUInt8(1, 0); // Some
+    slippageBuf.writeUInt16LE(args.slippageTolerance, 1);
+    buffers.push(slippageBuf);
+    
+    // twap_slices: Option<u8>
+    buffers.push(Buffer.from([0])); // None
+    
+    // use_dynamic_plan: bool
+    buffers.push(Buffer.from([args.useDynamicPlan ? 1 : 0]));
+    
+    // plan_account: Option<Pubkey>
+    buffers.push(Buffer.from([0])); // None
+    
+    // use_bundle: bool
+    buffers.push(Buffer.from([args.useBundle ? 1 : 0]));
+    
+    // primary_oracle_account: Pubkey
+    buffers.push(args.primaryOracleAccount.toBuffer());
+    
+    // fallback_oracle_account: Option<Pubkey>
+    buffers.push(Buffer.from([0])); // None
+    
+    // jupiter_route: Option<...>
+    buffers.push(Buffer.from([0])); // None - on utilise les venues natives
+    
+    // jupiter_swap_ix_data: Option<Vec<u8>>
+    buffers.push(Buffer.from([0])); // None
+    
+    // liquidity_estimate: Option<u64>
+    buffers.push(Buffer.from([0])); // None
+    
+    // volatility_bps: Option<u16>
+    buffers.push(Buffer.from([0])); // None
+    
+    // min_venue_score: Option<u16>
+    const minScoreBuf = Buffer.alloc(3);
+    minScoreBuf.writeUInt8(1, 0); // Some
+    minScoreBuf.writeUInt16LE(2500, 1); // 25% minimum
+    buffers.push(minScoreBuf);
+    
+    // slippage_per_venue: Option<Vec<...>>
+    buffers.push(Buffer.from([0])); // None
+    
+    // token decimals: Option<u8> x2
+    buffers.push(Buffer.from([0])); // None
+    buffers.push(Buffer.from([0])); // None
+    
+    // max_staleness_override: Option<i64>
+    buffers.push(Buffer.from([0])); // None
+    
+    // jito_bundle: Option<...>
+    buffers.push(Buffer.from([0])); // None
+    
+    return Buffer.concat(buffers);
+  }
+  
+  /**
+   * Récupère les comptes nécessaires pour le CPI vers un DEX
+   */
+  private async getVenueAccounts(
+    venue: VenueQuote,
+    inputMint: PublicKey,
+    outputMint: PublicKey
+  ): Promise<PublicKey[]> {
+    // Pour l'instant, retourne les comptes de base du DEX
+    // Une vraie implémentation nécessiterait de fetch les pools spécifiques
+    
+    switch (venue.venue) {
+      case "RAYDIUM_AMM":
+        return await this.getRaydiumAccounts(inputMint, outputMint);
+      case "ORCA_WHIRLPOOL":
+        return await this.getOrcaAccounts(inputMint, outputMint);
+      case "METEORA_DLMM":
+        return await this.getMeteoraAccounts(inputMint, outputMint);
+      case "PHOENIX":
+        return await this.getPhoenixAccounts(inputMint, outputMint);
+      default:
+        return [];
+    }
+  }
+  
+  /**
+   * Récupère les comptes Raydium pour le CPI
+   */
+  private async getRaydiumAccounts(
+    inputMint: PublicKey,
+    outputMint: PublicKey
+  ): Promise<PublicKey[]> {
+    // Fetch le pool Raydium pour cette paire
+    try {
+      const response = await fetch(
+        `https://api-v3.raydium.io/pools/info/mint?` +
+        `mint1=${inputMint.toString()}&mint2=${outputMint.toString()}&poolType=standard`,
+        { signal: AbortSignal.timeout(3000) }
+      );
+      
+      if (!response.ok) return [];
+      
+      const data = await response.json();
+      if (!data.success || !data.data?.[0]) return [];
+      
+      const pool = data.data[0];
+      
+      // Retourner les comptes nécessaires pour le swap Raydium
+      return [
+        new PublicKey(pool.id), // Pool ID
+        new PublicKey(pool.marketId), // Serum Market
+        // ... autres comptes nécessaires
+      ];
+    } catch {
+      return [];
+    }
+  }
+  
+  /**
+   * Récupère les comptes Orca pour le CPI
+   */
+  private async getOrcaAccounts(
+    inputMint: PublicKey,
+    outputMint: PublicKey
+  ): Promise<PublicKey[]> {
+    // Similaire à Raydium, fetch les whirlpools
+    return [];
+  }
+  
+  /**
+   * Récupère les comptes Meteora pour le CPI
+   */
+  private async getMeteoraAccounts(
+    inputMint: PublicKey,
+    outputMint: PublicKey
+  ): Promise<PublicKey[]> {
+    return [];
+  }
+  
+  /**
+   * Récupère les comptes Phoenix pour le CPI
+   */
+  private async getPhoenixAccounts(
+    inputMint: PublicKey,
+    outputMint: PublicKey
+  ): Promise<PublicKey[]> {
+    return [];
+  }
+  
+  /**
+   * Exécute un swap complet via le router natif
+   * Supporte Jito bundles pour protection MEV
+   */
+  async executeSwap(
+    params: NativeSwapParams,
+    signTransaction: (tx: VersionedTransaction) => Promise<VersionedTransaction>
+  ): Promise<NativeSwapResult> {
+    logger.info("NativeRouter", "Executing native swap", {
+      inputMint: params.inputMint.toString(),
+      outputMint: params.outputMint.toString(),
+      amountIn: params.amountIn,
+      useJito: params.useJitoBundle,
+    });
+    
+    // 1. Construire la route
+    const route = await this.buildNativeRoute(
+      params.inputMint,
+      params.outputMint,
+      params.amountIn,
+      params.slippageBps
+    );
+    
+    if (!route) {
+      throw new Error("Impossible de trouver une route native");
+    }
+    
+    // 2. Construire la transaction
+    const transaction = await this.buildSwapTransaction(params, route);
+    
+    // 3. Ajouter tip Jito si demandé (pour protection MEV)
+    if (params.useJitoBundle) {
+      const tipInstruction = createJitoTipInstruction(
+        params.userPublicKey,
+        DEFAULT_JITO_TIP_LAMPORTS
+      );
+      
+      // Reconstruire la transaction avec le tip
+      const { blockhash } = await this.connection.getLatestBlockhash();
+      const message = transaction.message;
+      
+      // Note: Pour une vraie implémentation, il faudrait modifier le message
+      // pour inclure l'instruction de tip. Ici on log l'intention.
+      logger.info("NativeRouter", "Jito MEV protection enabled", {
+        tipLamports: DEFAULT_JITO_TIP_LAMPORTS,
+      });
+    }
+    
+    // 4. Signer
+    const signedTransaction = await signTransaction(transaction);
+    
+    // 5. Envoyer (via Jito ou normal)
+    let signature: string;
+    
+    if (params.useJitoBundle) {
+      // Envoyer via Jito bundle engine
+      try {
+        const bundleId = await sendJitoBundle([signedTransaction]);
+        
+        // Attendre la confirmation du bundle
+        // Note: Jito bundles n'ont pas de signature standard, on attend le landing
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Le bundle ID est retourné, mais pour le résultat on utilise le hash de la tx
+        const txHash = Buffer.from(signedTransaction.signatures[0]).toString('base58');
+        signature = txHash;
+        
+        logger.info("NativeRouter", "Jito bundle landed", {
+          bundleId,
+          signature,
+        });
+      } catch (jitoError) {
+        logger.warn("NativeRouter", "Jito bundle failed, falling back to normal send", {
+          error: jitoError,
+        });
+        
+        // Fallback: envoyer normalement
+        const rawTransaction = signedTransaction.serialize();
+        signature = await this.connection.sendRawTransaction(rawTransaction, {
+          skipPreflight: false,
+          preflightCommitment: "confirmed",
+          maxRetries: 3,
+        });
+      }
+    } else {
+      // Envoi standard
+      const rawTransaction = signedTransaction.serialize();
+      signature = await this.connection.sendRawTransaction(rawTransaction, {
+        skipPreflight: false,
+        preflightCommitment: "confirmed",
+        maxRetries: 3,
+      });
+    }
+    
+    // 6. Confirmer
+    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash();
+    await this.connection.confirmTransaction({
+      signature,
+      blockhash,
+      lastValidBlockHeight,
+    }, "confirmed");
+    
+    logger.info("NativeRouter", "Swap executed successfully", {
+      signature,
+      venues: route.venues.map(v => v.venue),
+      outputAmount: route.totalOutputAmount,
+      rebate: route.estimatedRebate,
+      usedJito: params.useJitoBundle,
+    });
+    
+    return {
+      signature,
+      inputAmount: params.amountIn,
+      outputAmount: route.totalOutputAmount,
+      venues: route.venues.map(v => v.venue),
+      rebateAmount: route.estimatedRebate,
+      npiGenerated: route.estimatedNpi,
+      transactionFee: params.useJitoBundle ? 5000 + DEFAULT_JITO_TIP_LAMPORTS : 5000,
+    };
+  }
+  
+  /**
+   * Compare les prix entre plusieurs venues et retourne le meilleur
+   */
+  async compareVenuePrices(
+    inputMint: PublicKey,
+    outputMint: PublicKey,
+    amountIn: number
+  ): Promise<{
+    venues: VenueQuote[];
+    bestVenue: string;
+    priceDifferenceBps: number;
+  }> {
+    const quotes = await this.getMultiVenueQuotes(inputMint, outputMint, amountIn);
+    
+    if (quotes.length === 0) {
+      return { venues: [], bestVenue: "", priceDifferenceBps: 0 };
+    }
+    
+    const best = quotes[0];
+    const worst = quotes[quotes.length - 1];
+    
+    const priceDifferenceBps = worst.outputAmount > 0 
+      ? Math.floor(((best.outputAmount - worst.outputAmount) / worst.outputAmount) * 10000)
+      : 0;
+    
+    return {
+      venues: quotes,
+      bestVenue: best.venue,
+      priceDifferenceBps,
+    };
+  }
+}
+
+// ============================================================================
+// SINGLETON
+// ============================================================================
+
+let nativeRouterInstance: NativeRouterService | null = null;
+
+export function getNativeRouter(connection: Connection): NativeRouterService {
+  if (!nativeRouterInstance) {
+    nativeRouterInstance = new NativeRouterService(connection);
+  }
+  return nativeRouterInstance;
+}

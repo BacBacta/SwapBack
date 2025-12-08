@@ -9,7 +9,7 @@
  * - Historique en section collapsible
  */
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Gift, 
@@ -25,17 +25,6 @@ import {
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import toast from "react-hot-toast";
-
-// Router program ID - lazy loaded to avoid SSR issues
-const ROUTER_PROGRAM_ID_STR = process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf";
-let _routerProgramId: PublicKey | null = null;
-
-function getRouterProgramId(): PublicKey {
-  if (!_routerProgramId) {
-    _routerProgramId = new PublicKey(ROUTER_PROGRAM_ID_STR);
-  }
-  return _routerProgramId;
-}
 
 interface RebateData {
   unclaimedRebate: number;
@@ -59,127 +48,116 @@ export function SimpleRebatesCard() {
   const [showHistory, setShowHistory] = useState(false);
   const [rebateData, setRebateData] = useState<RebateData | null>(null);
   const [claimHistory, setClaimHistory] = useState<ClaimEvent[]>([]);
-  const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Memoize the router program ID to avoid re-renders
-  const routerProgramId = useMemo(() => getRouterProgramId(), []);
+  // Router program ID
+  const ROUTER_PROGRAM_ID = new PublicKey(
+    process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf"
+  );
 
-  // Fetch rebate data from on-chain - wrapped in useCallback
-  const fetchData = useCallback(async () => {
-    if (!connected || !publicKey) {
-      console.log('[SimpleRebatesCard] Not connected or no publicKey');
-      setRebateData(null);
-      setLoading(false);
-      setFetchError(null);
-      return;
-    }
-
-    console.log('[SimpleRebatesCard] Starting fetchData...');
-    console.log('[SimpleRebatesCard] RPC endpoint:', connection.rpcEndpoint);
-    console.log('[SimpleRebatesCard] Wallet:', publicKey.toBase58().substring(0, 8) + '...');
-    
-    setLoading(true);
-    setFetchError(null);
-    const startTime = Date.now();
-    
-    try {
-      // Derive UserRebate PDA
-      const [userRebatePDA] = PublicKey.findProgramAddressSync(
-        [Buffer.from("user_rebate"), publicKey.toBuffer()],
-        routerProgramId
-      );
-      console.log('[SimpleRebatesCard] UserRebate PDA:', userRebatePDA.toBase58().substring(0, 8) + '...');
-
-      console.log('[SimpleRebatesCard] Calling getAccountInfo...');
-      const accountInfo = await connection.getAccountInfo(userRebatePDA);
-      console.log('[SimpleRebatesCard] getAccountInfo completed in', Date.now() - startTime, 'ms');
-
-      if (accountInfo && accountInfo.data.length >= 80) {
-        console.log('[SimpleRebatesCard] Account found, parsing data...');
-        // Parse UserRebate account data
-        // Layout: discriminator(8) + user(32) + unclaimed(8) + total_claimed(8) + total_swaps(8) + ...
-        const data = accountInfo.data;
-        let offset = 8; // Skip discriminator
-        offset += 32; // Skip user pubkey
-
-        const unclaimedRebate = Number(data.readBigUInt64LE(offset)) / 1e6; // USDC 6 decimals
-        offset += 8;
-
-        const totalClaimed = Number(data.readBigUInt64LE(offset)) / 1e6;
-        offset += 8;
-
-        const totalSwaps = Number(data.readBigUInt64LE(offset));
-        offset += 8;
-
-        // Estimate volume from rebates (0.1% rebate rate)
-        const totalVolume = (unclaimedRebate + totalClaimed) * 1000;
-
-        console.log('[SimpleRebatesCard] Parsed data:', { unclaimedRebate, totalClaimed, totalSwaps, totalVolume });
-        
-        setRebateData({
-          unclaimedRebate,
-          totalClaimed,
-          totalVolume,
-          totalSwaps,
-        });
-      } else {
-        console.log('[SimpleRebatesCard] No account found or insufficient data length');
-        // No account - user has never swapped
-        setRebateData({
-          unclaimedRebate: 0,
-          totalClaimed: 0,
-          totalVolume: 0,
-          totalSwaps: 0,
-        });
-      }
-
-      // Fetch claim history from signatures (simplified)
-      // In production, use proper indexer
-      setClaimHistory([]);
-      console.log('[SimpleRebatesCard] fetchData completed successfully in', Date.now() - startTime, 'ms');
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorName = error instanceof Error ? error.name : 'Unknown';
-      
-      console.error('[SimpleRebatesCard] ERROR in fetchData:');
-      console.error('[SimpleRebatesCard] Error name:', errorName);
-      console.error('[SimpleRebatesCard] Error message:', errorMessage);
-      console.error('[SimpleRebatesCard] RPC endpoint:', connection.rpcEndpoint);
-      console.error('[SimpleRebatesCard] Time elapsed:', Date.now() - startTime, 'ms');
-      
-      // Check for specific error types
-      if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests')) {
-        console.error('[SimpleRebatesCard] ⚠️ RATE LIMITED (429) - RPC is blocking requests');
-        setFetchError('RPC rate limited. Please try again later.');
-      } else if (errorMessage.includes('fetch failed') || errorMessage.includes('network')) {
-        console.error('[SimpleRebatesCard] ⚠️ NETWORK ERROR - Check RPC endpoint');
-        setFetchError('Network error. Please check your connection.');
-      } else {
-        setFetchError('Error loading rebate data.');
-      }
-      
-      console.error('[SimpleRebatesCard] Full error:', error);
-      // Set default values on error instead of null to prevent UI issues
-      setRebateData({
-        unclaimedRebate: 0,
-        totalClaimed: 0,
-        totalVolume: 0,
-        totalSwaps: 0,
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [connected, publicKey, connection, routerProgramId]);
-
-  // Effect to fetch data when dependencies change
+  // Fetch rebate data from on-chain
   useEffect(() => {
+    const fetchData = async () => {
+      if (!connected || !publicKey) {
+        console.log('[SimpleRebatesCard] Not connected or no publicKey');
+        setRebateData(null);
+        setLoading(false);
+        return;
+      }
+
+      console.log('[SimpleRebatesCard] Starting fetchData...');
+      console.log('[SimpleRebatesCard] RPC endpoint:', connection.rpcEndpoint);
+      console.log('[SimpleRebatesCard] Wallet:', publicKey.toBase58().substring(0, 8) + '...');
+      
+      setLoading(true);
+      const startTime = Date.now();
+      
+      try {
+        // Derive UserRebate PDA
+        const [userRebatePDA] = PublicKey.findProgramAddressSync(
+          [Buffer.from("user_rebate"), publicKey.toBuffer()],
+          ROUTER_PROGRAM_ID
+        );
+        console.log('[SimpleRebatesCard] UserRebate PDA:', userRebatePDA.toBase58().substring(0, 8) + '...');
+
+        console.log('[SimpleRebatesCard] Calling getAccountInfo...');
+        const accountInfo = await connection.getAccountInfo(userRebatePDA);
+        console.log('[SimpleRebatesCard] getAccountInfo completed in', Date.now() - startTime, 'ms');
+
+        if (accountInfo && accountInfo.data.length >= 80) {
+          console.log('[SimpleRebatesCard] Account found, parsing data...');
+          // Parse UserRebate account data
+          // Layout: discriminator(8) + user(32) + unclaimed(8) + total_claimed(8) + total_swaps(8) + ...
+          const data = accountInfo.data;
+          let offset = 8; // Skip discriminator
+          offset += 32; // Skip user pubkey
+
+          const unclaimedRebate = Number(data.readBigUInt64LE(offset)) / 1e6; // USDC 6 decimals
+          offset += 8;
+
+          const totalClaimed = Number(data.readBigUInt64LE(offset)) / 1e6;
+          offset += 8;
+
+          const totalSwaps = Number(data.readBigUInt64LE(offset));
+          offset += 8;
+
+          // Estimate volume from rebates (0.1% rebate rate)
+          const totalVolume = (unclaimedRebate + totalClaimed) * 1000;
+
+          console.log('[SimpleRebatesCard] Parsed data:', { unclaimedRebate, totalClaimed, totalSwaps, totalVolume });
+          
+          setRebateData({
+            unclaimedRebate,
+            totalClaimed,
+            totalVolume,
+            totalSwaps,
+          });
+        } else {
+          console.log('[SimpleRebatesCard] No account found or insufficient data length');
+          // No account - user has never swapped
+          setRebateData({
+            unclaimedRebate: 0,
+            totalClaimed: 0,
+            totalVolume: 0,
+            totalSwaps: 0,
+          });
+        }
+
+        // Fetch claim history from signatures (simplified)
+        // In production, use proper indexer
+        setClaimHistory([]);
+        console.log('[SimpleRebatesCard] fetchData completed successfully in', Date.now() - startTime, 'ms');
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorName = error instanceof Error ? error.name : 'Unknown';
+        
+        console.error('[SimpleRebatesCard] ERROR in fetchData:');
+        console.error('[SimpleRebatesCard] Error name:', errorName);
+        console.error('[SimpleRebatesCard] Error message:', errorMessage);
+        console.error('[SimpleRebatesCard] RPC endpoint:', connection.rpcEndpoint);
+        console.error('[SimpleRebatesCard] Time elapsed:', Date.now() - startTime, 'ms');
+        
+        // Check for specific error types
+        if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests')) {
+          console.error('[SimpleRebatesCard] ⚠️ RATE LIMITED (429) - RPC is blocking requests');
+        }
+        if (errorMessage.includes('fetch failed') || errorMessage.includes('network')) {
+          console.error('[SimpleRebatesCard] ⚠️ NETWORK ERROR - Check RPC endpoint');
+        }
+        
+        console.error('[SimpleRebatesCard] Full error:', error);
+        setRebateData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     // Delay initial fetch to avoid burst of requests on page load
     const timeoutId = setTimeout(fetchData, 300);
     
     return () => clearTimeout(timeoutId);
-  }, [fetchData]);
+  }, [connected, publicKey, connection, ROUTER_PROGRAM_ID]);
 
-  const handleClaim = useCallback(async () => {
+  const handleClaim = async () => {
     if (!connected || !publicKey || !signTransaction || !rebateData || rebateData.unclaimedRebate <= 0) {
       return;
     }
@@ -190,12 +168,12 @@ export function SimpleRebatesCard() {
       // Derive PDAs
       const [userRebatePDA] = PublicKey.findProgramAddressSync(
         [Buffer.from("user_rebate"), publicKey.toBuffer()],
-        routerProgramId
+        ROUTER_PROGRAM_ID
       );
 
       const [treasuryPDA] = PublicKey.findProgramAddressSync(
         [Buffer.from("treasury")],
-        routerProgramId
+        ROUTER_PROGRAM_ID
       );
 
       // USDC mint
@@ -213,7 +191,7 @@ export function SimpleRebatesCard() {
       const { TOKEN_PROGRAM_ID } = await import("@solana/spl-token");
 
       const claimInstruction = new TransactionInstruction({
-        programId: routerProgramId,
+        programId: ROUTER_PROGRAM_ID,
         keys: [
           { pubkey: userRebatePDA, isSigner: false, isWritable: true },
           { pubkey: treasuryPDA, isSigner: false, isWritable: true },
@@ -260,13 +238,13 @@ export function SimpleRebatesCard() {
     } finally {
       setClaiming(false);
     }
-  }, [connected, publicKey, signTransaction, rebateData, routerProgramId, connection]);
+  };
 
-  const formatNumber = useCallback((num: number, decimals = 2) => {
+  const formatNumber = (num: number, decimals = 2) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
     if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
     return num.toFixed(decimals);
-  }, []);
+  };
 
   if (loading) {
     return (
@@ -287,24 +265,6 @@ export function SimpleRebatesCard() {
           <Gift className="w-12 h-12 text-gray-600 mx-auto mb-4" />
           <p className="text-gray-400 mb-2">Connectez votre wallet</p>
           <p className="text-sm text-gray-500">pour voir vos rebates</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show error state with retry option
-  if (fetchError) {
-    return (
-      <div className="w-full max-w-lg mx-auto theme-light">
-        <div className="card-simple text-center py-12">
-          <Gift className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <p className="text-red-400 mb-2">{fetchError}</p>
-          <button 
-            onClick={fetchData}
-            className="mt-4 px-4 py-2 bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30 transition-colors"
-          >
-            Réessayer
-          </button>
         </div>
       </div>
     );
