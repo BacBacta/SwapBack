@@ -273,7 +273,7 @@ describe("API Route: /api/native-quote POST Success", () => {
       call[0].toString().includes("raydium")
     );
     if (raydiumCall) {
-      expect(raydiumCall[0]).toContain("slippage=0.01");
+      expect(raydiumCall[0]).toContain("slippageBps=100");
     }
   });
   
