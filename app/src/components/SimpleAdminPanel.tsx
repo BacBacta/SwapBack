@@ -61,7 +61,7 @@ interface LogEntry {
   resolved: boolean;
 }
 
-const PROGRAM_ID = process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "5HR9WsW81YySSst7qUSdqxnXc2X4NVfJNANDfvWnZUXW";
+const PROGRAM_ID = process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "FuzLkp1G7v39XXxobvr5pnGk7xZucBUroa215LrCjsAg";
 const ADMIN_AUTHORITY = process.env.NEXT_PUBLIC_ADMIN_AUTHORITY || "";
 
 export function SimpleAdminPanel() {

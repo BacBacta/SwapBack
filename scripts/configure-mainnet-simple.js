@@ -15,7 +15,7 @@ const fs = require('fs');
 const path = require('path');
 
 // ============ CONFIGURATION ============
-const ROUTER_PROGRAM_ID = new PublicKey('5HR9WsW81YySSst7qUSdqxnXc2X4NVfJNANDfvWnZUXW');
+const ROUTER_PROGRAM_ID = new PublicKey('GEdKdZRVZHLUKGCX8swwLn7BJUciDFgf2edkjq4M31mJ');
 const USDC_MINT_MAINNET = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 const RPC_URL = 'https://api.mainnet-beta.solana.com';
 

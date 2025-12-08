@@ -41,8 +41,8 @@ use routing::{
     adjust_venue_weights_with_scores, parse_venue_scores_by_pubkey, MIN_QUALITY_SCORE_DEFAULT,
 };
 
-// Program ID - Deployed on mainnet-beta (Dec 4, 2025)
-declare_id!("5HR9WsW81YySSst7qUSdqxnXc2X4NVfJNANDfvWnZUXW");
+// Program ID - Deployed on mainnet-beta (Dec 8, 2025)
+declare_id!("FuzLkp1G7v39XXxobvr5pnGk7xZucBUroa215LrCjsAg");
 
 // ============================================
 // DEX Program IDs (Mainnet-beta)

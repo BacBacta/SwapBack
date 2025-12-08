@@ -69,12 +69,12 @@ const TESTNET_PROGRAM_IDS: ProgramIds = {
 };
 
 /**
- * Program IDs - MAINNET
+ * Program IDs - MAINNET (Deployed December 8, 2025)
  */
 const MAINNET_PROGRAM_IDS: ProgramIds = {
-  cnftProgram: new PublicKey('11111111111111111111111111111111'), // À déployer
-  routerProgram: new PublicKey('11111111111111111111111111111111'), // À déployer
-  buybackProgram: new PublicKey('11111111111111111111111111111111'), // À déployer
+  cnftProgram: new PublicKey('EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP'), // cNFT Program
+  routerProgram: new PublicKey('FuzLkp1G7v39XXxobvr5pnGk7xZucBUroa215LrCjsAg'), // Router - Deployed Dec 8, 2025
+  buybackProgram: new PublicKey('7wCCwRXxWvMY2DJDRrnhFg3b8jVPb5vVPxLH5YAGL6eJ'), // Buyback Program
 };
 
 /**

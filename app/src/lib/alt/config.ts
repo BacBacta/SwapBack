@@ -8,13 +8,13 @@ import { SwapbackALTConfig } from './types';
 
 export const SWAPBACK_ALT_CONFIG: SwapbackALTConfig = {
   // Programs SwapBack
-  routerProgram: new PublicKey('5HR9WsW81YySSst7qUSdqxnXc2X4NVfJNANDfvWnZUXW'),
+  routerProgram: new PublicKey('FuzLkp1G7v39XXxobvr5pnGk7xZucBUroa215LrCjsAg'),
   buybackProgram: new PublicKey('7wCCwRXxWvMY2DJDRrnhFg3b8jVPb5vVPxLH5YAGL6eJ'),
   cnftProgram: new PublicKey('26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru'),
   
-  // PDAs SwapBack
-  routerState: new PublicKey('7nGEn5zY78G1X97VynadEbHRPkNtHmR69TGwWqymqeSs'),
-  rebateVault: new PublicKey('27bTPt5g9M3uJk8vKd4nwhrmQZ8csbXepfHRDZELjdmz'),
+  // PDAs SwapBack (updated for new router program)
+  routerState: new PublicKey('F1iDHhX7SPKCdZWex5JPV3dJ2KUKEsdRCbhDBGSgyK7k'),
+  rebateVault: new PublicKey('G1epdUBUm152UkWZVbs8kAvEaJcKKbVYZJMjc9ofn8r1'),
   
   // External Programs
   jupiterProgram: new PublicKey('JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4'),

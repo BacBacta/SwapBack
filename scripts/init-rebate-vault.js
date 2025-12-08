@@ -23,7 +23,7 @@ async function main() {
     (programArgIndex !== -1 && args[programArgIndex + 1]) ||
       process.env.ROUTER_PROGRAM_ID ||
       process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID ||
-        "5HR9WsW81YySSst7qUSdqxnXc2X4NVfJNANDfvWnZUXW"
+        "GEdKdZRVZHLUKGCX8swwLn7BJUciDFgf2edkjq4M31mJ"
   );
 
   const usdcMint = new PublicKey(

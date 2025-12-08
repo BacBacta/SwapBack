@@ -35,8 +35,8 @@ import { getTokenPrice, getSolPrice } from "@/lib/price-service";
 // CONSTANTS
 // ============================================================================
 
-// Program IDs (Mainnet)
-export const ROUTER_PROGRAM_ID = new PublicKey("5HR9WsW81YySSst7qUSdqxnXc2X4NVfJNANDfvWnZUXW");
+// Program IDs (Mainnet - Deployed December 8, 2025)
+export const ROUTER_PROGRAM_ID = new PublicKey("FuzLkp1G7v39XXxobvr5pnGk7xZucBUroa215LrCjsAg");
 export const BUYBACK_PROGRAM_ID = new PublicKey("7wCCwRXxWvMY2DJDRrnhFg3b8jVPb5vVPxLH5YAGL6eJ");
 export const CNFT_PROGRAM_ID = new PublicKey("26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru");
 
