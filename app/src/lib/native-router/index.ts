@@ -1624,16 +1624,6 @@ export class NativeRouterService {
         isWritable: true,
       })),
     ];
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      // 19. system_program
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      // remaining_accounts: Venue accounts pour le CPI
-      ...venueAccounts.map(pubkey => ({
-        pubkey,
-        isSigner: false,
-        isWritable: true,
-      })),
-    ];
     
     return new TransactionInstruction({
       programId: this.programId,
