@@ -36,7 +36,7 @@ import * as path from 'path';
 
 // ============ CONFIGURATION ============
 
-const ROUTER_PROGRAM_ID = new PublicKey('5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf');
+const ROUTER_PROGRAM_ID = new PublicKey('5HR9WsW81YySSst7qUSdqxnXc2X4NVfJNANDfvWnZUXW');
 const USDC_MINT_MAINNET = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 const RPC_URL = 'https://api.mainnet-beta.solana.com';
 

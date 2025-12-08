@@ -8,7 +8,7 @@ import { SwapbackALTConfig } from './types';
 
 export const SWAPBACK_ALT_CONFIG: SwapbackALTConfig = {
   // Programs SwapBack
-  routerProgram: new PublicKey('5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf'),
+  routerProgram: new PublicKey('5HR9WsW81YySSst7qUSdqxnXc2X4NVfJNANDfvWnZUXW'),
   buybackProgram: new PublicKey('7wCCwRXxWvMY2DJDRrnhFg3b8jVPb5vVPxLH5YAGL6eJ'),
   cnftProgram: new PublicKey('26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru'),
   

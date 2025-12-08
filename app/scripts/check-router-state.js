@@ -1,6 +1,6 @@
 const { Connection, PublicKey } = require('@solana/web3.js');
 
-const ROUTER_PROGRAM_ID = new PublicKey('5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf');
+const ROUTER_PROGRAM_ID = new PublicKey('5HR9WsW81YySSst7qUSdqxnXc2X4NVfJNANDfvWnZUXW');
 const RPC_URL = 'https://api.mainnet-beta.solana.com';
 
 async function main() {

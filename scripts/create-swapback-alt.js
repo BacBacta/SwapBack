@@ -28,7 +28,7 @@ const KEYPAIR_PATH = process.env.DEPLOYER_KEYPAIR_PATH || './mainnet-deploy-keyp
 // Adresses à inclure dans l'ALT
 const ADDRESSES_TO_INCLUDE = [
   // === Programs SwapBack ===
-  '5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf', // Router Program
+  '5HR9WsW81YySSst7qUSdqxnXc2X4NVfJNANDfvWnZUXW', // Router Program
   '7wCCwRXxWvMY2DJDRrnhFg3b8jVPb5vVPxLH5YAGL6eJ', // Buyback Program
   '26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru', // cNFT Program
   

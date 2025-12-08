@@ -37,7 +37,7 @@ import toast from "react-hot-toast";
 let _programId: PublicKey | null = null;
 function getProgramId(): PublicKey {
   if (!_programId) {
-    _programId = new PublicKey(process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf");
+    _programId = new PublicKey(process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "5HR9WsW81YySSst7qUSdqxnXc2X4NVfJNANDfvWnZUXW");
   }
   return _programId;
 }

@@ -23,7 +23,7 @@ swapback_buyback = "4cyYvpjwERF67UDpd5euYzZ6xZ5tcDL6XrByBaZbVVjK"
 [programs.mainnet]
 swapback_buyback = "Fx6yfXhqq1i3CJjocwnLXMw3VMLFt5mfoLtWPJzSRQvn"
 swapback_cnft = "CxBwdrrSZVUycbJAhkCmVsWbX4zttmM393VXugooxATH"
-swapback_router = "5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf"
+swapback_router = "5HR9WsW81YySSst7qUSdqxnXc2X4NVfJNANDfvWnZUXW"
 
 [scripts]
 build = "export TMPDIR=/tmp && export CARGO_TARGET_DIR=/tmp/cargo-target && export RUSTFLAGS='-C target-cpu=generic -C opt-level=1' && anchor build --program-name swapback_router -- --features switchboard"

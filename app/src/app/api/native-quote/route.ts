@@ -435,7 +435,7 @@ export async function GET() {
       { name: "Sanctum", type: "LST", programId: "5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx", apiAvailable: false },
       { name: "Saber", type: "StableSwap", programId: "SSwpkEEcbUqx4vtoEByFjSkhKdCT862DNVb52nZg1UZ", apiAvailable: false },
     ],
-    routerProgram: "5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf",
+    routerProgram: "5HR9WsW81YySSst7qUSdqxnXc2X4NVfJNANDfvWnZUXW",
     fallbackEnabled: true,
     fallbackSource: "/api/price (Jupiter/Birdeye/DexScreener)",
   }, { headers: CORS_HEADERS });

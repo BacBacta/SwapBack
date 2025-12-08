@@ -19,7 +19,7 @@ let _routerProgramId: PublicKey | null = null;
 export function getRouterProgramId(): PublicKey {
   if (!_routerProgramId) {
     _routerProgramId = new PublicKey(
-      process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || '5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf'
+      process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || '5HR9WsW81YySSst7qUSdqxnXc2X4NVfJNANDfvWnZUXW'
     );
   }
   return _routerProgramId;

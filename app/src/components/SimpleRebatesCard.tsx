@@ -51,7 +51,7 @@ export function SimpleRebatesCard() {
 
   // Router program ID
   const ROUTER_PROGRAM_ID = new PublicKey(
-    process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf"
+    process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "5HR9WsW81YySSst7qUSdqxnXc2X4NVfJNANDfvWnZUXW"
   );
 
   // Fetch rebate data from on-chain

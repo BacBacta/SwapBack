@@ -42,7 +42,7 @@ use routing::{
 };
 
 // Program ID - Deployed on mainnet-beta (Dec 4, 2025)
-declare_id!("5K7kKoYd1E2S2gycBMeAeyXnxdbVgAEqJWKERwW8FTMf");
+declare_id!("5HR9WsW81YySSst7qUSdqxnXc2X4NVfJNANDfvWnZUXW");
 
 // ============================================
 // DEX Program IDs (Mainnet-beta)
