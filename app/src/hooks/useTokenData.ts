@@ -131,52 +131,99 @@ export const useTokenData = (tokenMint: string) => {
     };
   }, [connection, publicKey, tokenMint, connected]);
 
-  // Récupérer le prix USD
+  // Récupérer le prix USD en temps réel via l'API
   useEffect(() => {
     const fetchPrice = async () => {
-      try {
-        // Prix pour tokens mainnet (utilisés en production)
-        const mainnetPrices: { [key: string]: number } = {
-          // Native SOL
-          So11111111111111111111111111111111111111112: 218.50, // SOL prix actuel ~$218
+      if (!tokenMint) {
+        setUsdPrice(0);
+        return;
+      }
 
-          // Mainnet tokens
-          EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v: 1.0, // USDC
-          Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB: 1.0, // USDT
-          DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263: 0.00002, // BONK
-          "862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux": 0.001, // $BACK
-          mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So: 240.0, // mSOL
-          JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN: 0.85, // JUP
-          "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr": 2.5, // JTO
-          
-          // Testnet deployed tokens (fallback)
-          "3y4dCqwWuYx1B97YEDmgq9qjuNE1eyEwGx2eLgz6Rc6G": 1.0, // USDC Test
-          BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR: 1.0, // USDC Testnet
+      try {
+        // Stablecoins - prix fixe à $1 (pas besoin d'API)
+        const stablecoins = [
+          'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
+          'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', // USDT
+          'USDH1SM1ojwWUga67PGrgFWUHibbjqMvuMaDkRJTgkX',  // USDH
+          '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU', // Devnet USDC
+          '3y4dCqwWuYx1B97YEDmgq9qjuNE1eyEwGx2eLgz6Rc6G', // Test USDC
+          'BinixfcasoPdEQyV1tGw9BJ7Ar3ujoZe8MqDtTyDPEvR', // Testnet USDC
+        ];
+        
+        if (stablecoins.includes(tokenMint)) {
+          setUsdPrice(1.0);
+          console.log(`💰 Stablecoin ${tokenMint.substring(0, 8)}... = $1.00`);
+          return;
+        }
+
+        // Appeler notre API proxy pour éviter CORS et rate limiting
+        const response = await fetch(`/api/price?mint=${tokenMint}`, {
+          signal: AbortSignal.timeout(10000), // 10s timeout
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.price && data.price > 0) {
+            setUsdPrice(data.price);
+            console.log(`💰 Prix temps réel ${tokenMint.substring(0, 8)}... = $${data.price.toFixed(4)} (source: ${data.source})`);
+            return;
+          }
+        }
+
+        // Fallback: essayer Jupiter directement (peut échouer avec CORS)
+        try {
+          const jupiterResponse = await fetch(
+            `https://api.jup.ag/price/v2?ids=${tokenMint}`,
+            { 
+              signal: AbortSignal.timeout(5000),
+              headers: { 'Accept': 'application/json' }
+            }
+          );
+
+          if (jupiterResponse.ok) {
+            const jupiterData = await jupiterResponse.json();
+            if (jupiterData.data?.[tokenMint]?.price) {
+              const price = parseFloat(jupiterData.data[tokenMint].price);
+              if (price > 0) {
+                setUsdPrice(price);
+                console.log(`💰 Jupiter direct ${tokenMint.substring(0, 8)}... = $${price.toFixed(4)}`);
+                return;
+              }
+            }
+          }
+        } catch (jupiterError) {
+          // Jupiter direct failed, continue to fallback
+          console.warn('Jupiter direct price fetch failed:', jupiterError);
+        }
+
+        // Dernier fallback: prix statiques pour tokens connus
+        const fallbackPrices: { [key: string]: number } = {
+          'So11111111111111111111111111111111111111112': 220, // SOL ~$220
+          '862PQyzjqhN4ztaqLC4kozwZCUTug7DRz1oyiuQYn7Ux': 0.001, // $BACK
         };
 
-        // Utiliser le prix ou 0
-        const price = mainnetPrices[tokenMint] || 0;
-        setUsdPrice(price);
-
-        if (price > 0) {
-          console.log(
-            `💰 Prix pour ${tokenMint.substring(0, 8)}... = $${price.toFixed(2)}`
-          );
-        } else {
-          console.warn(
-            `⚠️ Pas de prix pour ${tokenMint.substring(0, 8)}...`
-          );
+        const fallbackPrice = fallbackPrices[tokenMint];
+        if (fallbackPrice) {
+          setUsdPrice(fallbackPrice);
+          console.log(`💰 Fallback ${tokenMint.substring(0, 8)}... = $${fallbackPrice.toFixed(4)}`);
+          return;
         }
+
+        // Aucun prix trouvé
+        console.warn(`⚠️ Pas de prix trouvé pour ${tokenMint.substring(0, 8)}...`);
+        setUsdPrice(0);
+
       } catch (error) {
         console.error("Error fetching price:", error);
         setUsdPrice(0);
       }
     };
 
+    // Fetch immédiatement
     fetchPrice();
 
-    // Rafraîchir toutes les 120 secondes (prices don't change that fast)
-    const interval = setInterval(fetchPrice, 120000);
+    // Rafraîchir toutes les 30 secondes pour les prix en temps réel
+    const interval = setInterval(fetchPrice, 30000);
     return () => clearInterval(interval);
   }, [tokenMint]);
 

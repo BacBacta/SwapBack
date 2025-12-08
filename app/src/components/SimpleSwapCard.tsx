@@ -354,6 +354,12 @@ export function SimpleSwapCard() {
                   <ChevronRight className="w-4 h-4 text-gray-400" />
                 </button>
               </div>
+              {/* Valeur USD en temps réel */}
+              {inputAmount && parseFloat(inputAmount) > 0 && inputTokenData.usdPrice > 0 && (
+                <div className="mt-1 text-xs text-gray-500">
+                  ≈ ${(parseFloat(inputAmount) * inputTokenData.usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                </div>
+              )}
             </div>
 
             {/* Bouton swap */}
@@ -401,6 +407,12 @@ export function SimpleSwapCard() {
                   <ChevronRight className="w-4 h-4 text-gray-400" />
                 </button>
               </div>
+              {/* Valeur USD en temps réel pour l'output */}
+              {quote && quote.outputAmountFormatted > 0 && outputTokenData.usdPrice > 0 && (
+                <div className="mt-1 text-xs text-gray-500">
+                  ≈ ${(quote.outputAmountFormatted * outputTokenData.usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                </div>
+              )}
             </div>
 
             {/* Résumé cashback et route native */}
