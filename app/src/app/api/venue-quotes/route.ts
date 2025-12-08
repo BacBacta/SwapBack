@@ -252,11 +252,14 @@ async function generateSyntheticQuotes(
  * Stratégie:
  * 1. Appel direct (côté serveur Next.js = pas de CORS)
  * 2. Fallback via proxy interne /api/cors-proxy
+ * 
+ * PERFORMANCE: Timeout réduit à 3s pour éviter les cascades de timeouts
+ * Le client a un timeout de 5s, donc on doit répondre dans ce délai
  */
 async function fetchWithFallback(
   url: string,
   venueName: string,
-  timeout: number = 8000
+  timeout: number = 3000
 ): Promise<Response | null> {
   // Tentative 1: Appel direct (côté serveur, devrait toujours fonctionner)
   try {

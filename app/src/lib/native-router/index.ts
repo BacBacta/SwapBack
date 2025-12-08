@@ -1235,6 +1235,11 @@ export class NativeRouterService {
   /**
    * Calcule le NPI réel en comparant avec Jupiter (benchmark du marché)
    * Utilise l'API proxy côté client pour éviter CORS
+   * 
+   * OPTIMISÉ: 
+   * - Timeout réduit côté client pour éviter les DOMException
+   * - Race entre venue-quotes et fallback direct
+   * - Le NPI n'est pas critique, on retourne 0 si timeout
    */
   async calculateRealNPI(
     inputMint: PublicKey,
@@ -1252,21 +1257,71 @@ export class NativeRouterService {
       let jupiterOutput = 0;
       
       if (isClient) {
-        // Côté client: utiliser l'API proxy
-        const response = await fetch(
-          `/api/venue-quotes?inputMint=${inputMintStr}&outputMint=${outputMintStr}&amount=${amountIn}`,
-          { signal: AbortSignal.timeout(5000) }
-        );
-        
-        if (response.ok) {
-          const data = await response.json();
-          jupiterOutput = data.jupiterBenchmark?.outputAmount || 0;
+        // Côté client: timeout très court (3s) car venue-quotes fait déjà des appels cascadés
+        // Utiliser Promise.race avec un fallback prix direct
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000);
+          
+          // Stratégie 1: venue-quotes (complet mais plus lent)
+          const venueQuotesPromise = fetch(
+            `/api/venue-quotes?inputMint=${inputMintStr}&outputMint=${outputMintStr}&amount=${amountIn}`,
+            { signal: controller.signal }
+          ).then(async (res) => {
+            if (!res.ok) return 0;
+            const data = await res.json();
+            return data.jupiterBenchmark?.outputAmount || 0;
+          }).catch(() => 0);
+          
+          // Stratégie 2: API prix directe (plus rapide, estimation)
+          const priceApiPromise = fetch(
+            `/api/price?mint=${outputMintStr}`,
+            { signal: controller.signal }
+          ).then(async (res) => {
+            if (!res.ok) return 0;
+            const data = await res.json();
+            const outputPrice = data.price || 0;
+            if (outputPrice <= 0) return 0;
+            
+            // Récupérer aussi le prix d'entrée
+            const inputRes = await fetch(`/api/price?mint=${inputMintStr}`, { signal: controller.signal });
+            if (!inputRes.ok) return 0;
+            const inputData = await inputRes.json();
+            const inputPrice = inputData.price || 0;
+            if (inputPrice <= 0) return 0;
+            
+            // Estimation: (amountIn * inputPrice) / outputPrice
+            // Ajuster pour les décimales (assumé 6 pour USDC, 9 pour SOL)
+            const inputDecimals = inputMintStr === 'So11111111111111111111111111111111111111112' ? 9 : 6;
+            const outputDecimals = outputMintStr === 'So11111111111111111111111111111111111111112' ? 9 : 6;
+            
+            const inputValue = (amountIn / Math.pow(10, inputDecimals)) * inputPrice;
+            const estimatedOutput = (inputValue / outputPrice) * Math.pow(10, outputDecimals);
+            
+            return Math.floor(estimatedOutput);
+          }).catch(() => 0);
+          
+          // Race: prendre le premier résultat non-nul
+          const results = await Promise.allSettled([venueQuotesPromise, priceApiPromise]);
+          clearTimeout(timeoutId);
+          
+          for (const result of results) {
+            if (result.status === 'fulfilled' && result.value > 0) {
+              jupiterOutput = result.value;
+              break;
+            }
+          }
+        } catch (e) {
+          // AbortError est normal, pas besoin de logger
+          if (e instanceof Error && e.name !== 'AbortError') {
+            logger.debug("NativeRouter", "NPI calculation aborted (expected)", { error: e.message });
+          }
         }
       } else {
-        // Côté serveur: appeler Jupiter directement
+        // Côté serveur: appeler Jupiter directement avec timeout court
         const jupiterResponse = await fetch(
           `https://quote-api.jup.ag/v6/quote?inputMint=${inputMintStr}&outputMint=${outputMintStr}&amount=${amountIn}&slippageBps=50`,
-          { signal: AbortSignal.timeout(3000) }
+          { signal: AbortSignal.timeout(2500) }
         );
         
         if (jupiterResponse.ok) {
