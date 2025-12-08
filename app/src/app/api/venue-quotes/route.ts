@@ -6,8 +6,10 @@ import { NextRequest, NextResponse } from 'next/server';
  * 
  * Solutions CORS implémentées:
  * 1. Appels côté serveur (Next.js API Route) - pas de CORS
- * 2. Fallback via corsfix.com si nécessaire
+ * 2. Fallback via proxy interne /api/cors-proxy
  * 3. Estimation basée sur les prix si APIs échouent
+ * 
+ * CORS: Cette route supporte les preflight requests (OPTIONS)
  */
 
 interface VenueQuoteResult {
@@ -16,7 +18,7 @@ interface VenueQuoteResult {
   priceImpactBps: number;
   latencyMs: number;
   error?: string;
-  source?: string; // 'direct' | 'corsfix' | 'estimated'
+  source?: string; // 'direct' | 'proxy' | 'estimated'
 }
 
 interface QuoteResponse {
@@ -27,8 +29,31 @@ interface QuoteResponse {
   timestamp: number;
 }
 
-// CORS proxy fallback (corsfix.com)
-const CORS_PROXY = 'https://proxy.corsfix.com/?';
+// Helper pour les headers CORS
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
+  'Access-Control-Allow-Methods': 'GET,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Requested-With',
+  'Access-Control-Allow-Credentials': 'true',
+};
+
+// Proxy interne (plus fiable que corsfix.com)
+const getInternalProxyUrl = () => {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL 
+    ? `https://${process.env.VERCEL_URL}` 
+    : 'http://localhost:3000';
+  return `${baseUrl}/api/cors-proxy?url=`;
+};
+
+/**
+ * Handler OPTIONS pour les preflight requests CORS
+ */
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: CORS_HEADERS,
+  });
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -137,6 +162,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(response, {
     headers: {
       'Cache-Control': 'no-cache, no-store, must-revalidate',
+      ...CORS_HEADERS,
     },
   });
 }
@@ -146,45 +172,62 @@ export async function GET(request: NextRequest) {
 // ============================================================================
 
 /**
- * Helper pour fetch avec retry et fallback via proxy CORS
+ * Helper pour fetch avec retry et fallback via proxy interne
+ * Stratégie:
+ * 1. Appel direct (côté serveur Next.js = pas de CORS)
+ * 2. Fallback via proxy interne /api/cors-proxy
  */
 async function fetchWithFallback(
   url: string,
   venueName: string,
   timeout: number = 8000
 ): Promise<Response | null> {
-  // Tentative 1: Appel direct (côté serveur, devrait fonctionner)
+  // Tentative 1: Appel direct (côté serveur, devrait toujours fonctionner)
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
     const response = await fetch(url, {
-      signal: AbortSignal.timeout(timeout),
+      signal: controller.signal,
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'SwapBack/1.0',
+        'User-Agent': 'SwapBack-Server/1.0',
       },
     });
+    
+    clearTimeout(timeoutId);
+    
     if (response.ok) {
       console.log(`[${venueName}] Direct fetch succeeded`);
       return response;
     }
     console.log(`[${venueName}] Direct fetch failed: HTTP ${response.status}`);
   } catch (error) {
-    console.log(`[${venueName}] Direct fetch error:`, error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.log(`[${venueName}] Direct fetch error: ${errorMessage}`);
   }
 
-  // Tentative 2: Via corsfix proxy
+  // Tentative 2: Via proxy interne (plus fiable que services externes)
   try {
-    const proxyUrl = `${CORS_PROXY}${encodeURIComponent(url)}`;
+    const proxyUrl = `${getInternalProxyUrl()}${encodeURIComponent(url)}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
     const response = await fetch(proxyUrl, {
-      signal: AbortSignal.timeout(timeout),
+      signal: controller.signal,
       headers: { 'Accept': 'application/json' },
     });
+    
+    clearTimeout(timeoutId);
+    
     if (response.ok) {
-      console.log(`[${venueName}] CORS proxy fetch succeeded`);
+      console.log(`[${venueName}] Internal proxy fetch succeeded`);
       return response;
     }
-    console.log(`[${venueName}] CORS proxy failed: HTTP ${response.status}`);
+    console.log(`[${venueName}] Internal proxy failed: HTTP ${response.status}`);
   } catch (error) {
-    console.log(`[${venueName}] CORS proxy error:`, error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.log(`[${venueName}] Internal proxy error: ${errorMessage}`);
   }
 
   return null;

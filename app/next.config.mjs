@@ -13,6 +13,24 @@ const nextConfig = {
   
   // Désactiver le header X-Powered-By
   poweredByHeader: false,
+
+  // 🔓 Configuration CORS pour les routes API
+  // Permet aux clients (dApp, extension, mobile) d'accéder aux APIs
+  async headers() {
+    const allowedOrigin = process.env.ALLOWED_ORIGIN || '*';
+    return [
+      {
+        source: '/api/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: allowedOrigin },
+          { key: 'Access-Control-Allow-Methods', value: 'GET,POST,OPTIONS' },
+          { key: 'Access-Control-Allow-Headers', value: 'Content-Type,Authorization,X-Requested-With' },
+          { key: 'Access-Control-Allow-Credentials', value: 'true' },
+          { key: 'Access-Control-Max-Age', value: '86400' },
+        ],
+      },
+    ];
+  },
   
   // 🚀 Performance optimizations
   experimental: {
