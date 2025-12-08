@@ -980,6 +980,7 @@ export class NativeRouterService {
       'METEORA': 'METEORA_DLMM',
       'PHOENIX': 'PHOENIX',
       'JUPITER': 'JUPITER',
+      'JUPITER_FALLBACK': 'JUPITER', // Fallback utilise Jupiter
     };
     return mapping[venueName] || 'RAYDIUM_AMM';
   }
