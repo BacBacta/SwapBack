@@ -850,6 +850,7 @@ export class NativeRouterService {
   
   /**
    * Récupère des quotes depuis toutes les venues natives disponibles
+   * Utilise l'API proxy pour éviter les problèmes CORS côté client
    * Inclut Jupiter comme benchmark pour comparaison
    */
   async getMultiVenueQuotes(
@@ -860,51 +861,143 @@ export class NativeRouterService {
     const inputMintStr = inputMint.toString();
     const outputMintStr = outputMint.toString();
     
-    logger.info("NativeRouter", "Fetching multi-venue quotes", {
+    logger.info("NativeRouter", "Fetching multi-venue quotes via API proxy", {
       inputMint: inputMintStr,
       outputMint: outputMintStr,
       amountIn,
     });
     
-    // Fetch quotes en parallèle depuis toutes les venues natives + Jupiter
-    const quotePromises = [
-      fetchRaydiumQuote(inputMintStr, outputMintStr, amountIn),
-      fetchOrcaQuote(inputMintStr, outputMintStr, amountIn),
-      fetchMeteoraQuote(inputMintStr, outputMintStr, amountIn),
-      fetchPhoenixQuote(inputMintStr, outputMintStr, amountIn),
-      fetchJupiterBenchmark(inputMintStr, outputMintStr, amountIn), // Jupiter comme référence
-    ];
+    // Détecter si on est côté client (browser) ou serveur
+    const isClient = typeof window !== 'undefined';
     
-    const results = await Promise.allSettled(quotePromises);
-    
-    const quotes: VenueQuote[] = [];
-    for (const result of results) {
-      if (result.status === "fulfilled" && result.value) {
-        quotes.push(result.value);
+    if (isClient) {
+      // Côté client: utiliser l'API proxy pour éviter CORS
+      try {
+        const response = await fetch(
+          `/api/venue-quotes?inputMint=${inputMintStr}&outputMint=${outputMintStr}&amount=${amountIn}`,
+          { signal: AbortSignal.timeout(10000) }
+        );
+        
+        if (!response.ok) {
+          logger.warn("NativeRouter", "Venue quotes API failed", { status: response.status });
+          return [];
+        }
+        
+        const data = await response.json();
+        
+        // Convertir les résultats en VenueQuote
+        const quotes: VenueQuote[] = [];
+        
+        for (const q of data.quotes || []) {
+          if (q.outputAmount > 0 && !q.error) {
+            const venueKey = this.mapVenueNameToKey(q.venue);
+            quotes.push({
+              venue: venueKey,
+              venueProgramId: DEX_PROGRAMS[venueKey] || DEX_PROGRAMS.RAYDIUM_AMM,
+              inputAmount: amountIn,
+              outputAmount: q.outputAmount,
+              priceImpactBps: q.priceImpactBps || 0,
+              accounts: [],
+              estimatedNpiBps: this.getEstimatedNpiBps(venueKey),
+              latencyMs: q.latencyMs || 0,
+            });
+          }
+        }
+        
+        // Ajouter Jupiter comme benchmark
+        if (data.jupiterBenchmark && data.jupiterBenchmark.outputAmount > 0) {
+          quotes.push({
+            venue: "JUPITER" as keyof typeof DEX_PROGRAMS,
+            venueProgramId: DEX_PROGRAMS.JUPITER,
+            inputAmount: amountIn,
+            outputAmount: data.jupiterBenchmark.outputAmount,
+            priceImpactBps: data.jupiterBenchmark.priceImpactBps || 0,
+            accounts: [],
+            estimatedNpiBps: 0, // Jupiter ne génère pas de NPI
+            latencyMs: data.jupiterBenchmark.latencyMs || 0,
+          });
+        }
+        
+        // Trier par meilleur output
+        quotes.sort((a, b) => b.outputAmount - a.outputAmount);
+        
+        logger.info("NativeRouter", `Got ${quotes.length} venue quotes from API`, {
+          venues: quotes.map(q => ({
+            venue: q.venue,
+            output: q.outputAmount,
+            priceImpact: q.priceImpactBps,
+            latency: q.latencyMs,
+          })),
+          bestVenue: quotes[0]?.venue,
+          bestOutput: quotes[0]?.outputAmount,
+        });
+        
+        return quotes;
+      } catch (error) {
+        logger.error("NativeRouter", "Failed to fetch quotes via API", { error });
+        return [];
       }
+    } else {
+      // Côté serveur: appeler directement les APIs (pas de CORS)
+      const quotePromises = [
+        fetchRaydiumQuote(inputMintStr, outputMintStr, amountIn),
+        fetchOrcaQuote(inputMintStr, outputMintStr, amountIn),
+        fetchMeteoraQuote(inputMintStr, outputMintStr, amountIn),
+        fetchPhoenixQuote(inputMintStr, outputMintStr, amountIn),
+        fetchJupiterBenchmark(inputMintStr, outputMintStr, amountIn),
+      ];
+      
+      const results = await Promise.allSettled(quotePromises);
+      
+      const quotes: VenueQuote[] = [];
+      for (const result of results) {
+        if (result.status === "fulfilled" && result.value) {
+          quotes.push(result.value);
+        }
+      }
+      
+      // Trier par meilleur output
+      quotes.sort((a, b) => b.outputAmount - a.outputAmount);
+      
+      logger.info("NativeRouter", `Got ${quotes.length} venue quotes (server-side)`, {
+        venues: quotes.map(q => ({
+          venue: q.venue,
+          output: q.outputAmount,
+        })),
+      });
+      
+      return quotes;
     }
-    
-    // Trier par meilleur output
-    quotes.sort((a, b) => b.outputAmount - a.outputAmount);
-    
-    // Log détaillé de toutes les quotes reçues
-    logger.info("NativeRouter", `Got ${quotes.length} venue quotes`, {
-      venues: quotes.map(q => ({
-        venue: q.venue,
-        output: q.outputAmount,
-        priceImpact: q.priceImpactBps,
-        latency: q.latencyMs,
-      })),
-      bestVenue: quotes[0]?.venue,
-      bestOutput: quotes[0]?.outputAmount,
-      worstVenue: quotes[quotes.length - 1]?.venue,
-      worstOutput: quotes[quotes.length - 1]?.outputAmount,
-      spreadBps: quotes.length > 1 
-        ? Math.floor(((quotes[0]?.outputAmount - quotes[quotes.length - 1]?.outputAmount) / quotes[0]?.outputAmount) * 10000)
-        : 0,
-    });
-    
-    return quotes;
+  }
+  
+  /**
+   * Map le nom de venue de l'API vers la clé DEX_PROGRAMS
+   */
+  private mapVenueNameToKey(venueName: string): keyof typeof DEX_PROGRAMS {
+    const mapping: Record<string, keyof typeof DEX_PROGRAMS> = {
+      'RAYDIUM': 'RAYDIUM_AMM',
+      'ORCA': 'ORCA_WHIRLPOOL',
+      'METEORA': 'METEORA_DLMM',
+      'PHOENIX': 'PHOENIX',
+      'JUPITER': 'JUPITER',
+    };
+    return mapping[venueName] || 'RAYDIUM_AMM';
+  }
+  
+  /**
+   * Retourne le NPI estimé par venue
+   */
+  private getEstimatedNpiBps(venue: keyof typeof DEX_PROGRAMS): number {
+    const npiByVenue: Partial<Record<keyof typeof DEX_PROGRAMS, number>> = {
+      'RAYDIUM_AMM': 10,
+      'RAYDIUM_CLMM': 12,
+      'ORCA_WHIRLPOOL': 12,
+      'METEORA_DLMM': 15,
+      'PHOENIX': 8,
+      'LIFINITY': 10,
+      'JUPITER': 0, // Jupiter ne génère pas de NPI
+    };
+    return npiByVenue[venue] || 10;
   }
   
   /**
@@ -1023,6 +1116,7 @@ export class NativeRouterService {
   
   /**
    * Calcule le NPI réel en comparant avec Jupiter (benchmark du marché)
+   * Utilise l'API proxy côté client pour éviter CORS
    */
   async calculateRealNPI(
     inputMint: PublicKey,
@@ -1031,18 +1125,37 @@ export class NativeRouterService {
     nativeOutput: number
   ): Promise<{ npi: number; jupiterOutput: number }> {
     try {
-      // Fetch Jupiter quote comme benchmark
-      const jupiterResponse = await fetch(
-        `https://quote-api.jup.ag/v6/quote?inputMint=${inputMint.toBase58()}&outputMint=${outputMint.toBase58()}&amount=${amountIn}&slippageBps=50`,
-        { signal: AbortSignal.timeout(3000) }
-      );
+      const inputMintStr = inputMint.toBase58();
+      const outputMintStr = outputMint.toBase58();
       
-      if (!jupiterResponse.ok) {
-        return { npi: 0, jupiterOutput: 0 };
+      // Détecter si on est côté client (browser) ou serveur
+      const isClient = typeof window !== 'undefined';
+      
+      let jupiterOutput = 0;
+      
+      if (isClient) {
+        // Côté client: utiliser l'API proxy
+        const response = await fetch(
+          `/api/venue-quotes?inputMint=${inputMintStr}&outputMint=${outputMintStr}&amount=${amountIn}`,
+          { signal: AbortSignal.timeout(5000) }
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          jupiterOutput = data.jupiterBenchmark?.outputAmount || 0;
+        }
+      } else {
+        // Côté serveur: appeler Jupiter directement
+        const jupiterResponse = await fetch(
+          `https://quote-api.jup.ag/v6/quote?inputMint=${inputMintStr}&outputMint=${outputMintStr}&amount=${amountIn}&slippageBps=50`,
+          { signal: AbortSignal.timeout(3000) }
+        );
+        
+        if (jupiterResponse.ok) {
+          const jupiterQuote = await jupiterResponse.json();
+          jupiterOutput = parseInt(jupiterQuote.outAmount || "0");
+        }
       }
-      
-      const jupiterQuote = await jupiterResponse.json();
-      const jupiterOutput = parseInt(jupiterQuote.outAmount || "0");
       
       if (jupiterOutput === 0) {
         return { npi: 0, jupiterOutput: 0 };
@@ -1056,6 +1169,14 @@ export class NativeRouterService {
       // Clamp à des valeurs raisonnables (0-100 bps = 0-1%)
       // Si négatif, Jupiter est meilleur - on utilise 0
       const clampedNpi = Math.max(0, Math.min(npiBps, 100));
+      
+      logger.info("NativeRouter", "Real NPI calculated", {
+        nativeOutput,
+        jupiterOutput,
+        improvement,
+        npiBps,
+        clampedNpi,
+      });
       
       return { npi: clampedNpi, jupiterOutput };
     } catch (error) {
