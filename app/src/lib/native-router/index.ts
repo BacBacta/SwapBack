@@ -1010,8 +1010,9 @@ export class NativeRouterService {
   }
   
   /**
-   * Génère des quotes estimées localement basées sur les prix Jupiter
+   * Génère des quotes estimées localement basées sur les prix
    * Utilisé comme fallback quand l'API /api/venue-quotes échoue
+   * Utilise notre API proxy /api/price pour éviter CORS
    */
   private async getLocalEstimatedQuotes(
     inputMint: PublicKey,
@@ -1021,33 +1022,39 @@ export class NativeRouterService {
     const quotes: VenueQuote[] = [];
     
     try {
-      // Récupérer les prix via Jupiter Price API
       const inputMintStr = inputMint.toBase58();
       const outputMintStr = outputMint.toBase58();
       
-      const priceResponse = await fetch(
-        `https://api.jup.ag/price/v2?ids=${inputMintStr},${outputMintStr}`,
-        { signal: AbortSignal.timeout(5000) }
-      );
+      // Utiliser notre API proxy /api/price pour éviter CORS
+      const [inputPriceRes, outputPriceRes] = await Promise.all([
+        fetch(`/api/price?mint=${inputMintStr}`, { signal: AbortSignal.timeout(5000) }),
+        fetch(`/api/price?mint=${outputMintStr}`, { signal: AbortSignal.timeout(5000) }),
+      ]);
       
-      if (!priceResponse.ok) {
-        logger.warn("NativeRouter", "Jupiter price API failed");
+      if (!inputPriceRes.ok || !outputPriceRes.ok) {
+        logger.warn("NativeRouter", "Price API failed", { 
+          inputStatus: inputPriceRes.status, 
+          outputStatus: outputPriceRes.status 
+        });
         return quotes;
       }
       
-      const priceData = await priceResponse.json();
-      const inputPrice = parseFloat(priceData.data?.[inputMintStr]?.price || '0');
-      const outputPrice = parseFloat(priceData.data?.[outputMintStr]?.price || '0');
+      const inputPriceData = await inputPriceRes.json();
+      const outputPriceData = await outputPriceRes.json();
+      
+      const inputPrice = inputPriceData.price || 0;
+      const outputPrice = outputPriceData.price || 0;
       
       if (inputPrice <= 0 || outputPrice <= 0) {
-        logger.warn("NativeRouter", "Invalid prices from Jupiter", { inputPrice, outputPrice });
+        logger.warn("NativeRouter", "Invalid prices", { inputPrice, outputPrice });
         return quotes;
       }
       
       // Calculer le montant de sortie estimé
-      // Supposer 9 decimals pour input (SOL) et 6 pour output (USDC) par défaut
+      // Déterminer les decimals basé sur les tokens connus
       const inputDecimals = inputMintStr === SOL_MINT.toBase58() ? 9 : 6;
-      const outputDecimals = outputMintStr === USDC_MINT.toBase58() ? 6 : 9;
+      const outputDecimals = outputMintStr === USDC_MINT.toBase58() ? 6 : 
+                             outputMintStr === SOL_MINT.toBase58() ? 9 : 6;
       
       const inputAmountNormalized = amountIn / Math.pow(10, inputDecimals);
       const inputValueUsd = inputAmountNormalized * inputPrice;
