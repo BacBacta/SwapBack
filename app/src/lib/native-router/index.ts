@@ -932,10 +932,18 @@ export class NativeRouterService {
           bestOutput: quotes[0]?.outputAmount,
         });
         
-        return quotes;
+        // Si on a des quotes, les retourner
+        if (quotes.length > 0) {
+          return quotes;
+        }
+        
+        // Sinon, fallback sur estimation locale
+        logger.warn("NativeRouter", "API returned no valid quotes, using local estimation");
+        return this.getLocalEstimatedQuotes(inputMint, outputMint, amountIn);
       } catch (error) {
         logger.error("NativeRouter", "Failed to fetch quotes via API", { error });
-        return [];
+        // Fallback: estimation locale basée sur les prix
+        return this.getLocalEstimatedQuotes(inputMint, outputMint, amountIn);
       }
     } else {
       // Côté serveur: appeler directement les APIs (pas de CORS)
@@ -999,6 +1007,108 @@ export class NativeRouterService {
       'JUPITER': 0, // Jupiter ne génère pas de NPI
     };
     return npiByVenue[venue] || 10;
+  }
+  
+  /**
+   * Génère des quotes estimées localement basées sur les prix Jupiter
+   * Utilisé comme fallback quand l'API /api/venue-quotes échoue
+   */
+  private async getLocalEstimatedQuotes(
+    inputMint: PublicKey,
+    outputMint: PublicKey,
+    amountIn: number
+  ): Promise<VenueQuote[]> {
+    const quotes: VenueQuote[] = [];
+    
+    try {
+      // Récupérer les prix via Jupiter Price API
+      const inputMintStr = inputMint.toBase58();
+      const outputMintStr = outputMint.toBase58();
+      
+      const priceResponse = await fetch(
+        `https://api.jup.ag/price/v2?ids=${inputMintStr},${outputMintStr}`,
+        { signal: AbortSignal.timeout(5000) }
+      );
+      
+      if (!priceResponse.ok) {
+        logger.warn("NativeRouter", "Jupiter price API failed");
+        return quotes;
+      }
+      
+      const priceData = await priceResponse.json();
+      const inputPrice = parseFloat(priceData.data?.[inputMintStr]?.price || '0');
+      const outputPrice = parseFloat(priceData.data?.[outputMintStr]?.price || '0');
+      
+      if (inputPrice <= 0 || outputPrice <= 0) {
+        logger.warn("NativeRouter", "Invalid prices from Jupiter", { inputPrice, outputPrice });
+        return quotes;
+      }
+      
+      // Calculer le montant de sortie estimé
+      // Supposer 9 decimals pour input (SOL) et 6 pour output (USDC) par défaut
+      const inputDecimals = inputMintStr === SOL_MINT.toBase58() ? 9 : 6;
+      const outputDecimals = outputMintStr === USDC_MINT.toBase58() ? 6 : 9;
+      
+      const inputAmountNormalized = amountIn / Math.pow(10, inputDecimals);
+      const inputValueUsd = inputAmountNormalized * inputPrice;
+      const outputAmountNormalized = inputValueUsd / outputPrice;
+      const baseOutputAmount = Math.floor(outputAmountNormalized * Math.pow(10, outputDecimals));
+      
+      logger.info("NativeRouter", "Local price estimation", {
+        inputPrice,
+        outputPrice,
+        inputAmountNormalized,
+        inputValueUsd,
+        outputAmountNormalized,
+        baseOutputAmount,
+      });
+      
+      // Créer des quotes estimées pour chaque venue avec différents spreads
+      const venueConfigs: { venue: keyof typeof DEX_PROGRAMS; spreadBps: number }[] = [
+        { venue: 'RAYDIUM_AMM', spreadBps: 20 },      // 0.2%
+        { venue: 'ORCA_WHIRLPOOL', spreadBps: 25 },   // 0.25%
+        { venue: 'METEORA_DLMM', spreadBps: 30 },     // 0.3%
+        { venue: 'PHOENIX', spreadBps: 10 },          // 0.1%
+      ];
+      
+      for (const config of venueConfigs) {
+        const outputAmount = Math.floor(baseOutputAmount * (10000 - config.spreadBps) / 10000);
+        quotes.push({
+          venue: config.venue,
+          venueProgramId: DEX_PROGRAMS[config.venue],
+          inputAmount: amountIn,
+          outputAmount,
+          priceImpactBps: 10, // Estimé
+          accounts: [],
+          estimatedNpiBps: this.getEstimatedNpiBps(config.venue),
+          latencyMs: 0,
+        });
+      }
+      
+      // Ajouter Jupiter comme benchmark (meilleur prix théorique)
+      quotes.push({
+        venue: 'JUPITER' as keyof typeof DEX_PROGRAMS,
+        venueProgramId: DEX_PROGRAMS.JUPITER,
+        inputAmount: amountIn,
+        outputAmount: baseOutputAmount,
+        priceImpactBps: 5,
+        accounts: [],
+        estimatedNpiBps: 0,
+        latencyMs: 0,
+      });
+      
+      // Trier par meilleur output
+      quotes.sort((a, b) => b.outputAmount - a.outputAmount);
+      
+      logger.info("NativeRouter", `Generated ${quotes.length} estimated quotes`, {
+        venues: quotes.map(q => ({ venue: q.venue, output: q.outputAmount })),
+      });
+      
+    } catch (error) {
+      logger.error("NativeRouter", "Local estimation failed", { error });
+    }
+    
+    return quotes;
   }
   
   /**
