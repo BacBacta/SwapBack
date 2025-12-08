@@ -86,6 +86,9 @@ const nextConfig = {
         ...config.resolve.alias,
         crypto: require.resolve('crypto-browserify'),
         stream: require.resolve('stream-browserify'),
+        // Fix rpc-websockets v9.x export issues
+        'rpc-websockets/dist/lib/client': require.resolve('rpc-websockets'),
+        'rpc-websockets/dist/lib/client/websocket.browser': require.resolve('rpc-websockets'),
       };
 
       config.plugins = config.plugins || [];
