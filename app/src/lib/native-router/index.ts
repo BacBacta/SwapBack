@@ -49,6 +49,7 @@ export const DEX_PROGRAMS = {
   LIFINITY: new PublicKey("EewxydAPCCVuNEyrVN68PuSYdQ7wKn27V9Gjeoi8dy3S"),
   SANCTUM: new PublicKey("5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx"),
   SABER: new PublicKey("SSwpkEEcbUqx4vtoEByFjSkhKdCT862DNVb52nZg1UZ"),
+  JUPITER: new PublicKey("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"), // Jupiter comme référence
 };
 
 // Common token mints
@@ -664,6 +665,48 @@ async function fetchPhoenixQuote(
   }
 }
 
+/**
+ * Récupère une quote depuis Jupiter comme benchmark de comparaison
+ * Jupiter agrège tous les DEX donc sert de référence du marché
+ */
+async function fetchJupiterBenchmark(
+  inputMint: string,
+  outputMint: string,
+  amountIn: number
+): Promise<VenueQuote | null> {
+  const startTime = Date.now();
+  try {
+    const response = await fetch(
+      `https://quote-api.jup.ag/v6/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountIn}&slippageBps=50`,
+      { signal: AbortSignal.timeout(3000) }
+    );
+    
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    if (!data.outAmount) return null;
+    
+    const latencyMs = Date.now() - startTime;
+    
+    // Identifier la venue principale utilisée par Jupiter
+    const mainRoute = data.routePlan?.[0]?.swapInfo?.label || "Jupiter";
+    
+    return {
+      venue: "JUPITER" as keyof typeof DEX_PROGRAMS, // Type assertion pour compatibilité
+      venueProgramId: new PublicKey("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"),
+      inputAmount: amountIn,
+      outputAmount: parseInt(data.outAmount),
+      priceImpactBps: Math.floor(parseFloat(data.priceImpactPct || "0") * 100),
+      accounts: [],
+      estimatedNpiBps: 0, // Jupiter n'a pas de NPI
+      latencyMs,
+    };
+  } catch (error) {
+    logger.warn("NativeRouter", "Jupiter benchmark failed", { error });
+    return null;
+  }
+}
+
 // ============================================================================
 // NATIVE ROUTER SERVICE
 // ============================================================================
@@ -805,6 +848,7 @@ export class NativeRouterService {
   
   /**
    * Récupère des quotes depuis toutes les venues natives disponibles
+   * Inclut Jupiter comme benchmark pour comparaison
    */
   async getMultiVenueQuotes(
     inputMint: PublicKey,
@@ -820,12 +864,13 @@ export class NativeRouterService {
       amountIn,
     });
     
-    // Fetch quotes en parallèle depuis toutes les venues
+    // Fetch quotes en parallèle depuis toutes les venues natives + Jupiter
     const quotePromises = [
       fetchRaydiumQuote(inputMintStr, outputMintStr, amountIn),
       fetchOrcaQuote(inputMintStr, outputMintStr, amountIn),
       fetchMeteoraQuote(inputMintStr, outputMintStr, amountIn),
       fetchPhoenixQuote(inputMintStr, outputMintStr, amountIn),
+      fetchJupiterBenchmark(inputMintStr, outputMintStr, amountIn), // Jupiter comme référence
     ];
     
     const results = await Promise.allSettled(quotePromises);
@@ -840,9 +885,21 @@ export class NativeRouterService {
     // Trier par meilleur output
     quotes.sort((a, b) => b.outputAmount - a.outputAmount);
     
+    // Log détaillé de toutes les quotes reçues
     logger.info("NativeRouter", `Got ${quotes.length} venue quotes`, {
-      venues: quotes.map(q => q.venue),
+      venues: quotes.map(q => ({
+        venue: q.venue,
+        output: q.outputAmount,
+        priceImpact: q.priceImpactBps,
+        latency: q.latencyMs,
+      })),
+      bestVenue: quotes[0]?.venue,
       bestOutput: quotes[0]?.outputAmount,
+      worstVenue: quotes[quotes.length - 1]?.venue,
+      worstOutput: quotes[quotes.length - 1]?.outputAmount,
+      spreadBps: quotes.length > 1 
+        ? Math.floor(((quotes[0]?.outputAmount - quotes[quotes.length - 1]?.outputAmount) / quotes[0]?.outputAmount) * 10000)
+        : 0,
     });
     
     return quotes;
@@ -913,14 +970,35 @@ export class NativeRouterService {
     // Calculer le min output avec slippage
     const minOutput = Math.floor(bestQuote.outputAmount * (10000 - finalSlippageBps) / 10000);
     
-    // Estimation du NPI et rebates
+    // 6. Calculer le NPI RÉEL en comparant avec le prix du marché (Jupiter)
+    const { npi: realNpiBps, jupiterOutput } = await this.calculateRealNPI(
+      inputMint,
+      outputMint,
+      amountIn,
+      bestQuote.outputAmount
+    );
+    
+    // Utiliser le NPI réel s'il est positif, sinon fallback sur l'estimation
+    const effectiveNpiBps = realNpiBps > 0 ? realNpiBps : bestQuote.estimatedNpiBps;
+    
+    // Estimation du NPI et rebates basée sur le NPI réel
     const platformFeeBps = 20; // 0.2%
-    const npiEstimate = Math.floor(bestQuote.outputAmount * bestQuote.estimatedNpiBps / 10000);
+    const npiEstimate = Math.floor(bestQuote.outputAmount * effectiveNpiBps / 10000);
     const rebateEstimate = Math.floor(npiEstimate * 0.7); // 70% du NPI va aux rebates
     
     // Net output = output - platform fee + rebate
     const platformFee = Math.floor(bestQuote.outputAmount * platformFeeBps / 10000);
     const netOutput = bestQuote.outputAmount - platformFee + rebateEstimate;
+    
+    logger.info("NativeRouter", "NPI calculation", {
+      bestVenueOutput: bestQuote.outputAmount,
+      jupiterOutput,
+      realNpiBps,
+      estimatedNpiBps: bestQuote.estimatedNpiBps,
+      effectiveNpiBps,
+      npiEstimate,
+      rebateEstimate,
+    });
     
     return {
       venues: adjustedQuotes.slice(0, MAX_VENUES),
@@ -932,6 +1010,49 @@ export class NativeRouterService {
       platformFeeBps,
       netOutputAmount: netOutput,
     };
+  }
+  
+  /**
+   * Calcule le NPI réel en comparant avec Jupiter (benchmark du marché)
+   */
+  async calculateRealNPI(
+    inputMint: PublicKey,
+    outputMint: PublicKey,
+    amountIn: number,
+    nativeOutput: number
+  ): Promise<{ npi: number; jupiterOutput: number }> {
+    try {
+      // Fetch Jupiter quote comme benchmark
+      const jupiterResponse = await fetch(
+        `https://quote-api.jup.ag/v6/quote?inputMint=${inputMint.toBase58()}&outputMint=${outputMint.toBase58()}&amount=${amountIn}&slippageBps=50`,
+        { signal: AbortSignal.timeout(3000) }
+      );
+      
+      if (!jupiterResponse.ok) {
+        return { npi: 0, jupiterOutput: 0 };
+      }
+      
+      const jupiterQuote = await jupiterResponse.json();
+      const jupiterOutput = parseInt(jupiterQuote.outAmount || "0");
+      
+      if (jupiterOutput === 0) {
+        return { npi: 0, jupiterOutput: 0 };
+      }
+      
+      // NPI = (nativeOutput - jupiterOutput) / jupiterOutput * 10000
+      // Positif si notre route est meilleure que Jupiter
+      const improvement = nativeOutput - jupiterOutput;
+      const npiBps = Math.floor((improvement / jupiterOutput) * 10000);
+      
+      // Clamp à des valeurs raisonnables (0-100 bps = 0-1%)
+      // Si négatif, Jupiter est meilleur - on utilise 0
+      const clampedNpi = Math.max(0, Math.min(npiBps, 100));
+      
+      return { npi: clampedNpi, jupiterOutput };
+    } catch (error) {
+      logger.warn("NativeRouter", "Failed to calculate real NPI", { error });
+      return { npi: 0, jupiterOutput: 0 };
+    }
   }
   
   /**
