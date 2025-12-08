@@ -1560,27 +1560,23 @@ export class NativeRouterService {
     // Récupérer les comptes du DEX pour le CPI
     const venueAccounts = await this.getVenueAccounts(bestVenue, inputMint, outputMint);
     
+    // Vérifier quels comptes optionnels existent on-chain
+    const [userNftExists, oracleCacheExists, venueScoreExists] = await Promise.all([
+      this.connection.getAccountInfo(accounts.userNftPda).then(info => !!info),
+      this.connection.getAccountInfo(accounts.oracleCache).then(info => !!info),
+      this.connection.getAccountInfo(accounts.venueScore).then(info => !!info),
+    ]);
+    
+    logger.debug("NativeRouter", "Optional accounts check", {
+      userNftExists,
+      oracleCacheExists,
+      venueScoreExists,
+    });
+    
     // Comptes selon l'ordre de l'IDL swap_toc:
-    // 1. state (writable)
-    // 2. user (writable, signer)
-    // 3. primary_oracle
-    // 4. fallback_oracle (optional) - on passe null/none
-    // 5. user_token_account_a (writable)
-    // 6. user_token_account_b (writable)
-    // 7. vault_token_account_a (writable)
-    // 8. vault_token_account_b (writable)
-    // 9. plan (optional) - null
-    // 10. user_nft (optional)
-    // 11. buyback_program (optional) - null
-    // 12. buyback_usdc_vault (optional) - null
-    // 13. buyback_state (optional) - null
-    // 14. user_rebate_account (optional, writable)
-    // 15. rebate_vault (writable)
-    // 16. oracle_cache (optional, writable)
-    // 17. venue_score (optional, writable)
-    // 18. token_program
-    // 19. system_program
-    // + remaining_accounts pour les venues DEX
+    // Pour les comptes optionnels qui n'existent pas, on utilise le program ID du router
+    // Anchor traite cela comme "None" pour Option<Account>
+    const NONE_ACCOUNT = this.programId;
     
     const keys = [
       // 1. state
@@ -1589,8 +1585,8 @@ export class NativeRouterService {
       { pubkey: userPublicKey, isSigner: true, isWritable: true },
       // 3. primary_oracle
       { pubkey: DEFAULT_ORACLE, isSigner: false, isWritable: false },
-      // 4. fallback_oracle (optional - utiliser program ID comme "None")
-      { pubkey: this.programId, isSigner: false, isWritable: false },
+      // 4. fallback_oracle (optional - None)
+      { pubkey: NONE_ACCOUNT, isSigner: false, isWritable: false },
       // 5. user_token_account_a
       { pubkey: accounts.userTokenAccountA, isSigner: false, isWritable: true },
       // 6. user_token_account_b
@@ -1600,24 +1596,34 @@ export class NativeRouterService {
       // 8. vault_token_account_b
       { pubkey: accounts.vaultTokenAccountB, isSigner: false, isWritable: true },
       // 9. plan (optional - None)
-      { pubkey: this.programId, isSigner: false, isWritable: false },
-      // 10. user_nft (optional)
-      { pubkey: accounts.userNftPda, isSigner: false, isWritable: false },
+      { pubkey: NONE_ACCOUNT, isSigner: false, isWritable: false },
+      // 10. user_nft (optional - seulement si existe)
+      { pubkey: userNftExists ? accounts.userNftPda : NONE_ACCOUNT, isSigner: false, isWritable: false },
       // 11. buyback_program (optional - None)
-      { pubkey: this.programId, isSigner: false, isWritable: false },
+      { pubkey: NONE_ACCOUNT, isSigner: false, isWritable: false },
       // 12. buyback_usdc_vault (optional - None)
-      { pubkey: this.programId, isSigner: false, isWritable: false },
+      { pubkey: NONE_ACCOUNT, isSigner: false, isWritable: false },
       // 13. buyback_state (optional - None)
-      { pubkey: this.programId, isSigner: false, isWritable: false },
+      { pubkey: NONE_ACCOUNT, isSigner: false, isWritable: false },
       // 14. user_rebate_account (optional)
       { pubkey: accounts.userRebateAccount, isSigner: false, isWritable: true },
       // 15. rebate_vault
       { pubkey: accounts.rebateVault, isSigner: false, isWritable: true },
-      // 16. oracle_cache (optional)
-      { pubkey: accounts.oracleCache, isSigner: false, isWritable: true },
-      // 17. venue_score (optional)
-      { pubkey: accounts.venueScore, isSigner: false, isWritable: true },
+      // 16. oracle_cache (optional - seulement si existe)
+      { pubkey: oracleCacheExists ? accounts.oracleCache : NONE_ACCOUNT, isSigner: false, isWritable: oracleCacheExists },
+      // 17. venue_score (optional - seulement si existe)
+      { pubkey: venueScoreExists ? accounts.venueScore : NONE_ACCOUNT, isSigner: false, isWritable: venueScoreExists },
       // 18. token_program
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      // 19. system_program
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      // remaining_accounts: Venue accounts pour le CPI
+      ...venueAccounts.map(pubkey => ({
+        pubkey,
+        isSigner: false,
+        isWritable: true,
+      })),
+    ];
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       // 19. system_program
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
