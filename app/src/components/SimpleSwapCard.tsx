@@ -451,16 +451,20 @@ export function SimpleSwapCard() {
                   {quote.venues.map((venue, i) => (
                     <span 
                       key={i}
-                      className="text-xs bg-white/5 text-gray-300 px-2 py-0.5 rounded-full"
+                      className="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-medium"
                     >
-                      {venue}
+                      ✓ {venue}
                     </span>
                   ))}
                 </div>
                 <div className="flex flex-col gap-1 mt-2 text-xs text-gray-500">
                   <div className="flex justify-between">
                     <span>NPI généré:</span>
-                    <span className="text-emerald-400">~{formatAmount(quote.npiAmount || 0)} {outputToken.symbol}</span>
+                    {(quote.npiAmount || 0) > 0 ? (
+                      <span className="text-emerald-400">+{formatAmount(quote.npiAmount)} {outputToken.symbol}</span>
+                    ) : (
+                      <span className="text-gray-400">0 (prix marché optimal)</span>
+                    )}
                   </div>
                   
                   {/* Slippage dynamique avec breakdown */}

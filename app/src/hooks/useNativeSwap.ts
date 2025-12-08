@@ -183,7 +183,7 @@ export function useNativeSwap() {
           
           // Route
           venues: route.venues,
-          bestVenue: route.venues[0].venue,
+          bestVenue: route.bestVenue, // Utiliser directement bestVenue de la route
           
           // Économie
           priceImpactBps: route.totalPriceImpactBps,

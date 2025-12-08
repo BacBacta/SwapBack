@@ -113,6 +113,8 @@ export interface VenueQuote {
 
 export interface NativeRouteQuote {
   venues: VenueQuote[];
+  /** Nom de la meilleure venue sélectionnée */
+  bestVenue: keyof typeof DEX_PROGRAMS;
   totalInputAmount: number;
   totalOutputAmount: number;
   totalPriceImpactBps: number;
@@ -978,30 +980,37 @@ export class NativeRouterService {
       bestQuote.outputAmount
     );
     
-    // Utiliser le NPI réel s'il est positif, sinon fallback sur l'estimation
-    const effectiveNpiBps = realNpiBps > 0 ? realNpiBps : bestQuote.estimatedNpiBps;
+    // NPI = amélioration réelle par rapport à Jupiter
+    // Si Jupiter est meilleur ou égal, NPI = 0 (pas de fallback sur estimation!)
+    // L'estimation hardcodée ne doit JAMAIS être utilisée pour afficher le NPI
+    const effectiveNpiBps = realNpiBps; // Plus de fallback!
     
-    // Estimation du NPI et rebates basée sur le NPI réel
+    // Estimation du NPI et rebates basée sur le NPI réel UNIQUEMENT
     const platformFeeBps = 20; // 0.2%
-    const npiEstimate = Math.floor(bestQuote.outputAmount * effectiveNpiBps / 10000);
+    const npiEstimate = effectiveNpiBps > 0 
+      ? Math.floor(bestQuote.outputAmount * effectiveNpiBps / 10000)
+      : 0;
     const rebateEstimate = Math.floor(npiEstimate * 0.7); // 70% du NPI va aux rebates
     
     // Net output = output - platform fee + rebate
     const platformFee = Math.floor(bestQuote.outputAmount * platformFeeBps / 10000);
     const netOutput = bestQuote.outputAmount - platformFee + rebateEstimate;
     
-    logger.info("NativeRouter", "NPI calculation", {
+    logger.info("NativeRouter", "NPI calculation (REAL)", {
+      bestVenue: bestQuote.venue,
       bestVenueOutput: bestQuote.outputAmount,
       jupiterOutput,
-      realNpiBps,
-      estimatedNpiBps: bestQuote.estimatedNpiBps,
-      effectiveNpiBps,
-      npiEstimate,
-      rebateEstimate,
+      improvementBps: realNpiBps,
+      npiAmount: npiEstimate,
+      rebateAmount: rebateEstimate,
+      isJupiterBetter: jupiterOutput > bestQuote.outputAmount,
     });
     
+    // Ne retourner que la meilleure venue (celle utilisée pour le swap)
+    // Les autres venues sont juste pour comparaison dans les logs
     return {
-      venues: adjustedQuotes.slice(0, MAX_VENUES),
+      venues: [bestQuote], // SEULEMENT la meilleure venue utilisée
+      bestVenue: bestQuote.venue,
       totalInputAmount: amountIn,
       totalOutputAmount: bestQuote.outputAmount,
       totalPriceImpactBps: bestQuote.priceImpactBps,
