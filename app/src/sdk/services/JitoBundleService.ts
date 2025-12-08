@@ -20,7 +20,6 @@ import {
   BundleEligibilityFactors,
 } from "../types/smart-router";
 import { BundleOptimizer } from "./BundleOptimizer";
-import { getSolPrice } from "@/lib/price-service";
 
 // ============================================================================
 // JITO BUNDLE SERVICE
@@ -548,12 +547,12 @@ export class MEVProtectionAnalyzer {
   /**
    * Calculate recommended bundle tip based on trade value
    */
-  async calculateRecommendedTip(tradeValueUSD: number): Promise<number> {
+  calculateRecommendedTip(tradeValueUSD: number): number {
     // Tip scales with trade value (0.01% of trade)
     const tipUSD = tradeValueUSD * 0.0001;
 
-    // Get real-time SOL price
-    const solPrice = await getSolPrice() || 200; // Fallback to $200 if API fails
+    // Convert to lamports (assuming SOL = $100)
+    const solPrice = 100;
     const tipSOL = tipUSD / solPrice;
     const tipLamports = tipSOL * 1e9;
 

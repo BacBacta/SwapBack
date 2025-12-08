@@ -1,0 +1,60 @@
+# ============================================================================
+# VARIABLES VERCEL - SwapBack Production (Mainnet)
+# ============================================================================
+# Copier-coller ces variables dans Vercel Dashboard:
+# Settings → Environment Variables → Add New
+# ============================================================================
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RÉSEAU SOLANA (MAINNET)
+# ─────────────────────────────────────────────────────────────────────────────
+NEXT_PUBLIC_SOLANA_NETWORK=mainnet-beta
+NEXT_PUBLIC_SOLANA_RPC_URL=https://mainnet.helius-rpc.com/?api-key=VOTRE_CLE_HELIUS
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROGRAM IDS (MAINNET)
+# ─────────────────────────────────────────────────────────────────────────────
+NEXT_PUBLIC_ROUTER_PROGRAM_ID=opPhGcth2dGQQ7njYmkAYwfxspJ1DjgP9LV2y1jygCx
+NEXT_PUBLIC_BUYBACK_PROGRAM_ID=4cyYvpjwERF67UDpd5euYzZ6xZ5tcDL6XrByBaZbVVjK
+NEXT_PUBLIC_CNFT_PROGRAM_ID=EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TOKENS (MAINNET)
+# ─────────────────────────────────────────────────────────────────────────────
+NEXT_PUBLIC_BACK_MINT=VOTRE_BACK_TOKEN_MINT_MAINNET
+NEXT_PUBLIC_USDC_MINT=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ADDRESS LOOKUP TABLE
+# ─────────────────────────────────────────────────────────────────────────────
+NEXT_PUBLIC_SWAPBACK_ALT_ADDRESS=C1eKfdYffn2JeLBnfat7vqQQgpgMf9gPvcpEf568cP9x
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ORACLE PYTH HERMES (NOUVEAU)
+# ─────────────────────────────────────────────────────────────────────────────
+NEXT_PUBLIC_PYTH_PRICE_SERVICE_URL=https://hermes.pyth.network
+NEXT_PUBLIC_ORACLE_MAX_DIVERGENCE_PERCENT=0.01
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HELIUS API (pour RPC et webhooks)
+# ─────────────────────────────────────────────────────────────────────────────
+NEXT_PUBLIC_HELIUS_API_KEY=VOTRE_CLE_HELIUS
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ADMIN
+# ─────────────────────────────────────────────────────────────────────────────
+NEXT_PUBLIC_ADMIN_AUTHORITY=VOTRE_WALLET_ADMIN
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ANALYTICS (optionnel)
+# ─────────────────────────────────────────────────────────────────────────────
+NEXT_PUBLIC_ANALYTICS_ENABLED=false
+NEXT_PUBLIC_MIXPANEL_TOKEN=
+
+# ============================================================================
+# ⚠️  REMPLACEZ LES VALEURS SUIVANTES:
+# ============================================================================
+# - VOTRE_CLE_HELIUS         → Clé API Helius (https://www.helius.dev/)
+# - VOTRE_BACK_TOKEN_MINT_MAINNET → Adresse mint du token BACK sur mainnet
+# - VOTRE_WALLET_ADMIN       → Adresse wallet administrateur
+# ============================================================================

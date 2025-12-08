@@ -30,6 +30,9 @@ import { BN, Program, AnchorProvider, type Idl } from "@coral-xyz/anchor";
 import { logger } from "@/lib/logger";
 import { getOracleFeedsForPair } from "@/config/oracles";
 import { getTokenPrice, getSolPrice } from "@/lib/price-service";
+import { HermesClient } from "@pythnetwork/hermes-client";
+import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
+import { PYTH_FEED_IDS, getPythFeedIdByMint } from "@/sdk/config/pyth-feeds";
 
 // ============================================================================
 // CONSTANTS
@@ -1540,6 +1543,39 @@ export class NativeRouterService {
       venue: venue.venueProgramId,
       weight: index === 0 ? 10000 : 0, // 100% sur la meilleure venue pour l'instant
     }));
+
+    // --- HERMES PULL ORACLE UPDATE ---
+    try {
+      const inputFeedId = getPythFeedIdByMint(inputMint.toBase58());
+      const outputFeedId = getPythFeedIdByMint(outputMint.toBase58());
+      
+      if (inputFeedId && outputFeedId) {
+        logger.info("NativeRouter", "Fetching Hermes updates for feeds", { inputFeedId, outputFeedId });
+        
+        const hermes = new HermesClient("https://hermes.pyth.network", { timeout: 5000 });
+        const priceUpdates = await hermes.getLatestPriceUpdates([inputFeedId, outputFeedId]);
+        
+        if (priceUpdates && priceUpdates.binary && priceUpdates.binary.data) {
+          // PythSolanaReceiver expects a wallet-like object. We mock it with just publicKey for instruction generation.
+          const receiver = new PythSolanaReceiver({ 
+            connection: this.connection, 
+            wallet: { publicKey: userPublicKey } as any 
+          });
+          
+          const updateTx = await receiver.getPostUpdateTx(priceUpdates.binary.data);
+          
+          // Add update instructions to our transaction
+          if (updateTx.instructions && updateTx.instructions.length > 0) {
+             logger.info("NativeRouter", "Adding Hermes update instructions", { count: updateTx.instructions.length });
+             instructions.push(...updateTx.instructions);
+          }
+        }
+      }
+    } catch (err) {
+      logger.warn("NativeRouter", "Failed to fetch/add Hermes updates", { error: err });
+      // We continue, as maybe the on-chain data is fresh enough (unlikely given the error, but safe fallback)
+    }
+    // ---------------------------------
     
     // Construire l'instruction swap_toc
     const swapInstruction = await this.buildSwapToCInstruction(

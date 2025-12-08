@@ -275,8 +275,14 @@ export interface OptimizationConfig {
 // ORACLE PRICE VERIFICATION
 // ============================================================================
 
+export type OraclePriceSource =
+  | "pyth-account"
+  | "pyth-hermes"
+  | "switchboard";
+
 export interface OraclePriceData {
   provider: "pyth" | "switchboard";
+  source?: OraclePriceSource;
   price: number; // Current market price
   confidence: number; // Price confidence interval
   timestamp: number; // Backwards-compatible timestamp (ms)

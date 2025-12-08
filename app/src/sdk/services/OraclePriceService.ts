@@ -5,6 +5,7 @@
 
 import { Connection, PublicKey } from "@solana/web3.js";
 import { parsePriceData } from "@pythnetwork/client";
+import { HermesClient } from "@pythnetwork/hermes-client";
 import {
   OraclePriceData,
   OracleVerificationDetail,
@@ -14,6 +15,8 @@ import {
 import {
   getPythFeedAccount,
   getPythFeedByMint,
+  getPythFeedId,
+  getPythFeedIdByMint,
   MAX_PRICE_AGE_SECONDS,
   MAX_CONFIDENCE_INTERVAL_PERCENT,
 } from "../config/pyth-feeds";
@@ -27,6 +30,11 @@ import {
 const DEFAULT_MAX_ORACLE_DIVERGENCE_PERCENT = Number(
   process.env.NEXT_PUBLIC_ORACLE_MAX_DIVERGENCE_PERCENT ?? 0.01
 );
+
+const DEFAULT_PYTH_HERMES_ENDPOINT =
+  process.env.PYTH_HERMES_ENDPOINT ??
+  process.env.NEXT_PUBLIC_PYTH_PRICE_SERVICE_URL ??
+  "https://hermes.pyth.network";
 
 type OraclePriceServiceOptions = {
   maxOracleDivergencePercent?: number;
@@ -53,6 +61,8 @@ export class OraclePriceService {
   private verificationDetailCache: Map<string, OracleVerificationDetail>;
   private cacheExpiryMs: number;
   private readonly maxOracleDivergencePercent: number;
+  private hermesClient?: HermesClient;
+  private readonly hermesEndpoint: string;
 
   // Price feed addresses (examples - replace with actual addresses)
   private readonly PRICE_FEEDS = {
@@ -74,6 +84,16 @@ export class OraclePriceService {
     this.maxOracleDivergencePercent =
       options.maxOracleDivergencePercent ??
       DEFAULT_MAX_ORACLE_DIVERGENCE_PERCENT;
+    this.hermesEndpoint = DEFAULT_PYTH_HERMES_ENDPOINT;
+  }
+
+  private getHermesClient(): HermesClient {
+    if (!this.hermesClient) {
+      this.hermesClient = new HermesClient(this.hermesEndpoint, {
+        timeout: this.cacheExpiryMs,
+      });
+    }
+    return this.hermesClient;
   }
 
   /**
@@ -181,9 +201,20 @@ export class OraclePriceService {
 
   /**
    * Fetch price from Pyth Network
-   * Real implementation using Pyth Client SDK
+   * Tries on-chain account first, then Hermes pull oracle
    */
   private async fetchPythPrice(mint: string): Promise<OraclePriceData | null> {
+    const accountPrice = await this.fetchPythPriceFromAccount(mint);
+    if (accountPrice) {
+      return accountPrice;
+    }
+
+    return this.fetchPythPriceFromHermes(mint);
+  }
+
+  private async fetchPythPriceFromAccount(
+    mint: string
+  ): Promise<OraclePriceData | null> {
     try {
       // Get Pyth price feed account for this token
       let feedAccount = getPythFeedByMint(mint);
@@ -212,8 +243,42 @@ export class OraclePriceService {
       // Parse Pyth price account data using the official SDK parser
       const priceData = parsePriceData(accountInfo.data);
 
-      if (!priceData?.price) {
-        console.warn("Failed to parse Pyth price data");
+      // Older Pyth accounts expose price/confidence at the root level while
+      // newer accounts (with accumulator v2) only populate aggregate fields.
+      const exponent = priceData.exponent ?? 0;
+      const aggregate = (priceData as unknown as {
+        aggregate?: {
+          priceComponent?: number | bigint;
+          price?: number;
+          confidenceComponent?: number | bigint;
+          confidence?: number;
+        };
+      }).aggregate;
+
+      const mantissaPriceRaw =
+        priceData.price ??
+        aggregate?.priceComponent ??
+        (typeof aggregate?.price === "number"
+          ? aggregate.price * Math.pow(10, -exponent)
+          : undefined);
+
+      if (mantissaPriceRaw === undefined) {
+        console.warn("Failed to parse Pyth price data (missing mantissa)");
+        return null;
+      }
+
+      const mantissaConfidenceRaw =
+        priceData.confidence ??
+        aggregate?.confidenceComponent ??
+        (typeof aggregate?.confidence === "number"
+          ? aggregate.confidence * Math.pow(10, -exponent)
+          : undefined) ?? 0;
+
+      const mantissaPrice = Number(mantissaPriceRaw);
+      const mantissaConfidence = Number(mantissaConfidenceRaw);
+
+      if (!Number.isFinite(mantissaPrice)) {
+        console.warn("Parsed Pyth price mantissa is invalid");
         return null;
       }
 
@@ -261,12 +326,8 @@ export class OraclePriceService {
       }
 
       // Calculate price with exponent
-      const exponent = priceData.exponent || 0;
-      const rawPrice = Number(priceData.price);
-      const rawConfidence = Number(priceData.confidence || 0);
-
-      const price = rawPrice * Math.pow(10, exponent);
-      const confidence = rawConfidence * Math.pow(10, exponent);
+      const price = mantissaPrice * Math.pow(10, exponent);
+      const confidence = mantissaConfidence * Math.pow(10, exponent);
 
       // Validate confidence interval
       const confidencePercent =
@@ -283,6 +344,7 @@ export class OraclePriceService {
       // Return validated price data
       return {
         provider: "pyth",
+        source: "pyth-account",
         price,
         confidence,
         timestamp: publishTimeMs,
@@ -291,6 +353,100 @@ export class OraclePriceService {
       };
     } catch (error) {
       console.error("Pyth price fetch error:", error);
+      return null;
+    }
+  }
+
+  private resolvePythFeedId(mint: string): string | null {
+    const direct = getPythFeedIdByMint(mint);
+    if (direct) {
+      return direct;
+    }
+
+    const symbol = this.guessSymbolFromMint(mint);
+    if (symbol) {
+      const symbolFeed = getPythFeedId(symbol);
+      if (symbolFeed) {
+        return symbolFeed;
+      }
+    }
+
+    return null;
+  }
+
+  private async fetchPythPriceFromHermes(
+    mint: string
+  ): Promise<OraclePriceData | null> {
+    try {
+      const feedId = this.resolvePythFeedId(mint);
+      if (!feedId) {
+        console.warn(`No Hermes feed ID for mint ${mint}`);
+        return null;
+      }
+
+      const client = this.getHermesClient();
+      const response = await client.getLatestPriceUpdates([feedId], {
+        parsed: true,
+      });
+
+      const parsedUpdate = response?.parsed?.[0];
+      const priceInfo = parsedUpdate?.price;
+
+      if (!priceInfo) {
+        console.warn(`Hermes response missing price info for feed ${feedId}`);
+        return null;
+      }
+
+      const rawPrice = Number(priceInfo.price);
+      const exponent = Number(priceInfo.expo ?? 0);
+      const rawConfidence = Number(priceInfo.conf ?? 0);
+      const publishTimeSeconds = Number(priceInfo.publish_time ?? 0);
+
+      if (!Number.isFinite(rawPrice)) {
+        console.warn("Hermes price value invalid");
+        return null;
+      }
+
+      if (!Number.isFinite(publishTimeSeconds) || publishTimeSeconds <= 0) {
+        console.warn("Hermes publish time missing or invalid");
+        return null;
+      }
+
+      const price = rawPrice * Math.pow(10, exponent);
+      const confidence = rawConfidence * Math.pow(10, exponent);
+      const publishTimeMs = publishTimeSeconds * 1000;
+      const priceAgeMs = Date.now() - publishTimeMs;
+
+      if (priceAgeMs > MAX_PRICE_AGE_SECONDS * 1000) {
+        console.warn(
+          `Hermes price stale: ${(priceAgeMs / 1000).toFixed(2)} seconds old`
+        );
+        return null;
+      }
+
+      const confidencePercent =
+        Math.abs(price) > 0 ? (Math.abs(confidence) / Math.abs(price)) * 100 : 100;
+
+      if (confidencePercent > MAX_CONFIDENCE_INTERVAL_PERCENT) {
+        console.warn(
+          `Hermes confidence interval too wide: ${confidencePercent.toFixed(
+            2
+          )}% (max ${MAX_CONFIDENCE_INTERVAL_PERCENT}%)`
+        );
+        return null;
+      }
+
+      return {
+        provider: "pyth",
+        source: "pyth-hermes",
+        price,
+        confidence,
+        timestamp: publishTimeMs,
+        publishTime: publishTimeMs,
+        exponent,
+      };
+    } catch (error) {
+      console.error("Hermes price fetch error:", error);
       return null;
     }
   }
@@ -309,6 +465,11 @@ export class OraclePriceService {
       SRMuApVNdxXokk5GT7XD5cUUgXMBCoAz2LHeuAoKWRt: "SRM",
       orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE: "ORCA",
       JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN: "JUP",
+      DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263: "BONK",
+      EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm: "WIF",
+      jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL: "JTO",
+      HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3: "PYTH",
+      "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr": "POPCAT",
     };
 
     return patterns[mint] || null;
@@ -410,6 +571,7 @@ export class OraclePriceService {
       const publishTimeMs = publishTimeSeconds * 1000;
       return {
         provider: "switchboard",
+        source: "switchboard",
         price,
         confidence: stdDeviation,
         timestamp: publishTimeMs,
@@ -503,10 +665,13 @@ export class OraclePriceService {
           )
         : undefined;
 
+    const fallbackUsed =
+      best.provider === "switchboard" || best.source === "pyth-hermes";
+
     return {
       best,
       providerUsed: best.provider,
-      fallbackUsed: Boolean(pythPrice) && best.provider !== "pyth",
+      fallbackUsed,
       divergencePercent,
       sources: {
         pyth: pythPrice ?? undefined,
