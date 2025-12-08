@@ -11,10 +11,14 @@ import { NextRequest, NextResponse } from 'next/server';
  * - Latence réduite (même infrastructure)
  * 
  * Usage: GET /api/cors-proxy?url=<encoded_url>
+ * 
+ * Configuration via variables d'environnement:
+ * - ALLOWED_DOMAINS: Liste de domaines autorisés séparés par des virgules
+ * - ALLOWED_ORIGIN: Origine autorisée pour les headers CORS (par défaut: *)
  */
 
-// Liste blanche des domaines autorisés pour le proxy
-const ALLOWED_DOMAINS = [
+// Liste blanche par défaut des domaines autorisés pour le proxy
+const DEFAULT_ALLOWED_DOMAINS = [
   'api.jup.ag',
   'quote-api.jup.ag',
   'public.jupiterapi.com',
@@ -28,6 +32,19 @@ const ALLOWED_DOMAINS = [
   'api.dexscreener.com',
   'public-api.birdeye.so',
 ];
+
+// Fusionner les domaines par défaut avec ceux de la variable d'environnement
+function getAllowedDomains(): string[] {
+  const envDomains = process.env.ALLOWED_DOMAINS;
+  if (envDomains) {
+    const customDomains = envDomains.split(',').map(d => d.trim()).filter(Boolean);
+    // Fusionner les deux listes sans doublons
+    return [...new Set([...DEFAULT_ALLOWED_DOMAINS, ...customDomains])];
+  }
+  return DEFAULT_ALLOWED_DOMAINS;
+}
+
+const ALLOWED_DOMAINS = getAllowedDomains();
 
 // Headers CORS pour les réponses
 const CORS_HEADERS = {

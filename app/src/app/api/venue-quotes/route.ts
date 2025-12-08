@@ -193,6 +193,10 @@ export async function GET(request: NextRequest) {
 /**
  * Génère des quotes synthétiques pour toutes les venues principales
  * basées sur les prix du marché. Utilisé quand toutes les APIs échouent.
+ * 
+ * IMPORTANT: Les quotes synthétiques ont TOUTES le même output car on ne peut pas
+ * déterminer quel DEX est meilleur sans les vraies APIs. On applique juste un 
+ * petit spread pour être conservateur.
  */
 async function generateSyntheticQuotes(
   inputMint: string,
@@ -209,32 +213,32 @@ async function generateSyntheticQuotes(
 
   const baseOutput = estimate.outputAmount;
   
-  // Générer des quotes pour chaque venue avec des spreads réalistes
-  const venueConfigs: Array<{ venue: string; spreadMultiplier: number; priceImpactBps: number }> = [
-    { venue: 'RAYDIUM', spreadMultiplier: 0.998, priceImpactBps: 15 },    // 0.2% spread
-    { venue: 'ORCA', spreadMultiplier: 0.9975, priceImpactBps: 12 },      // 0.25% spread  
-    { venue: 'METEORA', spreadMultiplier: 0.997, priceImpactBps: 18 },    // 0.3% spread
-    { venue: 'PHOENIX', spreadMultiplier: 0.999, priceImpactBps: 5 },     // 0.1% spread (CLOB)
-  ];
-
-  const quotes: VenueQuoteResult[] = venueConfigs.map(config => ({
-    venue: config.venue,
-    outputAmount: Math.floor(baseOutput * config.spreadMultiplier),
-    priceImpactBps: config.priceImpactBps,
+  // IMPORTANT: Toutes les venues ont le MÊME output (avec un spread conservateur uniforme)
+  // On ne peut pas savoir quelle venue est meilleure sans les vraies APIs
+  const conservativeSpread = 0.997; // 0.3% spread conservateur
+  const adjustedOutput = Math.floor(baseOutput * conservativeSpread);
+  
+  // Générer des quotes identiques pour chaque venue (pas de faux avantage)
+  const venues = ['RAYDIUM', 'ORCA', 'METEORA', 'PHOENIX'];
+  
+  const quotes: VenueQuoteResult[] = venues.map(venue => ({
+    venue,
+    outputAmount: adjustedOutput, // Même output pour toutes
+    priceImpactBps: 30, // Impact conservateur
     latencyMs: Date.now() - startTime,
-    source: 'synthetic',
+    source: 'synthetic', // IMPORTANT: marqué comme synthétique
   }));
 
-  // Ajouter Jupiter comme benchmark (prix du marché exact)
+  // Jupiter comme benchmark = prix du marché exact
   quotes.push({
     venue: 'JUPITER',
-    outputAmount: baseOutput,
+    outputAmount: baseOutput, // Prix du marché
     priceImpactBps: 10,
     latencyMs: Date.now() - startTime,
     source: 'synthetic',
   });
 
-  console.log('[generateSyntheticQuotes] Generated quotes:', quotes.map(q => `${q.venue}:${q.outputAmount}`).join(', '));
+  console.log('[generateSyntheticQuotes] Generated IDENTICAL quotes for all venues:', adjustedOutput, '(synthetic, Jupiter baseline:', baseOutput, ')');
   
   return quotes;
 }
@@ -353,19 +357,66 @@ async function getTokenPrice(mint: string): Promise<number> {
     console.log(`[getTokenPrice] Jupiter failed for ${mint.slice(0, 8)}...`);
   }
 
-  // Tentative 2: Prix hardcodés pour les tokens majeurs (fallback de secours)
-  const hardcodedPrices: Record<string, number> = {
-    'So11111111111111111111111111111111111111112': 180, // SOL ~$180
-    'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 1, // USDC = $1
-    'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': 1, // USDT = $1
-    'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So': 200, // mSOL ~$200
-  };
-  
-  if (hardcodedPrices[mint]) {
-    console.log(`[getTokenPrice] Using hardcoded price for ${mint.slice(0, 8)}...: $${hardcodedPrices[mint]}`);
-    return hardcodedPrices[mint];
+  // Tentative 2: DexScreener API (temps réel, pas de clé API requise)
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    const response = await fetch(
+      `https://api.dexscreener.com/latest/dex/tokens/${mint}`,
+      { signal: controller.signal }
+    );
+    
+    clearTimeout(timeoutId);
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data.pairs && data.pairs.length > 0) {
+        const pairWithPrice = data.pairs.find((p: { priceUsd?: string }) => p.priceUsd);
+        if (pairWithPrice?.priceUsd) {
+          const price = parseFloat(pairWithPrice.priceUsd);
+          console.log(`[getTokenPrice] DexScreener price for ${mint.slice(0, 8)}...: $${price}`);
+          return price;
+        }
+      }
+    }
+  } catch (error) {
+    console.log(`[getTokenPrice] DexScreener failed for ${mint.slice(0, 8)}...`);
   }
 
+  // Tentative 3: Birdeye API (si clé disponible)
+  const birdeyeApiKey = process.env.BIRDEYE_API_KEY;
+  if (birdeyeApiKey) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch(
+        `https://public-api.birdeye.so/defi/price?address=${mint}`,
+        { 
+          signal: controller.signal,
+          headers: { 'X-API-KEY': birdeyeApiKey },
+        }
+      );
+      
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.data?.value) {
+          const price = parseFloat(data.data.value);
+          console.log(`[getTokenPrice] Birdeye price for ${mint.slice(0, 8)}...: $${price}`);
+          return price;
+        }
+      }
+    } catch (error) {
+      console.log(`[getTokenPrice] Birdeye failed for ${mint.slice(0, 8)}...`);
+    }
+  }
+
+  // NOTE: Pas de prix hardcodés - on retourne 0 si toutes les APIs échouent
+  // Cela forcera le système à utiliser les vraies quotes des DEX
+  console.log(`[getTokenPrice] All price sources failed for ${mint.slice(0, 8)}...`);
   return 0;
 }
 
@@ -437,13 +488,13 @@ async function fetchRaydiumQuote(
     }
   }
 
-  // Fallback: estimation basée sur les prix
+  // Fallback: estimation basée sur les prix (spread uniforme conservateur)
   const estimate = await estimateOutputFromPrices(inputMint, outputMint, amountIn);
   if (estimate) {
     return {
       venue: 'RAYDIUM',
-      outputAmount: Math.floor(estimate.outputAmount * 0.998), // 0.2% moins que le prix (spread simulé)
-      priceImpactBps: estimate.priceImpactBps,
+      outputAmount: Math.floor(estimate.outputAmount * 0.997), // 0.3% spread conservateur uniforme
+      priceImpactBps: 30,
       latencyMs: Date.now() - startTime,
       source: 'estimated',
     };
@@ -479,13 +530,13 @@ async function fetchOrcaQuote(
     }
   }
 
-  // Fallback: estimation basée sur les prix
+  // Fallback: estimation basée sur les prix (spread uniforme conservateur)
   const estimate = await estimateOutputFromPrices(inputMint, outputMint, amountIn);
   if (estimate) {
     return {
       venue: 'ORCA',
-      outputAmount: Math.floor(estimate.outputAmount * 0.997), // 0.3% moins
-      priceImpactBps: estimate.priceImpactBps,
+      outputAmount: Math.floor(estimate.outputAmount * 0.997), // 0.3% spread conservateur uniforme
+      priceImpactBps: 30,
       latencyMs: Date.now() - startTime,
       source: 'estimated',
     };
@@ -521,13 +572,13 @@ async function fetchMeteoraQuote(
     }
   }
 
-  // Fallback: estimation basée sur les prix
+  // Fallback: estimation basée sur les prix (spread uniforme conservateur)
   const estimate = await estimateOutputFromPrices(inputMint, outputMint, amountIn);
   if (estimate) {
     return {
       venue: 'METEORA',
-      outputAmount: Math.floor(estimate.outputAmount * 0.996), // 0.4% moins (DLMM spread)
-      priceImpactBps: estimate.priceImpactBps,
+      outputAmount: Math.floor(estimate.outputAmount * 0.997), // 0.3% spread conservateur uniforme
+      priceImpactBps: 30,
       latencyMs: Date.now() - startTime,
       source: 'estimated',
     };
@@ -542,14 +593,15 @@ async function fetchPhoenixQuote(
   amountIn: number
 ): Promise<VenueQuoteResult> {
   const startTime = Date.now();
-  // Phoenix n'a pas d'API publique simple, on va estimer
+  // Phoenix n'a pas d'API publique simple, on utilise une estimation
+  // IMPORTANT: Même spread que les autres venues pour ne pas inventer d'avantage
   const estimate = await estimateOutputFromPrices(inputMint, outputMint, amountIn);
   
   if (estimate) {
     return {
       venue: 'PHOENIX',
-      outputAmount: Math.floor(estimate.outputAmount * 0.999), // CLOB a généralement de meilleurs spreads
-      priceImpactBps: 5, // Très faible pour un CLOB
+      outputAmount: Math.floor(estimate.outputAmount * 0.997), // 0.3% spread conservateur uniforme
+      priceImpactBps: 30,
       latencyMs: Date.now() - startTime,
       source: 'estimated',
     };
