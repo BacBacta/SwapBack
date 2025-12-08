@@ -1470,7 +1470,7 @@ export class NativeRouterService {
     
     const instructions: TransactionInstruction[] = [];
     
-    // Vérifier si les ATAs existent, sinon les créer
+    // Vérifier si les ATAs utilisateurs existent, sinon les créer
     const ataChecks = await Promise.all([
       this.connection.getAccountInfo(accounts.userTokenAccountA),
       this.connection.getAccountInfo(accounts.userTokenAccountB),
@@ -1498,6 +1498,43 @@ export class NativeRouterService {
       );
     }
     
+    // Vérifier si les vaults du router existent (ATAs appartenant au RouterState)
+    // Ces comptes sont nécessaires pour stocker temporairement les tokens durant le swap
+    const vaultAtaChecks = await Promise.all([
+      this.connection.getAccountInfo(accounts.vaultTokenAccountA),
+      this.connection.getAccountInfo(accounts.vaultTokenAccountB),
+    ]);
+
+    if (!vaultAtaChecks[0]) {
+      logger.info("NativeRouter", "Creating router vault ATA (token A)", {
+        mint: inputMint.toBase58(),
+        vault: accounts.vaultTokenAccountA.toBase58(),
+      });
+      instructions.push(
+        createAssociatedTokenAccountInstruction(
+          userPublicKey,
+          accounts.vaultTokenAccountA,
+          accounts.routerState,
+          inputMint
+        )
+      );
+    }
+
+    if (!vaultAtaChecks[1]) {
+      logger.info("NativeRouter", "Creating router vault ATA (token B)", {
+        mint: outputMint.toBase58(),
+        vault: accounts.vaultTokenAccountB.toBase58(),
+      });
+      instructions.push(
+        createAssociatedTokenAccountInstruction(
+          userPublicKey,
+          accounts.vaultTokenAccountB,
+          accounts.routerState,
+          outputMint
+        )
+      );
+    }
+
     // Construire les VenueWeight pour chaque venue
     const venueWeights = route.venues.map((venue, index) => ({
       venue: venue.venueProgramId,
