@@ -32,6 +32,9 @@
     "benchmark": "npx tsx scripts/performanceComparison.ts",
     "capture:bn-error": "tsx scripts/capture-bn-error.ts"
   },
+  "overrides": {
+    "rpc-websockets": "7.11.2"
+  },
   "devDependencies": {
     "@coral-xyz/anchor": "0.30.1",
     "@coral-xyz/anchor-cli": "^0.31.2",
