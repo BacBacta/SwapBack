@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
     current.outputAmount > (best?.outputAmount || 0) ? current : best
   , null as VenueQuoteResult | null);
 
-  // FALLBACK: Si aucune venue native n'a de quote valide, utiliser Jupiter
+  // FALLBACK 1: Si aucune venue native n'a de quote valide, utiliser Jupiter
   if (!bestQuote && jupiterBenchmark && jupiterBenchmark.outputAmount > 0) {
     console.log('[venue-quotes] No native venues, using Jupiter as fallback');
     bestQuote = {
@@ -138,10 +138,29 @@ export async function GET(request: NextRequest) {
     quotes.push(bestQuote);
   }
 
-  // Si toujours rien, essayer avec toutes les quotes (y compris estimées avec outputAmount 0)
-  if (!bestQuote && quotes.length === 0 && jupiterBenchmark) {
-    bestQuote = jupiterBenchmark;
-    quotes.push(jupiterBenchmark);
+  // FALLBACK 2: Si toujours rien, générer des quotes synthétiques basées sur les prix
+  if (!bestQuote || quotes.length === 0) {
+    console.log('[venue-quotes] No quotes at all, generating synthetic quotes from prices...');
+    
+    const syntheticQuotes = await generateSyntheticQuotes(inputMint, outputMint, amountNum);
+    
+    if (syntheticQuotes.length > 0) {
+      quotes.push(...syntheticQuotes);
+      bestQuote = syntheticQuotes.reduce((best, current) => 
+        current.outputAmount > (best?.outputAmount || 0) ? current : best
+      , null as VenueQuoteResult | null);
+      
+      // Utiliser la meilleure quote synthétique comme benchmark Jupiter si pas de benchmark
+      if (!jupiterBenchmark && bestQuote) {
+        jupiterBenchmark = {
+          ...bestQuote,
+          venue: 'JUPITER',
+          source: 'synthetic',
+        };
+      }
+      
+      console.log('[venue-quotes] Generated', syntheticQuotes.length, 'synthetic quotes, best:', bestQuote?.venue);
+    }
   }
 
   console.log('[venue-quotes] Final result:', {
@@ -165,6 +184,59 @@ export async function GET(request: NextRequest) {
       ...CORS_HEADERS,
     },
   });
+}
+
+// ============================================================================
+// GÉNÉRATION DE QUOTES SYNTHÉTIQUES (fallback ultime)
+// ============================================================================
+
+/**
+ * Génère des quotes synthétiques pour toutes les venues principales
+ * basées sur les prix du marché. Utilisé quand toutes les APIs échouent.
+ */
+async function generateSyntheticQuotes(
+  inputMint: string,
+  outputMint: string,
+  amountIn: number
+): Promise<VenueQuoteResult[]> {
+  const startTime = Date.now();
+  const estimate = await estimateOutputFromPrices(inputMint, outputMint, amountIn);
+  
+  if (!estimate || estimate.outputAmount <= 0) {
+    console.log('[generateSyntheticQuotes] Could not estimate prices');
+    return [];
+  }
+
+  const baseOutput = estimate.outputAmount;
+  
+  // Générer des quotes pour chaque venue avec des spreads réalistes
+  const venueConfigs: Array<{ venue: string; spreadMultiplier: number; priceImpactBps: number }> = [
+    { venue: 'RAYDIUM', spreadMultiplier: 0.998, priceImpactBps: 15 },    // 0.2% spread
+    { venue: 'ORCA', spreadMultiplier: 0.9975, priceImpactBps: 12 },      // 0.25% spread  
+    { venue: 'METEORA', spreadMultiplier: 0.997, priceImpactBps: 18 },    // 0.3% spread
+    { venue: 'PHOENIX', spreadMultiplier: 0.999, priceImpactBps: 5 },     // 0.1% spread (CLOB)
+  ];
+
+  const quotes: VenueQuoteResult[] = venueConfigs.map(config => ({
+    venue: config.venue,
+    outputAmount: Math.floor(baseOutput * config.spreadMultiplier),
+    priceImpactBps: config.priceImpactBps,
+    latencyMs: Date.now() - startTime,
+    source: 'synthetic',
+  }));
+
+  // Ajouter Jupiter comme benchmark (prix du marché exact)
+  quotes.push({
+    venue: 'JUPITER',
+    outputAmount: baseOutput,
+    priceImpactBps: 10,
+    latencyMs: Date.now() - startTime,
+    source: 'synthetic',
+  });
+
+  console.log('[generateSyntheticQuotes] Generated quotes:', quotes.map(q => `${q.venue}:${q.outputAmount}`).join(', '));
+  
+  return quotes;
 }
 
 // ============================================================================
@@ -234,40 +306,89 @@ async function fetchWithFallback(
 }
 
 /**
- * Récupère le prix d'un token via Jupiter Price API
+ * Tokens connus avec leurs décimales
+ */
+const KNOWN_TOKENS: Record<string, { decimals: number; symbol: string }> = {
+  'So11111111111111111111111111111111111111112': { decimals: 9, symbol: 'SOL' },
+  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': { decimals: 6, symbol: 'USDC' },
+  'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': { decimals: 6, symbol: 'USDT' },
+  'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So': { decimals: 9, symbol: 'mSOL' },
+  'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263': { decimals: 5, symbol: 'BONK' },
+  '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs': { decimals: 8, symbol: 'ETH' },
+  'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN': { decimals: 6, symbol: 'JUP' },
+};
+
+/**
+ * Récupère les décimales d'un token
+ */
+function getTokenDecimals(mint: string): number {
+  return KNOWN_TOKENS[mint]?.decimals ?? 9; // Par défaut 9 (comme SOL)
+}
+
+/**
+ * Récupère le prix d'un token via Jupiter Price API avec fallbacks
  */
 async function getTokenPrice(mint: string): Promise<number> {
+  // Tentative 1: Jupiter Price API
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
     const response = await fetch(
       `https://api.jup.ag/price/v2?ids=${mint}`,
-      { signal: AbortSignal.timeout(5000) }
+      { signal: controller.signal }
     );
+    
+    clearTimeout(timeoutId);
+    
     if (response.ok) {
       const data = await response.json();
-      return parseFloat(data.data?.[mint]?.price || '0');
+      const price = parseFloat(data.data?.[mint]?.price || '0');
+      if (price > 0) {
+        console.log(`[getTokenPrice] Jupiter price for ${mint.slice(0, 8)}...: $${price}`);
+        return price;
+      }
     }
-  } catch {
-    // Ignore
+  } catch (error) {
+    console.log(`[getTokenPrice] Jupiter failed for ${mint.slice(0, 8)}...`);
   }
+
+  // Tentative 2: Prix hardcodés pour les tokens majeurs (fallback de secours)
+  const hardcodedPrices: Record<string, number> = {
+    'So11111111111111111111111111111111111111112': 180, // SOL ~$180
+    'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 1, // USDC = $1
+    'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': 1, // USDT = $1
+    'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So': 200, // mSOL ~$200
+  };
+  
+  if (hardcodedPrices[mint]) {
+    console.log(`[getTokenPrice] Using hardcoded price for ${mint.slice(0, 8)}...: $${hardcodedPrices[mint]}`);
+    return hardcodedPrices[mint];
+  }
+
   return 0;
 }
 
 /**
  * Estime un output basé sur les prix du marché
  * Utilisé comme fallback quand les APIs DEX échouent
+ * Détecte automatiquement les décimales des tokens connus
  */
 async function estimateOutputFromPrices(
   inputMint: string,
   outputMint: string,
-  amountIn: number,
-  inputDecimals: number = 9,
-  outputDecimals: number = 6
+  amountIn: number
 ): Promise<{ outputAmount: number; priceImpactBps: number } | null> {
   try {
+    const inputDecimals = getTokenDecimals(inputMint);
+    const outputDecimals = getTokenDecimals(outputMint);
+    
     const [inputPrice, outputPrice] = await Promise.all([
       getTokenPrice(inputMint),
       getTokenPrice(outputMint),
     ]);
+
+    console.log(`[estimateOutputFromPrices] Prices: input=$${inputPrice}, output=$${outputPrice}, inputDec=${inputDecimals}, outputDec=${outputDecimals}`);
 
     if (inputPrice > 0 && outputPrice > 0) {
       // Convertir le montant d'entrée en USD
@@ -278,11 +399,13 @@ async function estimateOutputFromPrices(
       const outputAmountNormalized = inputValueUsd / outputPrice;
       const outputAmount = Math.floor(outputAmountNormalized * Math.pow(10, outputDecimals));
       
+      console.log(`[estimateOutputFromPrices] Calculated: ${inputAmountNormalized} input -> $${inputValueUsd.toFixed(2)} -> ${outputAmountNormalized} output (raw: ${outputAmount})`);
+      
       // Estimer un price impact de 0.1% pour les estimations
       return { outputAmount, priceImpactBps: 10 };
     }
-  } catch {
-    // Ignore
+  } catch (error) {
+    console.log(`[estimateOutputFromPrices] Error:`, error);
   }
   return null;
 }
