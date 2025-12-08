@@ -1368,10 +1368,14 @@ export class NativeRouterService {
   ): Promise<{
     routerState: PublicKey;
     rebateVault: PublicKey;
+    vaultTokenAccountA: PublicKey;
+    vaultTokenAccountB: PublicKey;
     userTokenAccountA: PublicKey;
     userTokenAccountB: PublicKey;
     userRebateAccount: PublicKey;
     userNftPda: PublicKey;
+    oracleCache: PublicKey;
+    venueScore: PublicKey;
   }> {
     // Router State PDA
     const [routerState] = PublicKey.findProgramAddressSync(
@@ -1383,6 +1387,19 @@ export class NativeRouterService {
     const [rebateVault] = PublicKey.findProgramAddressSync(
       [Buffer.from("rebate_vault"), routerState.toBuffer()],
       this.programId
+    );
+    
+    // Vault token accounts (ATAs du RouterState pour chaque token)
+    // Ces comptes doivent être créés avec init-router-vaults.js
+    const vaultTokenAccountA = await getAssociatedTokenAddress(
+      inputMint,
+      routerState,
+      true // allowOwnerOffCurve = true car routerState est un PDA
+    );
+    const vaultTokenAccountB = await getAssociatedTokenAddress(
+      outputMint,
+      routerState,
+      true // allowOwnerOffCurve = true car routerState est un PDA
     );
     
     // User token accounts (ATAs)
@@ -1398,13 +1415,29 @@ export class NativeRouterService {
       CNFT_PROGRAM_ID
     );
     
+    // Oracle cache PDA
+    const [oracleCache] = PublicKey.findProgramAddressSync(
+      [Buffer.from("oracle_cache"), DEFAULT_ORACLE.toBuffer()],
+      this.programId
+    );
+    
+    // Venue score PDA
+    const [venueScore] = PublicKey.findProgramAddressSync(
+      [Buffer.from("venue_score"), routerState.toBuffer()],
+      this.programId
+    );
+    
     return {
       routerState,
       rebateVault,
+      vaultTokenAccountA,
+      vaultTokenAccountB,
       userTokenAccountA,
       userTokenAccountB,
       userRebateAccount,
       userNftPda,
+      oracleCache,
+      venueScore,
     };
   }
   
@@ -1507,11 +1540,9 @@ export class NativeRouterService {
     const idlResponse = await fetch("/idl/swapback_router.json");
     const idl = await idlResponse.json();
     
-    // Discriminator pour swap_toc (calculé depuis l'IDL)
-    // "swap_toc" => SHA256("global:swap_toc")[0..8]
-    const discriminator = Buffer.from([
-      0x5f, 0x1c, 0x8a, 0xc3, 0x9d, 0x6b, 0x2e, 0x7f
-    ]); // Placeholder - sera remplacé par le vrai discriminator
+    // Discriminator pour swap_toc (depuis l'IDL)
+    // swap_toc => [187, 201, 212, 51, 16, 155, 236, 60]
+    const discriminator = Buffer.from([187, 201, 212, 51, 16, 155, 236, 60]);
     
     // Sérialiser les arguments SwapArgs
     const argsBuffer = this.serializeSwapArgs({
@@ -1529,18 +1560,68 @@ export class NativeRouterService {
     // Récupérer les comptes du DEX pour le CPI
     const venueAccounts = await this.getVenueAccounts(bestVenue, inputMint, outputMint);
     
+    // Comptes selon l'ordre de l'IDL swap_toc:
+    // 1. state (writable)
+    // 2. user (writable, signer)
+    // 3. primary_oracle
+    // 4. fallback_oracle (optional) - on passe null/none
+    // 5. user_token_account_a (writable)
+    // 6. user_token_account_b (writable)
+    // 7. vault_token_account_a (writable)
+    // 8. vault_token_account_b (writable)
+    // 9. plan (optional) - null
+    // 10. user_nft (optional)
+    // 11. buyback_program (optional) - null
+    // 12. buyback_usdc_vault (optional) - null
+    // 13. buyback_state (optional) - null
+    // 14. user_rebate_account (optional, writable)
+    // 15. rebate_vault (writable)
+    // 16. oracle_cache (optional, writable)
+    // 17. venue_score (optional, writable)
+    // 18. token_program
+    // 19. system_program
+    // + remaining_accounts pour les venues DEX
+    
     const keys = [
-      // Comptes fixes
+      // 1. state
       { pubkey: accounts.routerState, isSigner: false, isWritable: true },
+      // 2. user
       { pubkey: userPublicKey, isSigner: true, isWritable: true },
+      // 3. primary_oracle
       { pubkey: DEFAULT_ORACLE, isSigner: false, isWritable: false },
+      // 4. fallback_oracle (optional - utiliser program ID comme "None")
+      { pubkey: this.programId, isSigner: false, isWritable: false },
+      // 5. user_token_account_a
       { pubkey: accounts.userTokenAccountA, isSigner: false, isWritable: true },
+      // 6. user_token_account_b
       { pubkey: accounts.userTokenAccountB, isSigner: false, isWritable: true },
-      { pubkey: accounts.rebateVault, isSigner: false, isWritable: true },
+      // 7. vault_token_account_a
+      { pubkey: accounts.vaultTokenAccountA, isSigner: false, isWritable: true },
+      // 8. vault_token_account_b
+      { pubkey: accounts.vaultTokenAccountB, isSigner: false, isWritable: true },
+      // 9. plan (optional - None)
+      { pubkey: this.programId, isSigner: false, isWritable: false },
+      // 10. user_nft (optional)
+      { pubkey: accounts.userNftPda, isSigner: false, isWritable: false },
+      // 11. buyback_program (optional - None)
+      { pubkey: this.programId, isSigner: false, isWritable: false },
+      // 12. buyback_usdc_vault (optional - None)
+      { pubkey: this.programId, isSigner: false, isWritable: false },
+      // 13. buyback_state (optional - None)
+      { pubkey: this.programId, isSigner: false, isWritable: false },
+      // 14. user_rebate_account (optional)
       { pubkey: accounts.userRebateAccount, isSigner: false, isWritable: true },
+      // 15. rebate_vault
+      { pubkey: accounts.rebateVault, isSigner: false, isWritable: true },
+      // 16. oracle_cache (optional)
+      { pubkey: accounts.oracleCache, isSigner: false, isWritable: true },
+      // 17. venue_score (optional)
+      { pubkey: accounts.venueScore, isSigner: false, isWritable: true },
+      // 18. token_program
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      // 19. system_program
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      // Venue accounts en remaining_accounts
+      // remaining_accounts: Venue accounts pour le CPI
       ...venueAccounts.map(pubkey => ({
         pubkey,
         isSigner: false,
