@@ -73,7 +73,10 @@ pub fn read_price_with_staleness(
     // Total size: 134 bytes
     // - 8 bytes: Anchor discriminator
     // - 32 bytes: write_authority (Pubkey, NOT Option!)
-    // - 2 bytes: verification_level (VerificationLevel enum - u8 + padding or u16)
+    // - verification_level (Anchor/Borsh enum):
+    //   - 1 byte discriminant
+    //   - +1 byte if Partial (num_signatures)
+    //   - +0 byte if Full
     // - PriceFeedMessage fields:
     //   - 32 bytes: feed_id [u8; 32]
     //   - 8 bytes: price (i64)
@@ -85,20 +88,6 @@ pub fn read_price_with_staleness(
     //   - 8 bytes: ema_conf (u64)
     // - 8 bytes: posted_slot (u64)
     //
-    // Layout offsets:
-    // 0-7:   discriminator
-    // 8-39:  write_authority (32 bytes)
-    // 40-41: verification_level (2 bytes)
-    // 42-73: feed_id (32 bytes)
-    // 74-81: price (8 bytes)
-    // 82-89: conf (8 bytes)
-    // 90-93: exponent (4 bytes)
-    // 94-101: publish_time (8 bytes)
-    // 102-109: prev_publish_time (8 bytes)
-    // 110-117: ema_price (8 bytes)
-    // 118-125: ema_conf (8 bytes)
-    // 126-133: posted_slot (8 bytes)
-    
     const EXPECTED_LEN: usize = 134;
     
     if data.len() < EXPECTED_LEN {
@@ -106,9 +95,38 @@ pub fn read_price_with_staleness(
         return err!(ErrorCode::InvalidOraclePrice);
     }
     
-    // PriceFeedMessage starts at offset 42 (after discriminator + write_authority + verification_level)
-    const MSG_OFFSET: usize = 8 + 32 + 2; // = 42
-    let msg_offset = MSG_OFFSET;
+    // Compute dynamic offset: discriminator (8) + write_authority (32) + verification_level (variable)
+    let mut msg_offset = 8 + 32;
+    if data.len() <= msg_offset {
+        msg!("⚠️ Missing verification_level discriminant");
+        return err!(ErrorCode::InvalidOraclePrice);
+    }
+
+    // VerificationLevel::Partial { num_signatures: u8 } => discriminant 0 + 1 byte payload
+    // VerificationLevel::Full => discriminant 1 (no payload)
+    match data[msg_offset] {
+        0 => {
+            msg_offset += 1; // discriminant
+            if data.len() <= msg_offset {
+                msg!("⚠️ verification_level Partial missing num_signatures byte");
+                return err!(ErrorCode::InvalidOraclePrice);
+            }
+            msg_offset += 1; // num_signatures
+        }
+        1 => {
+            msg_offset += 1; // discriminant only
+        }
+        other => {
+            msg!("⚠️ Unknown verification_level discriminant: {}", other);
+            return err!(ErrorCode::InvalidOraclePrice);
+        }
+    }
+
+    const PRICE_MESSAGE_AND_SLOT_LEN: usize = 32 + 8 + 8 + 4 + 8 + 8 + 8 + 8 + 8; // 92 bytes
+    if data.len() < msg_offset + PRICE_MESSAGE_AND_SLOT_LEN {
+        msg!("⚠️ PriceUpdateV2 data too short for price message block");
+        return err!(ErrorCode::InvalidOraclePrice);
+    }
     
     // Read price message fields
     // feed_id: [u8; 32] at msg_offset
