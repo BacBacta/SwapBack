@@ -4,7 +4,7 @@
  * Step 1: Initialize RouterConfig (this will set correct percentages in RouterState)
  * Step 2: Initialize Rebate Vault (USDC token account for user rebates)
  * 
- * Program ID: FuzLkp1G7v39XXxobvr5pnGk7xZucBUroa215LrCjsAg
+ * Program ID: APHj6L2b2bA2q62jwYZp38dqbTxQUqwatqdUum1trPnN
  * 
  * Expected values after initialization:
  * - Rebate: 7000 bps (70%)
@@ -30,7 +30,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 // Router Program ID (deployed Dec 8, 2025)
-const ROUTER_PROGRAM_ID = new PublicKey('FuzLkp1G7v39XXxobvr5pnGk7xZucBUroa215LrCjsAg');
+const ROUTER_PROGRAM_ID = new PublicKey('APHj6L2b2bA2q62jwYZp38dqbTxQUqwatqdUum1trPnN');
 
 // USDC Mint on mainnet
 const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');

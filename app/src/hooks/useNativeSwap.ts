@@ -32,6 +32,10 @@ import {
   MIN_VENUE_SCORE,
   MAX_ORACLE_DIVERGENCE_BPS,
 } from "@/lib/native-router";
+import { 
+  isNativeSwapAvailable, 
+  NATIVE_SWAP_UNAVAILABLE_MESSAGE 
+} from "@/config/oracles";
 import { useBoostCalculations } from "./useBoostCalculations";
 import { logger } from "@/lib/logger";
 
@@ -105,6 +109,11 @@ export function useNativeSwap() {
   const [lastSwapResult, setLastSwapResult] = useState<NativeSwapResult | null>(null);
   const [currentQuote, setCurrentQuote] = useState<NativeSwapQuote | null>(null);
   const [useMevProtection, setUseMevProtection] = useState(false);
+  
+  // Vérifier si les swaps natifs sont disponibles
+  const nativeSwapEnabled = useMemo(() => {
+    return isNativeSwapAvailable();
+  }, []);
 
   // Router natif
   const nativeRouter = useMemo(() => {
@@ -128,6 +137,15 @@ export function useNativeSwap() {
       setError(null);
 
       try {
+        // Vérifier si les swaps natifs sont disponibles
+        if (!nativeSwapEnabled) {
+          logger.warn("useNativeSwap", "Native swap unavailable - oracles deprecated", {
+            message: NATIVE_SWAP_UNAVAILABLE_MESSAGE,
+          });
+          setError(NATIVE_SWAP_UNAVAILABLE_MESSAGE);
+          return null;
+        }
+        
         logger.info("useNativeSwap", "Fetching native quote", {
           inputMint: params.inputMint.toString(),
           outputMint: params.outputMint.toString(),

@@ -73,7 +73,7 @@ const TESTNET_PROGRAM_IDS: ProgramIds = {
  */
 const MAINNET_PROGRAM_IDS: ProgramIds = {
   cnftProgram: new PublicKey('EPtggan3TvdcVdxWnsJ9sKUoymoRoS1HdBa7YqNpPoSP'), // cNFT Program
-  routerProgram: new PublicKey('FuzLkp1G7v39XXxobvr5pnGk7xZucBUroa215LrCjsAg'), // Router - Deployed Dec 8, 2025
+  routerProgram: new PublicKey('APHj6L2b2bA2q62jwYZp38dqbTxQUqwatqdUum1trPnN'), // Router - Deployed Dec 8, 2025
   buybackProgram: new PublicKey('7wCCwRXxWvMY2DJDRrnhFg3b8jVPb5vVPxLH5YAGL6eJ'), // Buyback Program
 };
 

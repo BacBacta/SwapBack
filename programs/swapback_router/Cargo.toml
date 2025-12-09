@@ -32,8 +32,10 @@ solana-program = { workspace = true }
 # use anchor_lang::solana_program au lieu de use solana_program
 switchboard-solana = { version = "0.30.4", optional = true }
 
-# Pyth SDK
-pyth-sdk-solana = "=0.10.1"
+# Pyth V2 SDK (Pull Oracle) - Non utilisé directement, désérialisation manuelle
+# pyth-solana-receiver-sdk = "1.1.0"
+# Note: Nous désérialisons manuellement les comptes PriceUpdateV2 pour éviter
+# les conflits de version Anchor. Voir oracle_v2.rs pour les détails.
 
 # getrandom avec custom feature pour notre stub BPF
 getrandom = { version = "0.2", default-features = false, features = ["custom"] }

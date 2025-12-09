@@ -11,7 +11,7 @@ const BN = require('bn.js');
 
 // Configuration
 const RPC_URL = process.env.MAINNET_RPC || 'https://api.mainnet-beta.solana.com';
-const ROUTER_PROGRAM_ID = new PublicKey('FuzLkp1G7v39XXxobvr5pnGk7xZucBUroa215LrCjsAg');
+const ROUTER_PROGRAM_ID = new PublicKey('APHj6L2b2bA2q62jwYZp38dqbTxQUqwatqdUum1trPnN');
 const SOL_MINT = new PublicKey('So11111111111111111111111111111111111111112');
 const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 const PYTH_SOL_USD = new PublicKey('H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG');

@@ -39,7 +39,7 @@ import { PYTH_FEED_IDS, getPythFeedIdByMint } from "@/sdk/config/pyth-feeds";
 // ============================================================================
 
 // Program IDs (Mainnet - Deployed December 8, 2025)
-export const ROUTER_PROGRAM_ID = new PublicKey("FuzLkp1G7v39XXxobvr5pnGk7xZucBUroa215LrCjsAg");
+export const ROUTER_PROGRAM_ID = new PublicKey("APHj6L2b2bA2q62jwYZp38dqbTxQUqwatqdUum1trPnN");
 export const BUYBACK_PROGRAM_ID = new PublicKey("7wCCwRXxWvMY2DJDRrnhFg3b8jVPb5vVPxLH5YAGL6eJ");
 export const CNFT_PROGRAM_ID = new PublicKey("26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru");
 

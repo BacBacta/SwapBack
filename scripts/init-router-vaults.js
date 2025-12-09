@@ -44,7 +44,7 @@ async function main() {
   const routerProgramId = new PublicKey(
     process.env.ROUTER_PROGRAM_ID ||
       process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID ||
-      "FuzLkp1G7v39XXxobvr5pnGk7xZucBUroa215LrCjsAg"
+      "APHj6L2b2bA2q62jwYZp38dqbTxQUqwatqdUum1trPnN"
   );
 
   const [routerState] = PublicKey.findProgramAddressSync([

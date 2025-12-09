@@ -1,28 +1,28 @@
+//! Oracle Module - Wrapper pour oracle_v2
+//! 
+//! Ce module délègue maintenant vers oracle_v2.rs qui utilise Pyth V2.
+//! Conservé pour compatibilité avec le code existant.
+
 use anchor_lang::prelude::*;
 
 use crate::{ErrorCode, OracleType};
+use crate::oracle_v2;
 
 #[cfg(feature = "switchboard")]
 use switchboard_solana::AggregatorAccountData;
 
-#[derive(Clone, Copy)]
-pub struct OracleObservation {
-    pub price: u64,
-    pub confidence: u64,
-    pub publish_time: i64,
-    pub slot: u64,
-    pub oracle_type: OracleType,
-    pub feed: Pubkey,
-}
+// Re-export OracleObservation depuis oracle_v2
+pub use oracle_v2::OracleObservation;
 
 // Confidence maximale autorisée (5% = 500 bps) - Pyth seulement
-// Augmenté de 200 à 500 pour supporter les actifs volatils (memecoins)
-// Pour les paires majeures (SOL/USDC), la confidence est typiquement < 50 bps
+#[allow(dead_code)]
 const MAX_CONFIDENCE_BPS: u128 = 500;
 
 /// Read oracle price with configurable staleness threshold
 /// For volatile markets, use lower values (30-60s)
 /// Default: MAX_STALENESS_SECS (300s)
+/// 
+/// Cette fonction délègue maintenant vers oracle_v2 qui supporte Pyth V2
 pub fn read_price_with_staleness(
     oracle_account: &AccountInfo,
     clock: &Clock,
@@ -32,10 +32,10 @@ pub fn read_price_with_staleness(
         return err!(ErrorCode::InvalidOraclePrice);
     }
 
-    // Strategy: Try Switchboard first, fallback to Pyth if it fails
+    // Strategy: Try Switchboard first, fallback to Pyth V2 if it fails
     // This ensures maximum availability across oracle providers
 
-    // Primary: Switchboard Oracle (ACTIVÉ - Compatible Solana 1.18)
+    // Primary: Switchboard Oracle (si feature activée)
     #[cfg(feature = "switchboard")]
     {
         match try_read_switchboard(oracle_account, clock, max_staleness_secs) {
@@ -44,22 +44,13 @@ pub fn read_price_with_staleness(
                 return Ok(observation);
             }
             Err(e) => {
-                msg!("⚠️ Switchboard failed: {:?}, attempting Pyth fallback", e);
+                msg!("⚠️ Switchboard failed: {:?}, attempting Pyth V2 fallback", e);
             }
         }
     }
 
-    // Fallback: Pyth SDK
-    match try_read_pyth(oracle_account, clock, max_staleness_secs) {
-        Ok(observation) => {
-            msg!("✅ Pyth oracle used (staleness limit: {}s)", max_staleness_secs);
-            Ok(observation)
-        }
-        Err(e) => {
-            msg!("❌ Both oracles failed - Pyth error: {:?}", e);
-            err!(ErrorCode::InvalidOraclePrice)
-        }
-    }
+    // Fallback: Pyth V2 via oracle_v2 module
+    oracle_v2::read_price_with_staleness(oracle_account, clock, max_staleness_secs)
 }
 
 #[cfg(feature = "switchboard")]
@@ -134,107 +125,4 @@ fn try_read_switchboard(
         oracle_type: OracleType::Switchboard,
         feed: oracle_account.key(),
     })
-}
-
-fn try_read_pyth(
-    oracle_account: &AccountInfo,
-    clock: &Clock,
-    max_staleness_secs: i64,
-) -> Result<OracleObservation> {
-    let price_data = oracle_account
-        .try_borrow_data()
-        .map_err(|_| error!(ErrorCode::InvalidOraclePrice))?;
-
-    let price_account = pyth_sdk_solana::state::load_price_account::<32, ()>(&price_data)
-        .map_err(|_| error!(ErrorCode::InvalidOraclePrice))?;
-
-    let price_key = oracle_account.key();
-    let price_feed = price_account.to_price_feed(&price_key);
-    drop(price_data);
-
-    let price = price_feed
-        .get_price_no_older_than(clock.unix_timestamp, max_staleness_secs as u64)
-        .ok_or_else(|| error!(ErrorCode::StaleOracleData))?;
-
-    let staleness = clock.unix_timestamp - price.publish_time;
-    if staleness > max_staleness_secs {
-        msg!(
-            "⚠️ Pyth data too old: {}s (max: {}s)",
-            staleness,
-            max_staleness_secs
-        );
-        return err!(ErrorCode::StaleOracleData);
-    }
-
-    let price_scaled = normalize_decimal(price.price as i128, price.expo)
-        .ok_or_else(|| error!(ErrorCode::InvalidOraclePrice))?;
-
-    if price_scaled == 0 {
-        return err!(ErrorCode::InvalidOraclePrice);
-    }
-
-    let confidence_scaled = normalize_decimal(price.conf as i128, price.expo)
-        .ok_or_else(|| error!(ErrorCode::InvalidOraclePrice))?;
-
-    let confidence_bps = confidence_scaled
-        .checked_mul(10_000)
-        .and_then(|value| value.checked_div(price_scaled))
-        .ok_or_else(|| error!(ErrorCode::InvalidOraclePrice))?;
-
-    if confidence_bps > MAX_CONFIDENCE_BPS {
-        msg!(
-            "❌ Pyth confidence too wide: {} bps (max: {})",
-            confidence_bps,
-            MAX_CONFIDENCE_BPS
-        );
-        return err!(ErrorCode::InvalidOraclePrice);
-    }
-
-    let normalized_price =
-        u64::try_from(price_scaled).map_err(|_| error!(ErrorCode::InvalidOraclePrice))?;
-    let normalized_confidence =
-        u64::try_from(confidence_scaled).map_err(|_| error!(ErrorCode::InvalidOraclePrice))?;
-
-    msg!(
-        "✅ Pyth price read: {} (confidence: {} bps)",
-        normalized_price,
-        confidence_bps
-    );
-
-    Ok(OracleObservation {
-        price: normalized_price,
-        confidence: normalized_confidence,
-        publish_time: price.publish_time,
-        slot: clock.slot,
-        oracle_type: OracleType::Pyth,
-        feed: oracle_account.key(),
-    })
-}
-
-// Fonctions utilitaires pour Pyth
-fn normalize_decimal(value: i128, expo: i32) -> Option<u128> {
-    let target_exponent = -8;
-    let exponent_diff = target_exponent - expo;
-    let mut scaled = value;
-
-    if exponent_diff >= 0 {
-        scaled = scaled.checked_mul(pow10_i128(exponent_diff as u32)?)?;
-    } else {
-        scaled = scaled.checked_div(pow10_i128((-exponent_diff) as u32)?)?;
-    }
-
-    if scaled < 0 {
-        None
-    } else {
-        Some(scaled as u128)
-    }
-}
-
-#[allow(dead_code)]
-fn pow10_i128(exp: u32) -> Option<i128> {
-    let mut value: i128 = 1;
-    for _ in 0..exp {
-        value = value.checked_mul(10)?;
-    }
-    Some(value)
 }

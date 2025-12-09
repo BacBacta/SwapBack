@@ -73,6 +73,13 @@ const nextConfig = {
   },
   
   webpack: (config, { isServer, dev }) => {
+    config.resolve = config.resolve || {};
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'rpc-websockets/dist/lib/client': RPC_WEBSOCKETS_SHIM_PATH,
+      'rpc-websockets/dist/lib/client/websocket.browser': RPC_WEBSOCKETS_SHIM_PATH,
+    };
+
     // Polyfills pour les modules Node.js requis par Solana (côté client uniquement)
     if (!isServer) {
       config.resolve.fallback = {
@@ -94,9 +101,6 @@ const nextConfig = {
         ...config.resolve.alias,
         crypto: require.resolve('crypto-browserify'),
         stream: require.resolve('stream-browserify'),
-        // Fix rpc-websockets v9.x export issues - redirect old paths to shim
-        'rpc-websockets/dist/lib/client': RPC_WEBSOCKETS_SHIM_PATH,
-        'rpc-websockets/dist/lib/client/websocket.browser': RPC_WEBSOCKETS_SHIM_PATH,
       };
 
       config.plugins = config.plugins || [];

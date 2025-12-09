@@ -19,7 +19,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 // New Router Program ID (deployed Dec 8, 2025)
-const ROUTER_PROGRAM_ID = new PublicKey('FuzLkp1G7v39XXxobvr5pnGk7xZucBUroa215LrCjsAg');
+const ROUTER_PROGRAM_ID = new PublicKey('APHj6L2b2bA2q62jwYZp38dqbTxQUqwatqdUum1trPnN');
 
 // RouterState size from state/router_state.rs
 const ROUTER_STATE_SIZE = 278; // 8 + 32 + 33 + 1 + 8 + 10 + 128 + 56 + 1 + 1

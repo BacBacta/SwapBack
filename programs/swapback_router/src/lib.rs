@@ -17,12 +17,16 @@ pub mod instructions;
 #[macro_use]
 pub mod logging;
 pub mod math;
+mod oracle_v2;  // Must be before oracle (oracle depends on oracle_v2)
 mod oracle;
 pub mod oracle_cache;
 pub mod routing;
 pub mod slippage;
 pub mod state;
 pub mod venue_scoring;
+
+// Re-export Pyth V2 feed IDs for external use
+pub use oracle_v2::feed_ids;
 
 // Custom getrandom stub for Solana BPF target
 #[cfg(target_os = "solana")]
@@ -42,7 +46,7 @@ use routing::{
 };
 
 // Program ID - Deployed on mainnet-beta (Dec 8, 2025)
-declare_id!("FuzLkp1G7v39XXxobvr5pnGk7xZucBUroa215LrCjsAg");
+declare_id!("APHj6L2b2bA2q62jwYZp38dqbTxQUqwatqdUum1trPnN");
 
 // ============================================
 // DEX Program IDs (Mainnet-beta)
