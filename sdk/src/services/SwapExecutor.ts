@@ -53,7 +53,7 @@ import {
 import { JitoBundleService, MEVProtectionAnalyzer } from "./JitoBundleService";
 
 const SWAPBACK_ROUTER_PROGRAM_ID = new PublicKey(
-  "FPK46poe53iX6Bcv3q8cgmc1jm7dJKQ9Qs9oESFxGN55"
+  "APHj6L2b2bA2q62jwYZp38dqbTxQUqwatqdUum1trPnN"
 );
 
 const JUPITER_AGGREGATOR_PROGRAM_ID = new PublicKey(

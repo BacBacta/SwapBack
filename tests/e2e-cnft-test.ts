@@ -14,7 +14,7 @@ import { PublicKey, Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import fs from "fs";
 
 // Program IDs déployés sur devnet
-const ROUTER_PROGRAM_ID = new PublicKey("FPK46poe53iX6Bcv3q8cgmc1jm7dJKQ9Qs9oESFxGN55");
+const ROUTER_PROGRAM_ID = new PublicKey("APHj6L2b2bA2q62jwYZp38dqbTxQUqwatqdUum1trPnN");
 const CNFT_PROGRAM_ID = new PublicKey("FPNibu4RhrTt9yLDxcc8nQuHiVkFCfLVJ7DZUn6yn8K8");
 
 interface TestResult {

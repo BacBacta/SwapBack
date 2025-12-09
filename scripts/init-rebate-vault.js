@@ -1,110 +1,108 @@
-#!/usr/bin/env node
-
 /**
- * Initialize the rebate vault PDA (USDC) controlled by the router state.
- *
- * Usage: node scripts/init-rebate-vault.js [--program <router_program_id>] [--mint <usdc_mint>]
+ * Initialize Rebate Vault for SwapBack Router
+ * 
+ * Le rebate_vault est un PDA Token Account qui stocke les USDC pour les rebates
  */
 
-const anchor = require("@coral-xyz/anchor");
-const { Connection, Keypair, PublicKey, SystemProgram } = require("@solana/web3.js");
-const { TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync, ASSOCIATED_TOKEN_PROGRAM_ID } = require("@solana/spl-token");
-const fs = require("fs");
-const path = require("path");
+const { Connection, PublicKey, Keypair, Transaction, SystemProgram, SYSVAR_RENT_PUBKEY } = require('@solana/web3.js');
+const { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } = require('@solana/spl-token');
+const anchor = require('@coral-xyz/anchor');
+const fs = require('fs');
+const path = require('path');
+
+const PROGRAM_ID = new PublicKey('APHj6L2b2bA2q62jwYZp38dqbTxQUqwatqdUum1trPnN');
+const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 
 async function main() {
-  console.log("\n🚀 Initialisation du rebate vault USDC\n");
-
-  const args = process.argv.slice(2);
-  const programArgIndex = args.indexOf("--program");
-  const mintArgIndex = args.indexOf("--mint");
-
-  const routerProgramId = new PublicKey(
-    (programArgIndex !== -1 && args[programArgIndex + 1]) ||
-      process.env.ROUTER_PROGRAM_ID ||
-      process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID ||
-        "GEdKdZRVZHLUKGCX8swwLn7BJUciDFgf2edkjq4M31mJ"
-  );
-
-  const usdcMint = new PublicKey(
-    (mintArgIndex !== -1 && args[mintArgIndex + 1]) ||
-      process.env.USDC_MINT ||
-      process.env.NEXT_PUBLIC_USDC_MINT ||
-      "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-  );
-
-  const rpcUrl = process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
-  const connection = new Connection(rpcUrl, "confirmed");
-
-  // Try mainnet keypair first, fallback to default
-  let walletPath = path.join(process.cwd(), "mainnet-deploy-keypair.json");
-  if (!fs.existsSync(walletPath)) {
-    walletPath = path.join(process.env.HOME || ".", ".config/solana/id.json");
-  }
-  const secret = JSON.parse(fs.readFileSync(walletPath, "utf8"));
-  const authority = Keypair.fromSecretKey(Uint8Array.from(secret));
-
-  console.log(`🔑 Authority: ${authority.publicKey.toBase58()}`);
-  console.log(`📡 RPC: ${rpcUrl}`);
-  console.log(`🏦 Router Program: ${routerProgramId.toBase58()}`);
-  console.log(`💵 USDC Mint: ${usdcMint.toBase58()}\n`);
-
-  const provider = new anchor.AnchorProvider(
-    connection,
-    new anchor.Wallet(authority),
-    { commitment: "confirmed" }
-  );
-  anchor.setProvider(provider);
-
-  // Load IDL - handle both old and new Anchor IDL formats
-  const idlPath = path.join(__dirname, "../target/idl/swapback_router.json");
-  const idlJson = JSON.parse(fs.readFileSync(idlPath, "utf8"));
+  console.log('='.repeat(60));
+  console.log('Initialize Rebate Vault');
+  console.log('='.repeat(60));
   
-  // For Anchor 0.30+, we need to use the Program constructor differently
-  const program = new anchor.Program(idlJson, provider);
-
-  const [routerState] = PublicKey.findProgramAddressSync([
-    Buffer.from("router_state"),
-  ], routerProgramId);
-
-  const [rebateVault] = PublicKey.findProgramAddressSync([
-    Buffer.from("rebate_vault"),
-    routerState.toBuffer(),
-  ], routerProgramId);
-
-  console.log(`🧠 RouterState PDA: ${routerState.toBase58()}`);
-  console.log(`🏛️  Rebate vault PDA: ${rebateVault.toBase58()}`);
+  // Connect to mainnet
+  const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+  
+  // Load wallet
+  const keypairPath = process.env.HOME + '/.config/solana/id.json';
+  const keypairData = JSON.parse(fs.readFileSync(keypairPath, 'utf8'));
+  const wallet = Keypair.fromSecretKey(Uint8Array.from(keypairData));
+  
+  console.log(`\nWallet: ${wallet.publicKey.toBase58()}`);
+  
+  // Derive RouterState PDA
+  const [routerState, stateBump] = PublicKey.findProgramAddressSync(
+    [Buffer.from('router_state')],
+    PROGRAM_ID
+  );
+  console.log(`RouterState PDA: ${routerState.toBase58()}`);
+  
+  // Derive RebateVault PDA
+  const [rebateVault, vaultBump] = PublicKey.findProgramAddressSync(
+    [Buffer.from('rebate_vault'), routerState.toBuffer()],
+    PROGRAM_ID
+  );
+  console.log(`RebateVault PDA: ${rebateVault.toBase58()}`);
   
   // Check if rebate vault already exists
-  const existingAccount = await connection.getAccountInfo(rebateVault);
-  if (existingAccount) {
-    console.log("\n✅ Le rebate vault existe déjà!");
-    console.log(`   Lamports: ${existingAccount.lamports}`);
-    console.log(`   Owner: ${existingAccount.owner.toBase58()}`);
+  const vaultInfo = await connection.getAccountInfo(rebateVault);
+  if (vaultInfo) {
+    console.log('\n✅ RebateVault already initialized!');
+    console.log(`   Owner: ${vaultInfo.owner.toBase58()}`);
+    console.log(`   Size: ${vaultInfo.data.length} bytes`);
     return;
   }
-
-  console.log("\n⏳ Création du rebate vault...");
-
-  const tx = await program.methods
-    .initializeRebateVault()
-    .accounts({
-      state: routerState,
-      rebateVault,
-      usdcMint,
-      authority: authority.publicKey,
-      tokenProgram: TOKEN_PROGRAM_ID,
-      systemProgram: SystemProgram.programId,
-      rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-    })
-    .rpc();
-
-  console.log("\n✅ Rebate vault initialisé!");
-  console.log(`   Transaction: ${tx}`);
-  console.log(`   Explorer: https://explorer.solana.com/tx/${tx}\n`);
+  
+  console.log('\n⏳ RebateVault not initialized, creating...');
+  
+  // Load IDL
+  const idlPath = path.join(__dirname, '../target/idl/swapback_router.json');
+  const idl = JSON.parse(fs.readFileSync(idlPath, 'utf8'));
+  
+  // Setup provider
+  const provider = new anchor.AnchorProvider(
+    connection,
+    new anchor.Wallet(wallet),
+    { commitment: 'confirmed' }
+  );
+  anchor.setProvider(provider);
+  
+  // Create program instance
+  const program = new anchor.Program(idl, PROGRAM_ID, provider);
+  
+  // Check balance
+  const balance = await connection.getBalance(wallet.publicKey);
+  console.log(`Balance: ${(balance / 1e9).toFixed(4)} SOL`);
+  
+  if (balance < 0.01 * 1e9) {
+    console.error('❌ Insufficient balance!');
+    return;
+  }
+  
+  try {
+    // Call initialize_rebate_vault
+    const tx = await program.methods
+      .initializeRebateVault()
+      .accounts({
+        state: routerState,
+        rebateVault: rebateVault,
+        usdcMint: USDC_MINT,
+        authority: wallet.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        rent: SYSVAR_RENT_PUBKEY,
+      })
+      .signers([wallet])
+      .rpc();
+    
+    console.log(`\n✅ RebateVault initialized!`);
+    console.log(`Transaction: ${tx}`);
+    console.log(`https://solscan.io/tx/${tx}`);
+  } catch (err) {
+    console.error('\n❌ Error:', err.message);
+    if (err.logs) {
+      console.log('\nLogs:');
+      err.logs.forEach(log => console.log('  ', log));
+    }
+  }
 }
 
-main().catch((err) => {
-  console.error("❌ Erreur lors de l'initialisation du rebate vault:", err);
-  process.exit(1);
-});
+main().catch(console.error);
