@@ -69,13 +69,13 @@ pub fn read_price_with_staleness(
     let data = oracle_account.try_borrow_data()
         .map_err(|_| error!(ErrorCode::InvalidOraclePrice))?;
     
-    // PriceUpdateV2 structure (Anchor account with discriminator):
-    // - 8 bytes: discriminator
-    // - 1 byte: write_authority (Option flag)
-    // - 32 bytes: write_authority pubkey (if Some)
-    // - 1 byte: verification_level (enum: Partial=0, Full=1)
-    // - PriceMessage fields:
-    //   - 32 bytes: feed_id
+    // PriceUpdateV2 structure from pyth_solana_receiver_sdk (CORRECT LAYOUT):
+    // Total size: 134 bytes
+    // - 8 bytes: Anchor discriminator
+    // - 32 bytes: write_authority (Pubkey, NOT Option!)
+    // - 2 bytes: verification_level (VerificationLevel enum - u8 + padding or u16)
+    // - PriceFeedMessage fields:
+    //   - 32 bytes: feed_id [u8; 32]
     //   - 8 bytes: price (i64)
     //   - 8 bytes: conf (u64)
     //   - 4 bytes: exponent (i32)
@@ -83,31 +83,32 @@ pub fn read_price_with_staleness(
     //   - 8 bytes: prev_publish_time (i64)
     //   - 8 bytes: ema_price (i64)
     //   - 8 bytes: ema_conf (u64)
-    //   - 8 bytes: posted_slot (u64)
+    // - 8 bytes: posted_slot (u64)
+    //
+    // Layout offsets:
+    // 0-7:   discriminator
+    // 8-39:  write_authority (32 bytes)
+    // 40-41: verification_level (2 bytes)
+    // 42-73: feed_id (32 bytes)
+    // 74-81: price (8 bytes)
+    // 82-89: conf (8 bytes)
+    // 90-93: exponent (4 bytes)
+    // 94-101: publish_time (8 bytes)
+    // 102-109: prev_publish_time (8 bytes)
+    // 110-117: ema_price (8 bytes)
+    // 118-125: ema_conf (8 bytes)
+    // 126-133: posted_slot (8 bytes)
     
-    if data.len() < 8 + 1 {
-        msg!("⚠️ PriceUpdateV2 data too short (len: {})", data.len());
+    const EXPECTED_LEN: usize = 134;
+    
+    if data.len() < EXPECTED_LEN {
+        msg!("⚠️ PriceUpdateV2 data too short: {} < {} expected", data.len(), EXPECTED_LEN);
         return err!(ErrorCode::InvalidOraclePrice);
     }
     
-    // Skip discriminator (8 bytes) and check write_authority Option
-    let offset = if data[8] == 1 { 
-        // write_authority is Some: skip flag + pubkey
-        8 + 1 + 32 
-    } else { 
-        // write_authority is None: skip flag only
-        8 + 1 
-    };
-    
-    // Minimum required: verification_level (1) + feed_id (32) + price (8) + conf (8) + exp (4) + pub_time (8)
-    let min_len = offset + 1 + 32 + 8 + 8 + 4 + 8;
-    if data.len() < min_len {
-        msg!("⚠️ PriceUpdateV2 data too short: {} < {}", data.len(), min_len);
-        return err!(ErrorCode::InvalidOraclePrice);
-    }
-    
-    // Skip verification level (we don't validate it here - the account ownership is enough)
-    let msg_offset = offset + 1;
+    // PriceFeedMessage starts at offset 42 (after discriminator + write_authority + verification_level)
+    const MSG_OFFSET: usize = 8 + 32 + 2; // = 42
+    let msg_offset = MSG_OFFSET;
     
     // Read price message fields
     // feed_id: [u8; 32] at msg_offset
