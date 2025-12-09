@@ -1620,45 +1620,7 @@ export class NativeRouterService {
     bestVenue: VenueQuote,
     maxStalenessSecs?: number
   ): Promise<TransactionInstruction> {
-    // Charger l'IDL
-    const idlResponse = await fetch("/idl/swapback_router.json");
-    const idl = await idlResponse.json();
-    
-    // Discriminator pour swap_toc (depuis l'IDL)
-    // swap_toc => [187, 201, 212, 51, 16, 155, 236, 60]
-    const discriminator = Buffer.from([187, 201, 212, 51, 16, 155, 236, 60]);
-    
-    // Sérialiser les arguments SwapArgs
-    const argsBuffer = this.serializeSwapArgs({
-      amountIn: new BN(amountIn),
-      minOut: new BN(minAmountOut),
-      slippageTolerance: 50, // 0.5%
-      useDynamicPlan: false,
-      useBundle: false,
-      primaryOracleAccount: PYTH_SOL_USD_MAINNET, // Sera overridé par les oracles dans keys
-      venues: venueWeights,
-      maxStalenessOverride: maxStalenessSecs,
-    });
-    
-    const data = Buffer.concat([discriminator, argsBuffer]);
-    
-    // Récupérer les comptes du DEX pour le CPI
-    const venueAccounts = await this.getVenueAccounts(bestVenue, inputMint, outputMint);
-    
-    // Vérifier quels comptes optionnels existent on-chain
-    const [userNftExists, oracleCacheExists, venueScoreExists] = await Promise.all([
-      this.connection.getAccountInfo(accounts.userNftPda).then(info => !!info),
-      this.connection.getAccountInfo(accounts.oracleCache).then(info => !!info),
-      this.connection.getAccountInfo(accounts.venueScore).then(info => !!info),
-    ]);
-    
-    logger.debug("NativeRouter", "Optional accounts check", {
-      userNftExists,
-      oracleCacheExists,
-      venueScoreExists,
-    });
-    
-    // Obtenir les oracles pour cette paire de tokens
+    // Obtenir les oracles pour cette paire de tokens AVANT la sérialisation
     // IMPORTANT: Ne PAS fallback silencieusement sur DEFAULT_ORACLE
     let primaryOracle: PublicKey;
     let fallbackOracle: PublicKey | null = null;
@@ -1688,6 +1650,45 @@ export class NativeRouterService {
         `Veuillez contacter le support ou utiliser une autre paire.`
       );
     }
+
+    // Charger l'IDL
+    const idlResponse = await fetch("/idl/swapback_router.json");
+    const idl = await idlResponse.json();
+    
+    // Discriminator pour swap_toc (depuis l'IDL)
+    // swap_toc => [187, 201, 212, 51, 16, 155, 236, 60]
+    const discriminator = Buffer.from([187, 201, 212, 51, 16, 155, 236, 60]);
+    
+    // Sérialiser les arguments SwapArgs
+    // IMPORTANT: primaryOracleAccount DOIT correspondre au compte dans keys (primaryOracle)
+    const argsBuffer = this.serializeSwapArgs({
+      amountIn: new BN(amountIn),
+      minOut: new BN(minAmountOut),
+      slippageTolerance: 50, // 0.5%
+      useDynamicPlan: false,
+      useBundle: false,
+      primaryOracleAccount: primaryOracle, // Utiliser l'oracle réel, pas le hardcodé
+      venues: venueWeights,
+      maxStalenessOverride: maxStalenessSecs,
+    });
+    
+    const data = Buffer.concat([discriminator, argsBuffer]);
+    
+    // Récupérer les comptes du DEX pour le CPI
+    const venueAccounts = await this.getVenueAccounts(bestVenue, inputMint, outputMint);
+    
+    // Vérifier quels comptes optionnels existent on-chain
+    const [userNftExists, oracleCacheExists, venueScoreExists] = await Promise.all([
+      this.connection.getAccountInfo(accounts.userNftPda).then(info => !!info),
+      this.connection.getAccountInfo(accounts.oracleCache).then(info => !!info),
+      this.connection.getAccountInfo(accounts.venueScore).then(info => !!info),
+    ]);
+    
+    logger.debug("NativeRouter", "Optional accounts check", {
+      userNftExists,
+      oracleCacheExists,
+      venueScoreExists,
+    });
     
     // Comptes selon l'ordre de l'IDL swap_toc:
     // Pour les comptes optionnels qui n'existent pas, on utilise le program ID du router
