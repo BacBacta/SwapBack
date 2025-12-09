@@ -74,11 +74,24 @@ const nextConfig = {
   
   webpack: (config, { isServer, dev }) => {
     config.resolve = config.resolve || {};
+    
+    // Handle rpc-websockets resolution for all nested node_modules
+    const rpcWebsocketsPath = path.resolve(__dirname, 'node_modules/rpc-websockets/dist/lib/client/websocket.browser.cjs');
+    
     config.resolve.alias = {
       ...config.resolve.alias,
       'rpc-websockets/dist/lib/client': RPC_WEBSOCKETS_SHIM_PATH,
-      'rpc-websockets/dist/lib/client/websocket.browser': RPC_WEBSOCKETS_SHIM_PATH,
+      'rpc-websockets/dist/lib/client/websocket.browser': rpcWebsocketsPath,
     };
+    
+    // Use NormalModuleReplacementPlugin to handle nested node_modules
+    config.plugins = config.plugins || [];
+    config.plugins.push(
+      new webpack.NormalModuleReplacementPlugin(
+        /rpc-websockets\/dist\/lib\/client\/websocket\.browser$/,
+        rpcWebsocketsPath
+      )
+    );
 
     // Polyfills pour les modules Node.js requis par Solana (côté client uniquement)
     if (!isServer) {
