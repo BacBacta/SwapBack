@@ -41,7 +41,7 @@ switchboard-solana = { version = "0.30.4", optional = true }
 getrandom = { version = "0.2", default-features = false, features = ["custom"] }
 
 # Forcer les versions compatibles avec Rust 1.79
-indexmap = "=2.6.0"
+indexmap = "=2.12.1"
 toml_edit = "=0.22.22"
 
 [dev-dependencies]
