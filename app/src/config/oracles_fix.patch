@@ -1,0 +1,24 @@
+--- a/app/src/config/oracles.ts
++++ b/app/src/config/oracles.ts
+@@ -147,18 +147,12 @@ export function getOracleFeedsForPair(inputMint: string, outputMint: string): Or
+ }
+
+ /**
+- * Vérifie si une paire a un oracle configuré
+- * 
+- * ⚠️ IMPORTANT: Retourne toujours FALSE actuellement car les oracles Pyth V1 sont morts.
+- * Cette fonction est utilisée par le NativeRouter pour décider si le swap natif est possible.
++ * Vérifie si une paire a un oracle configuré (Pyth V2 Push Feeds)
+  */
+ export function hasOracleForPair(inputMint: string, outputMint: string): boolean {
+-  // DÉSACTIVÉ: Pyth V1 (Push) est déprécié, les comptes ne sont plus mis à jour
+-  // Tous les swaps doivent passer par Jupiter jusqu'au redeploy du programme
+-  // avec support Pyth V2 (Pull Oracle)
+-  return false;
+-  
+-  // Code original (commenté pour référence):
+-  // const key = `${inputMint}/${outputMint}` as OraclePair;
+-  // return key in ORACLE_FEED_CONFIGS;
++  const key = \`\${inputMint}/\${outputMint}\` as OraclePair;
++  return key in ORACLE_FEED_CONFIGS;
+ }

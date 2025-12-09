@@ -1,22 +1,17 @@
 /**
  * Mapping des oracles Pyth utilisés par le router.
  * 
- * ⚠️ SITUATION ACTUELLE (Décembre 2025) :
- * - Pyth V1 (Push) sur Solana est DÉPRÉCIÉ - les comptes ne sont plus mis à jour
- * - Le programme on-chain swapback_router utilise pyth_sdk_solana::load_price_account (V1)
- * - Pyth V2 (Pull) utilise PriceUpdateV2, un format INCOMPATIBLE avec le programme actuel
- * - Switchboard V2 est EOL (fin de vie) depuis novembre 2024
+ * ✅ SITUATION ACTUELLE (9 Décembre 2025) :
+ * - Programme redéployé avec support Pyth V2 Push Feeds
+ * - Nouveau Program ID: APHj6L2b2bA2q62jwYZp38dqbTxQUqwatqdUum1trPnN
+ * - Utilise les Pyth V2 Push Feeds (sponsorisés par Pyth Data Association)
+ * - Désérialisation manuelle des PriceUpdateV2 (oracle_v2.rs)
  * 
- * CONSÉQUENCE :
- * - Les swaps natifs sont DÉSACTIVÉS pour toutes les paires
- * - Tous les swaps sont routés vers Jupiter comme fallback
- * - Un redeploy du programme est nécessaire pour supporter Pyth V2
+ * Les swaps natifs sont ACTIVÉS pour les paires avec oracles sponsorisés.
  * 
- * TODO: Mettre à jour le programme pour utiliser pyth-solana-receiver-sdk
- * 
- * Sources officielles (pour référence future):
+ * Sources officielles:
  * - Pyth V2 Push Feeds: https://docs.pyth.network/price-feeds/core/push-feeds/solana
- * - Pyth SDK: https://docs.pyth.network/price-feeds/use-real-time-data/solana
+ * - Liste des feeds sponsorisés: https://docs.pyth.network/price-feeds/sponsored-feeds
  */
 
 import { PublicKey } from "@solana/web3.js";
@@ -147,39 +142,29 @@ export function getOracleFeedsForPair(inputMint: string, outputMint: string): Or
 }
 
 /**
- * Vérifie si une paire a un oracle configuré
- * 
- * ⚠️ IMPORTANT: Retourne toujours FALSE actuellement car les oracles Pyth V1 sont morts.
- * Cette fonction est utilisée par le NativeRouter pour décider si le swap natif est possible.
+ * Vérifie si une paire a un oracle configuré (Pyth V2 Push Feeds)
+ * ✅ RÉACTIVÉ: Programme redéployé le 9 Dec 2025
  */
 export function hasOracleForPair(inputMint: string, outputMint: string): boolean {
-  // DÉSACTIVÉ: Pyth V1 (Push) est déprécié, les comptes ne sont plus mis à jour
-  // Tous les swaps doivent passer par Jupiter jusqu'au redeploy du programme
-  // avec support Pyth V2 (Pull Oracle)
-  return false;
-  
-  // Code original (commenté pour référence):
-  // const key = `${inputMint}/${outputMint}` as OraclePair;
-  // return key in ORACLE_FEED_CONFIGS;
+  const key = `${inputMint}/${outputMint}` as OraclePair;
+  return key in ORACLE_FEED_CONFIGS;
 }
 
 /**
  * Vérifie si les swaps natifs sont disponibles
- * 
- * @returns false - Les swaps natifs sont actuellement désactivés
+ * ✅ RÉACTIVÉ: Programme APHj6L2b2bA2q62jwYZp38dqbTxQUqwatqdUum1trPnN
+ * déployé le 9 décembre 2025 avec support Pyth V2 Push Feeds
  */
 export function isNativeSwapAvailable(): boolean {
-  // Pyth V1 est mort, Switchboard V2 est EOL
-  // Le programme on-chain doit être mis à jour pour supporter Pyth V2
-  return false;
+  return true;
 }
 
 /**
- * Message d'erreur à afficher à l'utilisateur
+ * Message affiché quand un swap natif n'est pas disponible pour une paire spécifique
  */
 export const NATIVE_SWAP_UNAVAILABLE_MESSAGE = 
-  "Les swaps natifs sont temporairement indisponibles. " +
-  "Votre transaction sera routée via Jupiter pour garantir l'exécution.";
+  "Swap natif non disponible pour cette paire. " +
+  "Votre transaction sera routée via Jupiter.";
 
 /**
  * Retro-compatibilité (retourne l'oracle primaire uniquement)
