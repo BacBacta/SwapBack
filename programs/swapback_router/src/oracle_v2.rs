@@ -69,14 +69,12 @@ pub fn read_price_with_staleness(
     let data = oracle_account.try_borrow_data()
         .map_err(|_| error!(ErrorCode::InvalidOraclePrice))?;
     
-    // PriceUpdateV2 structure from pyth_solana_receiver_sdk (CORRECT LAYOUT):
-    // Total size: 134 bytes
+    // PriceUpdateV2 structure from pyth_solana_receiver_sdk:
     // - 8 bytes: Anchor discriminator
     // - 32 bytes: write_authority (Pubkey, NOT Option!)
-    // - verification_level (Anchor/Borsh enum):
-    //   - 1 byte discriminant
-    //   - +1 byte if Partial (num_signatures)
-    //   - +0 byte if Full
+    // - VerificationLevel enum (Borsh):
+    //     * variant 0 => Partial { num_signatures: u8 } (2 bytes total)
+    //     * variant 1 => Full (1 byte total)
     // - PriceFeedMessage fields:
     //   - 32 bytes: feed_id [u8; 32]
     //   - 8 bytes: price (i64)
@@ -87,44 +85,53 @@ pub fn read_price_with_staleness(
     //   - 8 bytes: ema_price (i64)
     //   - 8 bytes: ema_conf (u64)
     // - 8 bytes: posted_slot (u64)
-    //
-    const EXPECTED_LEN: usize = 134;
     
-    if data.len() < EXPECTED_LEN {
-        msg!("⚠️ PriceUpdateV2 data too short: {} < {} expected", data.len(), EXPECTED_LEN);
-        return err!(ErrorCode::InvalidOraclePrice);
-    }
-    
-    // Compute dynamic offset: discriminator (8) + write_authority (32) + verification_level (variable)
-    let mut msg_offset = 8 + 32;
-    if data.len() <= msg_offset {
-        msg!("⚠️ Missing verification_level discriminant");
+    const DISCRIMINATOR_LEN: usize = 8;
+    const WRITE_AUTHORITY_LEN: usize = 32;
+    const PRICE_MESSAGE_LEN: usize = 32 + 8 + 8 + 4 + 8 + 8 + 8 + 8;
+    const POSTED_SLOT_LEN: usize = 8;
+
+    if data.len() < DISCRIMINATOR_LEN + WRITE_AUTHORITY_LEN + 1 + PRICE_MESSAGE_LEN {
+        msg!(
+            "⚠️ PriceUpdateV2 data too short: {} bytes",
+            data.len()
+        );
         return err!(ErrorCode::InvalidOraclePrice);
     }
 
-    // VerificationLevel::Partial { num_signatures: u8 } => discriminant 0 + 1 byte payload
-    // VerificationLevel::Full => discriminant 1 (no payload)
-    match data[msg_offset] {
+    // Skip discriminator + write authority
+    let mut msg_offset = DISCRIMINATOR_LEN + WRITE_AUTHORITY_LEN;
+
+    // Parse VerificationLevel enum (Borsh encoded)
+    let verification_variant = *data
+        .get(msg_offset)
+        .ok_or_else(|| error!(ErrorCode::InvalidOraclePrice))?;
+    msg_offset += 1;
+
+    match verification_variant {
         0 => {
-            msg_offset += 1; // discriminant
-            if data.len() <= msg_offset {
-                msg!("⚠️ verification_level Partial missing num_signatures byte");
-                return err!(ErrorCode::InvalidOraclePrice);
-            }
-            msg_offset += 1; // num_signatures
+            // Partial verification: read num_signatures byte
+            let _num_signatures = *data
+                .get(msg_offset)
+                .ok_or_else(|| error!(ErrorCode::InvalidOraclePrice))?;
+            msg_offset += 1;
         }
         1 => {
-            msg_offset += 1; // discriminant only
+            // Full verification: nothing more to read
         }
         other => {
-            msg!("⚠️ Unknown verification_level discriminant: {}", other);
+            msg!("⚠️ Unknown Pyth verification variant: {}", other);
             return err!(ErrorCode::InvalidOraclePrice);
         }
     }
 
-    const PRICE_MESSAGE_AND_SLOT_LEN: usize = 32 + 8 + 8 + 4 + 8 + 8 + 8 + 8 + 8; // 92 bytes
-    if data.len() < msg_offset + PRICE_MESSAGE_AND_SLOT_LEN {
-        msg!("⚠️ PriceUpdateV2 data too short for price message block");
+    let min_required_len = msg_offset + PRICE_MESSAGE_LEN;
+    if data.len() < min_required_len {
+        msg!(
+            "⚠️ PriceUpdateV2 data too short for message fields: {} < {}",
+            data.len(),
+            min_required_len
+        );
         return err!(ErrorCode::InvalidOraclePrice);
     }
     
@@ -153,6 +160,13 @@ pub fn read_price_with_staleness(
     let pub_time_bytes: [u8; 8] = data[msg_offset + 52..msg_offset + 60].try_into()
         .map_err(|_| error!(ErrorCode::InvalidOraclePrice))?;
     let publish_time = i64::from_le_bytes(pub_time_bytes);
+
+    // posted_slot (optional - not used but validates layout)
+    let slot_offset = msg_offset + PRICE_MESSAGE_LEN;
+    if data.len() < slot_offset + POSTED_SLOT_LEN {
+        msg!("⚠️ Missing posted_slot in PriceUpdateV2 account");
+        return err!(ErrorCode::InvalidOraclePrice);
+    }
     
     // Drop borrow before any further operations
     drop(data);
