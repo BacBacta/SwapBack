@@ -659,7 +659,6 @@ async function fetchPhoenixQuote(
   // Pour utiliser Phoenix, il faut intégrer le SDK on-chain
   // https://github.com/Ellipsis-Labs/phoenix-sdk
   return null;
-  }
 }
 
 /**

@@ -30,7 +30,10 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "bench:ab": "npx tsx sdk/scripts/bench_ab.ts",
     "benchmark": "npx tsx scripts/performanceComparison.ts",
-    "capture:bn-error": "tsx scripts/capture-bn-error.ts"
+    "capture:bn-error": "tsx scripts/capture-bn-error.ts",
+    "clean": "rm -rf .next dist build coverage .turbo .cache app/.next app/dist",
+    "clean:anchor": "rm -rf target .anchor/test-ledger test-ledger",
+    "clean:all": "npm run clean && npm run clean:anchor"
   },
   "overrides": {
     "@coral-xyz/anchor": "0.30.1",
