@@ -37,6 +37,12 @@ import {
   hasOracleForPair,
   NATIVE_SWAP_UNAVAILABLE_MESSAGE 
 } from "@/config/oracles";
+import { 
+  decideSwapRoute, 
+  formatRouteDecisionForLog,
+  getUIMessageForReason,
+  type SwapRouteDecision,
+} from "@/lib/swap-routing";
 import { useBoostCalculations } from "./useBoostCalculations";
 import { logger } from "@/lib/logger";
 
@@ -138,28 +144,32 @@ export function useNativeSwap() {
       setError(null);
 
       try {
-        // Vérifier si les swaps natifs sont disponibles globalement
-        if (!nativeSwapEnabled) {
-          logger.warn("useNativeSwap", "Native swap unavailable - oracles deprecated", {
-            message: NATIVE_SWAP_UNAVAILABLE_MESSAGE,
-          });
-          setError(NATIVE_SWAP_UNAVAILABLE_MESSAGE);
-          return null;
-        }
-        
-        // Vérifier si cette paire spécifique a un oracle configuré
         const inputMintStr = params.inputMint.toString();
         const outputMintStr = params.outputMint.toString();
         
-        if (!hasOracleForPair(inputMintStr, outputMintStr)) {
-          const pairUnsupportedMsg = 
-            `Paire ${inputMintStr.slice(0,4)}.../${outputMintStr.slice(0,4)}... non supportée. ` +
-            `Votre transaction sera routée via Jupiter.`;
-          logger.warn("useNativeSwap", "Pair not supported - no oracle", {
-            inputMint: inputMintStr,
-            outputMint: outputMintStr,
+        // ============================================================
+        // Décision de routing centralisée via decideSwapRoute
+        // ============================================================
+        // Note: hasJupiterCpi est true ici car on vérifie avant d'obtenir
+        // la quote. Le vrai check jupiterCpi se fait au moment du swap.
+        const routeDecision = decideSwapRoute({
+          inputMint: inputMintStr,
+          outputMint: outputMintStr,
+          hasJupiterCpi: true, // Présumé disponible pour la quote
+        });
+        
+        // Log structuré de la décision
+        logger.debug("useNativeSwap", "Route decision", formatRouteDecisionForLog(routeDecision));
+        
+        // Si route != native, retourner null avec message approprié
+        if (routeDecision.route !== "native") {
+          const uiMessage = getUIMessageForReason(routeDecision.reason);
+          logger.info("useNativeSwap", "Routing to Jupiter", {
+            reason: routeDecision.reason,
+            inputMint: inputMintStr.slice(0, 8),
+            outputMint: outputMintStr.slice(0, 8),
           });
-          setError(pairUnsupportedMsg);
+          setError(uiMessage);
           return null;
         }
         
@@ -475,15 +485,22 @@ export function useNativeSwap() {
 
   /**
    * Vérifie si une paire est supportée pour le swap natif
-   * Utile pour l'UI afin de désactiver le bouton ou afficher un message
+   * Utilise decideSwapRoute pour une décision cohérente
    */
   const isPairSupported = useCallback(
     (inputMint: PublicKey | string, outputMint: PublicKey | string): boolean => {
       const inputStr = typeof inputMint === "string" ? inputMint : inputMint.toString();
       const outputStr = typeof outputMint === "string" ? outputMint : outputMint.toString();
-      return nativeSwapEnabled && hasOracleForPair(inputStr, outputStr);
+      
+      const decision = decideSwapRoute({
+        inputMint: inputStr,
+        outputMint: outputStr,
+        hasJupiterCpi: true, // Présumé pour le check UI
+      });
+      
+      return decision.route === "native";
     },
-    [nativeSwapEnabled]
+    []
   );
 
   return {

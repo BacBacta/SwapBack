@@ -40,12 +40,12 @@ const UNKNOWN_MINT = "unknownMint123456789012345678901234567890";
 // ============================================================================
 
 describe("Native Swap Availability", () => {
-  it("should return false because native swap requires jupiter_route not yet implemented", () => {
-    // Le swap natif est désactivé car le programme on-chain exige jupiter_route
-    // mais le native-router n'envoie pas encore ces données.
-    // Voir: docs/ai/solana-native-router-a2z.md
+  it("should return true by default (feature flag enabled)", () => {
+    // isNativeSwapAvailable vérifie le feature flag NEXT_PUBLIC_NATIVE_SWAP_ENABLED
+    // Par défaut (sans env var), il retourne true.
+    // La décision complète de routing utilise decideSwapRoute()
     const isAvailable = isNativeSwapAvailable();
-    expect(isAvailable).toBe(false);
+    expect(isAvailable).toBe(true);
   });
 });
 

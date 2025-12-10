@@ -153,37 +153,42 @@ export function hasOracleForPair(inputMint: string, outputMint: string): boolean
 }
 
 /**
- * Vérifie si les swaps natifs sont disponibles
+ * Vérifie si les swaps natifs sont disponibles (feature flag)
  * 
- * ⚠️ DÉSACTIVÉ (Janvier 2025):
- * Le programme on-chain `swapback_router` exige un `jupiter_route` valide
- * dans les arguments SwapArgs pour exécuter process_single_swap().
- * Le flux native-router envoyait `jupiter_route: None` ce qui causait
- * l'erreur `MissingJupiterRoute (6021)`.
+ * IMPORTANT: Cette fonction vérifie uniquement le feature flag.
+ * La décision complète de routing doit utiliser `decideSwapRoute()`
+ * qui vérifie aussi la paire supportée et la disponibilité de jupiterCpi.
  * 
- * Pour réactiver:
- * 1. Modifier native-router pour récupérer jupiterCpi via /api/swap/quote
- * 2. Sérialiser correctement jupiter_route dans serializeSwapArgs
- * 3. Valider avec simulateTransaction sur mainnet
+ * Note technique:
+ * Le programme on-chain `swapback_router` exige un `jupiter_route` valide.
+ * Le native-router doit obtenir ces données via /api/swap/quote avant le swap.
  * 
- * En attendant, tous les swaps passent par Jupiter direct.
- * Voir: docs/ai/solana-native-router-a2z.md
+ * @see lib/swap-routing/decideSwapRoute.ts
  */
 export function isNativeSwapAvailable(): boolean {
-  // Désactivé - le programme on-chain exige jupiter_route, 
-  // mais le native-router envoie None (erreur 6021/MissingJupiterRoute)
-  return false;
+  // Lire depuis le feature flag (activé par défaut)
+  const envValue = typeof window !== "undefined"
+    ? process.env.NEXT_PUBLIC_NATIVE_SWAP_ENABLED
+    : process.env.NATIVE_SWAP_ENABLED;
+  
+  // Désactivé explicitement si "false" ou "0"
+  if (envValue === "false" || envValue === "0") {
+    return false;
+  }
+  
+  // Activé par défaut
+  return true;
 }
 
 /**
  * Message affiché quand un swap natif n'est pas disponible
  * 
- * Le swap natif est temporairement désactivé car le programme on-chain
- * exige des données Jupiter qui ne sont pas encore intégrées au flux natif.
+ * Note: ce message est un fallback. Préférer `getUIMessageForReason()`
+ * de `lib/swap-routing` pour des messages contextuels.
  */
 export const NATIVE_SWAP_UNAVAILABLE_MESSAGE = 
-  "Le swap natif est temporairement désactivé. " +
-  "Votre transaction est routée via Jupiter pour garantir la meilleure exécution.";
+  "Le swap natif n'est pas disponible pour cette transaction. " +
+  "Votre transaction est routée via Jupiter.";
 
 /**
  * Retro-compatibilité (retourne l'oracle primaire uniquement)
