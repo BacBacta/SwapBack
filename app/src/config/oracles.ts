@@ -154,19 +154,36 @@ export function hasOracleForPair(inputMint: string, outputMint: string): boolean
 
 /**
  * Vérifie si les swaps natifs sont disponibles
- * ✅ RÉACTIVÉ: Programme APHj6L2b2bA2q62jwYZp38dqbTxQUqwatqdUum1trPnN
- * déployé le 9 décembre 2025 avec support Pyth V2 Push Feeds
+ * 
+ * ⚠️ DÉSACTIVÉ (Janvier 2025):
+ * Le programme on-chain `swapback_router` exige un `jupiter_route` valide
+ * dans les arguments SwapArgs pour exécuter process_single_swap().
+ * Le flux native-router envoyait `jupiter_route: None` ce qui causait
+ * l'erreur `MissingJupiterRoute (6021)`.
+ * 
+ * Pour réactiver:
+ * 1. Modifier native-router pour récupérer jupiterCpi via /api/swap/quote
+ * 2. Sérialiser correctement jupiter_route dans serializeSwapArgs
+ * 3. Valider avec simulateTransaction sur mainnet
+ * 
+ * En attendant, tous les swaps passent par Jupiter direct.
+ * Voir: docs/ai/solana-native-router-a2z.md
  */
 export function isNativeSwapAvailable(): boolean {
-  return true;
+  // Désactivé - le programme on-chain exige jupiter_route, 
+  // mais le native-router envoie None (erreur 6021/MissingJupiterRoute)
+  return false;
 }
 
 /**
- * Message affiché quand un swap natif n'est pas disponible pour une paire spécifique
+ * Message affiché quand un swap natif n'est pas disponible
+ * 
+ * Le swap natif est temporairement désactivé car le programme on-chain
+ * exige des données Jupiter qui ne sont pas encore intégrées au flux natif.
  */
 export const NATIVE_SWAP_UNAVAILABLE_MESSAGE = 
-  "Swap natif non disponible pour cette paire. " +
-  "Votre transaction sera routée via Jupiter.";
+  "Le swap natif est temporairement désactivé. " +
+  "Votre transaction est routée via Jupiter pour garantir la meilleure exécution.";
 
 /**
  * Retro-compatibilité (retourne l'oracle primaire uniquement)

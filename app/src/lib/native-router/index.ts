@@ -1526,7 +1526,7 @@ export class NativeRouterService {
       weight: index === 0 ? 10000 : 0, // 100% sur la meilleure venue pour l'instant
     }));
 
-    // --- HERMES PULL ORACLE UPDATE ---
+    // --- HERMES PULL ORACLE UPDATE (best-effort, ne bloque pas le swap) ---
     try {
       const inputFeedId = getPythFeedIdByMint(inputMint.toBase58());
       const outputFeedId = getPythFeedIdByMint(outputMint.toBase58());
@@ -1535,9 +1535,23 @@ export class NativeRouterService {
         logger.info("NativeRouter", "Fetching Hermes updates for feeds", { inputFeedId, outputFeedId });
         
         const hermes = new HermesClient("https://hermes.pyth.network", { timeout: 5000 });
-        const priceUpdates = await hermes.getLatestPriceUpdates([inputFeedId, outputFeedId]);
         
-        if (priceUpdates && priceUpdates.binary && priceUpdates.binary.data) {
+        let priceUpdates;
+        try {
+          priceUpdates = await hermes.getLatestPriceUpdates([inputFeedId, outputFeedId]);
+        } catch (hermesErr) {
+          // Hermes peut retourner une erreur réseau ou timeout
+          // C'est best-effort - on continue avec les données on-chain existantes
+          const errorMsg = hermesErr instanceof Error ? hermesErr.message : String(hermesErr);
+          logger.warn("NativeRouter", "Hermes fetch failed (best-effort, continuing)", { 
+            error: errorMsg,
+            inputFeedId: inputFeedId.slice(0, 16),
+            outputFeedId: outputFeedId.slice(0, 16),
+          });
+          priceUpdates = null;
+        }
+        
+        if (priceUpdates?.binary?.data && Array.isArray(priceUpdates.binary.data) && priceUpdates.binary.data.length > 0) {
           // PythSolanaReceiver expects a wallet-like object. We mock it with just publicKey for instruction generation.
           const receiver = new PythSolanaReceiver({ 
             connection: this.connection, 
@@ -1551,11 +1565,20 @@ export class NativeRouterService {
              logger.info("NativeRouter", "Adding Hermes update instructions", { count: updateTx.instructions.length });
              instructions.push(...updateTx.instructions);
           }
+        } else {
+          logger.debug("NativeRouter", "No Hermes updates available (using on-chain data)");
         }
+      } else {
+        logger.debug("NativeRouter", "Skipping Hermes updates - no feed IDs for tokens", {
+          inputMint: inputMint.toBase58().slice(0, 8),
+          outputMint: outputMint.toBase58().slice(0, 8),
+        });
       }
     } catch (err) {
-      logger.warn("NativeRouter", "Failed to fetch/add Hermes updates", { error: err });
-      // We continue, as maybe the on-chain data is fresh enough (unlikely given the error, but safe fallback)
+      // Catch-all pour toute erreur inattendue (TypeError, etc.)
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      logger.warn("NativeRouter", "Hermes update failed (best-effort, continuing)", { error: errorMsg });
+      // Best-effort: on continue, les données on-chain Pyth Push sont peut-être assez fraîches
     }
     // ---------------------------------
     
