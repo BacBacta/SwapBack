@@ -95,5 +95,9 @@
     "*test*.py"
   ],
   "python.testing.pytestEnabled": false,
-  "python.testing.unittestEnabled": true
+  "python.testing.unittestEnabled": true,
+
+  // GitHub Copilot - Utiliser les fichiers d'instructions
+  "github.copilot.chat.codeGeneration.useInstructionFiles": true,
+  "chat.useAgentsMdFile": true
 }

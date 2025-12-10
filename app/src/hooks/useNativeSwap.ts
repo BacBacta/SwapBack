@@ -34,6 +34,7 @@ import {
 } from "@/lib/native-router";
 import { 
   isNativeSwapAvailable, 
+  hasOracleForPair,
   NATIVE_SWAP_UNAVAILABLE_MESSAGE 
 } from "@/config/oracles";
 import { useBoostCalculations } from "./useBoostCalculations";
@@ -137,7 +138,7 @@ export function useNativeSwap() {
       setError(null);
 
       try {
-        // Vérifier si les swaps natifs sont disponibles
+        // Vérifier si les swaps natifs sont disponibles globalement
         if (!nativeSwapEnabled) {
           logger.warn("useNativeSwap", "Native swap unavailable - oracles deprecated", {
             message: NATIVE_SWAP_UNAVAILABLE_MESSAGE,
@@ -146,9 +147,25 @@ export function useNativeSwap() {
           return null;
         }
         
+        // Vérifier si cette paire spécifique a un oracle configuré
+        const inputMintStr = params.inputMint.toString();
+        const outputMintStr = params.outputMint.toString();
+        
+        if (!hasOracleForPair(inputMintStr, outputMintStr)) {
+          const pairUnsupportedMsg = 
+            `Paire ${inputMintStr.slice(0,4)}.../${outputMintStr.slice(0,4)}... non supportée. ` +
+            `Votre transaction sera routée via Jupiter.`;
+          logger.warn("useNativeSwap", "Pair not supported - no oracle", {
+            inputMint: inputMintStr,
+            outputMint: outputMintStr,
+          });
+          setError(pairUnsupportedMsg);
+          return null;
+        }
+        
         logger.info("useNativeSwap", "Fetching native quote", {
-          inputMint: params.inputMint.toString(),
-          outputMint: params.outputMint.toString(),
+          inputMint: inputMintStr,
+          outputMint: outputMintStr,
           amount: params.amount,
           boostBps: userBoostBps,
         });
@@ -456,6 +473,19 @@ export function useNativeSwap() {
     return result;
   }, []);
 
+  /**
+   * Vérifie si une paire est supportée pour le swap natif
+   * Utile pour l'UI afin de désactiver le bouton ou afficher un message
+   */
+  const isPairSupported = useCallback(
+    (inputMint: PublicKey | string, outputMint: PublicKey | string): boolean => {
+      const inputStr = typeof inputMint === "string" ? inputMint : inputMint.toString();
+      const outputStr = typeof outputMint === "string" ? outputMint : outputMint.toString();
+      return nativeSwapEnabled && hasOracleForPair(inputStr, outputStr);
+    },
+    [nativeSwapEnabled]
+  );
+
   return {
     // État
     loading,
@@ -463,6 +493,7 @@ export function useNativeSwap() {
     error,
     lastSwapResult,
     currentQuote,
+    nativeSwapEnabled,
     
     // MEV Protection
     useMevProtection,
@@ -478,6 +509,7 @@ export function useNativeSwap() {
     getSupportedVenues,
     getSlippageConfig,
     validateOraclePrices,
+    isPairSupported,
     
     // Configuration
     slippageConfig: SLIPPAGE_CONFIG,

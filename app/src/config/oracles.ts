@@ -36,20 +36,22 @@ const MINTS = {
   // Note: RAY and JTO removed - no sponsored push feeds available
 };
 
-// Pyth Price Feeds (mainnet) - NEW V2 Push Feeds (sponsored by Pyth Data Association)
+// Pyth Price Feeds (mainnet) - V2 Push Feeds (sponsored by Pyth Data Association)
 // https://docs.pyth.network/price-feeds/core/push-feeds/solana
 // These are PriceUpdateV2 accounts that are automatically updated
+// Addresses derived via scripts/derive-push-feed-addresses.ts on 2025-12-10
+// Verified via oracle-audit.mainnet.ts - ALL 10 feeds OK
 const PYTH_FEEDS = {
-  // Major tokens - from push feeds list
+  // Major tokens - verified on mainnet 2025-12-10
   SOL_USD: "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE",
-  USDC_USD: "Dpw1EAVrSB1ibxiDQyTLW6U4FU3tVFs28jVkLfKQqeFb",
+  USDC_USD: "Dpw1EAVrSB1ibxiDQyTAW6Zip3J4Btk2x4SgApQCeFbX",
   USDT_USD: "HT2PLQBcG5EiCcNSaMHAjSgd9F98ecpATbk4Sk5oYuM",
-  JUP_USD: "7dbob1psH1iZBS7qPsm3Kvnfa5zZHxvDrqpRpk54zcH5",
-  BONK_USD: "DBE3N8hDV6xwBY7sSjLHQ1EWPFMCT8YWygoAVPewBBiX",
+  JUP_USD: "g6eRCbboSwK4tSWngn773RCMexr1APQr4uA9bGZBYfo",    // Updated from audit
+  BONK_USD: "8ihFLu5FimgTQ1Unh4dVyEHUGodJ5gJQCrQf4KUVB9bN",  // Updated from audit
   WIF_USD: "6B23K3tkb51vLZA14jcEQVCA1pfHptzEHFA93V5dYwbT",
-  ORCA_USD: "4CBshVeNBEXz24GDNQVmkzwf3CAkMFNTgPw3W3rbnPiF",
-  PYTH_USD: "8vjchtMuJNY4oFQdTi8yCe6mhCaNBFaUbktT482TpLPS",
-  ETH_USD: "42amVS4KgzR71aw6z3LCrKdNZr1skmnfJfm81y2uX6XC",
+  ORCA_USD: "4CBshVeNBEXz24GAxNhnMdpLxBALHL8iAoYQf4VwS8GS",  // Updated from audit
+  PYTH_USD: "nrYkQQQur7z8rYTST3HWceMziog46ZQU5vCa8iLvsY4",   // Updated from audit
+  ETH_USD: "42amVS4KgzR9rA28tkVYqVXjq9Qa8dcZQMbH5EYFX6XC",
   BTC_USD: "4cSM2e6rvbGQUFiJbqytoVMi5GgghSMr8LwVrT9VPSPo",
 };
 

@@ -19,9 +19,13 @@
         "name": "next"
       }
     ],
+    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@swapback/sdk": ["./src/sdk/index.ts"]
+      "@swapback/sdk": ["./src/sdk/index.ts"],
+      "rpc-websockets/dist/lib/client": ["./src/lib/rpc-websockets-shim.js"],
+      "rpc-websockets/dist/lib/client/websocket.browser": ["./src/lib/rpc-websockets-shim.js"],
+      "rpc-websockets/dist/lib/client/websocket.browser.cjs": ["./src/lib/rpc-websockets-shim.js"]
     },
     "target": "es2020"
   },

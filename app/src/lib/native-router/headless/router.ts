@@ -27,12 +27,7 @@ import {
   createAssociatedTokenAccountInstruction,
 } from "@solana/spl-token";
 import BN from "bn.js";
-import { logger } from "@/lib/logger";
-import { getOracleFeedsForPair } from "@/config/oracles";
-import { getTokenPrice, getSolPrice } from "@/lib/price-service";
-import { HermesClient } from "@pythnetwork/hermes-client";
-import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
-import { PYTH_FEED_IDS, getPythFeedIdByMint } from "@/sdk/config/pyth-feeds";
+import { getOracleFeedsForPair } from "../../../config/oracles";
 
 // ============================================================================
 // CONSTANTS
@@ -63,6 +58,64 @@ export const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyT
 // Default oracle (Pyth SOL/USD mainnet)
 export const PYTH_SOL_USD_MAINNET = new PublicKey("H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG");
 export const DEFAULT_ORACLE = PYTH_SOL_USD_MAINNET; // Fallback si getOracleFeedsForPair échoue
+
+// Minimal logger for headless usage
+const headlessLogger = {
+  debug: (...args: unknown[]): void => console.debug("[NativeRouter][DEBUG]", ...args),
+  info: (...args: unknown[]): void => console.info("[NativeRouter][INFO]", ...args),
+  warn: (...args: unknown[]): void => console.warn("[NativeRouter][WARN]", ...args),
+  error: (...args: unknown[]): void => console.error("[NativeRouter][ERROR]", ...args),
+};
+
+const logger = headlessLogger;
+
+// Lightweight price helpers (avoid importing browser-specific service)
+const STABLECOINS = new Set([
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+  "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", // USDT
+  "USDH1SM1ojwWUga67PGrgFWUHibbjqMvuMaDkRJTgkX", // USDH
+]);
+
+async function fetchJupiterPrice(mint: string): Promise<number> {
+  try {
+    const response = await fetch(`https://api.jup.ag/price/v2?ids=${mint}`, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) {
+      return 0;
+    }
+    const data = await response.json();
+    const rawPrice = data?.data?.[mint]?.price;
+    if (typeof rawPrice === "number") {
+      return rawPrice;
+    }
+    if (typeof rawPrice === "string") {
+      const parsed = parseFloat(rawPrice);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
+  } catch (error) {
+    logger.warn("Jupiter price fetch failed", error);
+    return 0;
+  }
+}
+
+async function getTokenPrice(mint: string): Promise<{ price: number; source: string }> {
+  if (STABLECOINS.has(mint)) {
+    return { price: 1, source: "stable" };
+  }
+  const price = await fetchJupiterPrice(mint);
+  if (price > 0) {
+    return { price, source: "jupiter" };
+  }
+  return { price: 0, source: "none" };
+}
+
+async function getSolPrice(): Promise<number> {
+  const { price } = await getTokenPrice(SOL_MINT.toBase58());
+  return price;
+}
 
 // Jito MEV Protection (mainnet tip accounts)
 export const JITO_BLOCK_ENGINE_URL = "https://mainnet.block-engine.jito.wtf/api/v1/bundles";
@@ -494,8 +547,6 @@ function createJitoTipInstruction(
 
 /**
  * Récupère une quote depuis l'API Raydium
- * Endpoint: https://transaction-v1.raydium.io (updated Dec 2025)
- * Docs: https://docs.raydium.io/raydium/traders/trade-api
  */
 async function fetchRaydiumQuote(
   inputMint: string,
@@ -504,10 +555,10 @@ async function fetchRaydiumQuote(
 ): Promise<VenueQuote | null> {
   const startTime = Date.now();
   try {
-    // Raydium Trade API v1 (correct endpoint)
+    // Raydium API v3
     const response = await fetch(
-      `https://transaction-v1.raydium.io/compute/swap-base-in?` +
-      `inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountIn}&slippageBps=50&txVersion=V0`,
+      `https://api-v3.raydium.io/compute/swap-base-in?` +
+      `inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountIn}&slippageBps=50`,
       { signal: AbortSignal.timeout(3000) }
     );
     
@@ -537,8 +588,6 @@ async function fetchRaydiumQuote(
 
 /**
  * Récupère une quote depuis l'API Orca Whirlpool
- * Endpoint: https://api.mainnet.orca.so (verified Dec 2025)
- * Docs: https://dev.orca.so/SDKs/Overview/
  */
 async function fetchOrcaQuote(
   inputMint: string,
@@ -547,11 +596,11 @@ async function fetchOrcaQuote(
 ): Promise<VenueQuote | null> {
   const startTime = Date.now();
   try {
-    // Orca Whirlpool API - returns large response, parse carefully
+    // Orca Whirlpool API
     const response = await fetch(
       `https://api.mainnet.orca.so/v1/quote?` +
       `inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountIn}&slippage=0.5`,
-      { signal: AbortSignal.timeout(5000) }
+      { signal: AbortSignal.timeout(3000) }
     );
     
     if (!response.ok) return null;
@@ -579,9 +628,6 @@ async function fetchOrcaQuote(
 
 /**
  * Récupère une quote depuis Meteora DLMM
- * Note: L'API Meteora nécessite l'adresse de la paire, pas les mints
- * Fallback sur estimation par prix oracle
- * Docs: https://docs.meteora.ag/api-reference/dlmm/overview
  */
 async function fetchMeteoraQuote(
   inputMint: string,
@@ -590,8 +636,12 @@ async function fetchMeteoraQuote(
 ): Promise<VenueQuote | null> {
   const startTime = Date.now();
   try {
-    // Meteora DLMM API requiert pair address - pas de quote directe par mints
-    // Utiliser directement l'estimation par prix oracle
+    // Utiliser l'API Meteora DLMM quote
+    const response = await fetch(
+      `https://dlmm-api.meteora.ag/pair/quote?` +
+      `inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountIn}&swapMode=ExactIn`,
+      { signal: AbortSignal.timeout(3000) }
+    );
     
     if (response.ok) {
       const data = await response.json();
@@ -646,19 +696,39 @@ async function fetchMeteoraQuote(
 
 /**
  * Récupère une quote depuis Phoenix (CLOB)
- * NOTE: Phoenix n'a PAS d'API HTTP publique - nécessite SDK on-chain
- * Cette fonction est désactivée et retourne toujours null
- * Docs: https://github.com/Ellipsis-Labs/phoenix-sdk
  */
 async function fetchPhoenixQuote(
-  _inputMint: string,
-  _outputMint: string,
-  _amountIn: number
+  inputMint: string,
+  outputMint: string,
+  amountIn: number
 ): Promise<VenueQuote | null> {
-  // Phoenix n'a pas d'API HTTP publique
-  // Pour utiliser Phoenix, il faut intégrer le SDK on-chain
-  // https://github.com/Ellipsis-Labs/phoenix-sdk
-  return null;
+  const startTime = Date.now();
+  try {
+    // Phoenix SDK ou API
+    const response = await fetch(
+      `https://api.phoenix.com/v1/quote?` +
+      `base=${inputMint}&quote=${outputMint}&amount=${amountIn}&side=sell`,
+      { signal: AbortSignal.timeout(3000) }
+    );
+    
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    const latencyMs = Date.now() - startTime;
+    
+    return {
+      venue: "PHOENIX",
+      venueProgramId: DEX_PROGRAMS.PHOENIX,
+      inputAmount: amountIn,
+      outputAmount: parseInt(data.expectedOutput || "0"),
+      priceImpactBps: Math.floor(parseFloat(data.priceImpact || "0") * 100),
+      accounts: [],
+      estimatedNpiBps: 8, // CLOB a moins de NPI mais meilleur prix
+      latencyMs,
+    };
+  } catch (error) {
+    // Phoenix peut ne pas avoir de liquidité pour toutes les paires
+    return null;
   }
 }
 
@@ -1527,39 +1597,6 @@ export class NativeRouterService {
       weight: index === 0 ? 10000 : 0, // 100% sur la meilleure venue pour l'instant
     }));
 
-    // --- HERMES PULL ORACLE UPDATE ---
-    try {
-      const inputFeedId = getPythFeedIdByMint(inputMint.toBase58());
-      const outputFeedId = getPythFeedIdByMint(outputMint.toBase58());
-      
-      if (inputFeedId && outputFeedId) {
-        logger.info("NativeRouter", "Fetching Hermes updates for feeds", { inputFeedId, outputFeedId });
-        
-        const hermes = new HermesClient("https://hermes.pyth.network", { timeout: 5000 });
-        const priceUpdates = await hermes.getLatestPriceUpdates([inputFeedId, outputFeedId]);
-        
-        if (priceUpdates && priceUpdates.binary && priceUpdates.binary.data) {
-          // PythSolanaReceiver expects a wallet-like object. We mock it with just publicKey for instruction generation.
-          const receiver = new PythSolanaReceiver({ 
-            connection: this.connection, 
-            wallet: { publicKey: userPublicKey } as any 
-          });
-          
-          const updateTx = await receiver.getPostUpdateTx(priceUpdates.binary.data);
-          
-          // Add update instructions to our transaction
-          if (updateTx.instructions && updateTx.instructions.length > 0) {
-             logger.info("NativeRouter", "Adding Hermes update instructions", { count: updateTx.instructions.length });
-             instructions.push(...updateTx.instructions);
-          }
-        }
-      }
-    } catch (err) {
-      logger.warn("NativeRouter", "Failed to fetch/add Hermes updates", { error: err });
-      // We continue, as maybe the on-chain data is fresh enough (unlikely given the error, but safe fallback)
-    }
-    // ---------------------------------
-    
     // Construire l'instruction swap_toc
     const swapInstruction = await this.buildSwapToCInstruction(
       userPublicKey,
