@@ -26,6 +26,12 @@ import { trackServerEvent } from "@/lib/serverAnalytics";
 
 const PRIMARY_JUPITER_API = process.env.JUPITER_API_URL || "https://public.jupiterapi.com";
 
+// RPC endpoint for ALT resolution (must be mainnet for production)
+const DEFAULT_RPC_ENDPOINT =
+  process.env.SWAPBACK_RPC_ENDPOINT ??
+  process.env.ANCHOR_PROVIDER_URL ??
+  "https://api.mainnet-beta.solana.com";
+
 // Jupiter API endpoints (primary + fallbacks) - public.jupiterapi.com resolves better
 const JUPITER_ENDPOINTS = [
   "https://public.jupiterapi.com",
@@ -96,104 +102,319 @@ function checkRateLimit(ip: string): { allowed: boolean; remaining: number; rese
 
 // Program IDs Jupiter v6 (mainnet/devnet)
 const JUPITER_PROGRAM_IDS = new Set([
-  "JUP6LkbZBMd1McqTgnmMSpZ88LdKgmhyaXtCXnVQ1Nm",
+  "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4", // Jupiter V6 mainnet
+  "JUP6LkbZBMd1McqTgnmMSpZ88LdKgmhyaXtCXnVQ1Nm", // Legacy (keep for compatibility)
 ]);
 
-function extractJupiterAccounts(swapTxBase64: string): {
+/**
+ * Résout les Address Lookup Tables pour obtenir toutes les adresses.
+ * Utilisé pour reconstruire la liste complète des comptes Jupiter dans le bon ordre.
+ */
+async function resolveAddressLookupTables(
+  connection: Connection,
+  addressTableLookups: { accountKey: PublicKey; writableIndexes: number[]; readonlyIndexes: number[] }[]
+): Promise<Map<string, PublicKey[]>> {
+  const altAccountsMap = new Map<string, PublicKey[]>();
+  
+  if (!addressTableLookups || addressTableLookups.length === 0) {
+    return altAccountsMap;
+  }
+  
+  try {
+    const altAddresses = addressTableLookups.map(l => l.accountKey);
+    const altInfos = await connection.getMultipleAccountsInfo(altAddresses);
+    
+    const HEADER_SIZE = 56;
+    
+    for (let i = 0; i < altAddresses.length; i++) {
+      const altInfo = altInfos[i];
+      if (!altInfo || !altInfo.data) continue;
+      
+      const data = altInfo.data;
+      const addressCount = (data.length - HEADER_SIZE) / 32;
+      const addresses: PublicKey[] = [];
+      
+      for (let j = 0; j < addressCount; j++) {
+        const start = HEADER_SIZE + j * 32;
+        addresses.push(new PublicKey(data.subarray(start, start + 32)));
+      }
+      
+      altAccountsMap.set(altAddresses[i].toBase58(), addresses);
+    }
+    
+    console.log(`📍 Resolved ${altAccountsMap.size} ALTs with ${[...altAccountsMap.values()].reduce((sum, arr) => sum + arr.length, 0)} total addresses`);
+  } catch (error) {
+    console.error("❌ Error resolving ALTs:", error);
+  }
+  
+  return altAccountsMap;
+}
+
+/**
+ * Extrait les comptes Jupiter dans l'ORDRE EXACT requis pour le CPI.
+ * 
+ * IMPORTANT: L'ordre des comptes est CRUCIAL. Jupiter attend ses comptes
+ * dans l'ordre précis de accountKeyIndexes. On doit résoudre les indices
+ * ALT vers les vraies adresses et maintenir l'ordre.
+ * 
+ * @param swapTxBase64 - Transaction Jupiter sérialisée en base64
+ * @param connection - Connexion RPC pour résoudre les ALT (optionnel)
+ * @returns Comptes dans l'ordre EXACT + données d'instruction
+ */
+async function extractJupiterAccountsWithALTResolution(
+  swapTxBase64: string,
+  connection?: Connection
+): Promise<{
   accounts: { pubkey: string; isSigner: boolean; isWritable: boolean }[];
   programId: string;
   addressTableLookups?: { accountKey: string; writableIndexes: number[]; readonlyIndexes: number[] }[];
-  instructionData?: string; // Base64-encoded instruction data for CPI
-} {
+  instructionData?: string;
+  accountsInOrder: { pubkey: string; isSigner: boolean; isWritable: boolean }[];
+  jupiterProgramIndex: number;
+}> {
+  const emptyResult = {
+    accounts: [],
+    programId: "",
+    addressTableLookups: undefined,
+    instructionData: undefined,
+    accountsInOrder: [],
+    jupiterProgramIndex: -1,
+  };
+
   try {
     const buf = Buffer.from(swapTxBase64, "base64");
     const vtx = VersionedTransaction.deserialize(buf);
     const msg = vtx.message;
     
-    // Pour les transactions V0, on utilise staticAccountKeys au lieu de getAccountKeys
-    // car getAccountKeys nécessite les adresses résolues des lookup tables
     const staticKeys = msg.staticAccountKeys || [];
     
-    // Vérifier qu'on a des clés statiques
     if (staticKeys.length === 0) {
       console.warn("⚠️ No static account keys in transaction");
-      return { accounts: [], programId: "" };
+      return emptyResult;
     }
 
-    // Trouver l'instruction Jupiter (on ignore ComputeBudget)
     const instructions = [...msg.compiledInstructions];
     
-    // Vérifier que nous avons des instructions
     if (!instructions || instructions.length === 0) {
       console.warn("⚠️ No instructions found in transaction");
-      return { accounts: [], programId: "" };
+      return emptyResult;
     }
     
-    // Chercher l'instruction Jupiter parmi les clés statiques
-    const jupIx: MessageCompiledInstruction | undefined =
-      [...instructions]
-        .reverse()
-        .find((ix) => {
-          // L'index doit être dans les clés statiques
-          if (ix.programIdIndex >= staticKeys.length) return false;
-          const pid = staticKeys[ix.programIdIndex]?.toBase58();
-          if (!pid) return false;
-          if (pid === "ComputeBudget111111111111111111111111111111") return false;
-          return JUPITER_PROGRAM_IDS.has(pid);
-        });
+    // Chercher l'instruction Jupiter
+    const jupIx = [...instructions].reverse().find((ix) => {
+      if (ix.programIdIndex >= staticKeys.length) return false;
+      const pid = staticKeys[ix.programIdIndex]?.toBase58();
+      if (!pid) return false;
+      if (pid === "ComputeBudget111111111111111111111111111111") return false;
+      return JUPITER_PROGRAM_IDS.has(pid);
+    });
     
-    // Si pas trouvé dans les clés statiques, utiliser la dernière instruction non-ComputeBudget
     const fallbackIx = jupIx ?? [...instructions].reverse().find((ix) => {
-      if (ix.programIdIndex >= staticKeys.length) return true; // Probablement dans lookup table
+      if (ix.programIdIndex >= staticKeys.length) return true;
       const pid = staticKeys[ix.programIdIndex]?.toBase58();
       return pid !== "ComputeBudget111111111111111111111111111111";
     }) ?? instructions[instructions.length - 1];
 
-    // Vérifier que nous avons trouvé une instruction
     if (!fallbackIx) {
       console.warn("⚠️ No suitable instruction found in transaction");
-      return { accounts: [], programId: "" };
+      return emptyResult;
     }
 
-    // Obtenir le programId (peut être dans lookup table)
     const programId = fallbackIx.programIdIndex < staticKeys.length 
       ? staticKeys[fallbackIx.programIdIndex]?.toBase58() ?? ""
       : "";
     
-    // Extraire les données de l'instruction Jupiter pour le CPI
-    // C'est ce qui sera passé au Router pour exécuter le swap
     const instructionData = Buffer.from(fallbackIx.data).toString('base64');
-    console.log(`📦 Jupiter instruction data: ${fallbackIx.data.length} bytes`);
     
-    // Vérifier que accountKeyIndexes existe
     if (!fallbackIx.accountKeyIndexes || fallbackIx.accountKeyIndexes.length === 0) {
       console.warn("⚠️ No account key indexes in instruction");
-      return { accounts: [], programId, instructionData };
+      return { ...emptyResult, programId, instructionData };
     }
     
-    // Extraire les comptes depuis les clés statiques seulement
-    // Les comptes dans les lookup tables seront résolus côté client
+    // Comptes statiques (ancienne méthode pour compatibilité)
     const accounts = fallbackIx.accountKeyIndexes
-      .filter(idx => idx < staticKeys.length) // Seulement les clés statiques
-      .map((idx) => {
-        const pk = staticKeys[idx];
-        return {
-          pubkey: pk?.toBase58() ?? "",
-          isSigner: msg.isAccountSigner(idx),
-          isWritable: msg.isAccountWritable(idx),
-        };
-      })
+      .filter(idx => idx < staticKeys.length)
+      .map((idx) => ({
+        pubkey: staticKeys[idx]?.toBase58() ?? "",
+        isSigner: msg.isAccountSigner(idx),
+        isWritable: msg.isAccountWritable(idx),
+      }))
       .filter(acc => acc.pubkey !== "");
 
-    // Inclure les informations sur les lookup tables pour que le client puisse les résoudre
     const addressTableLookups = msg.addressTableLookups?.map(lookup => ({
       accountKey: lookup.accountKey.toBase58(),
       writableIndexes: [...lookup.writableIndexes],
       readonlyIndexes: [...lookup.readonlyIndexes],
     }));
 
-    // Log pour debug
-    console.log(`📊 Extracted ${accounts.length} static accounts, ${addressTableLookups?.length || 0} lookup tables, ${fallbackIx.data.length} bytes instruction data`);
+    // Si pas de connexion, retourner le résultat partiel (compatibilité)
+    if (!connection || !msg.addressTableLookups || msg.addressTableLookups.length === 0) {
+      console.log(`📊 Extracted ${accounts.length} static accounts (no ALT resolution)`);
+      return {
+        accounts,
+        programId,
+        addressTableLookups,
+        instructionData,
+        accountsInOrder: accounts, // Sans ALT, on retourne les comptes statiques
+        jupiterProgramIndex: accounts.findIndex(a => JUPITER_PROGRAM_IDS.has(a.pubkey)),
+      };
+    }
+
+    // Résoudre les ALT pour reconstruire l'ordre complet
+    const altAccountsMap = await resolveAddressLookupTables(connection, msg.addressTableLookups);
+    
+    // Reconstruire la liste complète dans l'ordre EXACT de accountKeyIndexes
+    const STATIC_ACCOUNT_COUNT = staticKeys.length;
+    const accountsInOrder: { pubkey: string; isSigner: boolean; isWritable: boolean }[] = [];
+    let jupiterProgramIndex = -1;
+    
+    console.log(`🔍 Rebuilding account order: ${fallbackIx.accountKeyIndexes.length} indexes, ${STATIC_ACCOUNT_COUNT} static keys`);
+    
+    // Log first few indices for debugging
+    const firstIndices = fallbackIx.accountKeyIndexes.slice(0, 10);
+    const maxIdx = Math.max(...fallbackIx.accountKeyIndexes);
+    console.log(`🔍 First 10 indices: [${firstIndices.join(', ')}], max index: ${maxIdx}`);
+    
+    for (const idx of fallbackIx.accountKeyIndexes) {
+      if (idx < STATIC_ACCOUNT_COUNT) {
+        // Compte statique
+        const pubkey = staticKeys[idx].toBase58();
+        accountsInOrder.push({
+          pubkey,
+          isSigner: msg.isAccountSigner(idx),
+          isWritable: msg.isAccountWritable(idx),
+        });
+        if (JUPITER_PROGRAM_IDS.has(pubkey) && jupiterProgramIndex === -1) {
+          jupiterProgramIndex = accountsInOrder.length - 1;
+        }
+      } else {
+        // Compte dans une ALT - calculer l'offset
+        let altOffset = idx - STATIC_ACCOUNT_COUNT;
+        let resolved = false;
+        
+        for (const lookup of msg.addressTableLookups) {
+          const altKey = lookup.accountKey.toBase58();
+          const altAddresses = altAccountsMap.get(altKey) || [];
+          const writableCount = lookup.writableIndexes.length;
+          const readonlyCount = lookup.readonlyIndexes.length;
+          const totalInThisAlt = writableCount + readonlyCount;
+          
+          if (altOffset < totalInThisAlt) {
+            let localIndex: number;
+            let isWritable: boolean;
+            
+            if (altOffset < writableCount) {
+              localIndex = lookup.writableIndexes[altOffset];
+              isWritable = true;
+            } else {
+              localIndex = lookup.readonlyIndexes[altOffset - writableCount];
+              isWritable = false;
+            }
+            
+            if (localIndex < altAddresses.length) {
+              const pubkey = altAddresses[localIndex].toBase58();
+              accountsInOrder.push({
+                pubkey,
+                isSigner: false, // ALT accounts are never signers
+                isWritable,
+              });
+              if (JUPITER_PROGRAM_IDS.has(pubkey) && jupiterProgramIndex === -1) {
+                jupiterProgramIndex = accountsInOrder.length - 1;
+              }
+              resolved = true;
+            }
+            break;
+          }
+          altOffset -= totalInThisAlt;
+        }
+        
+        if (!resolved) {
+          console.warn(`⚠️ Could not resolve account at index ${idx}`);
+        }
+      }
+    }
+    
+    console.log(`📊 Extracted ${accountsInOrder.length} accounts in exact order (Jupiter at index ${jupiterProgramIndex})`);
+    
+    return {
+      accounts,
+      programId,
+      addressTableLookups,
+      instructionData,
+      accountsInOrder,
+      jupiterProgramIndex,
+    };
+  } catch (error) {
+    console.error("❌ Error extracting Jupiter accounts:", error);
+    return emptyResult;
+  }
+}
+
+// Legacy function for compatibility
+function extractJupiterAccounts(swapTxBase64: string): {
+  accounts: { pubkey: string; isSigner: boolean; isWritable: boolean }[];
+  programId: string;
+  addressTableLookups?: { accountKey: string; writableIndexes: number[]; readonlyIndexes: number[] }[];
+  instructionData?: string;
+} {
+  // Use the new async version but return synchronously (without ALT resolution)
+  try {
+    const buf = Buffer.from(swapTxBase64, "base64");
+    const vtx = VersionedTransaction.deserialize(buf);
+    const msg = vtx.message;
+    const staticKeys = msg.staticAccountKeys || [];
+
+    if (staticKeys.length === 0) {
+      return { accounts: [], programId: "" };
+    }
+
+    const instructions = [...msg.compiledInstructions];
+    if (!instructions || instructions.length === 0) {
+      return { accounts: [], programId: "" };
+    }
+
+    const jupIx = [...instructions].reverse().find((ix) => {
+      if (ix.programIdIndex >= staticKeys.length) return false;
+      const pid = staticKeys[ix.programIdIndex]?.toBase58();
+      if (!pid) return false;
+      if (pid === "ComputeBudget111111111111111111111111111111") return false;
+      return JUPITER_PROGRAM_IDS.has(pid);
+    });
+
+    const fallbackIx = jupIx ?? [...instructions].reverse().find((ix) => {
+      if (ix.programIdIndex >= staticKeys.length) return true;
+      const pid = staticKeys[ix.programIdIndex]?.toBase58();
+      return pid !== "ComputeBudget111111111111111111111111111111";
+    }) ?? instructions[instructions.length - 1];
+
+    if (!fallbackIx) {
+      return { accounts: [], programId: "" };
+    }
+
+    const programId = fallbackIx.programIdIndex < staticKeys.length
+      ? staticKeys[fallbackIx.programIdIndex]?.toBase58() ?? ""
+      : "";
+
+    const instructionData = Buffer.from(fallbackIx.data).toString('base64');
+
+    if (!fallbackIx.accountKeyIndexes || fallbackIx.accountKeyIndexes.length === 0) {
+      return { accounts: [], programId, instructionData };
+    }
+
+    const accounts = fallbackIx.accountKeyIndexes
+      .filter(idx => idx < staticKeys.length)
+      .map((idx) => ({
+        pubkey: staticKeys[idx]?.toBase58() ?? "",
+        isSigner: msg.isAccountSigner(idx),
+        isWritable: msg.isAccountWritable(idx),
+      }))
+      .filter(acc => acc.pubkey !== "");
+
+    const addressTableLookups = msg.addressTableLookups?.map(lookup => ({
+      accountKey: lookup.accountKey.toBase58(),
+      writableIndexes: [...lookup.writableIndexes],
+      readonlyIndexes: [...lookup.readonlyIndexes],
+    }));
 
     return { accounts, programId, addressTableLookups, instructionData };
   } catch (error) {
@@ -687,13 +908,21 @@ export async function POST(request: NextRequest) {
           const swapData = await swapResponse.json();
 
           if (swapData.swapTransaction) {
-            const parsed = extractJupiterAccounts(swapData.swapTransaction);
+            // Créer une connexion pour résoudre les ALT
+            const connection = new Connection(DEFAULT_RPC_ENDPOINT, "confirmed");
+            
+            // Utiliser la nouvelle fonction avec résolution ALT pour obtenir l'ordre correct
+            const parsed = await extractJupiterAccountsWithALTResolution(
+              swapData.swapTransaction,
+              connection
+            );
 
             // On considère réussi si on a soit des comptes statiques, soit des lookup tables
             const hasStaticAccounts = parsed.accounts.length > 0;
             const hasLookupTables = parsed.addressTableLookups && parsed.addressTableLookups.length > 0;
+            const hasOrderedAccounts = parsed.accountsInOrder.length > 0;
             
-            if (!hasStaticAccounts && !hasLookupTables) {
+            if (!hasStaticAccounts && !hasLookupTables && !hasOrderedAccounts) {
               console.warn("⚠️ Jupiter accounts extraction failed - no accounts or lookup tables");
             } else {
               jupiterCpi = {
@@ -704,12 +933,15 @@ export async function POST(request: NextRequest) {
                 addressTableLookups: parsed.addressTableLookups,
                 // Données instruction pour CPI Router (bytes bruts)
                 instructionData: parsed.instructionData,
+                // NOUVEAU: Comptes dans l'ordre exact pour CPI
+                accountsInOrder: parsed.accountsInOrder,
+                jupiterProgramIndex: parsed.jupiterProgramIndex,
                 // Données additionnelles utiles
                 lastValidBlockHeight: swapData.lastValidBlockHeight,
                 prioritizationFeeLamports: swapData.prioritizationFeeLamports,
                 computeUnitLimit: swapData.computeUnitLimit,
               };
-              console.log(`✅ Swap instructions obtained (${parsed.accounts.length} static accounts, ${parsed.addressTableLookups?.length || 0} lookup tables, instruction data: ${parsed.instructionData?.length || 0} bytes)`);
+              console.log(`✅ Swap instructions obtained (${parsed.accountsInOrder.length} accounts in order, Jupiter at index ${parsed.jupiterProgramIndex}, instruction data: ${parsed.instructionData?.length || 0} bytes)`);
             }
           }
         } else if (swapResponse) {

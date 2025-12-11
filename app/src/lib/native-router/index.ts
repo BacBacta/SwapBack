@@ -243,6 +243,17 @@ export interface JupiterCpiData {
   addressTableLookups?: { accountKey: string; writableIndexes: number[]; readonlyIndexes: number[] }[];
   /** Block height pour la validité */
   lastValidBlockHeight?: number;
+  /** 
+   * NOUVEAU: Comptes dans l'ordre EXACT requis par Jupiter CPI.
+   * Si présent, utiliser cette liste au lieu de accounts+resolvedAccounts.
+   * L'ordre préserve les indices de accountKeyIndexes de l'instruction originale.
+   */
+  accountsInOrder?: { pubkey: string; isSigner: boolean; isWritable: boolean }[];
+  /**
+   * Index du Jupiter Program ID dans accountsInOrder (pour debug).
+   * -1 si non trouvé ou si accountsInOrder n'est pas utilisé.
+   */
+  jupiterProgramIndex?: number;
 }
 
 /**
@@ -424,6 +435,8 @@ export async function getJupiterCpiData(
       accountsCount: cpi.accounts?.length ?? 0,
       lookupTablesCount: cpi.addressTableLookups?.length ?? 0,
       resolvedCount: resolvedAccounts.length,
+      accountsInOrderCount: cpi.accountsInOrder?.length ?? 0,
+      jupiterProgramIndex: cpi.jupiterProgramIndex ?? -1,
     });
     
     return {
@@ -434,6 +447,9 @@ export async function getJupiterCpiData(
       programId: cpi.programId || DEX_PROGRAMS.JUPITER.toBase58(),
       addressTableLookups: cpi.addressTableLookups,
       lastValidBlockHeight: cpi.lastValidBlockHeight,
+      // NOUVEAU: Comptes dans l'ordre exact pour le CPI
+      accountsInOrder: cpi.accountsInOrder || undefined,
+      jupiterProgramIndex: cpi.jupiterProgramIndex ?? -1,
     };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
@@ -1982,46 +1998,75 @@ export class NativeRouterService {
     // --- JUPITER REMAINING ACCOUNTS ---
     // Le programme on-chain exige que remaining_accounts contienne:
     // 1. Jupiter Program ID (PREMIER compte obligatoire)
-    // 2. Tous les comptes de l'instruction Jupiter (statiques + résolus depuis ALTs)
+    // 2. Tous les comptes de l'instruction Jupiter dans l'ORDRE EXACT de accountKeyIndexes
+    //
+    // IMPORTANT: On ne doit PAS skipper Jupiter s'il apparaît dans accountsInOrder car
+    // l'instruction Jupiter peut référencer son propre program ID comme un compte.
+    // Le programme on-chain vérifie juste que remaining_accounts[0] == Jupiter.
     const jupiterRemainingAccounts: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[] = [];
     
-    // Premier compte: Jupiter Program ID
+    // Premier compte: Jupiter Program ID (requis par le programme on-chain)
     jupiterRemainingAccounts.push({
       pubkey: DEX_PROGRAMS.JUPITER,
       isSigner: false,
       isWritable: false,
     });
     
-    // Comptes statiques de l'instruction Jupiter (depuis l'API)
-    if (jupiterCpi.accounts && jupiterCpi.accounts.length > 0) {
-      for (const acc of jupiterCpi.accounts) {
+    // NOUVEAU: Utiliser accountsInOrder si disponible (ordre exact requis par Jupiter)
+    if (jupiterCpi.accountsInOrder && jupiterCpi.accountsInOrder.length > 0) {
+      // Les comptes sont déjà dans l'ordre exact de accountKeyIndexes
+      // IMPORTANT: On les ajoute TOUS, même si Jupiter apparaît dedans.
+      // Le programme on-chain a déjà Jupiter en position 0 mais l'instruction
+      // Jupiter peut aussi le référencer comme un compte dans son propre swap.
+      for (const acc of jupiterCpi.accountsInOrder) {
         jupiterRemainingAccounts.push({
           pubkey: new PublicKey(acc.pubkey),
           isSigner: false, // L'utilisateur signe la transaction, pas le CPI
           isWritable: acc.isWritable,
         });
       }
-    }
-    
-    // Comptes résolus depuis les Address Lookup Tables
-    // IMPORTANT: Ces comptes sont REQUIS pour le CPI Jupiter car les transactions V0
-    // utilisent des ALTs pour compresser les comptes
-    if (jupiterCpi.resolvedAccounts && jupiterCpi.resolvedAccounts.length > 0) {
-      for (const acc of jupiterCpi.resolvedAccounts) {
-        jupiterRemainingAccounts.push({
-          pubkey: new PublicKey(acc.pubkey),
-          isSigner: false,
-          isWritable: acc.isWritable,
-        });
+      
+      logger.info("NativeRouter", "Jupiter remaining accounts prepared (with correct order)", {
+        total: jupiterRemainingAccounts.length,
+        jupiterProgramId: DEX_PROGRAMS.JUPITER.toBase58().slice(0, 8),
+        accountsFromOrderedList: jupiterCpi.accountsInOrder.length,
+        originalJupiterIndex: jupiterCpi.jupiterProgramIndex,
+      });
+    } else {
+      // FALLBACK: Ancienne logique (comptes statiques + résolus depuis ALT)
+      // Note: Cette logique peut ne pas préserver l'ordre exact requis par Jupiter
+      
+      // Comptes statiques de l'instruction Jupiter (depuis l'API)
+      if (jupiterCpi.accounts && jupiterCpi.accounts.length > 0) {
+        for (const acc of jupiterCpi.accounts) {
+          jupiterRemainingAccounts.push({
+            pubkey: new PublicKey(acc.pubkey),
+            isSigner: false, // L'utilisateur signe la transaction, pas le CPI
+            isWritable: acc.isWritable,
+          });
+        }
       }
+      
+      // Comptes résolus depuis les Address Lookup Tables
+      // IMPORTANT: Ces comptes sont REQUIS pour le CPI Jupiter car les transactions V0
+      // utilisent des ALTs pour compresser les comptes
+      if (jupiterCpi.resolvedAccounts && jupiterCpi.resolvedAccounts.length > 0) {
+        for (const acc of jupiterCpi.resolvedAccounts) {
+          jupiterRemainingAccounts.push({
+            pubkey: new PublicKey(acc.pubkey),
+            isSigner: false,
+            isWritable: acc.isWritable,
+          });
+        }
+      }
+      
+      logger.warn("NativeRouter", "Jupiter remaining accounts prepared (legacy fallback - order may be incorrect)", {
+        total: jupiterRemainingAccounts.length,
+        jupiterProgramId: DEX_PROGRAMS.JUPITER.toBase58().slice(0, 8),
+        staticAccounts: jupiterCpi.accounts?.length ?? 0,
+        resolvedFromALT: jupiterCpi.resolvedAccounts?.length ?? 0,
+      });
     }
-    
-    logger.info("NativeRouter", "Jupiter remaining accounts prepared", {
-      total: jupiterRemainingAccounts.length,
-      jupiterProgramId: DEX_PROGRAMS.JUPITER.toBase58().slice(0, 8),
-      staticAccounts: jupiterCpi.accounts?.length ?? 0,
-      resolvedFromALT: jupiterCpi.resolvedAccounts?.length ?? 0,
-    });
     
     // Vérifier quels comptes optionnels existent on-chain
     const [userNftExists, oracleCacheExists, venueScoreExists] = await Promise.all([
