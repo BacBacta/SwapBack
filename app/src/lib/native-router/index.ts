@@ -213,6 +213,137 @@ export interface OracleObservation {
 }
 
 // ============================================================================
+// JUPITER CPI DATA
+// ============================================================================
+
+/**
+ * Données Jupiter CPI nécessaires pour le swap via le router on-chain.
+ * Le programme swapback_router exige ces données dans SwapArgs.jupiter_route.
+ * 
+ * Structure Rust correspondante:
+ * ```rust
+ * pub struct JupiterRouteParams {
+ *     pub swap_instruction: Vec<u8>,      // Données instruction Jupiter
+ *     pub expected_input_amount: u64,      // Montant attendu en entrée
+ * }
+ * ```
+ */
+export interface JupiterCpiData {
+  /** Données d'instruction Jupiter complètes (bytes bruts) */
+  swapInstruction: Buffer;
+  /** Montant attendu en entrée (en lamports/base units) */
+  expectedInputAmount: string;
+  /** Comptes statiques pour le CPI */
+  accounts: { pubkey: string; isSigner: boolean; isWritable: boolean }[];
+  /** Program ID Jupiter utilisé */
+  programId: string;
+  /** Address Table Lookups pour transactions V0 */
+  addressTableLookups?: { accountKey: string; writableIndexes: number[]; readonlyIndexes: number[] }[];
+  /** Block height pour la validité */
+  lastValidBlockHeight?: number;
+}
+
+/**
+ * Récupère les données Jupiter CPI depuis l'API /api/swap/quote.
+ * Ces données sont REQUISES par le programme on-chain pour exécuter le swap.
+ * 
+ * @param inputMint - Mint du token d'entrée
+ * @param outputMint - Mint du token de sortie
+ * @param amountLamports - Montant en lamports/base units
+ * @param slippageBps - Slippage en basis points
+ * @param userPublicKey - Clé publique de l'utilisateur
+ * @returns JupiterCpiData ou null si échec
+ */
+export async function getJupiterCpiData(
+  inputMint: string,
+  outputMint: string,
+  amountLamports: string,
+  slippageBps: number,
+  userPublicKey: string
+): Promise<JupiterCpiData | null> {
+  try {
+    logger.debug("NativeRouter", "Fetching Jupiter CPI data", {
+      inputMint: inputMint.slice(0, 8),
+      outputMint: outputMint.slice(0, 8),
+      amount: amountLamports,
+      slippageBps,
+    });
+    
+    // Construire l'URL de l'API (fonctionne côté client et serveur)
+    const baseUrl = typeof window !== "undefined" 
+      ? "" 
+      : (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000");
+    
+    const response = await fetch(`${baseUrl}/api/swap/quote`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        inputMint,
+        outputMint,
+        amount: amountLamports,
+        slippageBps,
+        userPublicKey,
+      }),
+      signal: AbortSignal.timeout(15000), // 15s timeout
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "Unknown error");
+      logger.warn("NativeRouter", "Jupiter CPI API error", { 
+        status: response.status, 
+        error: errorText.slice(0, 200),
+      });
+      return null;
+    }
+    
+    const data = await response.json();
+    
+    // Vérifier que jupiterCpi est présent
+    if (!data.success || !data.jupiterCpi) {
+      logger.debug("NativeRouter", "No Jupiter CPI in response", {
+        success: data.success,
+        hasJupiterCpi: !!data.jupiterCpi,
+        error: data.error,
+      });
+      return null;
+    }
+    
+    const cpi = data.jupiterCpi;
+    
+    // Valider les champs requis
+    if (!cpi.instructionData || !cpi.expectedInputAmount) {
+      logger.warn("NativeRouter", "Jupiter CPI missing required fields", {
+        hasInstructionData: !!cpi.instructionData,
+        hasExpectedInputAmount: !!cpi.expectedInputAmount,
+      });
+      return null;
+    }
+    
+    // Convertir instructionData de base64 en Buffer
+    const swapInstruction = Buffer.from(cpi.instructionData, "base64");
+    
+    logger.debug("NativeRouter", "Jupiter CPI data obtained", {
+      instructionBytes: swapInstruction.length,
+      accountsCount: cpi.accounts?.length ?? 0,
+      lookupTablesCount: cpi.addressTableLookups?.length ?? 0,
+    });
+    
+    return {
+      swapInstruction,
+      expectedInputAmount: cpi.expectedInputAmount,
+      accounts: cpi.accounts || [],
+      programId: cpi.programId || DEX_PROGRAMS.JUPITER.toBase58(),
+      addressTableLookups: cpi.addressTableLookups,
+      lastValidBlockHeight: cpi.lastValidBlockHeight,
+    };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logger.warn("NativeRouter", "Failed to get Jupiter CPI data", { error: errorMsg });
+    return null;
+  }
+}
+
+// ============================================================================
 // VENUE SCORE FETCHING
 // ============================================================================
 
@@ -1527,12 +1658,30 @@ export class NativeRouterService {
     }));
 
     // --- HERMES PULL ORACLE UPDATE (best-effort, ne bloque pas le swap) ---
+    // Note: Pyth Push Feeds sont déjà mis à jour automatiquement sur Solana mainnet
+    // Ce code est optionnel et sert à forcer une mise à jour plus récente
     try {
       const inputFeedId = getPythFeedIdByMint(inputMint.toBase58());
       const outputFeedId = getPythFeedIdByMint(outputMint.toBase58());
       
-      if (inputFeedId && outputFeedId) {
-        logger.info("NativeRouter", "Fetching Hermes updates for feeds", { inputFeedId, outputFeedId });
+      // Vérification stricte des feed IDs
+      if (!inputFeedId || !outputFeedId) {
+        logger.debug("NativeRouter", "Skipping Hermes - missing feed IDs", {
+          inputMint: inputMint.toBase58().slice(0, 8),
+          outputMint: outputMint.toBase58().slice(0, 8),
+          hasInputFeed: !!inputFeedId,
+          hasOutputFeed: !!outputFeedId,
+        });
+      } else if (typeof inputFeedId !== 'string' || typeof outputFeedId !== 'string') {
+        logger.warn("NativeRouter", "Skipping Hermes - invalid feed ID types", {
+          inputFeedIdType: typeof inputFeedId,
+          outputFeedIdType: typeof outputFeedId,
+        });
+      } else {
+        logger.debug("NativeRouter", "Fetching Hermes updates", { 
+          inputFeedId: inputFeedId.slice(0, 16), 
+          outputFeedId: outputFeedId.slice(0, 16),
+        });
         
         const hermes = new HermesClient("https://hermes.pyth.network", { timeout: 5000 });
         
@@ -1541,45 +1690,80 @@ export class NativeRouterService {
           priceUpdates = await hermes.getLatestPriceUpdates([inputFeedId, outputFeedId]);
         } catch (hermesErr) {
           // Hermes peut retourner une erreur réseau ou timeout
-          // C'est best-effort - on continue avec les données on-chain existantes
           const errorMsg = hermesErr instanceof Error ? hermesErr.message : String(hermesErr);
-          logger.warn("NativeRouter", "Hermes fetch failed (best-effort, continuing)", { 
-            error: errorMsg,
-            inputFeedId: inputFeedId.slice(0, 16),
-            outputFeedId: outputFeedId.slice(0, 16),
-          });
+          logger.debug("NativeRouter", "Hermes fetch skipped (network)", { error: errorMsg });
           priceUpdates = null;
         }
         
-        if (priceUpdates?.binary?.data && Array.isArray(priceUpdates.binary.data) && priceUpdates.binary.data.length > 0) {
-          // PythSolanaReceiver expects a wallet-like object. We mock it with just publicKey for instruction generation.
-          const receiver = new PythSolanaReceiver({ 
-            connection: this.connection, 
-            wallet: { publicKey: userPublicKey } as any 
-          });
-          
-          const updateTx = await receiver.getPostUpdateTx(priceUpdates.binary.data);
-          
-          // Add update instructions to our transaction
-          if (updateTx.instructions && updateTx.instructions.length > 0) {
-             logger.info("NativeRouter", "Adding Hermes update instructions", { count: updateTx.instructions.length });
-             instructions.push(...updateTx.instructions);
+        // Validation stricte des données avant utilisation
+        const hasValidData = priceUpdates?.binary?.data && 
+                            Array.isArray(priceUpdates.binary.data) && 
+                            priceUpdates.binary.data.length > 0 &&
+                            priceUpdates.binary.data.every((d: unknown) => typeof d === 'string' && d.length > 0);
+        
+        if (hasValidData) {
+          try {
+            // PythSolanaReceiver nécessite un wallet-like object
+            // Vérifions que userPublicKey est valide
+            if (!userPublicKey || typeof userPublicKey.toBase58 !== 'function') {
+              throw new Error('Invalid userPublicKey for PythSolanaReceiver');
+            }
+            
+            const receiver = new PythSolanaReceiver({ 
+              connection: this.connection, 
+              wallet: { publicKey: userPublicKey } as any 
+            });
+            
+            const updateTx = await receiver.getPostUpdateTx(priceUpdates.binary.data);
+            
+            // Vérification que les instructions sont valides
+            if (updateTx?.instructions && Array.isArray(updateTx.instructions) && updateTx.instructions.length > 0) {
+              logger.debug("NativeRouter", "Hermes update instructions ready", { count: updateTx.instructions.length });
+              instructions.push(...updateTx.instructions);
+            }
+          } catch (receiverErr) {
+            // L'erreur "_bn undefined" vient probablement d'ici
+            const errorMsg = receiverErr instanceof Error ? receiverErr.message : String(receiverErr);
+            logger.debug("NativeRouter", "PythSolanaReceiver skipped", { error: errorMsg });
           }
         } else {
-          logger.debug("NativeRouter", "No Hermes updates available (using on-chain data)");
+          logger.debug("NativeRouter", "No valid Hermes data (using on-chain Pyth Push)");
         }
-      } else {
-        logger.debug("NativeRouter", "Skipping Hermes updates - no feed IDs for tokens", {
-          inputMint: inputMint.toBase58().slice(0, 8),
-          outputMint: outputMint.toBase58().slice(0, 8),
-        });
       }
     } catch (err) {
-      // Catch-all pour toute erreur inattendue (TypeError, etc.)
+      // Catch-all pour toute erreur inattendue
       const errorMsg = err instanceof Error ? err.message : String(err);
-      logger.warn("NativeRouter", "Hermes update failed (best-effort, continuing)", { error: errorMsg });
-      // Best-effort: on continue, les données on-chain Pyth Push sont peut-être assez fraîches
+      logger.debug("NativeRouter", "Hermes update skipped (error)", { error: errorMsg });
+      // Best-effort: on continue, les données on-chain Pyth Push sont maintenues automatiquement
     }
+    // ---------------------------------
+    
+    // --- JUPITER CPI DATA (REQUIS par le programme on-chain) ---
+    // Le programme router exige jupiter_route: Some(JupiterRouteParams) pour process_single_swap()
+    const jupiterCpi = await getJupiterCpiData(
+      inputMint.toBase58(),
+      outputMint.toBase58(),
+      amountIn.toString(),
+      params.slippageBps ?? 50, // Default 0.5%
+      userPublicKey.toBase58()
+    );
+    
+    if (!jupiterCpi || !jupiterCpi.swapInstruction) {
+      logger.error("NativeRouter", "Cannot proceed without Jupiter CPI data", {
+        inputMint: inputMint.toBase58().slice(0, 8),
+        outputMint: outputMint.toBase58().slice(0, 8),
+        amount: amountIn,
+      });
+      throw new Error(
+        "Impossible d'obtenir les données Jupiter CPI. " +
+        "Veuillez réessayer ou utiliser Jupiter directement."
+      );
+    }
+    
+    logger.info("NativeRouter", "Jupiter CPI data obtained for swap", {
+      instructionBytes: jupiterCpi.swapInstruction.length,
+      expectedInputAmount: jupiterCpi.expectedInputAmount,
+    });
     // ---------------------------------
     
     // Construire l'instruction swap_toc
@@ -1592,7 +1776,8 @@ export class NativeRouterService {
       minAmountOut,
       venueWeights,
       route.venues[0], // Meilleure venue
-      params.maxStalenessSecs // Optionnel: override staleness
+      params.maxStalenessSecs, // Optionnel: override staleness
+      jupiterCpi // REQUIS: données Jupiter CPI pour le programme on-chain
     );
     
     instructions.push(swapInstruction);
@@ -1613,6 +1798,9 @@ export class NativeRouterService {
   
   /**
    * Construit l'instruction swap_toc
+   * 
+   * IMPORTANT: Cette fonction REQUIERT jupiterCpi car le programme on-chain
+   * exige un jupiter_route valide pour process_single_swap().
    */
   private async buildSwapToCInstruction(
     userPublicKey: PublicKey,
@@ -1623,8 +1811,18 @@ export class NativeRouterService {
     minAmountOut: number,
     venueWeights: { venue: PublicKey; weight: number }[],
     bestVenue: VenueQuote,
-    maxStalenessSecs?: number
+    maxStalenessSecs?: number,
+    jupiterCpi?: JupiterCpiData | null
   ): Promise<TransactionInstruction> {
+    // Vérifier que jupiterCpi est fourni (requis par le programme on-chain)
+    if (!jupiterCpi || !jupiterCpi.swapInstruction) {
+      logger.error("NativeRouter", "buildSwapToCInstruction called without jupiterCpi");
+      throw new Error(
+        "Jupiter CPI data is required. The on-chain program requires jupiter_route. " +
+        "Call getJupiterCpiData() before building the instruction."
+      );
+    }
+    
     // Obtenir les oracles pour cette paire de tokens AVANT la sérialisation
     // IMPORTANT: Ne PAS fallback silencieusement sur DEFAULT_ORACLE
     let primaryOracle: PublicKey;
@@ -1675,6 +1873,7 @@ export class NativeRouterService {
       primaryOracleAccount: primaryOracle, // Utiliser l'oracle réel, pas le hardcodé
       venues: venueWeights,
       maxStalenessOverride: maxStalenessSecs,
+      jupiterCpi: jupiterCpi, // REQUIS par le programme on-chain
     });
     
     const data = Buffer.concat([discriminator, argsBuffer]);
@@ -1766,6 +1965,7 @@ export class NativeRouterService {
     primaryOracleAccount: PublicKey;
     venues: { venue: PublicKey; weight: number }[];
     maxStalenessOverride?: number; // En secondes (10-300)
+    jupiterCpi?: JupiterCpiData | null; // Données Jupiter CPI pour le swap
   }): Buffer {
     // Sérialisation manuelle selon le format Anchor
     const buffers: Buffer[] = [];
@@ -1800,8 +2000,35 @@ export class NativeRouterService {
     // fallback_oracle_account: Option<Pubkey>
     buffers.push(Buffer.from([0])); // None
     
-    // jupiter_route: Option<...>
-    buffers.push(Buffer.from([0])); // None - on utilise les venues natives
+    // jupiter_route: Option<JupiterRouteParams>
+    // Structure Rust: { swap_instruction: Vec<u8>, expected_input_amount: u64 }
+    if (args.jupiterCpi && args.jupiterCpi.swapInstruction && args.jupiterCpi.swapInstruction.length > 0) {
+      buffers.push(Buffer.from([1])); // Some
+      
+      // swap_instruction: Vec<u8> - préfixé par la longueur (u32 LE)
+      const swapIxLen = Buffer.alloc(4);
+      swapIxLen.writeUInt32LE(args.jupiterCpi.swapInstruction.length, 0);
+      buffers.push(swapIxLen);
+      buffers.push(args.jupiterCpi.swapInstruction);
+      
+      // expected_input_amount: u64
+      const expectedAmount = new BN(args.jupiterCpi.expectedInputAmount);
+      buffers.push(expectedAmount.toArrayLike(Buffer, "le", 8));
+      
+      logger.debug("NativeRouter", "Serialized jupiter_route", {
+        instructionBytes: args.jupiterCpi.swapInstruction.length,
+        expectedInputAmount: args.jupiterCpi.expectedInputAmount,
+      });
+    } else {
+      // ERREUR: Le programme on-chain EXIGE jupiter_route
+      // Si on arrive ici sans jupiterCpi, le swap échouera avec MissingJupiterRoute (6021)
+      logger.error("NativeRouter", "No Jupiter CPI data - swap will fail with MissingJupiterRoute (6021)");
+      throw new Error(
+        "Jupiter CPI data required for swap. " +
+        "The on-chain program requires jupiter_route in SwapArgs. " +
+        "Call getJupiterCpiData() first."
+      );
+    }
     
     // jupiter_swap_ix_data: Option<Vec<u8>>
     buffers.push(Buffer.from([0])); // None
