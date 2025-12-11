@@ -2593,11 +2593,19 @@ pub mod swap_toc_processor {
             ErrorCode::DexExecutionFailed
         );
 
+        // Get the actual swap accounts (skip Jupiter program which is first)
+        // The Jupiter program is passed separately, remaining_accounts[1..] are the swap accounts
+        let jupiter_swap_accounts = &remaining_accounts[1..];
+        require!(
+            !jupiter_swap_accounts.is_empty(),
+            ErrorCode::DexExecutionFailed
+        );
+
         // Execute Jupiter swap via CPI with delta-based amount tracking
         // This measures actual balance changes for accurate amount_out
         let amount_out = cpi_jupiter::swap_with_balance_deltas(
             jupiter_program,
-            remaining_accounts,
+            jupiter_swap_accounts, // Pass only swap accounts, NOT jupiter_program
             &ctx.accounts.user_token_account_a.to_account_info(),
             &ctx.accounts.user_token_account_b.to_account_info(),
             amount_in,
