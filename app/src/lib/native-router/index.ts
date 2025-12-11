@@ -1878,8 +1878,35 @@ export class NativeRouterService {
     
     const data = Buffer.concat([discriminator, argsBuffer]);
     
-    // Récupérer les comptes du DEX pour le CPI
-    const venueAccounts = await this.getVenueAccounts(bestVenue, inputMint, outputMint);
+    // --- JUPITER REMAINING ACCOUNTS ---
+    // Le programme on-chain exige que remaining_accounts contienne:
+    // 1. Jupiter Program ID (PREMIER compte obligatoire)
+    // 2. Tous les comptes de l'instruction Jupiter (depuis jupiterCpi.accounts)
+    const jupiterRemainingAccounts: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[] = [];
+    
+    // Premier compte: Jupiter Program ID
+    jupiterRemainingAccounts.push({
+      pubkey: DEX_PROGRAMS.JUPITER,
+      isSigner: false,
+      isWritable: false,
+    });
+    
+    // Comptes de l'instruction Jupiter (depuis l'API)
+    if (jupiterCpi.accounts && jupiterCpi.accounts.length > 0) {
+      for (const acc of jupiterCpi.accounts) {
+        jupiterRemainingAccounts.push({
+          pubkey: new PublicKey(acc.pubkey),
+          isSigner: false, // L'utilisateur signe la transaction, pas le CPI
+          isWritable: acc.isWritable,
+        });
+      }
+    }
+    
+    logger.info("NativeRouter", "Jupiter remaining accounts prepared", {
+      count: jupiterRemainingAccounts.length,
+      jupiterProgramId: DEX_PROGRAMS.JUPITER.toBase58().slice(0, 8),
+      staticAccounts: jupiterCpi.accounts?.length ?? 0,
+    });
     
     // Vérifier quels comptes optionnels existent on-chain
     const [userNftExists, oracleCacheExists, venueScoreExists] = await Promise.all([
@@ -1938,12 +1965,9 @@ export class NativeRouterService {
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       // 19. system_program
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      // remaining_accounts: Venue accounts pour le CPI
-      ...venueAccounts.map(pubkey => ({
-        pubkey,
-        isSigner: false,
-        isWritable: true,
-      })),
+      // remaining_accounts: Jupiter Program ID + comptes de l'instruction Jupiter
+      // Le programme on-chain exige Jupiter Program ID comme PREMIER compte
+      ...jupiterRemainingAccounts,
     ];
     
     return new TransactionInstruction({
