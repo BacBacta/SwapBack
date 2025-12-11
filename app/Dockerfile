@@ -7,15 +7,15 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Installer les dépendances système nécessaires (incluant headers Linux pour USB)
+# Installer les dépendances système nécessaires
 RUN apk add --no-cache libc6-compat python3 make g++ linux-headers eudev-dev
 
 # Copier les fichiers de dépendances
 COPY package.json ./
 COPY package-lock.json* ./
 
-# Installer les dépendances (ignorer les erreurs des modules optionnels)
-RUN npm install --legacy-peer-deps --ignore-scripts || npm install --legacy-peer-deps --omit=optional
+# Installer les dépendances avec clean install
+RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 
 # ============================================
 # Stage 2: Builder
@@ -31,8 +31,8 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# Build de l'application (next build directement car IDL/SDK déjà dans src/)
-RUN npx next build
+# Build de l'application
+RUN npm run build
 
 # ============================================
 # Stage 3: Runner (Production)
