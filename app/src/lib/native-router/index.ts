@@ -235,12 +235,96 @@ export interface JupiterCpiData {
   expectedInputAmount: string;
   /** Comptes statiques pour le CPI */
   accounts: { pubkey: string; isSigner: boolean; isWritable: boolean }[];
+  /** Comptes résolus depuis les Address Lookup Tables */
+  resolvedAccounts?: { pubkey: string; isSigner: boolean; isWritable: boolean }[];
   /** Program ID Jupiter utilisé */
   programId: string;
   /** Address Table Lookups pour transactions V0 */
   addressTableLookups?: { accountKey: string; writableIndexes: number[]; readonlyIndexes: number[] }[];
   /** Block height pour la validité */
   lastValidBlockHeight?: number;
+}
+
+/**
+ * Résout les Address Lookup Tables pour obtenir tous les comptes d'une transaction Jupiter.
+ * Les transactions Jupiter V0 utilisent des ALT pour compresser les comptes.
+ * 
+ * @param connection - Connexion RPC Solana
+ * @param addressTableLookups - Lookups depuis la transaction Jupiter
+ * @returns Liste des comptes résolus avec leurs métadonnées
+ */
+async function resolveAddressLookupTables(
+  connection: Connection,
+  addressTableLookups: { accountKey: string; writableIndexes: number[]; readonlyIndexes: number[] }[]
+): Promise<{ pubkey: string; isSigner: boolean; isWritable: boolean }[]> {
+  const resolvedAccounts: { pubkey: string; isSigner: boolean; isWritable: boolean }[] = [];
+  
+  if (!addressTableLookups || addressTableLookups.length === 0) {
+    return resolvedAccounts;
+  }
+  
+  try {
+    // Récupérer toutes les ALT en parallèle
+    const altAddresses = addressTableLookups.map(lookup => new PublicKey(lookup.accountKey));
+    const altInfos = await connection.getMultipleAccountsInfo(altAddresses);
+    
+    for (let i = 0; i < addressTableLookups.length; i++) {
+      const lookup = addressTableLookups[i];
+      const altInfo = altInfos[i];
+      
+      if (!altInfo || !altInfo.data) {
+        logger.warn("NativeRouter", "ALT not found", { alt: lookup.accountKey.slice(0, 8) });
+        continue;
+      }
+      
+      // Parser les données de l'ALT
+      // Format: 56 bytes header + 32 bytes par adresse
+      const data = altInfo.data;
+      const LOOKUP_TABLE_META_SIZE = 56;
+      const addressCount = (data.length - LOOKUP_TABLE_META_SIZE) / 32;
+      
+      // Extraire les adresses
+      const addresses: PublicKey[] = [];
+      for (let j = 0; j < addressCount; j++) {
+        const start = LOOKUP_TABLE_META_SIZE + j * 32;
+        const end = start + 32;
+        addresses.push(new PublicKey(data.subarray(start, end)));
+      }
+      
+      // Ajouter les comptes writable
+      for (const idx of lookup.writableIndexes) {
+        if (idx < addresses.length) {
+          resolvedAccounts.push({
+            pubkey: addresses[idx].toBase58(),
+            isSigner: false,
+            isWritable: true,
+          });
+        }
+      }
+      
+      // Ajouter les comptes readonly
+      for (const idx of lookup.readonlyIndexes) {
+        if (idx < addresses.length) {
+          resolvedAccounts.push({
+            pubkey: addresses[idx].toBase58(),
+            isSigner: false,
+            isWritable: false,
+          });
+        }
+      }
+    }
+    
+    logger.debug("NativeRouter", "Resolved ALT accounts", {
+      altCount: addressTableLookups.length,
+      resolvedCount: resolvedAccounts.length,
+    });
+    
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logger.warn("NativeRouter", "Failed to resolve ALTs", { error: errorMsg });
+  }
+  
+  return resolvedAccounts;
 }
 
 /**
@@ -252,6 +336,7 @@ export interface JupiterCpiData {
  * @param amountLamports - Montant en lamports/base units
  * @param slippageBps - Slippage en basis points
  * @param userPublicKey - Clé publique de l'utilisateur
+ * @param connection - Connexion RPC pour résoudre les Address Lookup Tables (optionnel)
  * @returns JupiterCpiData ou null si échec
  */
 export async function getJupiterCpiData(
@@ -259,7 +344,8 @@ export async function getJupiterCpiData(
   outputMint: string,
   amountLamports: string,
   slippageBps: number,
-  userPublicKey: string
+  userPublicKey: string,
+  connection?: Connection
 ): Promise<JupiterCpiData | null> {
   try {
     logger.debug("NativeRouter", "Fetching Jupiter CPI data", {
@@ -322,16 +408,29 @@ export async function getJupiterCpiData(
     // Convertir instructionData de base64 en Buffer
     const swapInstruction = Buffer.from(cpi.instructionData, "base64");
     
+    // Résoudre les Address Lookup Tables si une connexion est fournie
+    let resolvedAccounts: { pubkey: string; isSigner: boolean; isWritable: boolean }[] = [];
+    if (connection && cpi.addressTableLookups && cpi.addressTableLookups.length > 0) {
+      resolvedAccounts = await resolveAddressLookupTables(connection, cpi.addressTableLookups);
+      logger.info("NativeRouter", "Resolved ALT accounts for Jupiter CPI", {
+        staticAccounts: cpi.accounts?.length ?? 0,
+        resolvedFromALT: resolvedAccounts.length,
+        totalAccounts: (cpi.accounts?.length ?? 0) + resolvedAccounts.length,
+      });
+    }
+    
     logger.debug("NativeRouter", "Jupiter CPI data obtained", {
       instructionBytes: swapInstruction.length,
       accountsCount: cpi.accounts?.length ?? 0,
       lookupTablesCount: cpi.addressTableLookups?.length ?? 0,
+      resolvedCount: resolvedAccounts.length,
     });
     
     return {
       swapInstruction,
       expectedInputAmount: cpi.expectedInputAmount,
       accounts: cpi.accounts || [],
+      resolvedAccounts,
       programId: cpi.programId || DEX_PROGRAMS.JUPITER.toBase58(),
       addressTableLookups: cpi.addressTableLookups,
       lastValidBlockHeight: cpi.lastValidBlockHeight,
@@ -1740,12 +1839,14 @@ export class NativeRouterService {
     
     // --- JUPITER CPI DATA (REQUIS par le programme on-chain) ---
     // Le programme router exige jupiter_route: Some(JupiterRouteParams) pour process_single_swap()
+    // On passe la connexion RPC pour résoudre les Address Lookup Tables
     const jupiterCpi = await getJupiterCpiData(
       inputMint.toBase58(),
       outputMint.toBase58(),
       amountIn.toString(),
       params.slippageBps ?? 50, // Default 0.5%
-      userPublicKey.toBase58()
+      userPublicKey.toBase58(),
+      this.connection // Permet de résoudre les ALTs
     );
     
     if (!jupiterCpi || !jupiterCpi.swapInstruction) {
@@ -1881,7 +1982,7 @@ export class NativeRouterService {
     // --- JUPITER REMAINING ACCOUNTS ---
     // Le programme on-chain exige que remaining_accounts contienne:
     // 1. Jupiter Program ID (PREMIER compte obligatoire)
-    // 2. Tous les comptes de l'instruction Jupiter (depuis jupiterCpi.accounts)
+    // 2. Tous les comptes de l'instruction Jupiter (statiques + résolus depuis ALTs)
     const jupiterRemainingAccounts: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[] = [];
     
     // Premier compte: Jupiter Program ID
@@ -1891,7 +1992,7 @@ export class NativeRouterService {
       isWritable: false,
     });
     
-    // Comptes de l'instruction Jupiter (depuis l'API)
+    // Comptes statiques de l'instruction Jupiter (depuis l'API)
     if (jupiterCpi.accounts && jupiterCpi.accounts.length > 0) {
       for (const acc of jupiterCpi.accounts) {
         jupiterRemainingAccounts.push({
@@ -1902,10 +2003,24 @@ export class NativeRouterService {
       }
     }
     
+    // Comptes résolus depuis les Address Lookup Tables
+    // IMPORTANT: Ces comptes sont REQUIS pour le CPI Jupiter car les transactions V0
+    // utilisent des ALTs pour compresser les comptes
+    if (jupiterCpi.resolvedAccounts && jupiterCpi.resolvedAccounts.length > 0) {
+      for (const acc of jupiterCpi.resolvedAccounts) {
+        jupiterRemainingAccounts.push({
+          pubkey: new PublicKey(acc.pubkey),
+          isSigner: false,
+          isWritable: acc.isWritable,
+        });
+      }
+    }
+    
     logger.info("NativeRouter", "Jupiter remaining accounts prepared", {
-      count: jupiterRemainingAccounts.length,
+      total: jupiterRemainingAccounts.length,
       jupiterProgramId: DEX_PROGRAMS.JUPITER.toBase58().slice(0, 8),
       staticAccounts: jupiterCpi.accounts?.length ?? 0,
+      resolvedFromALT: jupiterCpi.resolvedAccounts?.length ?? 0,
     });
     
     // Vérifier quels comptes optionnels existent on-chain
