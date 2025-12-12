@@ -31,8 +31,8 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# Build de l'application
-RUN npm run build
+# Build de l'application (next build directement car IDL/SDK déjà dans src/)
+RUN npx next build
 
 # ============================================
 # Stage 3: Runner (Production)
