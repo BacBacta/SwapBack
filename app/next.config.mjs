@@ -100,6 +100,15 @@ const nextConfig = {
       )
     );
 
+    // Handle server-side rpc-websockets issues
+    if (isServer) {
+      // Externalize rpc-websockets to avoid bundling issues
+      config.externals = config.externals || [];
+      if (Array.isArray(config.externals)) {
+        config.externals.push('rpc-websockets');
+      }
+    }
+
     // Polyfills pour les modules Node.js requis par Solana (côté client uniquement)
     if (!isServer) {
       config.resolve.fallback = {
