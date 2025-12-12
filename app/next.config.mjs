@@ -10,6 +10,10 @@ const RPC_WEBSOCKETS_SHIM_PATH = path.resolve(
   __dirname,
   'src/lib/rpc-websockets-shim.js'
 );
+const RPC_WEBSOCKETS_SERVER_SHIM_PATH = path.resolve(
+  __dirname,
+  'src/lib/rpc-websockets-server-shim.js'
+);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -75,28 +79,28 @@ const nextConfig = {
   webpack: (config, { isServer, dev }) => {
     config.resolve = config.resolve || {};
     
-    // Handle rpc-websockets resolution for all nested node_modules
-    // Use different files for server (ws-based) vs client (browser WebSocket)
+    // Handle rpc-websockets resolution
+    // Server uses our custom shim with ws package, client uses browser WebSocket
     let rpcWebsocketsPath;
+    let clientShimPath;
+    
     if (isServer) {
-      // Server: use the ws-based implementation
-      try {
-        rpcWebsocketsPath = require.resolve('rpc-websockets/dist/lib/client/websocket.cjs');
-      } catch {
-        rpcWebsocketsPath = RPC_WEBSOCKETS_SHIM_PATH;
-      }
+      // Server: use our custom server shim that wraps ws package
+      rpcWebsocketsPath = RPC_WEBSOCKETS_SERVER_SHIM_PATH;
+      clientShimPath = RPC_WEBSOCKETS_SERVER_SHIM_PATH;
     } else {
-      // Client: use the browser-based implementation
+      // Client: use the browser-based implementation or fallback to our shim
       try {
         rpcWebsocketsPath = require.resolve('rpc-websockets/dist/lib/client/websocket.browser.cjs');
       } catch {
         rpcWebsocketsPath = RPC_WEBSOCKETS_SHIM_PATH;
       }
+      clientShimPath = RPC_WEBSOCKETS_SHIM_PATH;
     }
     
     config.resolve.alias = {
       ...config.resolve.alias,
-      'rpc-websockets/dist/lib/client': RPC_WEBSOCKETS_SHIM_PATH,
+      'rpc-websockets/dist/lib/client': clientShimPath,
       'rpc-websockets/dist/lib/client/websocket.browser': rpcWebsocketsPath,
       'rpc-websockets/dist/lib/client/websocket': rpcWebsocketsPath,
     };
