@@ -76,7 +76,14 @@ const nextConfig = {
     config.resolve = config.resolve || {};
     
     // Handle rpc-websockets resolution for all nested node_modules
-    const rpcWebsocketsPath = path.resolve(__dirname, 'node_modules/rpc-websockets/dist/lib/client/websocket.browser.cjs');
+    // Use require.resolve for cross-environment compatibility (local + Docker)
+    let rpcWebsocketsPath;
+    try {
+      rpcWebsocketsPath = require.resolve('rpc-websockets/dist/lib/client/websocket.browser.cjs');
+    } catch {
+      // Fallback to shim if .cjs not found
+      rpcWebsocketsPath = RPC_WEBSOCKETS_SHIM_PATH;
+    }
     
     config.resolve.alias = {
       ...config.resolve.alias,
