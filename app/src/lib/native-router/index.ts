@@ -259,6 +259,39 @@ export interface JupiterCpiData {
   jupiterProgramIndex?: number;
   /** Diagnostics côté serveur pour tracer les quotes Jupiter */
   routerDiagnostics?: RouterQuoteDiagnostics | null;
+  
+  // ======================================================================
+  // NOUVEAU: Instructions de setup/cleanup Jupiter (wrapping SOL, etc.)
+  // ======================================================================
+  
+  /** 
+   * Instructions de setup à exécuter AVANT le swap (ex: wrap SOL → wSOL).
+   * Chaque instruction contient: programId, accounts, data (base64).
+   */
+  setupInstructions?: Array<{
+    programId: string;
+    accounts: Array<{ pubkey: string; isSigner: boolean; isWritable: boolean }>;
+    data: string; // base64
+  }>;
+  
+  /** 
+   * Instruction de cleanup à exécuter APRÈS le swap (ex: unwrap wSOL → SOL).
+   * Contient: programId, accounts, data (base64).
+   */
+  cleanupInstruction?: {
+    programId: string;
+    accounts: Array<{ pubkey: string; isSigner: boolean; isWritable: boolean }>;
+    data: string; // base64
+  };
+  
+  /**
+   * Instructions de compute budget (priority fees, compute units).
+   */
+  computeBudgetInstructions?: Array<{
+    programId: string;
+    accounts: Array<{ pubkey: string; isSigner: boolean; isWritable: boolean }>;
+    data: string; // base64
+  }>;
 }
 
 export interface RouterQuoteDiagnostics {
@@ -455,6 +488,9 @@ export async function getJupiterCpiData(
       resolvedCount: resolvedAccounts.length,
       accountsInOrderCount: cpi.accountsInOrder?.length ?? 0,
       jupiterProgramIndex: cpi.jupiterProgramIndex ?? -1,
+      hasSetupInstructions: !!(cpi.setupInstructions && cpi.setupInstructions.length > 0),
+      setupInstructionsCount: cpi.setupInstructions?.length ?? 0,
+      hasCleanupInstruction: !!cpi.cleanupInstruction,
     });
     
     if (routerDiagnostics) {
@@ -482,6 +518,10 @@ export async function getJupiterCpiData(
       accountsInOrder: cpi.accountsInOrder || undefined,
       jupiterProgramIndex: cpi.jupiterProgramIndex ?? -1,
       routerDiagnostics,
+      // Instructions de setup/cleanup Jupiter (wrap/unwrap SOL, etc.)
+      setupInstructions: cpi.setupInstructions || undefined,
+      cleanupInstruction: cpi.cleanupInstruction || undefined,
+      computeBudgetInstructions: cpi.computeBudgetInstructions || undefined,
     };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
@@ -1904,6 +1944,29 @@ export class NativeRouterService {
     }
     // ---------------------------------
     
+    // ========================================================================
+    // JUPITER SETUP INSTRUCTIONS (wrap SOL → wSOL, etc.)
+    // Ces instructions doivent être exécutées AVANT le swap
+    // ========================================================================
+    if (freshJupiterCpi.setupInstructions && freshJupiterCpi.setupInstructions.length > 0) {
+      logger.info("NativeRouter", "Adding Jupiter setup instructions", {
+        count: freshJupiterCpi.setupInstructions.length,
+      });
+      
+      for (const setupIx of freshJupiterCpi.setupInstructions) {
+        const setupInstruction = new TransactionInstruction({
+          programId: new PublicKey(setupIx.programId),
+          keys: setupIx.accounts.map(acc => ({
+            pubkey: new PublicKey(acc.pubkey),
+            isSigner: acc.isSigner,
+            isWritable: acc.isWritable,
+          })),
+          data: Buffer.from(setupIx.data, "base64"),
+        });
+        instructions.push(setupInstruction);
+      }
+    }
+    
     // Construire l'instruction swap_toc
     const swapInstruction = await this.buildSwapToCInstruction(
       userPublicKey,
@@ -1919,6 +1982,26 @@ export class NativeRouterService {
     );
     
     instructions.push(swapInstruction);
+    
+    // ========================================================================
+    // JUPITER CLEANUP INSTRUCTION (unwrap wSOL → SOL, etc.)
+    // Cette instruction doit être exécutée APRÈS le swap
+    // ========================================================================
+    if (freshJupiterCpi.cleanupInstruction) {
+      logger.info("NativeRouter", "Adding Jupiter cleanup instruction");
+      
+      const cleanupIx = freshJupiterCpi.cleanupInstruction;
+      const cleanupInstruction = new TransactionInstruction({
+        programId: new PublicKey(cleanupIx.programId),
+        keys: cleanupIx.accounts.map(acc => ({
+          pubkey: new PublicKey(acc.pubkey),
+          isSigner: acc.isSigner,
+          isWritable: acc.isWritable,
+        })),
+        data: Buffer.from(cleanupIx.data, "base64"),
+      });
+      instructions.push(cleanupInstruction);
+    }
     
     // Construire la transaction versionnée
     const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash();
