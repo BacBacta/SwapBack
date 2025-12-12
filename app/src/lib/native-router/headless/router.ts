@@ -2074,7 +2074,7 @@ export class NativeRouterService {
   /**
    * Compare les prix entre plusieurs venues et retourne le meilleur
    */
-  async compareVenuePrices(
+  compareVenuePrices = async (
     inputMint: PublicKey,
     outputMint: PublicKey,
     amountIn: number
@@ -2082,7 +2082,7 @@ export class NativeRouterService {
     venues: VenueQuote[];
     bestVenue: string;
     priceDifferenceBps: number;
-  }> {
+  }> => {
     const quotes = await this.getMultiVenueQuotes(inputMint, outputMint, amountIn);
     
     if (quotes.length === 0) {
@@ -2101,7 +2101,7 @@ export class NativeRouterService {
       bestVenue: best.venue,
       priceDifferenceBps,
     };
-  }
+  };
 }
 
 // ============================================================================
