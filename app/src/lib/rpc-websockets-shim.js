@@ -37,8 +37,13 @@ function attachEvent(target, eventName, handler) {
 }
 
 function defaultFactory(address, options) {
-  if (typeof browserWebSocketFactory === 'function') {
-    return browserWebSocketFactory(address, options);
+  // browserWebSocketFactory is now a class (WebSocketWrapper)
+  if (browserWebSocketFactory) {
+    try {
+      return new browserWebSocketFactory(address, options?.protocols, options);
+    } catch (e) {
+      // Fallback if constructor fails
+    }
   }
 
   if (!WebSocketImpl) {
