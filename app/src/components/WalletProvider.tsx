@@ -58,10 +58,10 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const rpcEndpoints = useMemo(() => {
     const endpoints: string[] = [];
     
-    // Primary: environment RPC
+    // Primary: environment RPC (validate it's a valid URL)
     const rpcFromEnv = process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
-    if (rpcFromEnv && rpcFromEnv.trim() !== "") {
-      endpoints.push(rpcFromEnv);
+    if (rpcFromEnv && rpcFromEnv.trim() !== "" && rpcFromEnv.startsWith("http")) {
+      endpoints.push(rpcFromEnv.trim());
     }
     
     // Add fallbacks for mainnet
@@ -72,11 +72,23 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
       endpoints.push("https://api.devnet.solana.com");
     }
     
+    // CRITICAL: Ensure we always have at least one valid endpoint
+    if (endpoints.length === 0) {
+      console.warn("No valid RPC endpoints configured, using Solana public RPC");
+      endpoints.push("https://api.mainnet-beta.solana.com");
+    }
+    
     return [...new Set(endpoints)]; // Remove duplicates
   }, [network]);
   
   const endpoint = useMemo(() => {
-    return rpcEndpoints[rpcIndex] || rpcEndpoints[0];
+    const selected = rpcEndpoints[rpcIndex] || rpcEndpoints[0];
+    // Final validation: must be a valid HTTP(S) URL
+    if (!selected || !selected.startsWith("http")) {
+      console.error("Invalid RPC endpoint, falling back to Solana public RPC");
+      return "https://api.mainnet-beta.solana.com";
+    }
+    return selected;
   }, [rpcEndpoints, rpcIndex]);
   
   // Test RPC connection and fallback if needed (only once per endpoint)
