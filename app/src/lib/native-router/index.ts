@@ -2000,30 +2000,20 @@ export class NativeRouterService {
     
     // Sérialiser les arguments SwapArgs
     // IMPORTANT: primaryOracleAccount DOIT correspondre au compte dans keys (primaryOracle)
-    const requestedMinOut = new BN(minAmountOut);
-    let effectiveMinOut = requestedMinOut;
-    if (jupiterCpi?.minOutputAmount) {
-      try {
-        const jupiterMin = new BN(jupiterCpi.minOutputAmount);
-        if (jupiterMin.lt(effectiveMinOut)) {
-          logger.debug("NativeRouter", "Clamping minOut to Jupiter threshold", {
-            userMin: effectiveMinOut.toString(),
-            jupiterMin: jupiterMin.toString(),
-          });
-          effectiveMinOut = jupiterMin;
-        }
-      } catch (bnErr) {
-        logger.warn("NativeRouter", "Failed to parse Jupiter minOutputAmount", {
-          value: jupiterCpi.minOutputAmount,
-          error: bnErr instanceof Error ? bnErr.message : String(bnErr),
-        });
-      }
-    }
+    // Note: minAmountOut est déjà correctement ajusté dans executeSwap() selon la venue
+    const effectiveMinOut = new BN(minAmountOut);
+    
+    logger.debug("NativeRouter", "Building swap instruction with minOut", {
+      minAmountOut,
+      effectiveMinOut: effectiveMinOut.toString(),
+      jupiterMinAvailable: !!jupiterCpi?.minOutputAmount,
+      jupiterMin: jupiterCpi?.minOutputAmount ?? "N/A",
+    });
 
     const argsBuffer = this.serializeSwapArgs({
       amountIn: new BN(amountIn),
       minOut: effectiveMinOut,
-      slippageTolerance: 50, // 0.5%
+      slippageTolerance: null, // None - use min_out directly, don't recalculate
       useDynamicPlan: false,
       useBundle: false,
       primaryOracleAccount: primaryOracle, // Utiliser l'oracle réel, pas le hardcodé
@@ -2182,7 +2172,7 @@ export class NativeRouterService {
   private serializeSwapArgs(args: {
     amountIn: BN;
     minOut: BN;
-    slippageTolerance: number;
+    slippageTolerance: number | null; // null = None, program uses min_out directly
     useDynamicPlan: boolean;
     useBundle: boolean;
     primaryOracleAccount: PublicKey;
@@ -2200,10 +2190,14 @@ export class NativeRouterService {
     buffers.push(args.minOut.toArrayLike(Buffer, "le", 8));
     
     // slippage_tolerance: Option<u16>
-    const slippageBuf = Buffer.alloc(3);
-    slippageBuf.writeUInt8(1, 0); // Some
-    slippageBuf.writeUInt16LE(args.slippageTolerance, 1);
-    buffers.push(slippageBuf);
+    if (args.slippageTolerance !== null) {
+      const slippageBuf = Buffer.alloc(3);
+      slippageBuf.writeUInt8(1, 0); // Some
+      slippageBuf.writeUInt16LE(args.slippageTolerance, 1);
+      buffers.push(slippageBuf);
+    } else {
+      buffers.push(Buffer.from([0])); // None - program uses args.min_out directly
+    }
     
     // twap_slices: Option<u8>
     buffers.push(Buffer.from([0])); // None
