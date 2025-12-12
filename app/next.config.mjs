@@ -87,13 +87,13 @@ const nextConfig = {
     
     // Handle rpc-websockets resolution (force shim to avoid ws dependency in Next build)
     const rpcWebsocketsPath = RPC_WEBSOCKETS_SHIM_PATH;
-    const clientShimPath = RPC_WEBSOCKETS_SHIM_PATH;
+    const rpcWebsocketBrowserPath = path.join(__dirname, 'src/lib/rpc-websockets-browser-shim.js');
     
     config.resolve.alias = {
       ...config.resolve.alias,
         'rpc-websockets/dist/lib/client': rpcWebsocketsPath,
-        'rpc-websockets/dist/lib/client/websocket.browser': rpcWebsocketsPath,
-        'rpc-websockets/dist/lib/client/websocket.browser.cjs': rpcWebsocketsPath,
+        'rpc-websockets/dist/lib/client/websocket.browser': rpcWebsocketBrowserPath,
+        'rpc-websockets/dist/lib/client/websocket.browser.cjs': rpcWebsocketBrowserPath,
         'rpc-websockets': rpcWebsocketsPath,
     };
     
@@ -102,7 +102,7 @@ const nextConfig = {
     config.plugins.push(
       new webpack.NormalModuleReplacementPlugin(
         /rpc-websockets\/dist\/lib\/client\/websocket(\.browser)?(\.cjs)?$/,
-        rpcWebsocketsPath
+        rpcWebsocketBrowserPath
       )
     );
 

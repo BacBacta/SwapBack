@@ -24,8 +24,8 @@
       "@/*": ["./src/*"],
       "@swapback/sdk": ["./src/sdk/index.ts"],
       "rpc-websockets/dist/lib/client": ["./src/lib/rpc-websockets-shim.js"],
-      "rpc-websockets/dist/lib/client/websocket.browser": ["./src/lib/rpc-websockets-shim.js"],
-      "rpc-websockets/dist/lib/client/websocket.browser.cjs": ["./src/lib/rpc-websockets-shim.js"]
+      "rpc-websockets/dist/lib/client/websocket.browser": ["./src/lib/rpc-websockets-browser-shim.js"],
+      "rpc-websockets/dist/lib/client/websocket.browser.cjs": ["./src/lib/rpc-websockets-browser-shim.js"]
     },
     "target": "es2020"
   },
