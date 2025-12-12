@@ -1723,6 +1723,7 @@ export class NativeRouterService {
   
   /**
    * Construit la transaction de swap native
+   * IMPORTANT: Rafraîchit le quote Jupiter pour éviter les erreurs de slippage périmé
    */
   async buildSwapTransaction(
     params: NativeSwapParams,
@@ -1736,6 +1737,43 @@ export class NativeRouterService {
       minAmountOut,
       venues: route.venues.map(v => v.venue),
     });
+    
+    // ========================================================================
+    // REFRESH JUPITER QUOTE - Évite les erreurs 0x177e (SlippageToleranceExceeded)
+    // Le quote Jupiter initial peut être périmé (prix a bougé pendant la confirmation)
+    // ========================================================================
+    let freshJupiterCpi = jupiterCpi;
+    try {
+      logger.info("NativeRouter", "Refreshing Jupiter quote before building transaction...");
+      
+      const freshCpi = await getJupiterCpiData(
+        inputMint.toBase58(),
+        outputMint.toBase58(),
+        String(amountIn),
+        params.slippageBps || 100, // Default 1% si non spécifié
+        userPublicKey.toBase58(),
+        this.connection
+      );
+      
+      if (freshCpi && freshCpi.swapInstruction && freshCpi.swapInstruction.length > 0) {
+        logger.info("NativeRouter", "Jupiter quote refreshed successfully", {
+          oldMinOutput: jupiterCpi.minOutputAmount,
+          newMinOutput: freshCpi.minOutputAmount,
+          instructionBytes: freshCpi.swapInstruction.length,
+        });
+        freshJupiterCpi = freshCpi;
+      } else {
+        logger.warn("NativeRouter", "Failed to refresh Jupiter quote, using original", {
+          hasFreshCpi: !!freshCpi,
+          hasInstruction: !!freshCpi?.swapInstruction,
+        });
+      }
+    } catch (refreshError) {
+      const errorMsg = refreshError instanceof Error ? refreshError.message : String(refreshError);
+      logger.warn("NativeRouter", "Jupiter quote refresh failed, using original", { error: errorMsg });
+      // Continue avec le quote original
+    }
+    // ========================================================================
     
     // Dériver les comptes
     const accounts = await this.deriveSwapAccounts(userPublicKey, inputMint, outputMint);
@@ -1905,7 +1943,7 @@ export class NativeRouterService {
       venueWeights,
       route.venues[0], // Meilleure venue
       params.maxStalenessSecs, // Optionnel: override staleness
-      jupiterCpi // REQUIS: données Jupiter CPI pour le programme on-chain
+      freshJupiterCpi // REQUIS: données Jupiter CPI FRAÎCHES pour le programme on-chain
     );
     
     instructions.push(swapInstruction);
@@ -1913,7 +1951,7 @@ export class NativeRouterService {
     // Construire la transaction versionnée
     const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash();
 
-    const lookupTables = await getAllALTs(this.connection, jupiterCpi.addressTableLookups);
+    const lookupTables = await getAllALTs(this.connection, freshJupiterCpi.addressTableLookups);
     logger.info("NativeRouter", "Loaded ALT accounts for swap", {
       lookupCount: lookupTables.length,
     });

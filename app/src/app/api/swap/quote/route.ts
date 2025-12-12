@@ -914,7 +914,7 @@ export async function POST(request: NextRequest) {
               useSharedAccounts: true,
               dynamicComputeUnitLimit: true,
               skipUserAccountsRpcCalls: false,
-              dynamicSlippage: { minBps: 50, maxBps: slippageBps },
+              dynamicSlippage: { minBps: 100, maxBps: Math.max(slippageBps, 200) }, // Min 1%, max at least 2%
             }),
           });
         } catch (swapErr) {
