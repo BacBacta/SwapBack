@@ -38,7 +38,22 @@ class CommonClient extends EventEmitter {
     }
 
     if (this.socket) return;
-    this.socket = new WebSocketImpl(this.url, this.options);
+
+    let normalizedUrl = this.url;
+    try {
+      if (/^https?:\/\//i.test(normalizedUrl)) {
+        normalizedUrl = normalizedUrl.replace(/^http/i, 'ws');
+      }
+
+      if (!/^wss?:\/\//i.test(normalizedUrl)) {
+        throw new Error(`Invalid WebSocket URL: ${normalizedUrl}`);
+      }
+    } catch (err) {
+      queueMicrotask(() => this.emit('error', err));
+      return;
+    }
+
+    this.socket = new WebSocketImpl(normalizedUrl, this.options);
 
     this.socket.onopen = (...args) => this.emit('open', ...args);
     this.socket.onclose = (...args) => this.emit('close', ...args);
