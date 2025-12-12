@@ -2001,7 +2001,6 @@ export class NativeRouterService {
     // Sérialiser les arguments SwapArgs
     // IMPORTANT: primaryOracleAccount DOIT correspondre au compte dans keys (primaryOracle)
     const requestedMinOut = new BN(minAmountOut);
-      const requestedMinOut = new BN(params.minAmountOut);
     let effectiveMinOut = requestedMinOut;
     if (jupiterCpi?.minOutputAmount) {
       try {
@@ -2443,7 +2442,6 @@ export class NativeRouterService {
       minOutputAmount: jupiterCpi.minOutputAmount ?? null,
     });
 
-    if (jupiterCpi.minOutputAmount) {
     if (jupiterCpi.minOutputAmount) {
       const jupiterMinOut = new BN(jupiterCpi.minOutputAmount);
       logger.info("NativeRouter", "Comparing router minOut with Jupiter threshold", {
