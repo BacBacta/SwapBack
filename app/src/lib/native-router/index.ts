@@ -2412,7 +2412,7 @@ export class NativeRouterService {
       throw new Error("Impossible de trouver une route native");
     }
     
-    const requestedMinOut = new BN(minAmountOut);
+    const requestedMinOut = new BN(params.minAmountOut);
 
     // 2. Récupérer Jupiter CPI + vérifier la compatibilité du slippage
     const jupiterCpi = await getJupiterCpiData(
