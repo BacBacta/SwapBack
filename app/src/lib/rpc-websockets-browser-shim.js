@@ -1,154 +1,141 @@
 /**
  * Shim for `rpc-websockets/dist/lib/client/websocket.browser`.
- * Provides a minimal WebSocket factory that works in browsers and Node runtimes
- * used by Next.js without pulling the native `ws` dependency when unavailable.
  * 
- * This class can be called with `new` (as a constructor) or as a regular function.
+ * This replaces the original module that uses `new window.WebSocket()` which fails
+ * in SSR/Node contexts. This shim safely uses the global WebSocket or falls back.
+ * 
+ * The original module exports:
+ *   exports.default = function(address, options) { return new WebSocketBrowserImpl(...) }
+ * 
+ * We must match this exact interface.
  */
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
 
 const { EventEmitter } = require('events');
 
-let WebSocketImpl = typeof WebSocket !== 'undefined' ? WebSocket : null;
-try {
-  if (!WebSocketImpl) {
-    // eslint-disable-next-line global-require
-    WebSocketImpl = require('ws');
+// Safely get WebSocket - check multiple locations
+function getWebSocketConstructor() {
+  // Browser environment
+  if (typeof window !== 'undefined' && window.WebSocket) {
+    return window.WebSocket;
   }
-} catch (err) {
-  WebSocketImpl = null;
+  // Web Worker or other global context
+  if (typeof globalThis !== 'undefined' && globalThis.WebSocket) {
+    return globalThis.WebSocket;
+  }
+  // Direct global (some bundlers)
+  if (typeof WebSocket !== 'undefined') {
+    return WebSocket;
+  }
+  // Node.js - try to load 'ws' package
+  try {
+    return require('ws');
+  } catch (e) {
+    return null;
+  }
 }
 
-function normalizeUrl(address) {
-  if (typeof address !== 'string') {
-    throw new TypeError(`Invalid WebSocket URL: ${address}`);
-  }
+const WebSocketImpl = getWebSocketConstructor();
 
-  let url = address.trim();
-  if (/^https?:\/\//i.test(url)) {
-    url = url.replace(/^http/i, 'ws');
-  }
-
-  if (!/^wss?:\/\//i.test(url)) {
-    throw new TypeError(`Invalid WebSocket URL: ${address}`);
-  }
-
-  return url;
-}
-
-function createInMemorySocket() {
-  const emitter = new EventEmitter();
-  const shim = {
-    readyState: 1,
-    send: () => {},
-    close: (code, reason) => {
-      shim.readyState = 3;
-      queueMicrotask(() => emitter.emit('close', { code, reason }));
-    },
-    addEventListener: emitter.on.bind(emitter),
-    removeEventListener: emitter.off ? emitter.off.bind(emitter) : emitter.removeListener.bind(emitter),
-  };
-
-  queueMicrotask(() => emitter.emit('open'));
-  emitter.on('message', () => {});
-
-  return shim;
+// Log for debugging
+if (typeof console !== 'undefined' && console.debug) {
+  console.debug('[rpc-websockets-shim] WebSocket implementation:', WebSocketImpl ? 'available' : 'NOT AVAILABLE');
 }
 
 /**
- * WebSocket wrapper class that can be instantiated with `new`.
- * This fixes the "WebSocket constructor: 'new' is required" error.
+ * WebSocketBrowserImpl - matches the interface of the original rpc-websockets module
  */
-class WebSocketWrapper {
-  constructor(address, protocols, options) {
-    const url = normalizeUrl(address);
-
+class WebSocketBrowserImpl extends EventEmitter {
+  constructor(address, options, protocols) {
+    super();
+    
     if (!WebSocketImpl) {
-      // Return in-memory socket for environments without WebSocket
-      const socket = createInMemorySocket();
-      Object.assign(this, socket);
+      // No WebSocket available - emit error asynchronously
+      console.warn('[rpc-websockets-shim] No WebSocket implementation available');
+      setTimeout(() => {
+        this.emit('error', new Error('WebSocket is not available in this environment'));
+      }, 0);
+      this.socket = null;
       return;
     }
-
-    // Create the actual WebSocket
-    const socket = new WebSocketImpl(url, protocols);
     
-    // Copy all properties and methods to this instance
-    this.readyState = socket.readyState;
-    this._socket = socket;
-    
-    // Proxy common properties
-    Object.defineProperty(this, 'readyState', {
-      get: () => socket.readyState,
-    });
-    Object.defineProperty(this, 'bufferedAmount', {
-      get: () => socket.bufferedAmount || 0,
-    });
-    Object.defineProperty(this, 'extensions', {
-      get: () => socket.extensions || '',
-    });
-    Object.defineProperty(this, 'protocol', {
-      get: () => socket.protocol || '',
-    });
-    Object.defineProperty(this, 'url', {
-      get: () => socket.url || url,
-    });
-    Object.defineProperty(this, 'binaryType', {
-      get: () => socket.binaryType,
-      set: (value) => { socket.binaryType = value; },
-    });
-    
-    // Bind methods
-    this.send = socket.send.bind(socket);
-    this.close = socket.close.bind(socket);
-    this.ping = socket.ping ? socket.ping.bind(socket) : () => {};
-    this.pong = socket.pong ? socket.pong.bind(socket) : () => {};
-    
-    // Handle addEventListener - normalize for both browser and Node ws
-    if (socket.addEventListener) {
-      this.addEventListener = socket.addEventListener.bind(socket);
-      this.removeEventListener = socket.removeEventListener.bind(socket);
-    } else if (socket.on) {
-      this.addEventListener = (event, handler) => {
-        socket.on(event, (...args) => handler(...args));
+    try {
+      // Create the actual WebSocket
+      // Note: browser WebSocket doesn't accept options object, only protocols
+      this.socket = new WebSocketImpl(address, protocols);
+      
+      this.socket.onopen = () => this.emit('open');
+      this.socket.onmessage = (event) => this.emit('message', event.data);
+      this.socket.onerror = (error) => this.emit('error', error);
+      this.socket.onclose = (event) => {
+        this.emit('close', event.code, event.reason);
       };
-      this.removeEventListener = socket.off 
-        ? socket.off.bind(socket) 
-        : socket.removeListener.bind(socket);
+    } catch (error) {
+      console.error('[rpc-websockets-shim] Error creating WebSocket:', error);
+      this.socket = null;
+      setTimeout(() => this.emit('error', error), 0);
     }
-    
-    // Event handler properties
-    ['onopen', 'onclose', 'onerror', 'onmessage'].forEach(prop => {
-      Object.defineProperty(this, prop, {
-        get: () => socket[prop],
-        set: (value) => { socket[prop] = value; },
-      });
-    });
+  }
+  
+  /**
+   * Sends data through a websocket connection
+   */
+  send(data, optionsOrCallback, callback) {
+    const cb = callback || optionsOrCallback || (() => {});
+    try {
+      if (this.socket && this.socket.readyState === 1) { // OPEN
+        this.socket.send(data);
+        if (typeof cb === 'function') cb();
+      } else {
+        if (typeof cb === 'function') cb(new Error('WebSocket is not open'));
+      }
+    } catch (error) {
+      if (typeof cb === 'function') cb(error);
+    }
+  }
+  
+  /**
+   * Closes an underlying socket
+   */
+  close(code, reason) {
+    if (this.socket) {
+      this.socket.close(code, reason);
+    }
+  }
+  
+  /**
+   * Add event listener (proxy to socket)
+   */
+  addEventListener(type, listener, options) {
+    if (this.socket && this.socket.addEventListener) {
+      this.socket.addEventListener(type, listener, options);
+    }
+  }
+  
+  /**
+   * Get ready state
+   */
+  get readyState() {
+    return this.socket ? this.socket.readyState : 3; // CLOSED
   }
 }
 
-// Static constants
-WebSocketWrapper.CONNECTING = 0;
-WebSocketWrapper.OPEN = 1;
-WebSocketWrapper.CLOSING = 2;
-WebSocketWrapper.CLOSED = 3;
-
-// Factory function for backward compatibility
-function createWebSocket(address, options = {}, protocols) {
-  try {
-    return new WebSocketWrapper(address, protocols, options);
-  } catch (error) {
-    const emitter = new EventEmitter();
-    queueMicrotask(() => emitter.emit('error', error));
-    emitter.addEventListener = emitter.on.bind(emitter);
-    emitter.removeEventListener = emitter.off ? emitter.off.bind(emitter) : emitter.removeListener.bind(emitter);
-    emitter.send = () => {};
-    emitter.close = () => {};
-    return emitter;
-  }
+/**
+ * Factory function for common WebSocket instance
+ * This is the default export that rpc-websockets expects
+ */
+function createWebSocket(address, options) {
+  return new WebSocketBrowserImpl(address, options);
 }
 
-// Export the class as default (for `new` usage)
-module.exports = WebSocketWrapper;
-module.exports.default = WebSocketWrapper;
-module.exports.WebSocket = WebSocketImpl;
-module.exports.createWebSocket = createWebSocket;
+// Match original module's export structure
+exports.default = createWebSocket;
+// Also export the class for direct use
+exports.WebSocketBrowserImpl = WebSocketBrowserImpl;
+// CommonJS default export pattern
+module.exports = createWebSocket;
+module.exports.default = createWebSocket;
+module.exports.WebSocketBrowserImpl = WebSocketBrowserImpl;

@@ -37,12 +37,22 @@ function attachEvent(target, eventName, handler) {
 }
 
 function defaultFactory(address, options) {
-  // browserWebSocketFactory is now a class (WebSocketWrapper)
-  if (browserWebSocketFactory) {
+  // browserWebSocketFactory is now a factory function that returns WebSocketBrowserImpl instance
+  // It matches the original rpc-websockets/dist/lib/client/websocket.browser.cjs interface
+  if (typeof browserWebSocketFactory === 'function') {
     try {
-      return new browserWebSocketFactory(address, options?.protocols, options);
+      return browserWebSocketFactory(address, options);
     } catch (e) {
-      // Fallback if constructor fails
+      console.warn('[rpc-websockets-shim] Factory error:', e);
+    }
+  }
+  
+  // browserWebSocketFactory might also be an object with .default property
+  if (browserWebSocketFactory && typeof browserWebSocketFactory.default === 'function') {
+    try {
+      return browserWebSocketFactory.default(address, options);
+    } catch (e) {
+      console.warn('[rpc-websockets-shim] Factory.default error:', e);
     }
   }
 
