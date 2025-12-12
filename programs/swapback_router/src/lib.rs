@@ -117,6 +117,9 @@ pub const MAX_VENUES: usize = 10;
 pub const MAX_FALLBACKS: usize = 5;
 pub const MAX_SINGLE_SWAP_LAMPORTS: u64 = 5_000_000_000_000; // ~5k SOL equivalent
 
+// Rebate claim delay (48 hours = 172800 seconds)
+pub const REBATE_CLAIM_DELAY_SECS: i64 = 172800;
+
 // DCA Account Structures - must be defined here for #[program] macro
 #[derive(Accounts)]
 #[instruction(plan_id: [u8; 32])]
@@ -826,13 +829,22 @@ pub mod swapback_router {
 
     /// Claim accumulated rebates
     /// Transfers unclaimed USDC rebates from vault to user
+    /// Requires 48 hours since last swap to prevent gaming
     pub fn claim_rewards(ctx: Context<ClaimRewards>) -> Result<()> {
         let user_rebate = &mut ctx.accounts.user_rebate;
+        let now = Clock::get()?.unix_timestamp;
 
         // Verify there are rewards to claim
         require!(
             user_rebate.unclaimed_rebate > 0,
             ErrorCode::NoRewardsToClaim
+        );
+
+        // Verify 48h delay since last swap (anti-gaming)
+        let claimable_after = user_rebate.last_swap_timestamp + REBATE_CLAIM_DELAY_SECS;
+        require!(
+            now >= claimable_after,
+            ErrorCode::RebateClaimTooEarly
         );
 
         // Verify vault has sufficient balance
@@ -1017,6 +1029,15 @@ pub struct SwapToC<'info> {
     /// CHECK: User's rebate USDC account (for receiving boosted rebates)
     #[account(mut)]
     pub user_rebate_account: Option<Box<Account<'info, TokenAccount>>>,
+
+    /// User's rebate tracking PDA - for deferred claim model
+    /// Credits are stored here and claimable after 48h
+    #[account(
+        mut,
+        seeds = [b"user_rebate", user.key().as_ref()],
+        bump
+    )]
+    pub user_rebate: Option<Account<'info, UserRebate>>,
 
     /// Rebate vault PDA holding USDC
     #[account(
@@ -1438,6 +1459,19 @@ pub struct RebatePaid {
     pub timestamp: i64,
 }
 
+/// Emitted when rebates are credited to user account (deferred claim model)
+#[event]
+pub struct RebateCredited {
+    pub user: Pubkey,
+    pub npi_amount: u64,      // NPI (routing profit) réalisé
+    pub base_rebate: u64,     // Rebate de base (70% du NPI)
+    pub boost: u16,           // Boost appliqué (basis points)
+    pub total_rebate: u64,    // Rebate total après boost
+    pub total_unclaimed: u64, // Total non réclamé après crédit
+    pub claimable_after: i64, // Timestamp à partir duquel le claim est possible
+    pub timestamp: i64,
+}
+
 #[event]
 pub struct FeesAllocated {
     pub swap_amount: u64,
@@ -1612,6 +1646,8 @@ pub enum ErrorCode {
     SlippageTooHigh,
     #[msg("No rewards to claim")]
     NoRewardsToClaim,
+    #[msg("Rebates can only be claimed 48 hours after last swap")]
+    RebateClaimTooEarly,
     #[msg("Insufficient vault balance")]
     InsufficientVaultBalance,
     #[msg("Math overflow")]
@@ -2817,7 +2853,8 @@ pub mod swap_toc_processor {
     }
 
     /// Pay rebate to user with pre-calculated amount
-    /// New function with cleaner separation of concerns
+    /// New deferred claim model: credits are stored in user_rebate PDA
+    /// and can be claimed 48h after last swap
     fn pay_rebate_to_user_with_amount(
         ctx: &mut Context<SwapToC>,
         npi_amount: u64,
@@ -2829,55 +2866,60 @@ pub mod swap_toc_processor {
             return Ok(());
         }
 
-        // Si pas de compte rebate, pas de paiement
-        let user_rebate_account = match &ctx.accounts.user_rebate_account {
+        // Si pas de compte user_rebate PDA, on ne peut pas créditer
+        let user_rebate = match &mut ctx.accounts.user_rebate {
             Some(acc) => acc,
-            None => return Ok(()),
+            None => {
+                msg!("⚠️ No user_rebate account provided, skipping rebate credit");
+                return Ok(());
+            }
         };
 
-        // Calculer le base rebate (60% du NPI)
+        // Calculer le base rebate (70% du NPI)
         let base_rebate = calculate_fee(npi_amount, ctx.accounts.state.rebate_percentage)?;
+        let now = Clock::get()?.unix_timestamp;
 
-        require!(
-            ctx.accounts.rebate_vault.amount >= total_rebate,
-            ErrorCode::InsufficientVaultBalance
-        );
-
-        let seeds = &[b"router_state".as_ref(), &[ctx.accounts.state.bump]];
-        let signer = &[&seeds[..]];
-
-        let cpi_accounts = token::Transfer {
-            from: ctx.accounts.rebate_vault.to_account_info(),
-            to: user_rebate_account.to_account_info(),
-            authority: ctx.accounts.state.to_account_info(),
-        };
-
-        let cpi_ctx = CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            cpi_accounts,
-            signer,
-        );
-        token::transfer(cpi_ctx, total_rebate)?;
+        // Créditer le rebate sur le compte UserRebate (deferred claim model)
+        user_rebate.unclaimed_rebate = user_rebate
+            .unclaimed_rebate
+            .checked_add(total_rebate)
+            .ok_or(ErrorCode::MathOverflow)?;
+        user_rebate.total_swaps = user_rebate
+            .total_swaps
+            .checked_add(1)
+            .ok_or(ErrorCode::MathOverflow)?;
+        user_rebate.last_swap_timestamp = now;
 
         // Mettre à jour les statistiques du state
         let state = &mut ctx.accounts.state;
         state.total_npi = state
             .total_npi
             .checked_add(npi_amount)
-            .ok_or(ErrorCode::InvalidOraclePrice)?;
+            .ok_or(ErrorCode::MathOverflow)?;
+        // Note: total_rebates_paid est maintenant "total_rebates_credited"
         state.total_rebates_paid = state
             .total_rebates_paid
             .checked_add(total_rebate)
-            .ok_or(ErrorCode::InvalidOraclePrice)?;
+            .ok_or(ErrorCode::MathOverflow)?;
 
-        emit!(RebatePaid {
+        let claimable_after = now + REBATE_CLAIM_DELAY_SECS;
+
+        emit!(RebateCredited {
             user: ctx.accounts.user.key(),
             npi_amount,
             base_rebate,
             boost,
             total_rebate,
-            timestamp: Clock::get()?.unix_timestamp,
+            total_unclaimed: user_rebate.unclaimed_rebate,
+            claimable_after,
+            timestamp: now,
         });
+
+        msg!(
+            "✅ Rebate credited: {} USDC (claimable after {})",
+            total_rebate / 1_000_000,
+            claimable_after
+        );
 
         Ok(())
     }

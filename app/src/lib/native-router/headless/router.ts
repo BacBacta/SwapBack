@@ -1439,6 +1439,7 @@ export class NativeRouterService {
     userTokenAccountB: PublicKey;
     userRebateAccount: PublicKey;
     userNftPda: PublicKey;
+    userRebatePda: PublicKey;
     oracleCache: PublicKey;
     venueScore: PublicKey;
   }> {
@@ -1480,6 +1481,12 @@ export class NativeRouterService {
       CNFT_PROGRAM_ID
     );
     
+    // User Rebate PDA (for deferred claim model - 48h delay)
+    const [userRebatePda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_rebate"), userPublicKey.toBuffer()],
+      this.programId
+    );
+    
     // Oracle cache PDA
     const [oracleCache] = PublicKey.findProgramAddressSync(
       [Buffer.from("oracle_cache"), DEFAULT_ORACLE.toBuffer()],
@@ -1501,6 +1508,7 @@ export class NativeRouterService {
       userTokenAccountB,
       userRebateAccount,
       userNftPda,
+      userRebatePda,
       oracleCache,
       venueScore,
     };
@@ -1698,14 +1706,16 @@ export class NativeRouterService {
     const venueAccounts = await this.getVenueAccounts(bestVenue, inputMint, outputMint);
     
     // Vérifier quels comptes optionnels existent on-chain
-    const [userNftExists, oracleCacheExists, venueScoreExists] = await Promise.all([
+    const [userNftExists, userRebatePdaExists, oracleCacheExists, venueScoreExists] = await Promise.all([
       this.connection.getAccountInfo(accounts.userNftPda).then(info => !!info),
+      this.connection.getAccountInfo(accounts.userRebatePda).then(info => !!info),
       this.connection.getAccountInfo(accounts.oracleCache).then(info => !!info),
       this.connection.getAccountInfo(accounts.venueScore).then(info => !!info),
     ]);
     
     logger.debug("NativeRouter", "Optional accounts check", {
       userNftExists,
+      userRebatePdaExists,
       oracleCacheExists,
       venueScoreExists,
     });
@@ -1742,17 +1752,20 @@ export class NativeRouterService {
       { pubkey: NONE_ACCOUNT, isSigner: false, isWritable: false },
       // 13. buyback_state (optional - None)
       { pubkey: NONE_ACCOUNT, isSigner: false, isWritable: false },
-      // 14. user_rebate_account (optional)
-      { pubkey: accounts.userRebateAccount, isSigner: false, isWritable: true },
-      // 15. rebate_vault
+      // 14. user_rebate_account (TokenAccount USDC for direct transfer - DISABLED)
+      { pubkey: NONE_ACCOUNT, isSigner: false, isWritable: false },
+      // 15. user_rebate PDA (UserRebate account for deferred claim - credits stored here)
+      // Pass if exists, otherwise program will skip rebate credit
+      { pubkey: userRebatePdaExists ? accounts.userRebatePda : NONE_ACCOUNT, isSigner: false, isWritable: userRebatePdaExists },
+      // 16. rebate_vault
       { pubkey: accounts.rebateVault, isSigner: false, isWritable: true },
-      // 16. oracle_cache (optional - seulement si existe)
+      // 17. oracle_cache (optional - seulement si existe)
       { pubkey: oracleCacheExists ? accounts.oracleCache : NONE_ACCOUNT, isSigner: false, isWritable: oracleCacheExists },
-      // 17. venue_score (optional - seulement si existe)
+      // 18. venue_score (optional - seulement si existe)
       { pubkey: venueScoreExists ? accounts.venueScore : NONE_ACCOUNT, isSigner: false, isWritable: venueScoreExists },
-      // 18. token_program
+      // 19. token_program
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      // 19. system_program
+      // 20. system_program
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       // remaining_accounts: Venue accounts pour le CPI
       ...venueAccounts.map(pubkey => ({

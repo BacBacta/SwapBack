@@ -1,5 +1,5 @@
 {
-  "address": "9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh",
+  "address": "APHj6L2b2bA2q62jwYZp38dqbTxQUqwatqdUum1trPnN",
   "metadata": {
     "name": "swapback_router",
     "version": "0.1.0",
@@ -7,6 +7,109 @@
     "description": "Programme de routage de swap avancé avec oracle et TWAP"
   },
   "instructions": [
+    {
+      "name": "accept_authority",
+      "docs": [
+        "Accept authority transfer (two-step transfer for security)",
+        "Step 2: Pending authority accepts the transfer"
+      ],
+      "discriminator": [
+        107,
+        86,
+        198,
+        91,
+        33,
+        12,
+        107,
+        160
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  116,
+                  101,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "new_authority",
+          "docs": [
+            "The new authority accepting the transfer"
+          ],
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancel_authority_transfer",
+      "docs": [
+        "Cancel a pending authority transfer"
+      ],
+      "discriminator": [
+        94,
+        131,
+        125,
+        184,
+        183,
+        24,
+        125,
+        229
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  116,
+                  101,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "state"
+          ]
+        }
+      ],
+      "args": []
+    },
     {
       "name": "cancel_dca_plan",
       "docs": [
@@ -42,7 +145,8 @@
       "name": "claim_rewards",
       "docs": [
         "Claim accumulated rebates",
-        "Transfers unclaimed USDC rebates from vault to user"
+        "Transfers unclaimed USDC rebates from vault to user",
+        "Requires 48 hours since last swap to prevent gaming"
       ],
       "discriminator": [
         4,
@@ -327,9 +431,113 @@
       ]
     },
     {
+      "name": "emergency_withdraw",
+      "docs": [
+        "Emergency withdraw from rebate vault (for stuck funds recovery)",
+        "Only callable by authority when protocol is paused"
+      ],
+      "discriminator": [
+        239,
+        45,
+        203,
+        64,
+        150,
+        73,
+        218,
+        92
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  116,
+                  101,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "rebate_vault",
+          "docs": [
+            "Rebate vault to withdraw from"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  98,
+                  97,
+                  116,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "state"
+              }
+            ]
+          }
+        },
+        {
+          "name": "destination",
+          "docs": [
+            "Destination token account for withdrawn funds"
+          ],
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "state"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "execute_dca_swap",
       "docs": [
-        "Execute a single swap in a DCA plan"
+        "Execute a single swap in a DCA plan",
+        "",
+        "This instruction executes a scheduled DCA swap via Jupiter CPI.",
+        "The keeper builds the Jupiter instruction off-chain and passes it",
+        "along with remaining accounts for the swap."
       ],
       "discriminator": [
         9,
@@ -396,6 +604,10 @@
           "signer": true
         },
         {
+          "name": "jupiter_program",
+          "address": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
+        },
+        {
           "name": "token_program",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
@@ -404,7 +616,16 @@
           "address": "11111111111111111111111111111111"
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "ExecuteDcaSwapArgs"
+            }
+          }
+        }
+      ]
     },
     {
       "name": "initialize",
@@ -587,7 +808,16 @@
           "address": "11111111111111111111111111111111"
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "token_in",
+          "type": "pubkey"
+        },
+        {
+          "name": "token_out",
+          "type": "pubkey"
+        }
+      ]
     },
     {
       "name": "initialize_rebate_vault",
@@ -767,6 +997,115 @@
       "args": []
     },
     {
+      "name": "pause_protocol",
+      "docs": [
+        "Pause the protocol (circuit breaker for emergencies)",
+        "Only callable by authority"
+      ],
+      "discriminator": [
+        144,
+        95,
+        0,
+        107,
+        119,
+        39,
+        248,
+        141
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  116,
+                  101,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "state"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "propose_authority",
+      "docs": [
+        "Propose a new authority (two-step transfer for security)",
+        "Step 1: Current authority proposes new authority"
+      ],
+      "discriminator": [
+        20,
+        148,
+        236,
+        198,
+        76,
+        119,
+        99,
+        142
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  116,
+                  101,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "state"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "new_authority",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "resume_dca_plan",
       "docs": [
         "Resume a paused DCA plan"
@@ -827,10 +1166,16 @@
         },
         {
           "name": "user_token_account_a",
+          "docs": [
+            "User's token account A - with ownership validation (H1 FIX)"
+          ],
           "writable": true
         },
         {
           "name": "user_token_account_b",
+          "docs": [
+            "User's token account B - with ownership validation (H1 FIX)"
+          ],
           "writable": true
         },
         {
@@ -910,7 +1255,7 @@
         {
           "name": "buyback_program",
           "optional": true,
-          "address": "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"
+          "address": "7wCCwRXxWvMY2DJDRrnhFg3b8jVPb5vVPxLH5YAGL6eJ"
         },
         {
           "name": "buyback_usdc_vault",
@@ -926,6 +1271,39 @@
           "name": "user_rebate_account",
           "writable": true,
           "optional": true
+        },
+        {
+          "name": "user_rebate",
+          "docs": [
+            "User's rebate tracking PDA - for deferred claim model",
+            "Credits are stored here and claimable after 48h"
+          ],
+          "writable": true,
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  114,
+                  101,
+                  98,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
         },
         {
           "name": "rebate_vault",
@@ -1037,6 +1415,58 @@
           }
         }
       ]
+    },
+    {
+      "name": "unpause_protocol",
+      "docs": [
+        "Unpause the protocol",
+        "Only callable by authority"
+      ],
+      "discriminator": [
+        183,
+        154,
+        5,
+        183,
+        105,
+        76,
+        87,
+        18
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  116,
+                  101,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "state"
+          ]
+        }
+      ],
+      "args": []
     },
     {
       "name": "update_config",
@@ -1154,6 +1584,82 @@
           }
         }
       ]
+    },
+    {
+      "name": "update_wallets",
+      "docs": [
+        "Update wallet addresses (treasury, buyback, boost vault)"
+      ],
+      "discriminator": [
+        161,
+        63,
+        139,
+        31,
+        207,
+        236,
+        60,
+        42
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  116,
+                  101,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "state"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "treasury_wallet",
+          "type": {
+            "option": "pubkey"
+          }
+        },
+        {
+          "name": "buyback_wallet",
+          "type": {
+            "option": "pubkey"
+          }
+        },
+        {
+          "name": "boost_vault_wallet",
+          "type": {
+            "option": "pubkey"
+          }
+        },
+        {
+          "name": "npi_vault_wallet",
+          "type": {
+            "option": "pubkey"
+          }
+        }
+      ]
     }
   ],
   "accounts": [
@@ -1168,81 +1674,7 @@
         241,
         52,
         84
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "planId",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "user",
-            "type": "pubkey"
-          },
-          {
-            "name": "tokenIn",
-            "type": "pubkey"
-          },
-          {
-            "name": "tokenOut",
-            "type": "pubkey"
-          },
-          {
-            "name": "amountPerSwap",
-            "type": "u64"
-          },
-          {
-            "name": "totalSwaps",
-            "type": "u32"
-          },
-          {
-            "name": "executedSwaps",
-            "type": "u32"
-          },
-          {
-            "name": "intervalSeconds",
-            "type": "i64"
-          },
-          {
-            "name": "nextExecution",
-            "type": "i64"
-          },
-          {
-            "name": "minOutPerSwap",
-            "type": "u64"
-          },
-          {
-            "name": "createdAt",
-            "type": "i64"
-          },
-          {
-            "name": "expiresAt",
-            "type": "i64"
-          },
-          {
-            "name": "isActive",
-            "type": "bool"
-          },
-          {
-            "name": "totalInvested",
-            "type": "u64"
-          },
-          {
-            "name": "totalReceived",
-            "type": "u64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
+      ]
     },
     {
       "name": "OracleCache",
@@ -1268,54 +1700,7 @@
         251,
         46,
         139
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "authority",
-            "type": "pubkey"
-          },
-          {
-            "name": "pendingAuthority",
-            "type": {
-              "option": "pubkey"
-            }
-          },
-          {
-            "name": "rebateBps",
-            "type": "u16"
-          },
-          {
-            "name": "treasuryBps",
-            "type": "u16"
-          },
-          {
-            "name": "boostVaultBps",
-            "type": "u16"
-          },
-          {
-            "name": "treasuryFromFeesBps",
-            "type": "u16"
-          },
-          {
-            "name": "buyburnFromFeesBps",
-            "type": "u16"
-          },
-          {
-            "name": "dynamicSlippageEnabled",
-            "type": "bool"
-          },
-          {
-            "name": "npiBenchmarkingEnabled",
-            "type": "bool"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
+      ]
     },
     {
       "name": "RouterState",
@@ -1328,48 +1713,7 @@
         208,
         200,
         27
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "authority",
-            "type": "pubkey"
-          },
-          {
-            "name": "rebatePercentage",
-            "type": "u16"
-          },
-          {
-            "name": "treasuryPercentage",
-            "type": "u16"
-          },
-          {
-            "name": "boostVaultPercentage",
-            "type": "u16"
-          },
-          {
-            "name": "totalSwaps",
-            "type": "u64"
-          },
-          {
-            "name": "totalVolume",
-            "type": "u64"
-          },
-          {
-            "name": "totalFees",
-            "type": "u64"
-          },
-          {
-            "name": "totalRebates",
-            "type": "u64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
+      ]
     },
     {
       "name": "SwapPlan",
@@ -1408,32 +1752,7 @@
         134,
         112,
         99
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "user",
-            "type": "pubkey"
-          },
-          {
-            "name": "totalRebates",
-            "type": "u64"
-          },
-          {
-            "name": "claimedRebates",
-            "type": "u64"
-          },
-          {
-            "name": "lastClaimAt",
-            "type": "i64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
+      ]
     },
     {
       "name": "VenueScore",
@@ -1450,6 +1769,45 @@
     }
   ],
   "events": [
+    {
+      "name": "AuthorityProposed",
+      "discriminator": [
+        244,
+        117,
+        94,
+        112,
+        53,
+        151,
+        35,
+        89
+      ]
+    },
+    {
+      "name": "AuthorityTransferCancelled",
+      "discriminator": [
+        31,
+        228,
+        187,
+        148,
+        20,
+        99,
+        237,
+        48
+      ]
+    },
+    {
+      "name": "AuthorityTransferred",
+      "discriminator": [
+        245,
+        109,
+        179,
+        54,
+        135,
+        92,
+        22,
+        64
+      ]
+    },
     {
       "name": "BundleHint",
       "discriminator": [
@@ -1490,6 +1848,19 @@
       ]
     },
     {
+      "name": "EmergencyWithdrawal",
+      "discriminator": [
+        225,
+        77,
+        96,
+        117,
+        149,
+        211,
+        83,
+        71
+      ]
+    },
+    {
       "name": "FallbackTriggered",
       "discriminator": [
         21,
@@ -1513,6 +1884,19 @@
         203,
         110,
         47
+      ]
+    },
+    {
+      "name": "JitoBundleConfigured",
+      "discriminator": [
+        158,
+        44,
+        164,
+        83,
+        96,
+        90,
+        38,
+        57
       ]
     },
     {
@@ -1555,6 +1939,45 @@
       ]
     },
     {
+      "name": "ProtocolPaused",
+      "discriminator": [
+        35,
+        111,
+        245,
+        138,
+        237,
+        199,
+        79,
+        223
+      ]
+    },
+    {
+      "name": "ProtocolUnpaused",
+      "discriminator": [
+        248,
+        204,
+        112,
+        239,
+        72,
+        67,
+        127,
+        216
+      ]
+    },
+    {
+      "name": "RebateCredited",
+      "discriminator": [
+        129,
+        152,
+        7,
+        191,
+        173,
+        65,
+        45,
+        220
+      ]
+    },
+    {
       "name": "RebatePaid",
       "discriminator": [
         240,
@@ -1594,6 +2017,19 @@
       ]
     },
     {
+      "name": "TwapSlicesRequired",
+      "discriminator": [
+        129,
+        161,
+        59,
+        191,
+        163,
+        132,
+        170,
+        93
+      ]
+    },
+    {
       "name": "VenueExecuted",
       "discriminator": [
         27,
@@ -1604,6 +2040,19 @@
         181,
         178,
         38
+      ]
+    },
+    {
+      "name": "WalletsUpdated",
+      "discriminator": [
+        30,
+        210,
+        107,
+        130,
+        205,
+        14,
+        58,
+        71
       ]
     }
   ],
@@ -1692,9 +2141,164 @@
       "code": 6016,
       "name": "AlreadyActive",
       "msg": "DCA plan is already active"
+    },
+    {
+      "code": 6017,
+      "name": "SwapExecutionFailed",
+      "msg": "Swap execution failed"
+    },
+    {
+      "code": 6018,
+      "name": "InvalidTokenAccount",
+      "msg": "Invalid token account"
+    },
+    {
+      "code": 6019,
+      "name": "Unauthorized",
+      "msg": "Unauthorized"
+    },
+    {
+      "code": 6020,
+      "name": "MathOverflow",
+      "msg": "Math overflow"
+    },
+    {
+      "code": 6021,
+      "name": "MissingJupiterRoute",
+      "msg": "Missing Jupiter route / instruction data for CPI swap"
+    },
+    {
+      "code": 6022,
+      "name": "JupiterCpiFailed",
+      "msg": "Jupiter CPI failed"
+    },
+    {
+      "code": 6023,
+      "name": "JupiterNoInputSpent",
+      "msg": "Jupiter CPI: input not spent (delta=0)"
+    },
+    {
+      "code": 6024,
+      "name": "JupiterSpentTooHigh",
+      "msg": "Jupiter CPI: spent input too high vs expected"
+    },
+    {
+      "code": 6025,
+      "name": "SlippageExceededCpi",
+      "msg": "Slippage exceeded (amount_out < min_out)"
+    },
+    {
+      "code": 6026,
+      "name": "InvalidLiquidityEstimate",
+      "msg": "Invalid liquidity estimate (must be > 0)"
+    },
+    {
+      "code": 6027,
+      "name": "TooManyVenues",
+      "msg": "Too many venues for one swap (compute guard)"
+    },
+    {
+      "code": 6028,
+      "name": "ProtocolPaused",
+      "msg": "Protocol is currently paused"
+    },
+    {
+      "code": 6029,
+      "name": "NoPendingAuthority",
+      "msg": "No pending authority to accept"
+    },
+    {
+      "code": 6030,
+      "name": "NotPendingAuthority",
+      "msg": "Caller is not the pending authority"
+    },
+    {
+      "code": 6031,
+      "name": "AddressBlacklisted",
+      "msg": "Address is blacklisted"
+    },
+    {
+      "code": 6032,
+      "name": "InvalidWalletAddress",
+      "msg": "Invalid wallet address (zero address)"
+    },
+    {
+      "code": 6033,
+      "name": "EmergencyWithdrawExceedsBalance",
+      "msg": "Emergency withdraw amount exceeds vault balance"
+    },
+    {
+      "code": 6034,
+      "name": "AlreadyPausedProtocol",
+      "msg": "Cannot pause an already paused protocol"
+    },
+    {
+      "code": 6035,
+      "name": "AlreadyUnpausedProtocol",
+      "msg": "Cannot unpause an already active protocol"
     }
   ],
   "types": [
+    {
+      "name": "AuthorityProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "current_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AuthorityTransferCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "cancelled_pending",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AuthorityTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
     {
       "name": "BundleHint",
       "type": {
@@ -1961,6 +2565,66 @@
       }
     },
     {
+      "name": "EmergencyWithdrawal",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "destination",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault_remaining",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ExecuteDcaSwapArgs",
+      "docs": [
+        "Arguments for DCA swap execution"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "jupiter_instruction",
+            "docs": [
+              "Jupiter swap instruction data (built off-chain by keeper)"
+            ],
+            "type": "bytes"
+          },
+          {
+            "name": "expected_input",
+            "docs": [
+              "Expected input amount (must match plan's amount_per_swap)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "amount_received",
+            "docs": [
+              "Actual amount received from Jupiter (reported by keeper after simulation)"
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "FallbackPlan",
       "type": {
         "kind": "struct",
@@ -2022,6 +2686,61 @@
           {
             "name": "timestamp",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "JitoBundleConfig",
+      "docs": [
+        "Jito MEV bundle configuration for sandwich attack protection"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "enabled",
+            "docs": [
+              "Whether to use Jito bundle (private mempool)"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "tip_lamports",
+            "docs": [
+              "Tip amount in lamports (clamped to MIN/MAX)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "tip_account_index",
+            "docs": [
+              "Selected tip account index (0-7)"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "JitoBundleConfigured",
+      "docs": [
+        "Emitted when Jito MEV protection is configured"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "enabled",
+            "type": "bool"
+          },
+          {
+            "name": "tip_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "tip_account",
+            "type": "pubkey"
           }
         ]
       }
@@ -2134,6 +2853,10 @@
             "type": "i64"
           },
           {
+            "name": "volatility_bps",
+            "type": "u16"
+          },
+          {
             "name": "bump",
             "type": "u8"
           }
@@ -2202,6 +2925,85 @@
           {
             "name": "compute_unit_price",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProtocolPaused",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProtocolUnpaused",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "paused_duration",
+            "type": "i64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RebateCredited",
+      "docs": [
+        "Emitted when rebates are credited to user account (deferred claim model)"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "npi_amount",
+            "type": "u64"
+          },
+          {
+            "name": "base_rebate",
+            "type": "u64"
+          },
+          {
+            "name": "boost",
+            "type": "u16"
+          },
+          {
+            "name": "total_rebate",
+            "type": "u64"
+          },
+          {
+            "name": "total_unclaimed",
+            "type": "u64"
+          },
+          {
+            "name": "claimable_after",
+            "type": "i64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }
@@ -2305,6 +3107,15 @@
             "type": "bool"
           },
           {
+            "name": "max_venues_per_swap",
+            "docs": [
+              "Maximum venues allowed per swap (compute guard). None = use default (3)"
+            ],
+            "type": {
+              "option": "u8"
+            }
+          },
+          {
             "name": "bump",
             "type": "u8"
           }
@@ -2325,6 +3136,29 @@
               "Authority that can update configuration"
             ],
             "type": "pubkey"
+          },
+          {
+            "name": "pending_authority",
+            "docs": [
+              "Pending authority for two-step transfer (security best practice)"
+            ],
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "is_paused",
+            "docs": [
+              "Whether the protocol is paused (circuit breaker)"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "paused_at",
+            "docs": [
+              "Timestamp when protocol was paused (for audit trail)"
+            ],
+            "type": "i64"
           },
           {
             "name": "rebate_percentage",
@@ -2513,6 +3347,99 @@
                 }
               }
             }
+          },
+          {
+            "name": "jupiter_swap_ix_data",
+            "docs": [
+              "Jupiter instruction data for CPI replay (provided by keeper/SDK)"
+            ],
+            "type": {
+              "option": "bytes"
+            }
+          },
+          {
+            "name": "liquidity_estimate",
+            "docs": [
+              "Liquidity estimate provided by off-chain services"
+            ],
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "volatility_bps",
+            "docs": [
+              "Volatility estimate in BPS (0..=5000, where 100 = 1%)"
+            ],
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "min_venue_score",
+            "docs": [
+              "Minimum venue quality score threshold (excludes venues below this)"
+            ],
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "slippage_per_venue",
+            "docs": [
+              "Per-venue slippage overrides (allows user to set max slippage per DEX)"
+            ],
+            "type": {
+              "option": {
+                "vec": {
+                  "defined": {
+                    "name": "VenueSlippage"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "name": "token_a_decimals",
+            "docs": [
+              "Token A decimals (for accurate TVL calculation, default: 6)"
+            ],
+            "type": {
+              "option": "u8"
+            }
+          },
+          {
+            "name": "token_b_decimals",
+            "docs": [
+              "Token B decimals (for accurate TVL calculation, default: 6)"
+            ],
+            "type": {
+              "option": "u8"
+            }
+          },
+          {
+            "name": "max_staleness_override",
+            "docs": [
+              "Max staleness override in seconds (for volatile markets, use 30-60s instead of default 300s)",
+              "Must be between MIN_STALENESS_SECS and MAX_STALENESS_SECS"
+            ],
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "jito_bundle",
+            "docs": [
+              "Jito bundle configuration for MEV protection",
+              "When enabled, transaction is sent via Jito's private mempool"
+            ],
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "JitoBundleConfig"
+                }
+              }
+            }
           }
         ]
       }
@@ -2622,6 +3549,50 @@
           {
             "name": "bump",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TwapSlicesRequired",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_amount",
+            "type": "u64"
+          },
+          {
+            "name": "slice_amount",
+            "type": "u64"
+          },
+          {
+            "name": "slice_min_out",
+            "type": "u64"
+          },
+          {
+            "name": "remaining_slices",
+            "type": "u8"
+          },
+          {
+            "name": "interval_seconds",
+            "type": "i64"
+          },
+          {
+            "name": "first_slice_executed",
+            "type": "bool"
+          },
+          {
+            "name": "first_slice_output",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }
@@ -2807,7 +3778,30 @@
       }
     },
     {
+      "name": "VenueSlippage",
+      "docs": [
+        "Per-venue slippage configuration"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "venue",
+            "type": "pubkey"
+          },
+          {
+            "name": "max_slippage_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
       "name": "VenueType",
+      "docs": [
+        "Enumeration of all supported DEX venues for native routing",
+        "Each venue can generate NPI (Native Price Improvement) rebates"
+      ],
       "type": {
         "kind": "enum",
         "variants": [
@@ -2815,7 +3809,25 @@
             "name": "Raydium"
           },
           {
+            "name": "RaydiumClmm"
+          },
+          {
             "name": "Orca"
+          },
+          {
+            "name": "Meteora"
+          },
+          {
+            "name": "Phoenix"
+          },
+          {
+            "name": "Lifinity"
+          },
+          {
+            "name": "Sanctum"
+          },
+          {
+            "name": "Saber"
           },
           {
             "name": "Jupiter"
@@ -2838,6 +3850,38 @@
           {
             "name": "weight",
             "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WalletsUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "buyback_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "boost_vault_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "npi_vault_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }
