@@ -363,6 +363,15 @@ export function useNativeSwap() {
             "Transaction trop volumineuse pour le router natif. " +
             "Réduisez le montant ou utilisez Jupiter direct."
           );
+        } else if (
+          normalized.includes("0x177e") ||
+          normalized.includes("slippage") ||
+          normalized.includes("slippage exceeded")
+        ) {
+          setError(
+            "Le prix a bougé pendant la simulation (slippage dépassé). " +
+            "Actualisez la quote ou augmentez légèrement le slippage."
+          );
         } else {
           setError(message);
         }

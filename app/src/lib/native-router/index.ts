@@ -234,6 +234,8 @@ export interface JupiterCpiData {
   swapInstruction: Buffer;
   /** Montant attendu en entrée (en lamports/base units) */
   expectedInputAmount: string;
+  /** Seuil min output (autreAmountThreshold) fourni par Jupiter */
+  minOutputAmount?: string;
   /** Comptes statiques pour le CPI */
   accounts: { pubkey: string; isSigner: boolean; isWritable: boolean }[];
   /** Comptes résolus depuis les Address Lookup Tables */
@@ -440,9 +442,13 @@ export async function getJupiterCpiData(
       jupiterProgramIndex: cpi.jupiterProgramIndex ?? -1,
     });
     
+    const jupiterQuote = data.quote ?? null;
+    const minOutputAmount = jupiterQuote?.otherAmountThreshold || jupiterQuote?.outAmount || null;
+
     return {
       swapInstruction,
       expectedInputAmount: cpi.expectedInputAmount,
+      minOutputAmount: minOutputAmount ?? undefined,
       accounts: cpi.accounts || [],
       resolvedAccounts,
       programId: cpi.programId || DEX_PROGRAMS.JUPITER.toBase58(),
@@ -1998,9 +2004,29 @@ export class NativeRouterService {
     
     // Sérialiser les arguments SwapArgs
     // IMPORTANT: primaryOracleAccount DOIT correspondre au compte dans keys (primaryOracle)
+    const requestedMinOut = new BN(minAmountOut);
+    let effectiveMinOut = requestedMinOut;
+    if (jupiterCpi?.minOutputAmount) {
+      try {
+        const jupiterMin = new BN(jupiterCpi.minOutputAmount);
+        if (jupiterMin.lt(effectiveMinOut)) {
+          logger.debug("NativeRouter", "Clamping minOut to Jupiter threshold", {
+            userMin: effectiveMinOut.toString(),
+            jupiterMin: jupiterMin.toString(),
+          });
+          effectiveMinOut = jupiterMin;
+        }
+      } catch (bnErr) {
+        logger.warn("NativeRouter", "Failed to parse Jupiter minOutputAmount", {
+          value: jupiterCpi.minOutputAmount,
+          error: bnErr instanceof Error ? bnErr.message : String(bnErr),
+        });
+      }
+    }
+
     const argsBuffer = this.serializeSwapArgs({
       amountIn: new BN(amountIn),
-      minOut: new BN(minAmountOut),
+      minOut: effectiveMinOut,
       slippageTolerance: 50, // 0.5%
       useDynamicPlan: false,
       useBundle: false,
