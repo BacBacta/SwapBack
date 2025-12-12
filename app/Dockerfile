@@ -12,10 +12,9 @@ RUN apk add --no-cache libc6-compat python3 make g++ linux-headers eudev-dev
 
 # Copier les fichiers de dépendances
 COPY package.json ./
-COPY package-lock.json* ./
 
-# Installer les dépendances avec clean install
-RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+# Installer les dépendances (pas de npm ci car pas de package-lock.json dans app/)
+RUN npm install --legacy-peer-deps
 
 # ============================================
 # Stage 2: Builder
