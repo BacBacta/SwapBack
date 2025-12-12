@@ -900,9 +900,11 @@ export async function POST(request: NextRequest) {
       console.log("🔧 Fetching swap instructions for:", userPublicKey.slice(0, 8) + "...");
 
       try {
-        let swapResponse: Response | null = null;
+        // NOUVEAU: Utiliser /swap-instructions au lieu de /swap pour obtenir les comptes
+        // dans l'ordre exact requis pour le CPI, sans avoir à parser la transaction
+        let swapInstructionsResponse: Response | null = null;
         try {
-          swapResponse = await fetchFromJupiter("/swap", {
+          swapInstructionsResponse = await fetchFromJupiter("/swap-instructions", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -914,60 +916,69 @@ export async function POST(request: NextRequest) {
               useSharedAccounts: true,
               dynamicComputeUnitLimit: true,
               skipUserAccountsRpcCalls: false,
-              dynamicSlippage: { minBps: 100, maxBps: Math.max(slippageBps, 200) }, // Min 1%, max at least 2%
+              dynamicSlippage: { minBps: 100, maxBps: Math.max(slippageBps, 200) },
             }),
           });
         } catch (swapErr) {
           if (isNetworkResolutionError(swapErr)) {
-            console.warn("🌐 Jupiter DNS lookup failed for /swap", swapErr);
-            swapResponse = null;
+            console.warn("🌐 Jupiter DNS lookup failed for /swap-instructions", swapErr);
+            swapInstructionsResponse = null;
           } else {
             throw swapErr;
           }
         }
 
-        if (swapResponse?.ok) {
-          const swapData = await swapResponse.json();
+        if (swapInstructionsResponse?.ok) {
+          const swapData = await swapInstructionsResponse.json();
 
-          if (swapData.swapTransaction) {
-            // Créer une connexion pour résoudre les ALT
-            const connection = new Connection(DEFAULT_RPC_ENDPOINT, "confirmed");
+          // /swap-instructions retourne directement swapInstruction avec accounts dans le bon ordre
+          if (swapData.swapInstruction) {
+            const swapIx = swapData.swapInstruction;
             
-            // Utiliser la nouvelle fonction avec résolution ALT pour obtenir l'ordre correct
-            const parsed = await extractJupiterAccountsWithALTResolution(
-              swapData.swapTransaction,
-              connection
+            // Les comptes sont DÉJÀ dans l'ordre exact pour le CPI !
+            const accountsInOrder = (swapIx.accounts || []).map((acc: any) => ({
+              pubkey: acc.pubkey,
+              isSigner: acc.isSigner || false,
+              isWritable: acc.isWritable || false,
+            }));
+            
+            // Trouver l'index de Jupiter Program ID
+            const JUPITER_PROGRAM_IDS = new Set([
+              "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+              "JUP4Fb2cqiRUcaTHdrPC8h2gNsA2ETXiPDD33WcGuJB",
+            ]);
+            const jupiterProgramIndex = accountsInOrder.findIndex(
+              (a: any) => JUPITER_PROGRAM_IDS.has(a.pubkey)
             );
-
-            // On considère réussi si on a soit des comptes statiques, soit des lookup tables
-            const hasStaticAccounts = parsed.accounts.length > 0;
-            const hasLookupTables = parsed.addressTableLookups && parsed.addressTableLookups.length > 0;
-            const hasOrderedAccounts = parsed.accountsInOrder.length > 0;
             
-            if (!hasStaticAccounts && !hasLookupTables && !hasOrderedAccounts) {
-              console.warn("⚠️ Jupiter accounts extraction failed - no accounts or lookup tables");
-            } else {
-              jupiterCpi = {
-                expectedInputAmount: quote.inAmount,
-                swapInstruction: swapData.swapTransaction, // Transaction sérialisée base64
-                accounts: parsed.accounts,
-                programId: parsed.programId,
-                addressTableLookups: parsed.addressTableLookups,
-                // Données instruction pour CPI Router (bytes bruts)
-                instructionData: parsed.instructionData,
-                // NOUVEAU: Comptes dans l'ordre exact pour CPI
-                accountsInOrder: parsed.accountsInOrder,
-                jupiterProgramIndex: parsed.jupiterProgramIndex,
-                // Données additionnelles utiles
-                lastValidBlockHeight: swapData.lastValidBlockHeight,
-                prioritizationFeeLamports: swapData.prioritizationFeeLamports,
-                computeUnitLimit: swapData.computeUnitLimit,
-              };
-              console.log(`✅ Swap instructions obtained (${parsed.accountsInOrder.length} accounts in order, Jupiter at index ${parsed.jupiterProgramIndex}, instruction data: ${parsed.instructionData?.length || 0} bytes)`);
-            }
+            jupiterCpi = {
+              expectedInputAmount: quote.inAmount,
+              swapInstruction: swapData.swapTransaction || "", // May not be present with /swap-instructions
+              accounts: accountsInOrder, // Legacy field
+              programId: swapIx.programId,
+              addressTableLookups: swapData.addressLookupTableAddresses?.map((addr: string) => ({
+                accountKey: addr,
+                writableIndexes: [],
+                readonlyIndexes: [],
+              })) || [],
+              // Données instruction pour CPI Router (bytes bruts base64)
+              instructionData: swapIx.data,
+              // Comptes dans l'ordre exact pour CPI (depuis /swap-instructions)
+              accountsInOrder,
+              jupiterProgramIndex,
+              // Données additionnelles
+              lastValidBlockHeight: swapData.lastValidBlockHeight,
+              prioritizationFeeLamports: swapData.prioritizationFeeLamports,
+              computeUnitLimit: swapData.computeUnitLimit,
+              // Nouvelles données utiles
+              setupInstructions: swapData.setupInstructions,
+              cleanupInstruction: swapData.cleanupInstruction,
+              computeBudgetInstructions: swapData.computeBudgetInstructions,
+            };
+            console.log(`✅ Swap instructions obtained from /swap-instructions (${accountsInOrder.length} accounts, Jupiter at index ${jupiterProgramIndex})`);
           }
-        } else if (swapResponse) {
-          const swapError = await swapResponse.text();
+        } else if (swapInstructionsResponse) {
+          const swapError = await swapInstructionsResponse.text();
           console.warn("⚠️ Failed to get swap instructions:", swapError);
         } else {
           console.warn("⚠️ Jupiter swap instructions skipped (network resolution error)");
