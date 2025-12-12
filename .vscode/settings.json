@@ -99,5 +99,9 @@
 
   // GitHub Copilot - Utiliser les fichiers d'instructions
   "github.copilot.chat.codeGeneration.useInstructionFiles": true,
-  "chat.useAgentsMdFile": true
+  "chat.useAgentsMdFile": true,
+
+  // Extensions désactivées pour économiser la mémoire
+  "even-better-toml.semanticTokens": false,
+  "evenBetterToml.formatter.crlf": false
 }

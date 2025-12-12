@@ -78,38 +78,30 @@ const nextConfig = {
   
   webpack: (config, { isServer, dev }) => {
     config.resolve = config.resolve || {};
+
+    // Ensure .cjs resolution works in both server/client bundles
+    config.resolve.extensions = Array.from(new Set([
+      '.cjs',
+      ...(config.resolve.extensions || []),
+    ]));
     
-    // Handle rpc-websockets resolution
-    // Server uses our custom shim with ws package, client uses browser WebSocket
-    let rpcWebsocketsPath;
-    let clientShimPath;
-    
-    if (isServer) {
-      // Server: use our custom server shim that wraps ws package
-      rpcWebsocketsPath = RPC_WEBSOCKETS_SERVER_SHIM_PATH;
-      clientShimPath = RPC_WEBSOCKETS_SERVER_SHIM_PATH;
-    } else {
-      // Client: use the browser-based implementation or fallback to our shim
-      try {
-        rpcWebsocketsPath = require.resolve('rpc-websockets/dist/lib/client/websocket.browser.cjs');
-      } catch {
-        rpcWebsocketsPath = RPC_WEBSOCKETS_SHIM_PATH;
-      }
-      clientShimPath = RPC_WEBSOCKETS_SHIM_PATH;
-    }
+    // Handle rpc-websockets resolution (force shim to avoid ws dependency in Next build)
+    const rpcWebsocketsPath = RPC_WEBSOCKETS_SHIM_PATH;
+    const clientShimPath = RPC_WEBSOCKETS_SHIM_PATH;
     
     config.resolve.alias = {
       ...config.resolve.alias,
-      'rpc-websockets/dist/lib/client': clientShimPath,
-      'rpc-websockets/dist/lib/client/websocket.browser': rpcWebsocketsPath,
-      'rpc-websockets/dist/lib/client/websocket': rpcWebsocketsPath,
+        'rpc-websockets/dist/lib/client': rpcWebsocketsPath,
+        'rpc-websockets/dist/lib/client/websocket.browser': rpcWebsocketsPath,
+        'rpc-websockets/dist/lib/client/websocket.browser.cjs': rpcWebsocketsPath,
+        'rpc-websockets': rpcWebsocketsPath,
     };
     
     // Use NormalModuleReplacementPlugin to handle nested node_modules
     config.plugins = config.plugins || [];
     config.plugins.push(
       new webpack.NormalModuleReplacementPlugin(
-        /rpc-websockets\/dist\/lib\/client\/websocket(\.browser)?$/,
+        /rpc-websockets\/dist\/lib\/client\/websocket(\.browser)?(\.cjs)?$/,
         rpcWebsocketsPath
       )
     );

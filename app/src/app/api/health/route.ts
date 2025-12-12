@@ -26,6 +26,15 @@ const JUPITER_CACHE_TTL = 30000; // 30 secondes
 
 const startTime = Date.now();
 
+const JUPITER_URL = process.env.JUPITER_API_URL || 'https://public.jupiterapi.com';
+
+const JUPITER_HEALTH_QUERY = new URLSearchParams({
+  inputMint: 'So11111111111111111111111111111111111111112', // SOL
+  outputMint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
+  amount: '1000000', // 0.001 SOL
+  slippageBps: '50',
+});
+
 async function checkJupiterConnectivity(): Promise<{ ok: boolean; latencyMs: number; message?: string }> {
   const now = Date.now();
   
@@ -44,13 +53,16 @@ async function checkJupiterConnectivity(): Promise<{ ok: boolean; latencyMs: num
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
 
-    const response = await fetch('https://quote-api.jup.ag/v6/tokens', {
+    const response = await fetch(
+      `${JUPITER_URL.replace(/\/$/, '')}/quote?${JUPITER_HEALTH_QUERY.toString()}`,
+      {
       method: 'GET',
       signal: controller.signal,
       headers: {
         'Accept': 'application/json',
       },
-    });
+      },
+    );
 
     clearTimeout(timeout);
     const latencyMs = Date.now() - checkStart;

@@ -59,7 +59,7 @@
     "prettier": "^3.0.0",
     "solana-bankrun": "^0.4.0",
     "ts-node": "^10.9.2",
-    "tsx": "^4.19.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.0.0",
     "vitest": "^3.2.4"
   },

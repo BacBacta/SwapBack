@@ -1,0 +1,11 @@
+Conversation log 2025-12-12
+
+(Timestamps approximate)
+
+1. User reported swap error: "Simulation failed ... custom program error: 0x1788" with logs referencing SwapToc and Jupiter SharedAccountsRoute.
+2. Asked user for inputMint/outputMint/amount/slippage/RPC/transaction base64/logs; provided guidance to run simulateTransaction using SWAP_TX_B64.
+3. Created scripts/capture-swap-debug.ts to analyze Jupiter transactions (TX meta, Jupiter IX details, simulation logs).
+4. Guided user through environment setup (chmod, npx tsx, node shebang) and handling of SWAP_TX_B64 extraction.
+5. Assisted with Jupiter quote/swap reproduction, ensuring user supplies userPublicKey and extracts swapTransaction base64.
+6. Diagnosed errors encountered: missing userPublicKey, invalid JSON, truncated base64, AccountNotFound due to insufficient lamports.
+7. Provided final instructions to top up wallet and rerun simulation for true Jupiter error reproduction.

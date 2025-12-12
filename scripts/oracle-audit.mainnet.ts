@@ -42,17 +42,17 @@ const MINTS: Record<string, string> = {
 
 // Pyth Price Feeds (mainnet) - V2 Push Feeds (sponsored by Pyth Data Association)
 // https://docs.pyth.network/price-feeds/core/push-feeds/solana
-// Addresses derived via scripts/derive-push-feed-addresses.ts on 2025-12-10
+// Addresses derived via scripts/derive-push-feed-addresses.ts on 2025-12-12
 // ALL VERIFIED OK in audit
 const PYTH_FEEDS: Record<string, string> = {
   SOL_USD: "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE",
   USDC_USD: "Dpw1EAVrSB1ibxiDQyTAW6Zip3J4Btk2x4SgApQCeFbX",
   USDT_USD: "HT2PLQBcG5EiCcNSaMHAjSgd9F98ecpATbk4Sk5oYuM",
-  JUP_USD: "g6eRCbboSwK4tSWngn773RCMexr1APQr4uA9bGZBYfo",
-  BONK_USD: "8ihFLu5FimgTQ1Unh4dVyEHUGodJ5gJQCrQf4KUVB9bN",
+  JUP_USD: "7dbob1psH1iZBS7qPsm3Kwbf5DzSXK8Jyg31CTgTnxH5",    // Fixed 2025-12-12
+  BONK_USD: "DBE3N8uNjhKPRHfANdwGvCZghWXyLPdqdSbEW2XFwBiX",  // Fixed 2025-12-12
   WIF_USD: "6B23K3tkb51vLZA14jcEQVCA1pfHptzEHFA93V5dYwbT",
-  ORCA_USD: "4CBshVeNBEXz24GAxNhnMdpLxBALHL8iAoYQf4VwS8GS",
-  PYTH_USD: "nrYkQQQur7z8rYTST3HWceMziog46ZQU5vCa8iLvsY4",
+  ORCA_USD: "4CBshVeNBEXz24GZpoj8SrqP5L7VGG3qjGd6tCST1pND",  // Fixed 2025-12-12
+  PYTH_USD: "8vjchtMuJNY4oFQdTi8yCe6mhCaNBFaUbktT482TpLPS",  // Fixed 2025-12-12
   ETH_USD: "42amVS4KgzR9rA28tkVYqVXjq9Qa8dcZQMbH5EYFX6XC",
   BTC_USD: "4cSM2e6rvbGQUFiJbqytoVMi5GgghSMr8LwVrT9VPSPo",
 };
