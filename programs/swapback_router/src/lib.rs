@@ -2619,21 +2619,21 @@ pub mod swap_toc_processor {
             ErrorCode::DexExecutionFailed
         );
 
-        // Find Jupiter program in remaining accounts (first account must be Jupiter)
+        // Find Jupiter program in remaining accounts (can be at any position)
+        // The client passes accountsInOrder exactly as received from Jupiter API,
+        // preserving the indices that the instruction data references.
         let jupiter_program = remaining_accounts
-            .first()
+            .iter()
+            .find(|acc| *acc.key == JUPITER_PROGRAM_ID)
             .ok_or(ErrorCode::DexExecutionFailed)?;
-        require_keys_eq!(
-            *jupiter_program.key,
-            JUPITER_PROGRAM_ID,
-            ErrorCode::DexExecutionFailed
-        );
 
-        // Get the actual swap accounts (skip Jupiter program which is first)
-        // The Jupiter program is passed separately, remaining_accounts[1..] are the swap accounts
-        let jupiter_swap_accounts = &remaining_accounts[1..];
+        // IMPORTANT: Pass ALL remaining_accounts to CPI
+        // The Jupiter instruction data was compiled with indices relative to the full
+        // account list. If we modify the order, the indices in swap_instruction become incorrect.
+        // Jupiter will use its own program ID from the Instruction.program_id field,
+        // so having it also in the accounts list is fine (it may be referenced by inner instructions).
         require!(
-            !jupiter_swap_accounts.is_empty(),
+            remaining_accounts.len() >= 2,
             ErrorCode::DexExecutionFailed
         );
 
@@ -2641,7 +2641,7 @@ pub mod swap_toc_processor {
         // This measures actual balance changes for accurate amount_out
         let amount_out = cpi_jupiter::swap_with_balance_deltas(
             jupiter_program,
-            jupiter_swap_accounts, // Pass only swap accounts, NOT jupiter_program
+            remaining_accounts, // Pass ALL accounts to preserve instruction indices
             &ctx.accounts.user_token_account_a.to_account_info(),
             &ctx.accounts.user_token_account_b.to_account_info(),
             amount_in,

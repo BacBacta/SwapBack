@@ -1739,41 +1739,13 @@ export class NativeRouterService {
     });
     
     // ========================================================================
-    // REFRESH JUPITER QUOTE - Évite les erreurs 0x177e (SlippageToleranceExceeded)
-    // Le quote Jupiter initial peut être périmé (prix a bougé pendant la confirmation)
+    // NOTE: On NE rafraîchit PAS le quote Jupiter ici car cela peut changer
+    // la route et causer des erreurs "NotEnoughAccountKeys" (0x1788).
+    // 
+    // La solution pour éviter SlippageToleranceExceeded (0x177e) est d'augmenter
+    // le slippage dans l'API /api/swap/quote (dynamicSlippage.minBps = 100).
     // ========================================================================
-    let freshJupiterCpi = jupiterCpi;
-    try {
-      logger.info("NativeRouter", "Refreshing Jupiter quote before building transaction...");
-      
-      const freshCpi = await getJupiterCpiData(
-        inputMint.toBase58(),
-        outputMint.toBase58(),
-        String(amountIn),
-        params.slippageBps || 100, // Default 1% si non spécifié
-        userPublicKey.toBase58(),
-        this.connection
-      );
-      
-      if (freshCpi && freshCpi.swapInstruction && freshCpi.swapInstruction.length > 0) {
-        logger.info("NativeRouter", "Jupiter quote refreshed successfully", {
-          oldMinOutput: jupiterCpi.minOutputAmount,
-          newMinOutput: freshCpi.minOutputAmount,
-          instructionBytes: freshCpi.swapInstruction.length,
-        });
-        freshJupiterCpi = freshCpi;
-      } else {
-        logger.warn("NativeRouter", "Failed to refresh Jupiter quote, using original", {
-          hasFreshCpi: !!freshCpi,
-          hasInstruction: !!freshCpi?.swapInstruction,
-        });
-      }
-    } catch (refreshError) {
-      const errorMsg = refreshError instanceof Error ? refreshError.message : String(refreshError);
-      logger.warn("NativeRouter", "Jupiter quote refresh failed, using original", { error: errorMsg });
-      // Continue avec le quote original
-    }
-    // ========================================================================
+    const freshJupiterCpi = jupiterCpi;
     
     // Dériver les comptes
     const accounts = await this.deriveSwapAccounts(userPublicKey, inputMint, outputMint);
@@ -2071,41 +2043,31 @@ export class NativeRouterService {
     const data = Buffer.concat([discriminator, argsBuffer]);
     
     // --- JUPITER REMAINING ACCOUNTS ---
-    // Le programme on-chain exige que remaining_accounts contienne:
-    // 1. Jupiter Program ID (PREMIER compte obligatoire)
-    // 2. Tous les comptes de l'instruction Jupiter dans l'ORDRE EXACT de accountKeyIndexes
-    //
-    // IMPORTANT: On ne doit PAS skipper Jupiter s'il apparaît dans accountsInOrder car
-    // l'instruction Jupiter peut référencer son propre program ID comme un compte.
-    // Le programme on-chain vérifie juste que remaining_accounts[0] == Jupiter.
+    // Le programme on-chain cherche Jupiter dans remaining_accounts (peut être à n'importe quelle position)
+    // puis passe remaining_accounts complet au CPI Jupiter.
+    // 
+    // IMPORTANT: L'instruction Jupiter utilise des indices relatifs à accountKeyIndexes.
+    // On doit passer accountsInOrder EXACTEMENT tel quel, sans modification.
     const jupiterRemainingAccounts: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[] = [];
     
-    // Premier compte: Jupiter Program ID (requis par le programme on-chain)
-    jupiterRemainingAccounts.push({
-      pubkey: DEX_PROGRAMS.JUPITER,
-      isSigner: false,
-      isWritable: false,
-    });
-    
-    // NOUVEAU: Utiliser accountsInOrder si disponible (ordre exact requis par Jupiter)
+    // Utiliser accountsInOrder si disponible (ordre exact requis par Jupiter)
     if (jupiterCpi.accountsInOrder && jupiterCpi.accountsInOrder.length > 0) {
-      // Les comptes sont déjà dans l'ordre exact de accountKeyIndexes
-      // IMPORTANT: On les ajoute TOUS, même si Jupiter apparaît dedans.
-      // Le programme on-chain a déjà Jupiter en position 0 mais l'instruction
-      // Jupiter peut aussi le référencer comme un compte dans son propre swap.
+      const jupiterProgramIndex = jupiterCpi.jupiterProgramIndex ?? -1;
+      
+      // Passer accountsInOrder tel quel - le programme on-chain cherche Jupiter 
+      // à n'importe quelle position et passe la liste complète au CPI
       for (const acc of jupiterCpi.accountsInOrder) {
         jupiterRemainingAccounts.push({
           pubkey: new PublicKey(acc.pubkey),
-          isSigner: false, // L'utilisateur signe la transaction, pas le CPI
+          isSigner: false,
           isWritable: acc.isWritable,
         });
       }
       
-      logger.info("NativeRouter", "Jupiter remaining accounts prepared (with correct order)", {
+      logger.info("NativeRouter", "Jupiter remaining accounts prepared (accountsInOrder exact order)", {
         total: jupiterRemainingAccounts.length,
         jupiterProgramId: DEX_PROGRAMS.JUPITER.toBase58().slice(0, 8),
-        accountsFromOrderedList: jupiterCpi.accountsInOrder.length,
-        originalJupiterIndex: jupiterCpi.jupiterProgramIndex,
+        jupiterIndexInAccountsInOrder: jupiterProgramIndex,
       });
     } else {
       // FALLBACK: Ancienne logique (comptes statiques + résolus depuis ALT)

@@ -111,14 +111,8 @@ async function main() {
   
   const jupiterRemainingAccounts: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[] = [];
   
-  // Add Jupiter Program ID first (required by on-chain code)
-  jupiterRemainingAccounts.push({
-    pubkey: JUPITER_PROGRAM_ID,
-    isSigner: false,
-    isWritable: false,
-  });
-  
-  // Use accountsInOrder if available
+  // Use accountsInOrder directly (no longer need Jupiter at position 0)
+  // The on-chain program now searches for Jupiter at any position
   if (cpi.accountsInOrder && cpi.accountsInOrder.length > 0) {
     for (const acc of cpi.accountsInOrder) {
       jupiterRemainingAccounts.push({
@@ -127,7 +121,7 @@ async function main() {
         isWritable: acc.isWritable,
       });
     }
-    console.log(`✅ Built ${jupiterRemainingAccounts.length} remaining accounts (new method)`);
+    console.log(`✅ Built ${jupiterRemainingAccounts.length} remaining accounts (accountsInOrder exact order)`);
   } else {
     // Fallback to old method
     for (const acc of cpi.accounts || []) {
@@ -143,14 +137,13 @@ async function main() {
   // Step 3: Verify account structure
   console.log("\n🔍 Step 3: Verifying account structure...");
   
-  console.log(`   Position 0: ${jupiterRemainingAccounts[0].pubkey.toBase58().slice(0, 12)}...`);
-  console.log(`   Is Jupiter at [0]? ${jupiterRemainingAccounts[0].pubkey.equals(JUPITER_PROGRAM_ID)}`);
-  
   // Count Jupiter occurrences
   const jupiterCount = jupiterRemainingAccounts.filter(
     a => a.pubkey.equals(JUPITER_PROGRAM_ID)
   ).length;
+  console.log(`   Total accounts: ${jupiterRemainingAccounts.length}`);
   console.log(`   Jupiter occurrences: ${jupiterCount}`);
+  console.log(`   Jupiter index in accountsInOrder: ${cpi.jupiterProgramIndex}`);
 
   // Step 4: Build a mock swap instruction (for structure verification)
   console.log("\n📦 Step 4: Building mock swap instruction...");
@@ -231,8 +224,10 @@ async function main() {
     issues.push("accountsInOrder is empty - using legacy fallback");
   }
   
-  if (!jupiterRemainingAccounts[0].pubkey.equals(JUPITER_PROGRAM_ID)) {
-    issues.push("Jupiter not at position 0");
+  // Jupiter can now be at any position - just check it's present
+  const jupiterFound = jupiterRemainingAccounts.some(a => a.pubkey.equals(JUPITER_PROGRAM_ID));
+  if (!jupiterFound) {
+    issues.push("Jupiter Program ID not found in remaining accounts");
   }
   
   if (totalAccounts < 10) {
