@@ -33,6 +33,7 @@ import { getTokenPrice, getSolPrice } from "@/lib/price-service";
 import { HermesClient } from "@pythnetwork/hermes-client";
 import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
 import { PYTH_FEED_IDS, getPythFeedIdByMint } from "@/sdk/config/pyth-feeds";
+import { getAllALTs } from "@/lib/alt/swapbackALT";
 
 // ============================================================================
 // CONSTANTS
@@ -1901,14 +1902,30 @@ export class NativeRouterService {
     
     // Construire la transaction versionnée
     const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash();
+
+    const lookupTables = await getAllALTs(this.connection, jupiterCpi.addressTableLookups);
+    logger.info("NativeRouter", "Loaded ALT accounts for swap", {
+      lookupCount: lookupTables.length,
+    });
     
     const messageV0 = new TransactionMessage({
       payerKey: userPublicKey,
       recentBlockhash: blockhash,
       instructions,
-    }).compileToV0Message();
-    
+    }).compileToV0Message(lookupTables);
+
     const transaction = new VersionedTransaction(messageV0);
+    const serializedLength = transaction.serialize().length;
+    logger.info("NativeRouter", "Versioned transaction size", {
+      bytes: serializedLength,
+    });
+
+    if (serializedLength > 1232) {
+      throw new Error(
+        `Transaction trop volumineuse pour le router natif (${serializedLength} bytes). ` +
+        `Réduisez le montant ou basculez vers Jupiter (ALT requis).`
+      );
+    }
     
     return transaction;
   }

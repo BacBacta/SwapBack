@@ -6,6 +6,11 @@
 
 const { EventEmitter } = require('events');
 
+// Reuse the browser shim so both environments share the same normalization logic
+const browserWebSocketFactory = require('./rpc-websockets-browser-shim');
+
+const DEFAULT_URL = 'ws://localhost:8080';
+
 // Pick a WebSocket implementation if it exists (browser or the `ws` package).
 let WebSocketImpl = typeof WebSocket !== 'undefined' ? WebSocket : null;
 try {
@@ -18,47 +23,78 @@ try {
   WebSocketImpl = null;
 }
 
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function attachEvent(target, eventName, handler) {
+  if (!target) return;
+  if (typeof target.addEventListener === 'function') {
+    target.addEventListener(eventName, handler);
+  } else if (typeof target.on === 'function') {
+    target.on(eventName, handler);
+  }
+}
+
+function defaultFactory(address, options) {
+  if (typeof browserWebSocketFactory === 'function') {
+    return browserWebSocketFactory(address, options);
+  }
+
+  if (!WebSocketImpl) {
+    return null;
+  }
+
+  return new WebSocketImpl(address, options?.protocols);
+}
+
 class CommonClient extends EventEmitter {
-  constructor(url, options = {}) {
+  constructor(arg1, arg2, arg3) {
     super();
-    this.url = url;
-    this.options = options;
+
+    const hasFactoryArg = typeof arg1 === 'function';
+    this.webSocketFactory = hasFactoryArg ? arg1 : null;
+    this.url = hasFactoryArg
+      ? (typeof arg2 === 'string' && arg2.length ? arg2 : DEFAULT_URL)
+      : (typeof arg1 === 'string' && arg1.length ? arg1 : DEFAULT_URL);
+    const optionCandidate = hasFactoryArg ? arg3 : arg2;
+    this.options = isPlainObject(optionCandidate) ? { ...optionCandidate } : {};
     this.socket = null;
 
-    if (options.autoconnect !== false) {
+    if (this.options.autoconnect !== false) {
       this.connect();
     }
   }
 
   connect() {
-    // If no WebSocket implementation is available, emit open so callers can continue gracefully.
-    if (!WebSocketImpl) {
+    if (this.socket) return;
+
+    let socketInstance;
+    try {
+      const factory = this.webSocketFactory || defaultFactory;
+      socketInstance = factory(this.url, this.options);
+    } catch (error) {
+      queueMicrotask(() => this.emit('error', error));
+      return;
+    }
+
+    if (!socketInstance) {
       queueMicrotask(() => this.emit('open'));
       return;
     }
 
-    if (this.socket) return;
+    attachEvent(socketInstance, 'open', (...args) => this.emit('open', ...args));
+    attachEvent(socketInstance, 'close', (...args) => {
+      this.socket = null;
+      this.emit('close', ...args);
+    });
+    attachEvent(socketInstance, 'error', (err) => this.emit('error', err));
+    attachEvent(socketInstance, 'message', (msg) => {
+      const data = msg?.data ?? msg;
+      this.emit('message', data);
+    });
 
-    let normalizedUrl = this.url;
-    try {
-      if (/^https?:\/\//i.test(normalizedUrl)) {
-        normalizedUrl = normalizedUrl.replace(/^http/i, 'ws');
-      }
-
-      if (!/^wss?:\/\//i.test(normalizedUrl)) {
-        throw new Error(`Invalid WebSocket URL: ${normalizedUrl}`);
-      }
-    } catch (err) {
-      queueMicrotask(() => this.emit('error', err));
-      return;
-    }
-
-    this.socket = new WebSocketImpl(normalizedUrl, this.options);
-
-    this.socket.onopen = (...args) => this.emit('open', ...args);
-    this.socket.onclose = (...args) => this.emit('close', ...args);
-    this.socket.onerror = (err) => this.emit('error', err);
-    this.socket.onmessage = (msg) => this.emit('message', msg.data);
+    this.socket = socketInstance;
   }
 
   close(code, reason) {
@@ -70,7 +106,7 @@ class CommonClient extends EventEmitter {
   }
 
   send(data) {
-    if (this.socket && this.socket.readyState === this.socket.OPEN) {
+    if (this.socket && typeof this.socket.send === 'function') {
       this.socket.send(data);
     }
   }

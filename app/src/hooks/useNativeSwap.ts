@@ -352,7 +352,20 @@ export function useNativeSwap() {
       } catch (err) {
         const message = err instanceof Error ? err.message : "Erreur lors du swap";
         logger.error("useNativeSwap", "Swap error", { error: message });
-        setError(message);
+        const normalized = message.toLowerCase();
+        if (
+          normalized.includes("too large") ||
+          normalized.includes("1644") ||
+          normalized.includes("1232") ||
+          normalized.includes("trop volumineuse")
+        ) {
+          setError(
+            "Transaction trop volumineuse pour le router natif. " +
+            "Réduisez le montant ou utilisez Jupiter direct."
+          );
+        } else {
+          setError(message);
+        }
         return null;
       } finally {
         setLoading(false);
