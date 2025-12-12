@@ -2412,7 +2412,9 @@ export class NativeRouterService {
       throw new Error("Impossible de trouver une route native");
     }
     
-    const requestedMinOut = new BN(params.minAmountOut);
+    // Déterminer si on utilise Jupiter comme venue principale
+    const isJupiterVenue = route.bestVenue === "JUPITER";
+    let effectiveMinOut = new BN(params.minAmountOut);
 
     // 2. Récupérer Jupiter CPI + vérifier la compatibilité du slippage
     const jupiterCpi = await getJupiterCpiData(
@@ -2440,38 +2442,39 @@ export class NativeRouterService {
       instructionBytes: jupiterCpi.swapInstruction.length,
       expectedInputAmount: jupiterCpi.expectedInputAmount,
       minOutputAmount: jupiterCpi.minOutputAmount ?? null,
+      bestVenue: route.bestVenue,
+      isJupiterVenue,
     });
 
-    if (jupiterCpi.minOutputAmount) {
+    // Logique de minOut différenciée selon la venue
+    if (isJupiterVenue && jupiterCpi.minOutputAmount) {
+      // Jupiter venue: utiliser directement otherAmountThreshold de Jupiter
       const jupiterMinOut = new BN(jupiterCpi.minOutputAmount);
-      logger.info("NativeRouter", "Comparing router minOut with Jupiter threshold", {
-        requestedMinOut: requestedMinOut.toString(),
+      logger.info("NativeRouter", "Using Jupiter otherAmountThreshold as minOut (Jupiter venue)", {
+        originalMinOut: effectiveMinOut.toString(),
         jupiterMinOut: jupiterMinOut.toString(),
-        exceedsThreshold: requestedMinOut.gt(jupiterMinOut),
         diagnosticsId: jupiterCpi.routerDiagnostics?.id ?? null,
       });
-      if (requestedMinOut.gt(jupiterMinOut)) {
-        const diff = requestedMinOut.sub(jupiterMinOut);
-        logger.warn("NativeRouter", "Slippage gate triggered (minOut > Jupiter threshold)", {
-          requestedMinOut: requestedMinOut.toString(),
-          jupiterMinOut: jupiterMinOut.toString(),
-          diff: diff.toString(),
-          diagnosticsId: jupiterCpi.routerDiagnostics?.id ?? null,
-        });
-        throw new Error(
-          `[NATIVE_SLIPPAGE_GATE] Votre slippage (${requestedMinOut.toString()}) ` +
-          `dépasse le seuil garanti par Jupiter (${jupiterMinOut.toString()}). ` +
-          `Actualisez la quote ou utilisez Jupiter direct.`
-        );
-      }
+      effectiveMinOut = jupiterMinOut;
+    } else if (!isJupiterVenue) {
+      // Native venue (Raydium, Orca, etc.): garder le calcul client
+      logger.info("NativeRouter", "Using client-calculated minOut (native venue)", {
+        venue: route.bestVenue,
+        minOut: effectiveMinOut.toString(),
+        diagnosticsId: jupiterCpi.routerDiagnostics?.id ?? null,
+      });
+      // effectiveMinOut reste params.minAmountOut
     } else {
-      logger.info("NativeRouter", "Jupiter CPI payload missing minOutputAmount", {
+      // Jupiter venue mais pas de minOutputAmount disponible
+      logger.warn("NativeRouter", "Jupiter venue but no minOutputAmount, keeping client value", {
+        minOut: effectiveMinOut.toString(),
         diagnosticsId: jupiterCpi.routerDiagnostics?.id ?? null,
       });
     }
 
-    // 3. Construire la transaction
-    const transaction = await this.buildSwapTransaction(params, route, jupiterCpi);
+    // 3. Construire la transaction avec le minOut approprié
+    const adjustedParams = { ...params, minAmountOut: effectiveMinOut.toNumber() };
+    const transaction = await this.buildSwapTransaction(adjustedParams, route, jupiterCpi);
     
     // 3. Ajouter tip Jito si demandé (pour protection MEV)
     if (params.useJitoBundle) {
