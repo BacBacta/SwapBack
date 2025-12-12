@@ -593,8 +593,8 @@ export type DerivedSwapAccounts = {
 
 const EXECUTION_RPC_MAP: Record<ExecutionChannel, string | null> = {
   public: null,
-  jito: process.env.NEXT_PUBLIC_JITO_RPC_URL ?? null,
-  "private-rpc": process.env.NEXT_PUBLIC_PRIVATE_RPC_URL ?? null,
+  jito: process.env.NEXT_PUBLIC_JITO_RPC_URL || null,
+  "private-rpc": process.env.NEXT_PUBLIC_PRIVATE_RPC_URL || null,
 };
 
 async function sendTransactionWithChannel(
@@ -603,7 +603,10 @@ async function sendTransactionWithChannel(
   channel: ExecutionChannel
 ) {
   const target = EXECUTION_RPC_MAP[channel];
-  const connection = target ? new Connection(target, "confirmed") : fallbackConnection;
+  // Only create new Connection if target is a valid URL
+  const connection = (target && target.startsWith("http"))
+    ? new Connection(target, "confirmed")
+    : fallbackConnection;
   return connection.sendRawTransaction(rawTransaction, {
     skipPreflight: false,
   });
