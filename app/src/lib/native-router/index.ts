@@ -257,6 +257,20 @@ export interface JupiterCpiData {
    * -1 si non trouvé ou si accountsInOrder n'est pas utilisé.
    */
   jupiterProgramIndex?: number;
+  /** Diagnostics côté serveur pour tracer les quotes Jupiter */
+  routerDiagnostics?: RouterQuoteDiagnostics | null;
+}
+
+export interface RouterQuoteDiagnostics {
+  id: string;
+  inputMint: string;
+  outputMint: string;
+  amountLamports: number;
+  slippageBps: number;
+  otherAmountThreshold?: string | null;
+  outAmount?: string | null;
+  inAmount?: string | null;
+  timestamp?: number;
 }
 
 /**
@@ -397,6 +411,7 @@ export async function getJupiterCpiData(
     }
     
     const data = await response.json();
+    const routerDiagnostics: RouterQuoteDiagnostics | null = data.routerDiagnostics ?? null;
     
     // Vérifier que jupiterCpi est présent
     if (!data.success || !data.jupiterCpi) {
@@ -442,6 +457,15 @@ export async function getJupiterCpiData(
       jupiterProgramIndex: cpi.jupiterProgramIndex ?? -1,
     });
     
+    if (routerDiagnostics) {
+      logger.info("NativeRouter", "Router diagnostics received", {
+        diagnosticsId: routerDiagnostics.id,
+        otherAmountThreshold: routerDiagnostics.otherAmountThreshold,
+        outAmount: routerDiagnostics.outAmount,
+        slippageBps: routerDiagnostics.slippageBps,
+      });
+    }
+    
     const jupiterQuote = data.quote ?? null;
     const minOutputAmount = jupiterQuote?.otherAmountThreshold || jupiterQuote?.outAmount || null;
 
@@ -457,6 +481,7 @@ export async function getJupiterCpiData(
       // NOUVEAU: Comptes dans l'ordre exact pour le CPI
       accountsInOrder: cpi.accountsInOrder || undefined,
       jupiterProgramIndex: cpi.jupiterProgramIndex ?? -1,
+      routerDiagnostics,
     };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
@@ -1693,7 +1718,8 @@ export class NativeRouterService {
    */
   async buildSwapTransaction(
     params: NativeSwapParams,
-    route: NativeRouteQuote
+    route: NativeRouteQuote,
+    jupiterCpi: JupiterCpiData
   ): Promise<VersionedTransaction> {
     const { userPublicKey, inputMint, outputMint, amountIn, minAmountOut } = params;
     
@@ -1860,36 +1886,6 @@ export class NativeRouterService {
     }
     // ---------------------------------
     
-    // --- JUPITER CPI DATA (REQUIS par le programme on-chain) ---
-    // Le programme router exige jupiter_route: Some(JupiterRouteParams) pour process_single_swap()
-    // On passe la connexion RPC pour résoudre les Address Lookup Tables
-    const jupiterCpi = await getJupiterCpiData(
-      inputMint.toBase58(),
-      outputMint.toBase58(),
-      amountIn.toString(),
-      params.slippageBps ?? 50, // Default 0.5%
-      userPublicKey.toBase58(),
-      this.connection // Permet de résoudre les ALTs
-    );
-    
-    if (!jupiterCpi || !jupiterCpi.swapInstruction) {
-      logger.error("NativeRouter", "Cannot proceed without Jupiter CPI data", {
-        inputMint: inputMint.toBase58().slice(0, 8),
-        outputMint: outputMint.toBase58().slice(0, 8),
-        amount: amountIn,
-      });
-      throw new Error(
-        "Impossible d'obtenir les données Jupiter CPI. " +
-        "Veuillez réessayer ou utiliser Jupiter directement."
-      );
-    }
-    
-    logger.info("NativeRouter", "Jupiter CPI data obtained for swap", {
-      instructionBytes: jupiterCpi.swapInstruction.length,
-      expectedInputAmount: jupiterCpi.expectedInputAmount,
-    });
-    // ---------------------------------
-    
     // Construire l'instruction swap_toc
     const swapInstruction = await this.buildSwapToCInstruction(
       userPublicKey,
@@ -2005,6 +2001,7 @@ export class NativeRouterService {
     // Sérialiser les arguments SwapArgs
     // IMPORTANT: primaryOracleAccount DOIT correspondre au compte dans keys (primaryOracle)
     const requestedMinOut = new BN(minAmountOut);
+      const requestedMinOut = new BN(params.minAmountOut);
     let effectiveMinOut = requestedMinOut;
     if (jupiterCpi?.minOutputAmount) {
       try {
@@ -2416,8 +2413,67 @@ export class NativeRouterService {
       throw new Error("Impossible de trouver une route native");
     }
     
-    // 2. Construire la transaction
-    const transaction = await this.buildSwapTransaction(params, route);
+    const requestedMinOut = new BN(minAmountOut);
+
+    // 2. Récupérer Jupiter CPI + vérifier la compatibilité du slippage
+    const jupiterCpi = await getJupiterCpiData(
+      params.inputMint.toBase58(),
+      params.outputMint.toBase58(),
+      params.amountIn.toString(),
+      params.slippageBps ?? 50,
+      params.userPublicKey.toBase58(),
+      this.connection
+    );
+
+    if (!jupiterCpi || !jupiterCpi.swapInstruction) {
+      logger.error("NativeRouter", "Cannot proceed without Jupiter CPI data", {
+        inputMint: params.inputMint.toBase58().slice(0, 8),
+        outputMint: params.outputMint.toBase58().slice(0, 8),
+        amount: params.amountIn,
+      });
+      throw new Error(
+        "Impossible d'obtenir les données Jupiter CPI. " +
+        "Veuillez réessayer ou utiliser Jupiter directement."
+      );
+    }
+
+    logger.info("NativeRouter", "Jupiter CPI data obtained for swap", {
+      instructionBytes: jupiterCpi.swapInstruction.length,
+      expectedInputAmount: jupiterCpi.expectedInputAmount,
+      minOutputAmount: jupiterCpi.minOutputAmount ?? null,
+    });
+
+    if (jupiterCpi.minOutputAmount) {
+    if (jupiterCpi.minOutputAmount) {
+      const jupiterMinOut = new BN(jupiterCpi.minOutputAmount);
+      logger.info("NativeRouter", "Comparing router minOut with Jupiter threshold", {
+        requestedMinOut: requestedMinOut.toString(),
+        jupiterMinOut: jupiterMinOut.toString(),
+        exceedsThreshold: requestedMinOut.gt(jupiterMinOut),
+        diagnosticsId: jupiterCpi.routerDiagnostics?.id ?? null,
+      });
+      if (requestedMinOut.gt(jupiterMinOut)) {
+        const diff = requestedMinOut.sub(jupiterMinOut);
+        logger.warn("NativeRouter", "Slippage gate triggered (minOut > Jupiter threshold)", {
+          requestedMinOut: requestedMinOut.toString(),
+          jupiterMinOut: jupiterMinOut.toString(),
+          diff: diff.toString(),
+          diagnosticsId: jupiterCpi.routerDiagnostics?.id ?? null,
+        });
+        throw new Error(
+          `[NATIVE_SLIPPAGE_GATE] Votre slippage (${requestedMinOut.toString()}) ` +
+          `dépasse le seuil garanti par Jupiter (${jupiterMinOut.toString()}). ` +
+          `Actualisez la quote ou utilisez Jupiter direct.`
+        );
+      }
+    } else {
+      logger.info("NativeRouter", "Jupiter CPI payload missing minOutputAmount", {
+        diagnosticsId: jupiterCpi.routerDiagnostics?.id ?? null,
+      });
+    }
+
+    // 3. Construire la transaction
+    const transaction = await this.buildSwapTransaction(params, route, jupiterCpi);
     
     // 3. Ajouter tip Jito si demandé (pour protection MEV)
     if (params.useJitoBundle) {

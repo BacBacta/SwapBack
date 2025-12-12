@@ -757,6 +757,7 @@ export async function POST(request: NextRequest) {
     }
 
     const aggregatedQuote = await aggregatedQuotePromise;
+    const diagnosticsTimestamp = Date.now();
 
     if (!quote?.outAmount) {
       if (aggregatedQuote?.bestQuote) {
@@ -803,6 +804,7 @@ export async function POST(request: NextRequest) {
               fallback: true,
               explanation: "Route native SwapBack (Jupiter indisponible)",
             },
+            routerDiagnostics: null,
             multiSourceQuotes: summarizeQuoteResults(aggregatedQuote.alternativeQuotes),
             usedMultiSourceFallback: true,
           },
@@ -836,6 +838,26 @@ export async function POST(request: NextRequest) {
       amountLamports,
       slippageBps,
       priceImpactPct: routeInfo.priceImpactPct ?? 0,
+    });
+
+    const routerDiagnostics = {
+      id: `jupiter-${diagnosticsTimestamp}-${Math.floor(Math.random() * 10_000)}`,
+      inputMint,
+      outputMint,
+      amountLamports,
+      slippageBps,
+      inAmount: quote.inAmount,
+      outAmount: quote.outAmount,
+      otherAmountThreshold: quote.otherAmountThreshold ?? null,
+      timestamp: diagnosticsTimestamp,
+    };
+
+    console.log("🧪 Jupiter slippage diagnostics", {
+      ...routerDiagnostics,
+      previewQuote: {
+        priceImpactPct: quote.priceImpactPct,
+        contextSlot: (quote as any)?.contextSlot ?? null,
+      },
     });
 
     let nativeRoute: Record<string, unknown> | null = null;
@@ -968,6 +990,7 @@ export async function POST(request: NextRequest) {
       npiOpportunity,
       multiSourceQuotes,
       usedMultiSourceFallback: false,
+      routerDiagnostics,
       timestamp: Date.now(),
     };
 

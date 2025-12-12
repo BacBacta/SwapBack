@@ -63,6 +63,7 @@ export interface NativeSwapQuote {
   inputAmount: number;
   outputAmount: number;
   netOutputAmount: number; // Après frais + rebates
+  slippageBpsUsed: number;
   
   // Route
   venues: VenueQuote[];
@@ -239,6 +240,7 @@ export function useNativeSwap() {
           // Slippage dynamique
           slippageResult,
           dynamicSlippageBps,
+          slippageBpsUsed: dynamicSlippageBps,
           
           // Boost
           baseRebate,
@@ -301,6 +303,22 @@ export function useNativeSwap() {
           throw new Error("Impossible d'obtenir une quote");
         }
 
+        // Rafraîchir si l'utilisateur a changé le slippage depuis la dernière quote
+        if (
+          typeof params.slippageBps === "number" &&
+          typeof quote.slippageBpsUsed === "number" &&
+          quote.slippageBpsUsed !== params.slippageBps
+        ) {
+          logger.info("useNativeSwap", "Slippage changed since last quote, refetching", {
+            previousSlippageBps: quote.slippageBpsUsed,
+            requestedSlippageBps: params.slippageBps,
+          });
+          quote = await getSwapQuote(params, userBoostBps);
+          if (!quote) {
+            throw new Error("Impossible d'obtenir une quote (slippage mismatch)");
+          }
+        }
+
         logger.info("useNativeSwap", "Executing native swap", {
           inputAmount: quote.inputAmount,
           outputAmount: quote.outputAmount,
@@ -310,8 +328,21 @@ export function useNativeSwap() {
         });
 
         // 2. Calculer le min output avec slippage (utiliser dynamique si disponible)
-        const slippageBps = params.slippageBps ?? quote.dynamicSlippageBps ?? SLIPPAGE_CONFIG.BASE_SLIPPAGE_BPS;
+        const slippageBps =
+          params.slippageBps ??
+          quote.dynamicSlippageBps ??
+          quote.slippageBpsUsed ??
+          SLIPPAGE_CONFIG.BASE_SLIPPAGE_BPS;
         const minAmountOut = Math.floor(quote.outputAmount * (10000 - slippageBps) / 10000);
+
+        logger.info("useNativeSwap", "Prepared slippage thresholds", {
+          quoteTimestamp: quote.timestamp,
+          quoteExpiresAt: quote.expiresAt,
+          quoteOutputAmount: quote.outputAmount,
+          appliedSlippageBps: slippageBps,
+          quoteSlippageBpsUsed: quote.slippageBpsUsed,
+          minAmountOut,
+        });
 
         // 3. Exécuter via le router natif (avec MEV protection si activée)
         const result = await nativeRouter.executeSwap(
@@ -371,6 +402,11 @@ export function useNativeSwap() {
           setError(
             "Le prix a bougé pendant la simulation (slippage dépassé). " +
             "Actualisez la quote ou augmentez légèrement le slippage."
+          );
+        } else if (normalized.includes("native_slippage_gate")) {
+          setError(
+            "Le router natif ne peut pas respecter ce slippage avec Jupiter. " +
+            "Relancez une quote fraîche ou passez via Jupiter directement."
           );
         } else {
           setError(message);
