@@ -76,38 +76,39 @@ const nextConfig = {
     config.resolve = config.resolve || {};
     
     // Handle rpc-websockets resolution for all nested node_modules
-    // Use require.resolve for cross-environment compatibility (local + Docker)
+    // Use different files for server (ws-based) vs client (browser WebSocket)
     let rpcWebsocketsPath;
-    try {
-      rpcWebsocketsPath = require.resolve('rpc-websockets/dist/lib/client/websocket.browser.cjs');
-    } catch {
-      // Fallback to shim if .cjs not found
-      rpcWebsocketsPath = RPC_WEBSOCKETS_SHIM_PATH;
+    if (isServer) {
+      // Server: use the ws-based implementation
+      try {
+        rpcWebsocketsPath = require.resolve('rpc-websockets/dist/lib/client/websocket.cjs');
+      } catch {
+        rpcWebsocketsPath = RPC_WEBSOCKETS_SHIM_PATH;
+      }
+    } else {
+      // Client: use the browser-based implementation
+      try {
+        rpcWebsocketsPath = require.resolve('rpc-websockets/dist/lib/client/websocket.browser.cjs');
+      } catch {
+        rpcWebsocketsPath = RPC_WEBSOCKETS_SHIM_PATH;
+      }
     }
     
     config.resolve.alias = {
       ...config.resolve.alias,
       'rpc-websockets/dist/lib/client': RPC_WEBSOCKETS_SHIM_PATH,
       'rpc-websockets/dist/lib/client/websocket.browser': rpcWebsocketsPath,
+      'rpc-websockets/dist/lib/client/websocket': rpcWebsocketsPath,
     };
     
     // Use NormalModuleReplacementPlugin to handle nested node_modules
     config.plugins = config.plugins || [];
     config.plugins.push(
       new webpack.NormalModuleReplacementPlugin(
-        /rpc-websockets\/dist\/lib\/client\/websocket\.browser$/,
+        /rpc-websockets\/dist\/lib\/client\/websocket(\.browser)?$/,
         rpcWebsocketsPath
       )
     );
-
-    // Handle server-side rpc-websockets issues
-    if (isServer) {
-      // Externalize rpc-websockets to avoid bundling issues
-      config.externals = config.externals || [];
-      if (Array.isArray(config.externals)) {
-        config.externals.push('rpc-websockets');
-      }
-    }
 
     // Polyfills pour les modules Node.js requis par Solana (côté client uniquement)
     if (!isServer) {
