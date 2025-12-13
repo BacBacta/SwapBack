@@ -37,6 +37,7 @@ import {
   type TrueNativeRoute,
   type TrueNativeSwapResult,
 } from "@/lib/native-router/true-native-swap";
+import { toPublicKey } from "@/lib/native-router/utils/publicKeyUtils";
 import { 
   isNativeSwapAvailable, 
   hasOracleForPair,
@@ -469,9 +470,13 @@ export function useNativeSwap() {
       setError(null);
 
       try {
+        // Normaliser les PublicKey en entrée
+        const safeInputMint = toPublicKey(params.inputMint);
+        const safeOutputMint = toPublicKey(params.outputMint);
+
         logger.info("useNativeSwap", "🔥 Executing TRUE native swap (no Jupiter)", {
-          inputMint: params.inputMint.toString().slice(0, 8),
-          outputMint: params.outputMint.toString().slice(0, 8),
+          inputMint: safeInputMint.toBase58().slice(0, 8),
+          outputMint: safeOutputMint.toBase58().slice(0, 8),
           amount: params.amount,
         });
 
@@ -482,8 +487,8 @@ export function useNativeSwap() {
         
         // Obtenir la meilleure route native
         const route = await trueNativeSwap.getBestNativeRoute({
-          inputMint: params.inputMint,
-          outputMint: params.outputMint,
+          inputMint: safeInputMint,
+          outputMint: safeOutputMint,
           amountIn: params.amount,
           minAmountOut: 0, // Sera calculé après
           slippageBps,
@@ -510,8 +515,8 @@ export function useNativeSwap() {
 
         // Construire la transaction
         const result = await trueNativeSwap.buildNativeSwapTransaction({
-          inputMint: params.inputMint,
-          outputMint: params.outputMint,
+          inputMint: safeInputMint,
+          outputMint: safeOutputMint,
           amountIn: params.amount,
           minAmountOut,
           slippageBps,
@@ -550,8 +555,8 @@ export function useNativeSwap() {
           signature,
           inputAmount: params.amount,
           outputAmount: route.outputAmount,
-          inputMint: params.inputMint.toString(),
-          outputMint: params.outputMint.toString(),
+          inputMint: safeInputMint.toBase58(),
+          outputMint: safeOutputMint.toBase58(),
           venues: [route.venue],
           rebateAmount: calculateBoostedRebate(route.outputAmount * 0.001, userBoostBps).boostedRebate,
           boostApplied: userBoostBps,

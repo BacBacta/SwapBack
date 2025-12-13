@@ -13,6 +13,7 @@
 
 import { Connection, PublicKey } from "@solana/web3.js";
 import { DEX_PROGRAMS } from "../headless/router";
+import { toPublicKey } from "../utils/publicKeyUtils";
 
 // ============================================================================
 // TYPES
@@ -138,12 +139,14 @@ function deriveTickArrays(
  */
 export async function getOrcaWhirlpoolAccounts(
   connection: Connection,
-  inputMint: PublicKey,
-  outputMint: PublicKey,
-  userPublicKey: PublicKey
+  inputMint: PublicKey | string,
+  outputMint: PublicKey | string,
+  userPublicKey: PublicKey | string
 ): Promise<DEXAccounts | null> {
   try {
-    const whirlpool = await findWhirlpool(connection, inputMint, outputMint);
+    const safeInputMint = toPublicKey(inputMint);
+    const safeOutputMint = toPublicKey(outputMint);
+    const whirlpool = await findWhirlpool(connection, safeInputMint, safeOutputMint);
     if (!whirlpool) {
       console.warn("[OrcaResolver] No Whirlpool found for pair");
       return null;
@@ -160,7 +163,7 @@ export async function getOrcaWhirlpoolAccounts(
     const feeRate = data.readUInt16LE(147);
     
     // Déterminer la direction
-    const aToB = inputMint.toBuffer().compare(outputMint.toBuffer()) < 0;
+    const aToB = safeInputMint.toBuffer().compare(safeOutputMint.toBuffer()) < 0;
     
     // Dériver les tick arrays
     const tickArrays = deriveTickArrays(whirlpool, currentTickIndex, tickSpacing, aToB);
@@ -248,12 +251,14 @@ async function findDLMMPair(
  */
 export async function getMeteoraAccounts(
   connection: Connection,
-  inputMint: PublicKey,
-  outputMint: PublicKey,
-  userPublicKey: PublicKey
+  inputMint: PublicKey | string,
+  outputMint: PublicKey | string,
+  userPublicKey: PublicKey | string
 ): Promise<DEXAccounts | null> {
   try {
-    const lbPair = await findDLMMPair(connection, inputMint, outputMint);
+    const safeInputMint = toPublicKey(inputMint);
+    const safeOutputMint = toPublicKey(outputMint);
+    const lbPair = await findDLMMPair(connection, safeInputMint, safeOutputMint);
     if (!lbPair) {
       console.warn("[MeteoraResolver] No DLMM pair found");
       return null;
@@ -369,12 +374,15 @@ async function findPhoenixMarket(
  */
 export async function getPhoenixAccounts(
   connection: Connection,
-  inputMint: PublicKey,
-  outputMint: PublicKey,
-  userPublicKey: PublicKey
+  inputMint: PublicKey | string,
+  outputMint: PublicKey | string,
+  userPublicKey: PublicKey | string
 ): Promise<DEXAccounts | null> {
   try {
-    const market = await findPhoenixMarket(connection, inputMint, outputMint);
+    const safeInputMint = toPublicKey(inputMint);
+    const safeOutputMint = toPublicKey(outputMint);
+    const safeUser = toPublicKey(userPublicKey);
+    const market = await findPhoenixMarket(connection, safeInputMint, safeOutputMint);
     if (!market) {
       console.warn("[PhoenixResolver] No Phoenix market found");
       return null;
@@ -388,7 +396,7 @@ export async function getPhoenixAccounts(
     
     // Dériver le seat (trader state)
     const [seat] = PublicKey.findProgramAddressSync(
-      [Buffer.from("seat"), market.toBuffer(), userPublicKey.toBuffer()],
+      [Buffer.from("seat"), market.toBuffer(), safeUser.toBuffer()],
       PHOENIX_PROGRAM
     );
     
@@ -458,12 +466,14 @@ async function findRaydiumPool(
  */
 export async function getRaydiumAccounts(
   connection: Connection,
-  inputMint: PublicKey,
-  outputMint: PublicKey,
-  userPublicKey: PublicKey
+  inputMint: PublicKey | string,
+  outputMint: PublicKey | string,
+  userPublicKey: PublicKey | string
 ): Promise<DEXAccounts | null> {
   try {
-    const poolId = await findRaydiumPool(inputMint, outputMint);
+    const safeInputMint = toPublicKey(inputMint);
+    const safeOutputMint = toPublicKey(outputMint);
+    const poolId = await findRaydiumPool(safeInputMint, safeOutputMint);
     if (!poolId) {
       console.warn("[RaydiumResolver] No Raydium pool found");
       return null;
@@ -510,10 +520,11 @@ export type SupportedVenue = 'ORCA_WHIRLPOOL' | 'METEORA_DLMM' | 'PHOENIX' | 'RA
 export async function getDEXAccounts(
   connection: Connection,
   venue: SupportedVenue,
-  inputMint: PublicKey,
-  outputMint: PublicKey,
-  userPublicKey: PublicKey
+  inputMint: PublicKey | string,
+  outputMint: PublicKey | string,
+  userPublicKey: PublicKey | string
 ): Promise<DEXAccounts | null> {
+  // Normalisation effectuée dans chaque resolver individuel
   switch (venue) {
     case 'ORCA_WHIRLPOOL':
       return getOrcaWhirlpoolAccounts(connection, inputMint, outputMint, userPublicKey);
@@ -534,14 +545,18 @@ export async function getDEXAccounts(
  */
 export async function getAllDEXAccounts(
   connection: Connection,
-  inputMint: PublicKey,
-  outputMint: PublicKey,
-  userPublicKey: PublicKey
+  inputMint: PublicKey | string,
+  outputMint: PublicKey | string,
+  userPublicKey: PublicKey | string
 ): Promise<Map<SupportedVenue, DEXAccounts>> {
+  // Normaliser les inputs une fois pour toutes
+  const safeInputMint = toPublicKey(inputMint);
+  const safeOutputMint = toPublicKey(outputMint);
+  const safeUser = toPublicKey(userPublicKey);
   const venues: SupportedVenue[] = ['ORCA_WHIRLPOOL', 'METEORA_DLMM', 'PHOENIX', 'RAYDIUM_AMM'];
   
   const results = await Promise.allSettled(
-    venues.map(venue => getDEXAccounts(connection, venue, inputMint, outputMint, userPublicKey))
+    venues.map(venue => getDEXAccounts(connection, venue, safeInputMint, safeOutputMint, safeUser))
   );
   
   const accountsMap = new Map<SupportedVenue, DEXAccounts>();

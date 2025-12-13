@@ -39,6 +39,7 @@ import {
   getDEXAccounts,
   getAllDEXAccounts,
 } from "./dex/DEXAccountResolvers";
+import { toPublicKey, toBase58Safe } from "./utils/publicKeyUtils";
 
 // ============================================================================
 // CONSTANTS
@@ -69,25 +70,8 @@ const PRIORITY_FEE_MICRO_LAMPORTS = 100_000;
 const COMPUTE_UNITS = 400_000;
 
 // ============================================================================
-// HELPERS
+// HELPERS - Using centralized publicKeyUtils
 // ============================================================================
-
-/**
- * Convertit une string ou PublicKey en PublicKey de manière sécurisée
- */
-function toPublicKey(value: PublicKey | string): PublicKey {
-  if (typeof value === 'string') {
-    return new PublicKey(value);
-  }
-  if (value instanceof PublicKey) {
-    return value;
-  }
-  // Fallback: essayer de créer depuis l'objet
-  if (value && typeof (value as { toBase58?: () => string }).toBase58 === 'function') {
-    return value as PublicKey;
-  }
-  throw new Error(`Cannot convert to PublicKey: ${JSON.stringify(value)}`);
-}
 
 // ============================================================================
 // TYPES
