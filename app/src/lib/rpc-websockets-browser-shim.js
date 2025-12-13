@@ -4,10 +4,9 @@
  * This replaces the original module that uses `new window.WebSocket()` which fails
  * in SSR/Node contexts. This shim safely uses the global WebSocket or falls back.
  * 
- * The original module exports:
- *   exports.default = function(address, options) { return new WebSocketBrowserImpl(...) }
- * 
- * We must match this exact interface.
+ * CRITICAL: This module must work when called BOTH with and without `new`:
+ *   - new WebSocketShim(url) - called as constructor
+ *   - WebSocketShim(url) - called as factory function
  */
 
 "use strict";
@@ -38,19 +37,14 @@ function getWebSocketConstructor() {
   }
 }
 
-const WebSocketImpl = getWebSocketConstructor();
-
-// Log for debugging
-if (typeof console !== 'undefined' && console.debug) {
-  console.debug('[rpc-websockets-shim] WebSocket implementation:', WebSocketImpl ? 'available' : 'NOT AVAILABLE');
-}
-
 /**
  * WebSocketBrowserImpl - matches the interface of the original rpc-websockets module
  */
 class WebSocketBrowserImpl extends EventEmitter {
   constructor(address, options, protocols) {
     super();
+    
+    const WebSocketImpl = getWebSocketConstructor();
     
     if (!WebSocketImpl) {
       // No WebSocket available - emit error asynchronously
@@ -124,18 +118,40 @@ class WebSocketBrowserImpl extends EventEmitter {
 }
 
 /**
- * Factory function for common WebSocket instance
- * This is the default export that rpc-websockets expects
+ * Universal WebSocket factory that works with or without 'new'
+ * This is the magic that fixes "WebSocket constructor: 'new' is required"
  */
-function createWebSocket(address, options) {
-  return new WebSocketBrowserImpl(address, options);
+function WebSocketFactory(address, options, protocols) {
+  // If called with 'new', 'this' will be an instance of WebSocketFactory
+  // If called without 'new', 'this' will be undefined or global
+  if (this instanceof WebSocketFactory) {
+    // Called with 'new' - delegate to WebSocketBrowserImpl
+    const instance = new WebSocketBrowserImpl(address, options, protocols);
+    // Copy all properties to 'this' (though it's better to just return the instance)
+    Object.assign(this, instance);
+    Object.setPrototypeOf(this, Object.getPrototypeOf(instance));
+    return this;
+  } else {
+    // Called without 'new' - return a new instance
+    return new WebSocketBrowserImpl(address, options, protocols);
+  }
 }
 
+// Make WebSocketFactory work like a class
+WebSocketFactory.prototype = Object.create(WebSocketBrowserImpl.prototype);
+WebSocketFactory.prototype.constructor = WebSocketFactory;
+
+// Static properties
+WebSocketFactory.CONNECTING = 0;
+WebSocketFactory.OPEN = 1;
+WebSocketFactory.CLOSING = 2;
+WebSocketFactory.CLOSED = 3;
+
 // Match original module's export structure
-exports.default = createWebSocket;
-// Also export the class for direct use
+exports.default = WebSocketFactory;
 exports.WebSocketBrowserImpl = WebSocketBrowserImpl;
-// CommonJS default export pattern
-module.exports = createWebSocket;
-module.exports.default = createWebSocket;
+
+// CommonJS default export pattern - use WebSocketFactory as the main export
+module.exports = WebSocketFactory;
+module.exports.default = WebSocketFactory;
 module.exports.WebSocketBrowserImpl = WebSocketBrowserImpl;

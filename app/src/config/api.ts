@@ -9,9 +9,10 @@ const isProduction = process.env.NODE_ENV === 'production';
 const isVercel = typeof window !== 'undefined' && window.location?.hostname?.includes('vercel.app');
 
 // URL de l'API backend (Fly.io en production, local en dev)
+// IMPORTANT: Utiliser swapback-api-prod.fly.dev (avec -prod)
 export const API_BASE_URL = 
   process.env.NEXT_PUBLIC_API_URL || 
-  (isProduction || isVercel ? 'https://swapback-api.fly.dev' : '');
+  (isProduction || isVercel ? 'https://swapback-api-prod.fly.dev' : '');
 
 /**
  * Construit l'URL complète pour un endpoint API
