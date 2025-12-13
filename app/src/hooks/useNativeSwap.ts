@@ -56,6 +56,8 @@ export interface NativeSwapParams {
   amount: number; // En lamports
   slippageBps?: number; // Default: dynamique
   useMevProtection?: boolean; // Activer Jito bundle
+  /** Callback de progression pour UI */
+  onProgress?: (status: 'preparing' | 'signing' | 'sending' | 'confirming' | 'confirmed') => void;
 }
 
 export interface NativeSwapQuote {
@@ -344,6 +346,9 @@ export function useNativeSwap() {
           minAmountOut,
         });
 
+        // Notifier: on va demander la signature
+        params.onProgress?.('signing');
+
         // 3. Exécuter via le router natif (avec MEV protection si activée)
         const result = await nativeRouter.executeSwap(
           {
@@ -357,9 +362,16 @@ export function useNativeSwap() {
             useJitoBundle: params.useMevProtection ?? useMevProtection,
           },
           async (tx: VersionedTransaction) => {
-            return await signTransaction(tx);
+            // L'utilisateur est en train de signer dans son wallet
+            const signed = await signTransaction(tx);
+            // Une fois signé, on passe à l'envoi
+            params.onProgress?.('sending');
+            return signed;
           }
         );
+
+        // Notifier: confirmation en cours
+        params.onProgress?.('confirming');
 
         logger.info("useNativeSwap", "Native swap executed successfully", {
           signature: result.signature,
@@ -378,6 +390,9 @@ export function useNativeSwap() {
 
         setLastSwapResult(finalResult);
         setCurrentQuote(null); // Invalider la quote
+        
+        // Notifier: confirmé!
+        params.onProgress?.('confirmed');
 
         return finalResult;
       } catch (err) {

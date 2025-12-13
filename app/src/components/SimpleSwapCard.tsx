@@ -292,42 +292,34 @@ export function SimpleSwapCard() {
     setSwapping(true);
     
     try {
-      // Étape 1: Préparation
-      await new Promise(resolve => setTimeout(resolve, 300)); // Brief visual feedback
+      // Callback de progression pour mettre à jour le modal en temps réel
+      const onProgress = (status: 'preparing' | 'signing' | 'sending' | 'confirming' | 'confirmed') => {
+        setTxStatus(status);
+      };
       
-      // Étape 2: Signature du wallet - passe à 'signing' juste avant d'appeler executeSwap
-      setTxStatus('signing');
+      // Étape 1: Préparation (brief)
+      await new Promise(resolve => setTimeout(resolve, 200));
       
-      // Note: executeSwap inclut la signature wallet + l'envoi + la confirmation
-      // On passe par un wrapper pour mettre à jour le statut dès que possible
-      const swapPromise = executeSwap(
+      // Exécuter le swap avec callback de progression
+      const result = await executeSwap(
         {
           inputMint: new PublicKey(inputToken.mint),
           outputMint: new PublicKey(outputToken.mint),
           amount: amountInBaseUnits,
           slippageBps: Math.round(slippage * 100),
           useMevProtection: mevProtection,
+          onProgress, // Callback pour mise à jour du statut en temps réel
         },
         0 // userBoostBP - could be fetched from user's lock status
       );
       
-      // Attendre le résultat
-      const result = await swapPromise;
-      
-      // Si on arrive ici, la signature a été faite et la tx envoyée
+      // Si on arrive ici, le swap est terminé
       if (result && result.signature) {
-        // Étape 3: Transaction envoyée - mise à jour immédiate
+        // Mettre à jour la signature immédiatement
         setTxSignature(result.signature);
-        setTxStatus('confirming');
         
         const outputFormatted = result.outputAmount / Math.pow(10, outputToken.decimals);
         setOutputAmountForModal(outputFormatted.toLocaleString(undefined, { maximumFractionDigits: 6 }));
-        
-        // Courte pause pour UX
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Étape 4: Succès!
-        setTxStatus('confirmed');
         
         // Sauvegarder dans l'historique
         saveTransaction({
