@@ -67,7 +67,9 @@ export const PYTH_SOL_USD_MAINNET = new PublicKey("H6ARHf6YXhGYeQfUzQNGk6rDNnLBQ
 export const DEFAULT_ORACLE = PYTH_SOL_USD_MAINNET; // Fallback si getOracleFeedsForPair échoue
 
 // Jito MEV Protection (mainnet tip accounts)
-export const JITO_BLOCK_ENGINE_URL = "https://mainnet.block-engine.jito.wtf/api/v1/bundles";
+// Utilise notre API proxy pour éviter CORS
+export const JITO_API_PROXY_URL = "/api/jito/send";
+export const JITO_BLOCK_ENGINE_URL = "https://mainnet.block-engine.jito.wtf/api/v1/transactions";
 export const JITO_TIP_ACCOUNTS = [
   new PublicKey("96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5"),
   new PublicKey("HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe"),
@@ -78,7 +80,9 @@ export const JITO_TIP_ACCOUNTS = [
   new PublicKey("DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL"),
   new PublicKey("3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT"),
 ];
-export const DEFAULT_JITO_TIP_LAMPORTS = 10_000; // 0.00001 SOL
+// Minimum tip recommandé par Jito: 1000 lamports
+// On utilise 10000 (0.00001 SOL) pour être compétitif
+export const DEFAULT_JITO_TIP_LAMPORTS = 10_000;
 
 // Priority Fee Configuration (for faster transactions)
 export const PRIORITY_FEE_CONFIG = {
@@ -157,6 +161,12 @@ export interface NativeSwapParams {
    * Augmenter pour les actifs peu liquides
    */
   maxStalenessSecs?: number;
+  /**
+   * Tip Jito en lamports (ajouté automatiquement si useJitoBundle=true)
+   * Minimum recommandé: 1000 lamports
+   * @internal
+   */
+  jitoTipLamports?: number;
 }
 
 export interface NativeSwapResult {
@@ -747,15 +757,71 @@ export function checkOracleDivergence(price1: number, price2: number): {
 
 /**
  * Envoie une transaction via Jito pour protection MEV
+ * Utilise notre API proxy (/api/jito/send) pour éviter les problèmes CORS
+ * 
+ * @see https://docs.jito.wtf/lowlatencytxnsend/
+ */
+async function sendJitoTransaction(
+  transaction: VersionedTransaction
+): Promise<{ signature: string; bundleId?: string }> {
+  // Sérialiser la transaction en base64
+  const encodedTx = Buffer.from(transaction.serialize()).toString('base64');
+  
+  logger.info("NativeRouter", "Sending transaction via Jito", {
+    txSize: encodedTx.length,
+  });
+  
+  try {
+    // Utiliser notre API proxy pour éviter CORS
+    const response = await fetch(JITO_API_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        transaction: encodedTx,
+        encoding: 'base64',
+        bundleOnly: false, // Pas de revert protection pour plus de vitesse
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: response.statusText }));
+      throw new Error(`Jito API error: ${errorData.error || response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(`Jito error: ${data.error || 'Unknown error'}`);
+    }
+    
+    logger.info("NativeRouter", "Jito transaction sent successfully", { 
+      signature: data.signature,
+      bundleId: data.bundleId,
+    });
+    
+    return {
+      signature: data.signature,
+      bundleId: data.bundleId,
+    };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logger.warn("NativeRouter", "Jito send failed", { error: errorMsg });
+    throw error;
+  }
+}
+
+/**
+ * Envoie un bundle de transactions via Jito (multi-tx atomique)
+ * Minimum tip: 1000 lamports
  */
 async function sendJitoBundle(
   transactions: VersionedTransaction[],
   tipLamports: number = DEFAULT_JITO_TIP_LAMPORTS
 ): Promise<string> {
-  // Sélectionner un tip account aléatoire
+  // Sélectionner un tip account aléatoire (pour info)
   const tipAccount = JITO_TIP_ACCOUNTS[Math.floor(Math.random() * JITO_TIP_ACCOUNTS.length)];
   
-  logger.info("NativeRouter", "Sending Jito bundle", {
+  logger.info("NativeRouter", "Sending bundle via Jito", {
     numTransactions: transactions.length,
     tipLamports,
     tipAccount: tipAccount.toString(),
@@ -767,33 +833,34 @@ async function sendJitoBundle(
   );
   
   try {
-    const response = await fetch(JITO_BLOCK_ENGINE_URL, {
+    // Utiliser notre API proxy
+    const response = await fetch(JITO_API_PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'sendBundle',
-        params: [encodedTxs],
+        transactions: encodedTxs,
+        encoding: 'base64',
       }),
     });
     
     if (!response.ok) {
-      throw new Error(`Jito bundle failed: ${response.status}`);
+      const errorData = await response.json().catch(() => ({ error: response.statusText }));
+      throw new Error(`Jito bundle API error: ${errorData.error || response.status}`);
     }
     
     const data = await response.json();
     
-    if (data.error) {
-      throw new Error(`Jito error: ${data.error.message}`);
+    if (!data.success) {
+      throw new Error(`Jito bundle error: ${data.error || 'Unknown error'}`);
     }
     
-    const bundleId = data.result;
-    logger.info("NativeRouter", "Jito bundle sent", { bundleId });
+    const bundleId = data.signature || data.bundleId;
+    logger.info("NativeRouter", "Jito bundle sent successfully", { bundleId });
     
     return bundleId;
   } catch (error) {
-    logger.error("NativeRouter", "Jito bundle failed", { error });
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logger.warn("NativeRouter", "Jito bundle failed", { error: errorMsg });
     throw error;
   }
 }
@@ -1818,6 +1885,18 @@ export class NativeRouterService {
       microLamports: PRIORITY_FEE_CONFIG.DEFAULT_MICRO_LAMPORTS,
     });
     
+    // === JITO TIP pour MEV protection ===
+    // Le tip DOIT être dans la transaction pour que Jito l'accepte
+    if (params.jitoTipLamports && params.jitoTipLamports >= 1000) {
+      const tipInstruction = createJitoTipInstruction(userPublicKey, params.jitoTipLamports);
+      instructions.push(tipInstruction);
+      
+      logger.info("NativeRouter", "Added Jito tip instruction", {
+        tipLamports: params.jitoTipLamports,
+        tipAccount: tipInstruction.keys[1].pubkey.toBase58(),
+      });
+    }
+    
     // Vérifier si les ATAs utilisateurs existent, sinon les créer
     const ataChecks = await Promise.all([
       this.connection.getAccountInfo(accounts.userTokenAccountA),
@@ -2590,25 +2669,14 @@ export class NativeRouterService {
 
     // 3. Construire la transaction avec le minOut approprié
     const adjustedParams = { ...params, minAmountOut: effectiveMinOut.toNumber() };
-    const transaction = await this.buildSwapTransaction(adjustedParams, route, jupiterCpi);
     
-    // 3. Ajouter tip Jito si demandé (pour protection MEV)
+    // Si Jito MEV protection demandée, inclure le tip dans la transaction
+    // Le tip DOIT être dans la même transaction pour la protection MEV
     if (params.useJitoBundle) {
-      const tipInstruction = createJitoTipInstruction(
-        params.userPublicKey,
-        DEFAULT_JITO_TIP_LAMPORTS
-      );
-      
-      // Reconstruire la transaction avec le tip
-      const { blockhash } = await this.connection.getLatestBlockhash();
-      const message = transaction.message;
-      
-      // Note: Pour une vraie implémentation, il faudrait modifier le message
-      // pour inclure l'instruction de tip. Ici on log l'intention.
-      logger.info("NativeRouter", "Jito MEV protection enabled", {
-        tipLamports: DEFAULT_JITO_TIP_LAMPORTS,
-      });
+      adjustedParams.jitoTipLamports = DEFAULT_JITO_TIP_LAMPORTS;
     }
+    
+    const transaction = await this.buildSwapTransaction(adjustedParams, route, jupiterCpi);
     
     // 4. Signer
     const signedTransaction = await signTransaction(transaction);
@@ -2617,34 +2685,32 @@ export class NativeRouterService {
     let signature: string;
     
     if (params.useJitoBundle) {
-      // Envoyer via Jito bundle engine
+      // Envoyer via Jito sendTransaction API (single tx avec MEV protection)
       try {
-        const bundleId = await sendJitoBundle([signedTransaction]);
+        const jitoResult = await sendJitoTransaction(signedTransaction);
+        signature = jitoResult.signature;
         
-        // Attendre la confirmation du bundle
-        // Note: Jito bundles n'ont pas de signature standard, on attend le landing
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Le bundle ID est retourné, mais pour le résultat on utilise le hash de la tx
-        const txHash = Buffer.from(signedTransaction.signatures[0]).toString('base58');
-        signature = txHash;
-        
-        logger.info("NativeRouter", "Jito bundle landed", {
-          bundleId,
+        logger.info("NativeRouter", "Transaction sent via Jito", {
           signature,
+          bundleId: jitoResult.bundleId,
         });
       } catch (jitoError) {
-        logger.warn("NativeRouter", "Jito bundle failed, falling back to normal send", {
-          error: jitoError,
+        // Jito a échoué - utiliser l'envoi normal avec priority fees
+        // C'est OK car on a déjà les priority fees dans la transaction
+        const errorMsg = jitoError instanceof Error ? jitoError.message : String(jitoError);
+        logger.info("NativeRouter", "Jito unavailable, using standard send with priority fees", {
+          jitoError: errorMsg,
         });
         
-        // Fallback: envoyer normalement
+        // Fallback: envoyer normalement (les priority fees sont déjà incluses)
         const rawTransaction = signedTransaction.serialize();
         signature = await this.connection.sendRawTransaction(rawTransaction, {
           skipPreflight: false,
           preflightCommitment: "confirmed",
           maxRetries: 3,
         });
+        
+        logger.info("NativeRouter", "Transaction sent via standard RPC", { signature });
       }
     } else {
       // Envoi standard
