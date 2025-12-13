@@ -160,20 +160,24 @@ export class TrueNativeSwap {
     amountIn: number,
     userPublicKey: PublicKey
   ): Promise<NativeVenueQuote[]> {
+    const safeInputMint = toPublicKey(inputMint);
+    const safeOutputMint = toPublicKey(outputMint);
+    const safeUser = toPublicKey(userPublicKey);
+
     const quotes: NativeVenueQuote[] = [];
 
     logger.info("TrueNativeSwap", "Fetching native quotes", {
-      inputMint: inputMint.toBase58().slice(0, 8),
-      outputMint: outputMint.toBase58().slice(0, 8),
+      inputMint: safeInputMint.toBase58().slice(0, 8),
+      outputMint: safeOutputMint.toBase58().slice(0, 8),
       amountIn,
     });
 
     // Obtenir les comptes pour toutes les venues en parallèle
     const allAccounts = await getAllDEXAccounts(
       this.connection,
-      inputMint,
-      outputMint,
-      userPublicKey
+      safeInputMint,
+      safeOutputMint,
+      safeUser
     );
 
     // Pour chaque venue disponible, obtenir une quote
@@ -182,8 +186,8 @@ export class TrueNativeSwap {
         const startTime = Date.now();
         const quote = await this.getQuoteForVenue(
           venue,
-          inputMint,
-          outputMint,
+          safeInputMint,
+          safeOutputMint,
           amountIn,
           accounts
         );
@@ -437,8 +441,9 @@ export class TrueNativeSwap {
    * Dérive l'adresse PDA du SwapPlan
    */
   deriveSwapPlanAddress(userPublicKey: PublicKey): [PublicKey, number] {
+    const userPk = toPublicKey(userPublicKey);
     return PublicKey.findProgramAddressSync(
-      [Buffer.from("swap_plan"), userPublicKey.toBuffer()],
+      [Buffer.from("swap_plan"), userPk.toBuffer()],
       ROUTER_PROGRAM_ID
     );
   }
@@ -457,7 +462,10 @@ export class TrueNativeSwap {
       expiresAt: number;
     }
   ): Promise<TransactionInstruction> {
-    const [planPda] = this.deriveSwapPlanAddress(userPublicKey);
+    const safeUser = toPublicKey(userPublicKey);
+    const safeInput = toPublicKey(params.inputMint);
+    const safeOutput = toPublicKey(params.outputMint);
+    const [planPda] = this.deriveSwapPlanAddress(safeUser);
 
     // Générer un plan_id unique
     const planId = new Uint8Array(32);
@@ -477,8 +485,8 @@ export class TrueNativeSwap {
 
     // Sérialiser les arguments CreatePlanArgs
     const planIdBuffer = Buffer.from(planId);
-    const tokenInBuffer = params.inputMint.toBuffer();
-    const tokenOutBuffer = params.outputMint.toBuffer();
+    const tokenInBuffer = safeInput.toBuffer();
+    const tokenOutBuffer = safeOutput.toBuffer();
     const amountInBuffer = Buffer.alloc(8);
     amountInBuffer.writeBigUInt64LE(BigInt(params.amountIn));
     const minOutBuffer = Buffer.alloc(8);
@@ -552,13 +560,17 @@ export class TrueNativeSwap {
       ROUTER_PROGRAM_ID
     );
 
+    const safeUser = toPublicKey(userPublicKey);
+    const safeInput = toPublicKey(inputMint);
+    const safeOutput = toPublicKey(outputMint);
+
     const userTokenAccountA = await getAssociatedTokenAddress(
-      inputMint,
-      userPublicKey
+      safeInput,
+      safeUser
     );
     const userTokenAccountB = await getAssociatedTokenAddress(
-      outputMint,
-      userPublicKey
+      safeOutput,
+      safeUser
     );
 
     const [rebateVault] = PublicKey.findProgramAddressSync(
@@ -567,7 +579,7 @@ export class TrueNativeSwap {
     );
 
     const [userRebate] = PublicKey.findProgramAddressSync(
-      [Buffer.from("user_rebate"), userPublicKey.toBuffer()],
+      [Buffer.from("user_rebate"), safeUser.toBuffer()],
       ROUTER_PROGRAM_ID
     );
 
@@ -594,15 +606,19 @@ export class TrueNativeSwap {
     route: TrueNativeRoute,
     params: TrueNativeSwapParams
   ): Promise<TransactionInstruction> {
-    const { inputMint, outputMint, amountIn, minAmountOut } = params;
+    const safeUser = toPublicKey(userPublicKey);
+    const inputMint = toPublicKey(params.inputMint);
+    const outputMint = toPublicKey(params.outputMint);
+    const amountIn = params.amountIn;
+    const minAmountOut = params.minAmountOut;
 
     // Dériver les comptes
     const accounts = await this.deriveSwapAccounts(
-      userPublicKey,
+      safeUser,
       inputMint,
       outputMint
     );
-    const [planPda] = this.deriveSwapPlanAddress(userPublicKey);
+    const [planPda] = this.deriveSwapPlanAddress(safeUser);
 
     // Obtenir les oracles
     const oracleConfig = getOracleFeedsForPair(
@@ -627,7 +643,7 @@ export class TrueNativeSwap {
     // Construire les keys
     const keys = [
       { pubkey: accounts.state, isSigner: false, isWritable: true },
-      { pubkey: userPublicKey, isSigner: true, isWritable: true },
+      { pubkey: safeUser, isSigner: true, isWritable: true },
       { pubkey: oracleConfig.primary, isSigner: false, isWritable: false },
       // Fallback oracle (optional)
       ...(oracleConfig.fallback
