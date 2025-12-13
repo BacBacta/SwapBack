@@ -317,6 +317,7 @@ export function SimpleSwapCard() {
       await new Promise(resolve => setTimeout(resolve, 200));
       
       // Exécuter le swap avec callback de progression
+      console.log("[SimpleSwapCard] Executing swap...");
       const result = await executeSwap(
         {
           inputMint: new PublicKey(inputToken.mint),
@@ -329,8 +330,11 @@ export function SimpleSwapCard() {
         0 // userBoostBP - could be fetched from user's lock status
       );
       
+      console.log("[SimpleSwapCard] Swap result:", result);
+      
       // Si on arrive ici, le swap est terminé
       if (result && result.signature) {
+        console.log("[SimpleSwapCard] Swap SUCCESS with signature:", result.signature);
         // Mettre à jour le status à confirmed IMMÉDIATEMENT
         setTxStatus('confirmed');
         

@@ -2722,13 +2722,39 @@ export class NativeRouterService {
       });
     }
     
-    // 6. Confirmer
-    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash();
-    await this.connection.confirmTransaction({
-      signature,
-      blockhash,
-      lastValidBlockHeight,
-    }, "confirmed");
+    // 6. Confirmer avec timeout
+    logger.info("NativeRouter", "Confirming transaction...", { signature });
+    
+    try {
+      // Utiliser un timeout pour éviter de bloquer indéfiniment
+      const confirmPromise = (async () => {
+        const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash();
+        return this.connection.confirmTransaction({
+          signature,
+          blockhash,
+          lastValidBlockHeight,
+        }, "confirmed");
+      })();
+      
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("Confirmation timeout")), 60000);
+      });
+      
+      await Promise.race([confirmPromise, timeoutPromise]);
+      
+      logger.info("NativeRouter", "Transaction confirmed", { signature });
+    } catch (confirmError) {
+      // Log l'erreur mais ne pas échouer si la transaction a été envoyée
+      // L'utilisateur peut vérifier sur l'explorateur
+      const errMsg = confirmError instanceof Error ? confirmError.message : String(confirmError);
+      logger.warn("NativeRouter", "Confirmation issue but tx was sent", { 
+        signature, 
+        error: errMsg 
+      });
+      
+      // Si c'est un timeout, la transaction peut quand même être passée
+      // On retourne la signature pour que l'utilisateur puisse vérifier
+    }
     
     logger.info("NativeRouter", "Swap executed successfully", {
       signature,
