@@ -5,45 +5,34 @@
  * - Slippage dynamique avancé (EMA + volatilité + liquidité)
  * - Simulation pré-exécution
  * - Cache hiérarchique des quotes
- * - Logging structuré avec analytics
  *
  * @author SwapBack Team
  */
 
 "use client";
 
-import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey, VersionedTransaction } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 import { 
   getNativeRouter, 
-  type NativeRouteQuote, 
   type VenueQuote,
-  SLIPPAGE_CONFIG,
 } from "@/lib/native-router";
 import { 
   RealTimeSlippageEstimator,
   TransactionSimulator,
   HierarchicalQuoteCache,
-  StructuredLogger,
-  SwapMetricsTracker,
+  initSession,
   type SlippageEstimate,
   type SimulationResult,
-  type CacheEntry,
-  type SwapMetrics,
 } from "@/lib/native-router/enhanced";
 import { 
-  isNativeSwapAvailable, 
-  hasOracleForPair,
-} from "@/config/oracles";
-import { 
   decideSwapRoute, 
-  formatRouteDecisionForLog,
   getUIMessageForReason,
 } from "@/lib/swap-routing";
 import { useBoostCalculations } from "./useBoostCalculations";
-import { logger as baseLogger } from "@/lib/logger";
+import { logger } from "@/lib/logger";
 
 // ============================================================================
 // TYPES
@@ -55,10 +44,10 @@ export interface EnhancedSwapParams {
   inputMint: PublicKey;
   outputMint: PublicKey;
   amount: number;
-  slippageBps?: number; // Si non fourni: auto-estimé
+  slippageBps?: number;
   useMevProtection?: boolean;
-  forceRefresh?: boolean; // Ignorer le cache
-  simulateFirst?: boolean; // Toujours simuler avant exécution
+  forceRefresh?: boolean;
+  simulateFirst?: boolean;
   onProgress?: (status: SwapProgressStatus) => void;
 }
 
@@ -74,37 +63,24 @@ export type SwapProgressStatus =
   | 'failed';
 
 export interface EnhancedQuote {
-  // Base quote
   inputAmount: number;
   outputAmount: number;
   netOutputAmount: number;
   venues: VenueQuote[];
   bestVenue: string;
-  
-  // Prix
   priceImpactBps: number;
   estimatedRebate: number;
   estimatedNpi: number;
-  
-  // Slippage amélioré
   slippageEstimate: SlippageEstimate;
   recommendedSlippageBps: number;
   slippageConfidence: number;
-  
-  // Simulation
   simulationResult?: SimulationResult;
   simulationPassed: boolean;
-  
-  // Boost
   baseRebate: number;
   boostedRebate: number;
   boostBps: number;
-  
-  // Cache
   fromCache: boolean;
   cacheLevel?: 'L1' | 'L2' | 'L3';
-  
-  // Méta
   timestamp: number;
   expiresAt: number;
   quoteId: string;
@@ -113,20 +89,16 @@ export interface EnhancedQuote {
 export interface SwapAnalytics {
   totalSwaps: number;
   successfulSwaps: number;
-  averageSlippage: number;
-  averageExecutionTime: number;
-  venueDistribution: Record<string, number>;
   cacheHitRate: number;
 }
 
 // ============================================================================
-// SINGLETON INSTANCES (partagées entre hooks)
+// SINGLETON INSTANCES
 // ============================================================================
 
 let sharedSlippageEstimator: RealTimeSlippageEstimator | null = null;
 let sharedQuoteCache: HierarchicalQuoteCache | null = null;
-let sharedLogger: StructuredLogger | null = null;
-let sharedMetricsTracker: SwapMetricsTracker | null = null;
+const swapCount = { total: 0, successful: 0 };
 
 function getSharedInstances() {
   if (!sharedSlippageEstimator) {
@@ -147,27 +119,9 @@ function getSharedInstances() {
     });
   }
   
-  if (!sharedLogger) {
-    sharedLogger = new StructuredLogger({
-      level: process.env.NODE_ENV === 'production' ? 'warn' : 'debug',
-      enableConsole: process.env.NODE_ENV !== 'production',
-      enableStructuredOutput: true,
-      metadata: {
-        app: 'swapback',
-        module: 'enhanced-native-swap',
-      },
-    });
-  }
-  
-  if (!sharedMetricsTracker) {
-    sharedMetricsTracker = new SwapMetricsTracker(sharedLogger);
-  }
-  
   return {
     slippageEstimator: sharedSlippageEstimator,
     quoteCache: sharedQuoteCache,
-    logger: sharedLogger,
-    metricsTracker: sharedMetricsTracker,
   };
 }
 
@@ -189,12 +143,12 @@ export function useEnhancedNativeSwap() {
   const [progressStatus, setProgressStatus] = useState<SwapProgressStatus | null>(null);
   
   // Instances partagées
-  const { slippageEstimator, quoteCache, logger, metricsTracker } = useMemo(
+  const { slippageEstimator, quoteCache } = useMemo(
     () => getSharedInstances(),
     []
   );
   
-  // Simulateur (dépend de connection)
+  // Simulateur
   const simulator = useMemo(() => {
     return new TransactionSimulator(connection, {
       maxRetries: 2,
@@ -207,15 +161,10 @@ export function useEnhancedNativeSwap() {
     return getNativeRouter(connection);
   }, [connection]);
   
-  // Session tracking
-  const sessionIdRef = useRef<string>(metricsTracker.startSession());
-  
-  // Cleanup on unmount
+  // Session init
   useEffect(() => {
-    return () => {
-      metricsTracker.endSession();
-    };
-  }, [metricsTracker]);
+    initSession();
+  }, []);
 
   // ============================================================================
   // QUOTE AMÉLIORÉE
@@ -235,7 +184,6 @@ export function useEnhancedNativeSwap() {
       setError(null);
       setProgressStatus('fetching-quote');
 
-      const startTime = Date.now();
       const quoteId = `Q-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       
       try {
@@ -243,17 +191,12 @@ export function useEnhancedNativeSwap() {
         const outputMintStr = params.outputMint.toString();
         const cacheKey = `${inputMintStr}-${outputMintStr}-${params.amount}`;
         
-        // Vérifier le cache si pas de force refresh
+        // Vérifier le cache
         if (!params.forceRefresh) {
           const cached = quoteCache.get(cacheKey);
           if (cached) {
-            logger.debug('Quote cache hit', { 
-              cacheKey, 
-              level: cached.level,
-              age: Date.now() - cached.timestamp,
-            });
+            logger.debug("useEnhancedNativeSwap", "Quote cache hit", { cacheKey });
             
-            // Construire quote depuis cache
             const cachedQuote: EnhancedQuote = {
               ...cached.data,
               fromCache: true,
@@ -274,8 +217,6 @@ export function useEnhancedNativeSwap() {
           hasJupiterCpi: true,
         });
         
-        logger.info('Route decision', formatRouteDecisionForLog(routeDecision));
-        
         if (routeDecision.route !== "native") {
           const uiMessage = getUIMessageForReason(routeDecision.reason);
           setError(uiMessage);
@@ -295,7 +236,7 @@ export function useEnhancedNativeSwap() {
           throw new Error("Aucune venue native disponible pour cette paire");
         }
 
-        // Estimation du slippage avancée
+        // Estimation du slippage
         setProgressStatus('estimating-slippage');
         
         const slippageEstimate = slippageEstimator.estimateSlippage(
@@ -304,59 +245,28 @@ export function useEnhancedNativeSwap() {
           params.amount,
           route.venues[0]?.tvl ?? 10_000_000_000_000
         );
-        
-        logger.debug('Slippage estimate', {
-          recommended: slippageEstimate.recommendedBps,
-          confidence: slippageEstimate.confidence,
-          components: slippageEstimate.components,
-        });
 
-        // Calcul des rebates avec boost
+        // Calcul des rebates
         const baseRebate = route.estimatedRebate;
         const rebateCalc = calculateBoostedRebate(baseRebate, userBoostBps);
 
-        // Simulation optionnelle
-        let simulationResult: SimulationResult | undefined;
-        let simulationPassed = true;
-        
-        if (mode === 'advanced' || params.simulateFirst) {
-          setProgressStatus('simulating');
-          // La simulation complète se fait lors de l'exécution
-          // Ici on fait juste un check de base
-          simulationPassed = true;
-        }
-
         const quote: EnhancedQuote = {
-          // Base
           inputAmount: route.totalInputAmount,
           outputAmount: route.totalOutputAmount,
           netOutputAmount: route.netOutputAmount,
           venues: route.venues,
           bestVenue: route.bestVenue,
-          
-          // Prix
           priceImpactBps: route.totalPriceImpactBps,
           estimatedRebate: route.estimatedRebate,
           estimatedNpi: route.estimatedNpi,
-          
-          // Slippage
           slippageEstimate,
           recommendedSlippageBps: slippageEstimate.recommendedBps,
           slippageConfidence: slippageEstimate.confidence,
-          
-          // Simulation
-          simulationResult,
-          simulationPassed,
-          
-          // Boost
+          simulationPassed: true,
           baseRebate,
           boostedRebate: rebateCalc.boostedRebate,
           boostBps: userBoostBps,
-          
-          // Cache
           fromCache: false,
-          
-          // Méta
           timestamp: Date.now(),
           expiresAt: Date.now() + 30000,
           quoteId,
@@ -368,22 +278,10 @@ export function useEnhancedNativeSwap() {
         setCurrentQuote(quote);
         setProgressStatus(null);
 
-        // Métriques
-        const latency = Date.now() - startTime;
-        logger.info('Enhanced quote generated', {
-          quoteId,
-          latencyMs: latency,
-          bestVenue: quote.bestVenue,
-          outputAmount: quote.outputAmount,
-          slippageBps: quote.recommendedSlippageBps,
-          confidence: quote.slippageConfidence,
-          fromCache: false,
-        });
-
         return quote;
       } catch (err) {
         const message = err instanceof Error ? err.message : "Erreur lors de la quote";
-        logger.error('Quote error', { error: message, quoteId });
+        logger.error("useEnhancedNativeSwap", "Quote error", { error: message });
         setError(message);
         setProgressStatus('failed');
         return null;
@@ -391,11 +289,11 @@ export function useEnhancedNativeSwap() {
         setQuoteLoading(false);
       }
     },
-    [publicKey, nativeRouter, calculateBoostedRebate, quoteCache, slippageEstimator, logger, mode]
+    [publicKey, nativeRouter, calculateBoostedRebate, quoteCache, slippageEstimator]
   );
 
   // ============================================================================
-  // EXÉCUTION AMÉLIORÉE
+  // EXÉCUTION
   // ============================================================================
   
   const executeEnhancedSwap = useCallback(
@@ -410,12 +308,7 @@ export function useEnhancedNativeSwap() {
 
       setLoading(true);
       setError(null);
-      
-      const swapId = metricsTracker.startSwap(
-        params.inputMint.toString(),
-        params.outputMint.toString(),
-        params.amount
-      );
+      swapCount.total++;
 
       try {
         // 1. Quote fraîche
@@ -428,21 +321,13 @@ export function useEnhancedNativeSwap() {
           throw new Error("Impossible d'obtenir une quote");
         }
 
-        // 2. Simulation pré-exécution
+        // 2. Simulation pré-exécution (mode avancé)
         if (mode === 'advanced' || params.simulateFirst) {
           setProgressStatus('simulating');
           params.onProgress?.('simulating');
           
-          // Construire la transaction pour simulation
           const slippageBps = params.slippageBps ?? quote.recommendedSlippageBps;
           const minAmountOut = Math.floor(quote.outputAmount * (10000 - slippageBps) / 10000);
-          
-          logger.info('Pre-execution simulation', {
-            swapId,
-            quoteId: quote.quoteId,
-            slippageBps,
-            minAmountOut,
-          });
           
           const txResult = await nativeRouter.buildSwapTransaction(
             publicKey,
@@ -457,30 +342,15 @@ export function useEnhancedNativeSwap() {
             throw new Error("Impossible de construire la transaction");
           }
           
-          // Simuler
           const simResult = await simulator.simulateTransaction(txResult.transaction);
           
           if (!simResult.success) {
-            metricsTracker.recordSwapResult(swapId, false, simResult.errorMessage);
-            
-            logger.warn('Simulation failed', {
-              swapId,
-              error: simResult.errorMessage,
-              errorCode: simResult.parsedError?.code,
-            });
-            
             throw new Error(
               simResult.parsedError?.userMessage ?? 
               simResult.errorMessage ?? 
               "La simulation a échoué"
             );
           }
-          
-          logger.info('Simulation passed', {
-            swapId,
-            computeUnits: simResult.computeUnitsConsumed,
-            balanceChanges: simResult.balanceChanges,
-          });
         }
 
         // 3. Exécution réelle
@@ -489,15 +359,7 @@ export function useEnhancedNativeSwap() {
         
         const slippageBps = params.slippageBps ?? quote.recommendedSlippageBps;
         const minAmountOut = Math.floor(quote.outputAmount * (10000 - slippageBps) / 10000);
-        
-        // Enregistrer l'observation de slippage pour l'EMA
-        slippageEstimator.recordObservation(
-          params.inputMint.toString(),
-          params.outputMint.toString(),
-          slippageBps / 10000
-        );
 
-        // Construction et envoi de la transaction
         const txResult = await nativeRouter.buildSwapTransaction(
           publicKey,
           params.inputMint,
@@ -536,45 +398,22 @@ export function useEnhancedNativeSwap() {
         setProgressStatus('confirmed');
         params.onProgress?.('confirmed');
         
-        // Succès
-        metricsTracker.recordSwapResult(swapId, true);
-        
-        logger.info('Swap executed successfully', {
-          swapId,
-          signature,
-          inputAmount: quote.inputAmount,
-          outputAmount: quote.outputAmount,
-          venue: quote.bestVenue,
-          slippageBps,
-        });
+        swapCount.successful++;
 
         return { success: true, signature };
         
       } catch (err) {
         const message = err instanceof Error ? err.message : "Erreur lors du swap";
-        logger.error('Swap execution error', { swapId, error: message });
+        logger.error("useEnhancedNativeSwap", "Swap error", { error: message });
         setError(message);
         setProgressStatus('failed');
         params.onProgress?.('failed');
-        metricsTracker.recordSwapResult(swapId, false, message);
         return { success: false, error: message };
       } finally {
         setLoading(false);
       }
     },
-    [
-      publicKey, 
-      signTransaction, 
-      connection, 
-      nativeRouter, 
-      currentQuote, 
-      getEnhancedQuote, 
-      simulator, 
-      slippageEstimator, 
-      metricsTracker, 
-      logger,
-      mode
-    ]
+    [publicKey, signTransaction, connection, nativeRouter, currentQuote, getEnhancedQuote, simulator, mode]
   );
 
   // ============================================================================
@@ -582,27 +421,14 @@ export function useEnhancedNativeSwap() {
   // ============================================================================
   
   const getAnalytics = useCallback((): SwapAnalytics => {
-    const metrics = metricsTracker.getMetrics();
     const cacheStats = quoteCache.getStats();
     
     return {
-      totalSwaps: metrics.length,
-      successfulSwaps: metrics.filter(m => m.success).length,
-      averageSlippage: metrics.length > 0 
-        ? metrics.reduce((sum, m) => sum + (m.actualSlippage ?? 0), 0) / metrics.length
-        : 0,
-      averageExecutionTime: metrics.length > 0
-        ? metrics.reduce((sum, m) => sum + m.latencyMs, 0) / metrics.length
-        : 0,
-      venueDistribution: metrics.reduce((acc, m) => {
-        if (m.venue) {
-          acc[m.venue] = (acc[m.venue] ?? 0) + 1;
-        }
-        return acc;
-      }, {} as Record<string, number>),
+      totalSwaps: swapCount.total,
+      successfulSwaps: swapCount.successful,
       cacheHitRate: cacheStats.totalHits / Math.max(1, cacheStats.totalHits + cacheStats.totalMisses),
     };
-  }, [metricsTracker, quoteCache]);
+  }, [quoteCache]);
 
   // ============================================================================
   // UTILITAIRES
@@ -610,40 +436,30 @@ export function useEnhancedNativeSwap() {
   
   const clearCache = useCallback(() => {
     quoteCache.clear();
-    logger.info('Quote cache cleared');
-  }, [quoteCache, logger]);
+  }, [quoteCache]);
   
   const setSwapMode = useCallback((newMode: SwapMode) => {
     setMode(newMode);
-    logger.info('Swap mode changed', { mode: newMode });
-  }, [logger]);
+  }, []);
 
   // ============================================================================
   // RETURN
   // ============================================================================
   
   return {
-    // États
     loading,
     quoteLoading,
     error,
     currentQuote,
     mode,
     progressStatus,
-    
-    // Actions
     getEnhancedQuote,
     executeEnhancedSwap,
     setSwapMode,
     clearCache,
-    
-    // Analytics
     getAnalytics,
-    
-    // Instances (pour accès avancé)
     slippageEstimator,
     quoteCache,
-    metricsTracker,
   };
 }
 
