@@ -1,7 +1,7 @@
 "use client";
 
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
@@ -12,6 +12,11 @@ export const useTokenData = (tokenMint: string) => {
   const [balance, setBalance] = useState<number>(0);
   const [usdPrice, setUsdPrice] = useState<number>(0);
   const [loading, setLoading] = useState(true); // Start as loading
+  const [lastPriceUpdate, setLastPriceUpdate] = useState<number>(0);
+  
+  // Refs pour éviter les appels multiples
+  const isFetchingBalance = useRef(false);
+  const isFetchingPrice = useRef(false);
 
   // Debug: log the tokenMint on mount/change
   useEffect(() => {
@@ -226,11 +231,63 @@ export const useTokenData = (tokenMint: string) => {
     const interval = setInterval(fetchPrice, 30000);
     return () => clearInterval(interval);
   }, [tokenMint]);
+  
+  // Fonction de rafraîchissement manuel
+  const refetch = useCallback(async () => {
+    if (!tokenMint) return;
+    
+    // Rafraîchir le solde
+    if (connected && publicKey && connection && !isFetchingBalance.current) {
+      isFetchingBalance.current = true;
+      try {
+        if (tokenMint === "So11111111111111111111111111111111111111112") {
+          const lamports = await connection.getBalance(publicKey);
+          setBalance(lamports / 1e9);
+        } else {
+          const mintPubkey = new PublicKey(tokenMint);
+          try {
+            const ata = await getAssociatedTokenAddress(mintPubkey, publicKey, false, TOKEN_PROGRAM_ID);
+            const tokenBalance = await connection.getTokenAccountBalance(ata);
+            setBalance(tokenBalance.value.uiAmount ?? 0);
+          } catch {
+            setBalance(0);
+          }
+        }
+      } catch (e) {
+        console.warn("Refetch balance error:", e);
+      } finally {
+        isFetchingBalance.current = false;
+      }
+    }
+    
+    // Rafraîchir le prix
+    if (!isFetchingPrice.current) {
+      isFetchingPrice.current = true;
+      try {
+        const response = await fetch(`/api/price?mint=${tokenMint}`, {
+          signal: AbortSignal.timeout(5000),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.price && data.price > 0) {
+            setUsdPrice(data.price);
+            setLastPriceUpdate(Date.now());
+          }
+        }
+      } catch (e) {
+        console.warn("Refetch price error:", e);
+      } finally {
+        isFetchingPrice.current = false;
+      }
+    }
+  }, [tokenMint, connected, publicKey, connection]);
 
   return {
     balance,
     usdPrice,
     usdValue: balance * usdPrice,
     loading,
+    lastPriceUpdate,
+    refetch,
   };
 };

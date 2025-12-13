@@ -10,16 +10,28 @@
  * @date December 8, 2025 - Migration vers routes natives
  */
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { ArrowDownUp, Settings, Loader2, ChevronRight, Sparkles, Zap } from "lucide-react";
+import { ArrowDownUp, Settings, Loader2, ChevronRight, Sparkles, Zap, Clock, ExternalLink } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TokenSelectorModal } from "./TokenSelectorModal";
 import { AdvancedOptionsPanel } from "./AdvancedOptionsPanel";
+import { TransactionStatusModal, TransactionStatus } from "./TransactionStatusModal";
 import { useTokenData } from "../hooks/useTokenData";
 import { useNativeSwap } from "../hooks/useNativeSwap";
 import toast from "react-hot-toast";
+
+// Interface pour l'historique des transactions
+interface RecentTransaction {
+  signature: string;
+  inputToken: string;
+  outputToken: string;
+  inputAmount: string;
+  outputAmount: string;
+  timestamp: number;
+  status: 'success' | 'failed';
+}
 
 // Types
 interface TokenInfo {
@@ -105,6 +117,20 @@ export function SimpleSwapCard() {
   const [showInputSelector, setShowInputSelector] = useState(false);
   const [showOutputSelector, setShowOutputSelector] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  
+  // État du modal de statut de transaction (style Jupiter)
+  const [txModalOpen, setTxModalOpen] = useState(false);
+  const [txStatus, setTxStatus] = useState<TransactionStatus>('idle');
+  const [txSignature, setTxSignature] = useState<string | null>(null);
+  const [txErrorMessage, setTxErrorMessage] = useState<string | undefined>();
+  const [outputAmountForModal, setOutputAmountForModal] = useState<string>('');
+  
+  // Historique des 5 dernières transactions
+  const [recentTxs, setRecentTxs] = useState<RecentTransaction[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  
+  // Ref pour rafraîchissement prix USD
+  const priceRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Paramètres (cachés par défaut)
   const [slippage, setSlippage] = useState(slippageConfig.BASE_SLIPPAGE_BPS / 100); // Utiliser config dynamique
@@ -113,6 +139,58 @@ export function SimpleSwapCard() {
   // Token data
   const inputTokenData = useTokenData(inputToken.mint);
   const outputTokenData = useTokenData(outputToken.mint);
+  
+  // Charger l'historique des transactions depuis localStorage
+  useEffect(() => {
+    if (publicKey) {
+      const storageKey = `swapback_recent_txs_${publicKey.toString()}`;
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored) as RecentTransaction[];
+          setRecentTxs(parsed.slice(0, 5));
+        } catch (e) {
+          console.warn("Failed to parse recent txs:", e);
+        }
+      }
+    }
+  }, [publicKey]);
+  
+  // Sauvegarder une nouvelle transaction dans l'historique
+  const saveTransaction = useCallback((tx: RecentTransaction) => {
+    if (!publicKey) return;
+    
+    setRecentTxs(prev => {
+      const updated = [tx, ...prev].slice(0, 5);
+      const storageKey = `swapback_recent_txs_${publicKey.toString()}`;
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+      return updated;
+    });
+  }, [publicKey]);
+  
+  // Rafraîchissement automatique des prix USD toutes les 10 secondes
+  useEffect(() => {
+    // Clear previous interval
+    if (priceRefreshIntervalRef.current) {
+      clearInterval(priceRefreshIntervalRef.current);
+    }
+    
+    // Rafraîchir les prix toutes les 10 secondes pendant qu'on a un montant
+    if (inputAmount && parseFloat(inputAmount) > 0) {
+      priceRefreshIntervalRef.current = setInterval(() => {
+        // Les hooks useTokenData vont automatiquement rafraîchir
+        // On force un re-render léger en mettant à jour un timestamp
+        inputTokenData.refetch?.();
+        outputTokenData.refetch?.();
+      }, 10000);
+    }
+    
+    return () => {
+      if (priceRefreshIntervalRef.current) {
+        clearInterval(priceRefreshIntervalRef.current);
+      }
+    };
+  }, [inputAmount, inputTokenData, outputTokenData]);
 
   // Calculer le montant en unités de base
   const amountInBaseUnits = useMemo(() => {
@@ -193,7 +271,7 @@ export function SimpleSwapCard() {
     setQuote(null);
   }, [inputToken, outputToken]);
 
-  // Exécuter le swap via ROUTES NATIVES
+  // Exécuter le swap via ROUTES NATIVES avec modal de statut style Jupiter
   const handleSwap = async () => {
     if (!connected || !publicKey) {
       toast.error("Connectez votre wallet pour swapper");
@@ -205,10 +283,22 @@ export function SimpleSwapCard() {
       return;
     }
 
+    // Ouvrir le modal et commencer la séquence
+    setTxModalOpen(true);
+    setTxStatus('preparing');
+    setTxSignature(null);
+    setTxErrorMessage(undefined);
+    setOutputAmountForModal(quote.outputAmountFormatted.toLocaleString(undefined, { maximumFractionDigits: 6 }));
     setSwapping(true);
-    const toastId = toast.loading("Swap via routes natives SwapBack...");
     
     try {
+      // Étape 1: Préparation
+      setTxStatus('preparing');
+      await new Promise(resolve => setTimeout(resolve, 500)); // Brief visual feedback
+      
+      // Étape 2: Signature du wallet
+      setTxStatus('signing');
+      
       const result = await executeSwap(
         {
           inputMint: new PublicKey(inputToken.mint),
@@ -219,25 +309,35 @@ export function SimpleSwapCard() {
         },
         0 // userBoostBP - could be fetched from user's lock status
       );
+      
+      // Étape 3: Transaction envoyée
+      setTxStatus('sending');
 
-      if (result) {
-        const outputFormatted = result.outputAmount / Math.pow(10, outputToken.decimals);
-        const rebateFormatted = result.rebateAmount / Math.pow(10, outputToken.decimals);
+      if (result && result.signature) {
+        setTxSignature(result.signature);
         
-        toast.success(
-          <div className="flex flex-col">
-            <span>✅ Swap réussi via {result.venues.join(", ")}!</span>
-            <span className="text-sm opacity-80">
-              {outputFormatted.toLocaleString()} {outputToken.symbol} reçus
-            </span>
-            {rebateFormatted > 0 && (
-              <span className="text-emerald-400 text-sm">
-                +{rebateFormatted.toFixed(4)} rebate NPI 💰
-              </span>
-            )}
-          </div>,
-          { id: toastId, duration: 5000 }
-        );
+        // Étape 4: Confirmation
+        setTxStatus('confirming');
+        
+        const outputFormatted = result.outputAmount / Math.pow(10, outputToken.decimals);
+        setOutputAmountForModal(outputFormatted.toLocaleString(undefined, { maximumFractionDigits: 6 }));
+        
+        // Attendre un peu pour l'animation
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Étape 5: Succès!
+        setTxStatus('confirmed');
+        
+        // Sauvegarder dans l'historique
+        saveTransaction({
+          signature: result.signature,
+          inputToken: inputToken.symbol,
+          outputToken: outputToken.symbol,
+          inputAmount: inputAmount,
+          outputAmount: outputFormatted.toLocaleString(undefined, { maximumFractionDigits: 6 }),
+          timestamp: Date.now(),
+          status: 'success',
+        });
         
         // Reset form après succès
         setInputAmount("");
@@ -247,17 +347,34 @@ export function SimpleSwapCard() {
         inputTokenData.refetch?.();
         outputTokenData.refetch?.();
       } else {
-        toast.error(swapError || "Erreur lors du swap", { id: toastId });
+        throw new Error(swapError || "Erreur lors du swap");
       }
     } catch (error) {
       console.error("Native swap error:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Erreur lors du swap natif",
-        { id: toastId }
-      );
+      setTxStatus('error');
+      setTxErrorMessage(error instanceof Error ? error.message : "Erreur lors du swap natif");
+      
+      // Sauvegarder l'échec dans l'historique
+      saveTransaction({
+        signature: '',
+        inputToken: inputToken.symbol,
+        outputToken: outputToken.symbol,
+        inputAmount: inputAmount,
+        outputAmount: '0',
+        timestamp: Date.now(),
+        status: 'failed',
+      });
     } finally {
       setSwapping(false);
     }
+  };
+  
+  // Fermer le modal de transaction
+  const handleCloseTxModal = () => {
+    setTxModalOpen(false);
+    setTxStatus('idle');
+    setTxSignature(null);
+    setTxErrorMessage(undefined);
   };
 
   // Sélection token depuis modal
@@ -321,12 +438,23 @@ export function SimpleSwapCard() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-gray-400">Vous payez</span>
                 {inputTokenData.balance !== null && (
-                  <button
-                    onClick={() => setInputAmount(inputTokenData.balance?.toString() || "")}
-                    className="max-btn"
-                  >
-                    MAX: {formatAmount(inputTokenData.balance || 0)}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const half = (inputTokenData.balance || 0) / 2;
+                        setInputAmount(half.toString());
+                      }}
+                      className="half-btn text-xs px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                    >
+                      HALF
+                    </button>
+                    <button
+                      onClick={() => setInputAmount(inputTokenData.balance?.toString() || "")}
+                      className="max-btn"
+                    >
+                      MAX: {formatAmount(inputTokenData.balance || 0)}
+                    </button>
+                  </div>
                 )}
               </div>
               <div className="flex items-center gap-3">
@@ -597,6 +725,90 @@ export function SimpleSwapCard() {
         inputToken={inputToken}
         outputToken={outputToken}
       />
+      
+      {/* Modal de statut de transaction (style Jupiter) */}
+      <TransactionStatusModal
+        isOpen={txModalOpen}
+        status={txStatus}
+        signature={txSignature}
+        inputToken={inputToken}
+        outputToken={outputToken}
+        inputAmount={inputAmount || '0'}
+        outputAmount={outputAmountForModal}
+        inputUsdValue={parseFloat(inputAmount || '0') * inputTokenData.usdPrice}
+        outputUsdValue={parseFloat(outputAmountForModal.replace(/,/g, '') || '0') * outputTokenData.usdPrice}
+        onClose={handleCloseTxModal}
+        errorMessage={txErrorMessage}
+      />
+      
+      {/* Section Historique des 5 dernières transactions */}
+      {recentTxs.length > 0 && (
+        <div className="w-full max-w-md mx-auto mt-4">
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-[#1a1b1f] rounded-xl border border-white/5 hover:border-white/10 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-gray-400" />
+              <span className="text-sm text-gray-300">Transactions récentes</span>
+              <span className="text-xs bg-white/10 text-gray-400 px-2 py-0.5 rounded-full">{recentTxs.length}</span>
+            </div>
+            <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${showHistory ? 'rotate-90' : ''}`} />
+          </button>
+          
+          <AnimatePresence>
+            {showHistory && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="mt-2 space-y-2">
+                  {recentTxs.map((tx, index) => (
+                    <motion.div
+                      key={tx.signature || index}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="flex items-center justify-between p-3 bg-[#1a1b1f] rounded-xl border border-white/5"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-2 h-2 rounded-full ${tx.status === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                        <div>
+                          <div className="flex items-center gap-1 text-sm">
+                            <span className="text-gray-300">{tx.inputAmount} {tx.inputToken}</span>
+                            <span className="text-gray-500">→</span>
+                            <span className="text-white font-medium">{tx.outputAmount} {tx.outputToken}</span>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {new Date(tx.timestamp).toLocaleString('fr-FR', { 
+                              day: '2-digit', 
+                              month: '2-digit', 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                      {tx.signature && (
+                        <a
+                          href={`https://solscan.io/tx/${tx.signature}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-2 rounded-lg hover:bg-white/5 transition-colors"
+                        >
+                          <ExternalLink className="w-4 h-4 text-gray-400 hover:text-white" />
+                        </a>
+                      )}
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
     </>
   );
 }
