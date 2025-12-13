@@ -293,13 +293,14 @@ export function SimpleSwapCard() {
     
     try {
       // Étape 1: Préparation
-      setTxStatus('preparing');
-      await new Promise(resolve => setTimeout(resolve, 500)); // Brief visual feedback
+      await new Promise(resolve => setTimeout(resolve, 300)); // Brief visual feedback
       
-      // Étape 2: Signature du wallet
+      // Étape 2: Signature du wallet - passe à 'signing' juste avant d'appeler executeSwap
       setTxStatus('signing');
       
-      const result = await executeSwap(
+      // Note: executeSwap inclut la signature wallet + l'envoi + la confirmation
+      // On passe par un wrapper pour mettre à jour le statut dès que possible
+      const swapPromise = executeSwap(
         {
           inputMint: new PublicKey(inputToken.mint),
           outputMint: new PublicKey(outputToken.mint),
@@ -310,22 +311,22 @@ export function SimpleSwapCard() {
         0 // userBoostBP - could be fetched from user's lock status
       );
       
-      // Étape 3: Transaction envoyée
-      setTxStatus('sending');
-
+      // Attendre le résultat
+      const result = await swapPromise;
+      
+      // Si on arrive ici, la signature a été faite et la tx envoyée
       if (result && result.signature) {
+        // Étape 3: Transaction envoyée - mise à jour immédiate
         setTxSignature(result.signature);
-        
-        // Étape 4: Confirmation
         setTxStatus('confirming');
         
         const outputFormatted = result.outputAmount / Math.pow(10, outputToken.decimals);
         setOutputAmountForModal(outputFormatted.toLocaleString(undefined, { maximumFractionDigits: 6 }));
         
-        // Attendre un peu pour l'animation
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Courte pause pour UX
+        await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Étape 5: Succès!
+        // Étape 4: Succès!
         setTxStatus('confirmed');
         
         // Sauvegarder dans l'historique
@@ -352,18 +353,21 @@ export function SimpleSwapCard() {
     } catch (error) {
       console.error("Native swap error:", error);
       setTxStatus('error');
-      setTxErrorMessage(error instanceof Error ? error.message : "Erreur lors du swap natif");
+      const errorMsg = error instanceof Error ? error.message : "Erreur lors du swap natif";
+      setTxErrorMessage(errorMsg);
       
-      // Sauvegarder l'échec dans l'historique
-      saveTransaction({
-        signature: '',
-        inputToken: inputToken.symbol,
-        outputToken: outputToken.symbol,
-        inputAmount: inputAmount,
-        outputAmount: '0',
-        timestamp: Date.now(),
-        status: 'failed',
-      });
+      // Ne pas sauvegarder dans l'historique si l'utilisateur a annulé
+      if (!errorMsg.toLowerCase().includes('user rejected') && !errorMsg.toLowerCase().includes('cancelled')) {
+        saveTransaction({
+          signature: '',
+          inputToken: inputToken.symbol,
+          outputToken: outputToken.symbol,
+          inputAmount: inputAmount,
+          outputAmount: '0',
+          timestamp: Date.now(),
+          status: 'failed',
+        });
+      }
     } finally {
       setSwapping(false);
     }
@@ -724,6 +728,7 @@ export function SimpleSwapCard() {
         quote={quote}
         inputToken={inputToken}
         outputToken={outputToken}
+        recentTransactions={recentTxs}
       />
       
       {/* Modal de statut de transaction (style Jupiter) */}
@@ -741,74 +746,6 @@ export function SimpleSwapCard() {
         errorMessage={txErrorMessage}
       />
       
-      {/* Section Historique des 5 dernières transactions */}
-      {recentTxs.length > 0 && (
-        <div className="w-full max-w-md mx-auto mt-4">
-          <button
-            onClick={() => setShowHistory(!showHistory)}
-            className="w-full flex items-center justify-between px-4 py-3 bg-[#1a1b1f] rounded-xl border border-white/5 hover:border-white/10 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-gray-400" />
-              <span className="text-sm text-gray-300">Transactions récentes</span>
-              <span className="text-xs bg-white/10 text-gray-400 px-2 py-0.5 rounded-full">{recentTxs.length}</span>
-            </div>
-            <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${showHistory ? 'rotate-90' : ''}`} />
-          </button>
-          
-          <AnimatePresence>
-            {showHistory && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="mt-2 space-y-2">
-                  {recentTxs.map((tx, index) => (
-                    <motion.div
-                      key={tx.signature || index}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      className="flex items-center justify-between p-3 bg-[#1a1b1f] rounded-xl border border-white/5"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-2 h-2 rounded-full ${tx.status === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                        <div>
-                          <div className="flex items-center gap-1 text-sm">
-                            <span className="text-gray-300">{tx.inputAmount} {tx.inputToken}</span>
-                            <span className="text-gray-500">→</span>
-                            <span className="text-white font-medium">{tx.outputAmount} {tx.outputToken}</span>
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {new Date(tx.timestamp).toLocaleString('fr-FR', { 
-                              day: '2-digit', 
-                              month: '2-digit', 
-                              hour: '2-digit', 
-                              minute: '2-digit' 
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                      {tx.signature && (
-                        <a
-                          href={`https://solscan.io/tx/${tx.signature}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 rounded-lg hover:bg-white/5 transition-colors"
-                        >
-                          <ExternalLink className="w-4 h-4 text-gray-400 hover:text-white" />
-                        </a>
-                      )}
-                    </motion.div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
     </>
   );
 }

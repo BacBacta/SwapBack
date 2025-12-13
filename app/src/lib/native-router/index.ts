@@ -20,6 +20,7 @@ import {
   TransactionMessage,
   SystemProgram,
   SYSVAR_CLOCK_PUBKEY,
+  ComputeBudgetProgram,
 } from "@solana/web3.js";
 import { 
   TOKEN_PROGRAM_ID, 
@@ -78,6 +79,13 @@ export const JITO_TIP_ACCOUNTS = [
   new PublicKey("3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT"),
 ];
 export const DEFAULT_JITO_TIP_LAMPORTS = 10_000; // 0.00001 SOL
+
+// Priority Fee Configuration (for faster transactions)
+export const PRIORITY_FEE_CONFIG = {
+  DEFAULT_MICRO_LAMPORTS: 100_000,   // 0.0001 SOL per CU - good balance speed/cost
+  HIGH_MICRO_LAMPORTS: 500_000,      // 0.0005 SOL per CU - faster during congestion
+  COMPUTE_UNITS: 400_000,            // Max compute units for swap transactions
+};
 
 // Slippage Configuration (matches on-chain SlippageConfig)
 export const SLIPPAGE_CONFIG = {
@@ -1791,6 +1799,24 @@ export class NativeRouterService {
     const accounts = await this.deriveSwapAccounts(userPublicKey, inputMint, outputMint);
     
     const instructions: TransactionInstruction[] = [];
+    
+    // === PRIORITY FEES pour des transactions plus rapides ===
+    // Ajouter au début de la transaction pour être traité en priorité
+    instructions.push(
+      ComputeBudgetProgram.setComputeUnitLimit({ 
+        units: PRIORITY_FEE_CONFIG.COMPUTE_UNITS 
+      })
+    );
+    instructions.push(
+      ComputeBudgetProgram.setComputeUnitPrice({ 
+        microLamports: PRIORITY_FEE_CONFIG.DEFAULT_MICRO_LAMPORTS 
+      })
+    );
+    
+    logger.debug("NativeRouter", "Added priority fees", {
+      computeUnits: PRIORITY_FEE_CONFIG.COMPUTE_UNITS,
+      microLamports: PRIORITY_FEE_CONFIG.DEFAULT_MICRO_LAMPORTS,
+    });
     
     // Vérifier si les ATAs utilisateurs existent, sinon les créer
     const ataChecks = await Promise.all([

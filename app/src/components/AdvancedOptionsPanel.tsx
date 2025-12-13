@@ -41,6 +41,17 @@ interface QuoteResult {
   route: string[];
 }
 
+// Interface pour l'historique des transactions
+interface RecentTransaction {
+  signature: string;
+  inputToken: string;
+  outputToken: string;
+  inputAmount: string;
+  outputAmount: string;
+  timestamp: number;
+  status: 'success' | 'failed';
+}
+
 interface AdvancedOptionsPanelProps {
   isOpen: boolean;
   onClose: () => void;
@@ -51,6 +62,7 @@ interface AdvancedOptionsPanelProps {
   quote: QuoteResult | null;
   inputToken: TokenInfo;
   outputToken: TokenInfo;
+  recentTransactions?: RecentTransaction[];
 }
 
 type TabId = "routing" | "protection" | "history";
@@ -67,6 +79,7 @@ export function AdvancedOptionsPanel({
   quote,
   inputToken,
   outputToken,
+  recentTransactions = [],
 }: AdvancedOptionsPanelProps) {
   const [activeTab, setActiveTab] = useState<TabId>("routing");
   const [customSlippage, setCustomSlippage] = useState("");
@@ -321,27 +334,80 @@ export function AdvancedOptionsPanel({
 
               {activeTab === "history" && (
                 <div className="space-y-4">
-                  <p className="text-sm text-gray-400">
-                    Vos 5 derniers swaps apparaîtront ici.
-                  </p>
-                  
-                  {/* Placeholder pour l'historique */}
-                  <div className="space-y-3">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="bg-gray-800/50 rounded-xl p-4 animate-pulse">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-gray-700 rounded-full" />
-                            <div>
-                              <div className="w-20 h-4 bg-gray-700 rounded" />
-                              <div className="w-16 h-3 bg-gray-700 rounded mt-1" />
-                            </div>
-                          </div>
-                          <div className="w-16 h-4 bg-gray-700 rounded" />
-                        </div>
+                  {recentTransactions.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Clock className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                      <p className="text-sm text-gray-400">
+                        Aucune transaction récente
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Vos 5 derniers swaps apparaîtront ici
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-sm text-gray-400 mb-2">
+                        <span>5 dernières transactions</span>
+                        <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full">
+                          {recentTransactions.length}
+                        </span>
                       </div>
-                    ))}
-                  </div>
+                      {recentTransactions.map((tx, index) => (
+                        <div
+                          key={tx.signature || index}
+                          className="bg-gray-800/50 rounded-xl p-4 hover:bg-gray-800 transition-colors"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-2.5 h-2.5 rounded-full ${tx.status === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                              <div>
+                                <div className="flex items-center gap-1.5 text-sm">
+                                  <span className="text-gray-300">{tx.inputAmount}</span>
+                                  <span className="text-gray-500">{tx.inputToken}</span>
+                                  <ChevronRight className="w-3 h-3 text-gray-500" />
+                                  <span className="text-white font-medium">{tx.outputAmount}</span>
+                                  <span className="text-gray-500">{tx.outputToken}</span>
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {new Date(tx.timestamp).toLocaleString('fr-FR', { 
+                                    day: '2-digit', 
+                                    month: '2-digit',
+                                    year: 'numeric',
+                                    hour: '2-digit', 
+                                    minute: '2-digit' 
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                            {tx.signature && (
+                              <a
+                                href={`https://solscan.io/tx/${tx.signature}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 rounded-lg hover:bg-white/5 transition-colors group"
+                                title="Voir sur Solscan"
+                              >
+                                <svg 
+                                  xmlns="http://www.w3.org/2000/svg" 
+                                  className="w-4 h-4 text-gray-400 group-hover:text-white" 
+                                  viewBox="0 0 24 24" 
+                                  fill="none" 
+                                  stroke="currentColor" 
+                                  strokeWidth="2" 
+                                  strokeLinecap="round" 
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                  <polyline points="15 3 21 3 21 9" />
+                                  <line x1="10" y1="14" x2="21" y2="3" />
+                                </svg>
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
