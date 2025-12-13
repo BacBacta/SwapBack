@@ -33,6 +33,11 @@ import {
   MAX_ORACLE_DIVERGENCE_BPS,
 } from "@/lib/native-router";
 import { 
+  TrueNativeSwap,
+  type TrueNativeRoute,
+  type TrueNativeSwapResult,
+} from "@/lib/native-router/true-native-swap";
+import { 
   isNativeSwapAvailable, 
   hasOracleForPair,
   NATIVE_SWAP_UNAVAILABLE_MESSAGE 
@@ -119,15 +124,22 @@ export function useNativeSwap() {
   const [lastSwapResult, setLastSwapResult] = useState<NativeSwapResult | null>(null);
   const [currentQuote, setCurrentQuote] = useState<NativeSwapQuote | null>(null);
   const [useMevProtection, setUseMevProtection] = useState(false);
+  const [useTrueNativeRouting, setUseTrueNativeRouting] = useState(false);
+  const [trueNativeRoute, setTrueNativeRoute] = useState<TrueNativeRoute | null>(null);
   
   // Vérifier si les swaps natifs sont disponibles
   const nativeSwapEnabled = useMemo(() => {
     return isNativeSwapAvailable();
   }, []);
 
-  // Router natif
+  // Router natif (ancien, utilise Jupiter CPI)
   const nativeRouter = useMemo(() => {
     return getNativeRouter(connection);
+  }, [connection]);
+
+  // Vrai routeur natif (appelle directement les DEX)
+  const trueNativeSwap = useMemo(() => {
+    return new TrueNativeSwap(connection);
   }, [connection]);
 
   /**
@@ -440,6 +452,135 @@ export function useNativeSwap() {
   );
 
   /**
+   * 🔥 Exécuter un swap via le VRAI routage natif (sans Jupiter)
+   * Appelle directement les DEX (Orca, Raydium, Meteora) via le mode Dynamic Plan
+   */
+  const executeTrueNativeSwap = useCallback(
+    async (
+      params: NativeSwapParams,
+      userBoostBps: number = 0
+    ): Promise<NativeSwapResult | null> => {
+      if (!publicKey || !signTransaction) {
+        setError("Veuillez connecter votre wallet");
+        return null;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        logger.info("useNativeSwap", "🔥 Executing TRUE native swap (no Jupiter)", {
+          inputMint: params.inputMint.toString().slice(0, 8),
+          outputMint: params.outputMint.toString().slice(0, 8),
+          amount: params.amount,
+        });
+
+        params.onProgress?.('preparing');
+
+        // Calculer le min output avec slippage
+        const slippageBps = params.slippageBps ?? SLIPPAGE_CONFIG.BASE_SLIPPAGE_BPS;
+        
+        // Obtenir la meilleure route native
+        const route = await trueNativeSwap.getBestNativeRoute({
+          inputMint: params.inputMint,
+          outputMint: params.outputMint,
+          amountIn: params.amount,
+          minAmountOut: 0, // Sera calculé après
+          slippageBps,
+          userPublicKey: publicKey,
+        });
+
+        if (!route) {
+          throw new Error(
+            "Aucune venue native disponible. Cette paire n'est pas supportée " +
+            "par les DEX natifs (Orca, Raydium, Meteora). Utilisez Jupiter."
+          );
+        }
+
+        setTrueNativeRoute(route);
+
+        const minAmountOut = Math.floor(route.outputAmount * (10000 - slippageBps) / 10000);
+
+        logger.info("useNativeSwap", "True native route found", {
+          venue: route.venue,
+          outputAmount: route.outputAmount,
+          minAmountOut,
+          priceImpactBps: route.priceImpactBps,
+        });
+
+        // Construire la transaction
+        const result = await trueNativeSwap.buildNativeSwapTransaction({
+          inputMint: params.inputMint,
+          outputMint: params.outputMint,
+          amountIn: params.amount,
+          minAmountOut,
+          slippageBps,
+          userPublicKey: publicKey,
+        });
+
+        if (!result) {
+          throw new Error("Impossible de construire la transaction native");
+        }
+
+        // Signer
+        params.onProgress?.('signing');
+        const signedTx = await signTransaction(result.transaction);
+
+        // Envoyer
+        params.onProgress?.('sending');
+        const signature = await connection.sendTransaction(signedTx, {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+        });
+
+        logger.info("useNativeSwap", "True native tx sent", { signature });
+
+        // Confirmer
+        params.onProgress?.('confirming');
+        const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+
+        if (confirmation.value.err) {
+          throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+        }
+
+        // Succès !
+        params.onProgress?.('confirmed');
+
+        const swapResult: NativeSwapResult = {
+          signature,
+          inputAmount: params.amount,
+          outputAmount: route.outputAmount,
+          inputMint: params.inputMint.toString(),
+          outputMint: params.outputMint.toString(),
+          venues: [route.venue],
+          rebateAmount: calculateBoostedRebate(route.outputAmount * 0.001, userBoostBps).boostedRebate,
+          boostApplied: userBoostBps,
+          npiGenerated: route.outputAmount * 0.001,
+          success: true,
+        };
+
+        setLastSwapResult(swapResult);
+
+        logger.info("useNativeSwap", "🔥 TRUE native swap completed!", {
+          signature,
+          venue: route.venue,
+          outputAmount: route.outputAmount,
+        });
+
+        return swapResult;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Erreur lors du swap natif";
+        logger.error("useNativeSwap", "True native swap error", { error: message });
+        setError(message);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [publicKey, signTransaction, connection, trueNativeSwap, calculateBoostedRebate]
+  );
+
+  /**
    * Comparer les routes natives disponibles
    */
   const compareRoutes = useCallback(
@@ -605,6 +746,12 @@ export function useNativeSwap() {
     getSlippageConfig,
     validateOraclePrices,
     isPairSupported,
+    
+    // 🔥 Vrai routage natif (sans Jupiter)
+    useTrueNativeRouting,
+    setUseTrueNativeRouting,
+    executeTrueNativeSwap,
+    trueNativeRoute,
     
     // Configuration
     slippageConfig: SLIPPAGE_CONFIG,

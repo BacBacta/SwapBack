@@ -104,6 +104,11 @@ export function SimpleSwapCard() {
     setUseMevProtection,
     slippageConfig,
     minVenueScore,
+    // 🔥 Vrai routage natif
+    useTrueNativeRouting,
+    setUseTrueNativeRouting,
+    executeTrueNativeSwap,
+    trueNativeRoute,
   } = useNativeSwap();
   
   // Hook amélioré pour slippage EMA, simulation, cache
@@ -151,6 +156,7 @@ export function SimpleSwapCard() {
   // Paramètres (cachés par défaut)
   const [slippage, setSlippage] = useState(slippageConfig.BASE_SLIPPAGE_BPS / 100); // Utiliser config dynamique
   const [mevProtection, setMevProtection] = useState(useMevProtection);
+  const [trueNativeMode, setTrueNativeMode] = useState(useTrueNativeRouting);
 
   // Token data
   const inputTokenData = useTokenData(inputToken.mint);
@@ -316,19 +322,26 @@ export function SimpleSwapCard() {
       // Étape 1: Préparation (brief)
       await new Promise(resolve => setTimeout(resolve, 200));
       
-      // Exécuter le swap avec callback de progression
-      console.log("[SimpleSwapCard] Executing swap...");
-      const result = await executeSwap(
-        {
-          inputMint: new PublicKey(inputToken.mint),
-          outputMint: new PublicKey(outputToken.mint),
-          amount: amountInBaseUnits,
-          slippageBps: Math.round(slippage * 100),
-          useMevProtection: mevProtection,
-          onProgress, // Callback pour mise à jour du statut en temps réel
-        },
-        0 // userBoostBP - could be fetched from user's lock status
-      );
+      // Choisir entre le vrai routage natif et le routage via Jupiter CPI
+      let result;
+      const swapParams = {
+        inputMint: new PublicKey(inputToken.mint),
+        outputMint: new PublicKey(outputToken.mint),
+        amount: amountInBaseUnits,
+        slippageBps: Math.round(slippage * 100),
+        useMevProtection: mevProtection,
+        onProgress, // Callback pour mise à jour du statut en temps réel
+      };
+      
+      if (trueNativeMode) {
+        // 🔥 VRAI routage natif - appelle directement les DEX
+        console.log("[SimpleSwapCard] Using TRUE NATIVE routing (no Jupiter)...");
+        result = await executeTrueNativeSwap(swapParams, 0);
+      } else {
+        // Routage standard via Jupiter CPI
+        console.log("[SimpleSwapCard] Executing swap via Jupiter CPI...");
+        result = await executeSwap(swapParams, 0);
+      }
       
       console.log("[SimpleSwapCard] Swap result:", result);
       
@@ -794,6 +807,8 @@ export function SimpleSwapCard() {
         onSlippageChange={setSlippage}
         mevProtection={mevProtection}
         onMevProtectionChange={setMevProtection}
+        trueNativeMode={trueNativeMode}
+        onTrueNativeModeChange={setTrueNativeMode}
         quote={quote}
         inputToken={inputToken}
         outputToken={outputToken}
