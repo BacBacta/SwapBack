@@ -348,6 +348,7 @@ export function useNativeSwap() {
 
         // Notifier: on va demander la signature
         params.onProgress?.('signing');
+        console.log("[useNativeSwap] Calling nativeRouter.executeSwap...");
 
         // 3. Exécuter via le router natif (avec MEV protection si activée)
         const result = await nativeRouter.executeSwap(
@@ -363,12 +364,16 @@ export function useNativeSwap() {
           },
           async (tx: VersionedTransaction) => {
             // L'utilisateur est en train de signer dans son wallet
+            console.log("[useNativeSwap] Waiting for wallet signature...");
             const signed = await signTransaction(tx);
+            console.log("[useNativeSwap] Transaction signed, sending...");
             // Une fois signé, on passe à l'envoi
             params.onProgress?.('sending');
             return signed;
           }
         );
+
+        console.log("[useNativeSwap] executeSwap returned:", result);
 
         // Notifier: confirmation en cours
         params.onProgress?.('confirming');
