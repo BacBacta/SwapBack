@@ -433,16 +433,18 @@ export function SimpleSwapCard() {
             <div className="flex items-center gap-2">
               {/* Mode Simple/Avancé */}
               <SwapModeSelector
+                mode={swapMode}
+                onModeChange={(newMode) => setSwapMode(newMode)}
                 config={{
                   mode: swapMode,
-                  showPriceImpact: true,
-                  showRoute: swapMode === 'advanced',
-                  showSlippageDetails: swapMode === 'advanced',
-                  showRebateDetails: true,
-                  autoRefreshQuote: true,
+                  showRouteDetails: swapMode === 'advanced',
+                  showSlippageBreakdown: swapMode === 'advanced',
+                  showSimulation: swapMode === 'advanced',
+                  showFiatEquivalent: true,
+                  showPerformanceMetrics: swapMode === 'advanced',
+                  showRouteChart: swapMode === 'advanced',
                 }}
-                onChange={(config) => setSwapMode(config.mode)}
-                compact
+                onConfigChange={(config) => setSwapMode(config.mode)}
               />
               <button
                 onClick={() => setShowAdvanced(true)}
