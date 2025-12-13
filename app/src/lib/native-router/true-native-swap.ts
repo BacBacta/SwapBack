@@ -169,9 +169,15 @@ export class TrueNativeSwap {
         const latencyMs = Date.now() - startTime;
 
         if (quote) {
+          const venueProgramId = DEX_PROGRAM_IDS[venue];
+          if (!venueProgramId) {
+            logger.warn("TrueNativeSwap", `Unknown venue program ID for ${venue}`);
+            continue;
+          }
+          
           quotes.push({
             venue,
-            venueProgramId: DEX_PROGRAM_IDS[venue],
+            venueProgramId,
             inputAmount: amountIn,
             outputAmount: quote.outputAmount,
             priceImpactBps: quote.priceImpactBps,
@@ -432,9 +438,15 @@ export class TrueNativeSwap {
     const planId = new Uint8Array(32);
     crypto.getRandomValues(planId);
 
+    // Vérifier que la venue est supportée
+    const venueProgramId = DEX_PROGRAM_IDS[params.venue];
+    if (!venueProgramId) {
+      throw new Error(`Venue non supportée: ${params.venue}. Venues supportées: ${Object.keys(DEX_PROGRAM_IDS).join(', ')}`);
+    }
+
     // Venue avec 100% du poids
     const venueWeight = {
-      venue: DEX_PROGRAM_IDS[params.venue],
+      venue: venueProgramId,
       weight: 10000, // 100%
     };
 
