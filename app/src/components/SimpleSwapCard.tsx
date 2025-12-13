@@ -18,7 +18,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { TokenSelectorModal } from "./TokenSelectorModal";
 import { AdvancedOptionsPanel } from "./AdvancedOptionsPanel";
 import { TransactionStatusModal, TransactionStatus } from "./TransactionStatusModal";
-import { SwapModeSelector, RouteVisualization, FiatEquivalent } from "./swap";
+import { SwapModeSelector, RouteVisualization, FiatEquivalent, SIMPLE_MODE_CONFIG, ADVANCED_MODE_CONFIG, type SwapModeConfig } from "./swap";
 import { useTokenData } from "../hooks/useTokenData";
 import { useNativeSwap } from "../hooks/useNativeSwap";
 import { useEnhancedNativeSwap } from "../hooks/useEnhancedNativeSwap";
@@ -113,6 +113,9 @@ export function SimpleSwapCard() {
     slippageEstimator,
     getAnalytics,
   } = useEnhancedNativeSwap();
+  
+  // État pour la config du mode (détails, slippage, simulation, etc.)
+  const [modeConfig, setModeConfig] = useState<SwapModeConfig>(SIMPLE_MODE_CONFIG);
   
   // État pour afficher la visualisation des routes
   const [showRouteViz, setShowRouteViz] = useState(false);
@@ -434,17 +437,17 @@ export function SimpleSwapCard() {
               {/* Mode Simple/Avancé */}
               <SwapModeSelector
                 mode={swapMode}
-                onModeChange={(newMode) => setSwapMode(newMode)}
-                config={{
-                  mode: swapMode,
-                  showRouteDetails: swapMode === 'advanced',
-                  showSlippageBreakdown: swapMode === 'advanced',
-                  showSimulation: swapMode === 'advanced',
-                  showFiatEquivalent: true,
-                  showPerformanceMetrics: swapMode === 'advanced',
-                  showRouteChart: swapMode === 'advanced',
+                onModeChange={(newMode) => {
+                  setSwapMode(newMode);
+                  setModeConfig(newMode === 'simple' ? SIMPLE_MODE_CONFIG : ADVANCED_MODE_CONFIG);
                 }}
-                onConfigChange={(config) => setSwapMode(config.mode)}
+                config={modeConfig}
+                onConfigChange={(newConfig) => {
+                  setModeConfig(newConfig);
+                  if (newConfig.mode !== swapMode) {
+                    setSwapMode(newConfig.mode);
+                  }
+                }}
               />
               <button
                 onClick={() => setShowAdvanced(true)}
