@@ -1,13 +1,17 @@
 "use client";
 
 /**
- * TransactionStatusModal - Modal de transaction style Jupiter
+ * TransactionStatusModal - Modal style Jupiter AG
  * 
- * Design minimaliste avec spinner central et animations fluides
+ * Design ultra-minimaliste:
+ * - Spinner central pendant le chargement
+ * - Icône de succès/erreur
+ * - Texte minimal
+ * - Lien explorateur
  */
 
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Check, X, ExternalLink } from "lucide-react";
+import { Check, X, ExternalLink } from "lucide-react";
 
 export type TransactionStatus = 'idle' | 'preparing' | 'signing' | 'sending' | 'confirming' | 'confirmed' | 'error';
 
@@ -33,8 +37,6 @@ export function TransactionStatusModal({
   outputToken,
   inputAmount,
   outputAmount,
-  inputUsdValue,
-  outputUsdValue,
   onClose,
   errorMessage,
 }: TransactionStatusModalProps) {
@@ -47,17 +49,15 @@ export function TransactionStatusModal({
   const getStatusText = () => {
     switch (status) {
       case 'preparing':
-        return 'Preparing transaction...';
       case 'signing':
-        return 'Waiting for wallet approval...';
+        return 'Confirm in wallet';
       case 'sending':
-        return 'Sending transaction...';
       case 'confirming':
-        return 'Confirming...';
+        return 'Processing...';
       case 'confirmed':
-        return 'Swap successful!';
+        return 'Success';
       case 'error':
-        return 'Transaction failed';
+        return 'Failed';
       default:
         return '';
     }
@@ -72,201 +72,156 @@ export function TransactionStatusModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50"
             onClick={isSuccess || isError ? onClose : undefined}
           />
 
-          {/* Modal - Style Jupiter */}
+          {/* Modal */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.15 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-[380px] px-4"
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50"
           >
-            <div className="bg-[#191B1F] rounded-2xl overflow-hidden shadow-xl border border-[#2d2f36]">
-              {/* Header */}
-              <div className="flex items-center justify-between p-4 border-b border-[#2d2f36]">
-                <span className="text-white font-medium">
-                  {isSuccess ? 'Transaction Submitted' : isError ? 'Error' : 'Confirm Swap'}
-                </span>
-                {(isSuccess || isError) && (
-                  <button
-                    onClick={onClose}
-                    className="text-gray-400 hover:text-white transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                )}
-              </div>
-
-              {/* Content */}
-              <div className="p-6">
-                {/* Swap visualization */}
-                <div className="flex items-center justify-center gap-3 mb-6">
-                  {/* Input token */}
-                  <div className="flex flex-col items-center">
-                    <div className="relative">
-                      {inputToken.logoURI ? (
-                        <img 
-                          src={inputToken.logoURI} 
-                          alt={inputToken.symbol} 
-                          className="w-12 h-12 rounded-full"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center text-white font-medium">
-                          {inputToken.symbol.charAt(0)}
-                        </div>
-                      )}
-                    </div>
-                    <span className="text-white font-medium mt-2">{inputAmount}</span>
-                    <span className="text-gray-400 text-sm">{inputToken.symbol}</span>
-                  </div>
-
-                  {/* Arrow with loader */}
-                  <div className="flex items-center justify-center w-16">
-                    {isLoading ? (
-                      <div className="relative">
-                        {/* Spinning arc */}
-                        <svg className="w-8 h-8 animate-spin" viewBox="0 0 24 24">
-                          <circle
-                            className="opacity-20"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="#6366f1"
-                            strokeWidth="3"
-                            fill="none"
-                          />
-                          <path
-                            className="opacity-80"
-                            d="M12 2a10 10 0 0 1 10 10"
-                            stroke="#6366f1"
-                            strokeWidth="3"
-                            strokeLinecap="round"
-                            fill="none"
-                          />
-                        </svg>
-                      </div>
-                    ) : isSuccess ? (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center"
-                      >
-                        <Check className="w-5 h-5 text-white" />
-                      </motion.div>
-                    ) : isError ? (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center"
-                      >
-                        <X className="w-5 h-5 text-white" />
-                      </motion.div>
-                    ) : (
-                      <div className="text-gray-500">→</div>
-                    )}
-                  </div>
-
-                  {/* Output token */}
-                  <div className="flex flex-col items-center">
-                    <div className="relative">
+            <div className="bg-[#131318] rounded-2xl p-8 min-w-[320px] max-w-[360px] text-center">
+              
+              {/* Status Icon */}
+              <div className="flex justify-center mb-6">
+                {isLoading ? (
+                  <div className="relative w-20 h-20">
+                    {/* Outer spinning ring */}
+                    <svg className="w-20 h-20 animate-spin" viewBox="0 0 80 80">
+                      <circle
+                        cx="40"
+                        cy="40"
+                        r="36"
+                        stroke="rgba(99, 102, 241, 0.15)"
+                        strokeWidth="4"
+                        fill="none"
+                      />
+                      <path
+                        d="M40 4 A36 36 0 0 1 76 40"
+                        stroke="#6366f1"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        fill="none"
+                      />
+                    </svg>
+                    {/* Token icon in center */}
+                    <div className="absolute inset-0 flex items-center justify-center">
                       {outputToken.logoURI ? (
                         <img 
                           src={outputToken.logoURI} 
-                          alt={outputToken.symbol} 
-                          className="w-12 h-12 rounded-full"
+                          alt="" 
+                          className="w-8 h-8 rounded-full"
                         />
                       ) : (
-                        <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center text-white font-medium">
+                        <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs text-white font-medium">
                           {outputToken.symbol.charAt(0)}
                         </div>
                       )}
-                      {/* Badge de succès sur le token output */}
-                      {isSuccess && (
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center border-2 border-[#191B1F]"
-                        >
-                          <Check className="w-3 h-3 text-white" />
-                        </motion.div>
-                      )}
                     </div>
-                    <span className={`font-medium mt-2 ${isSuccess ? 'text-emerald-400 text-lg' : 'text-white'}`}>
-                      {isSuccess ? `+${outputAmount}` : outputAmount}
-                    </span>
-                    <span className="text-gray-400 text-sm">{outputToken.symbol}</span>
-                    {outputUsdValue !== undefined && outputUsdValue > 0 && (
-                      <span className="text-gray-500 text-xs mt-0.5">
-                        ≈ ${outputUsdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    )}
                   </div>
-                </div>
-
-                {/* Montant reçu mis en valeur pour le succès */}
-                {isSuccess && (
+                ) : isSuccess ? (
                   <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mb-4 text-center"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", duration: 0.5 }}
+                    className="w-20 h-20 rounded-full bg-emerald-500/20 flex items-center justify-center"
                   >
-                    <p className="text-sm text-emerald-400 mb-1">Vous avez reçu</p>
-                    <p className="text-2xl font-bold text-white">
-                      {outputAmount} <span className="text-emerald-400">{outputToken.symbol}</span>
-                    </p>
-                    {outputUsdValue !== undefined && outputUsdValue > 0 && (
-                      <p className="text-sm text-gray-400 mt-1">
-                        ≈ ${outputUsdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
-                      </p>
-                    )}
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.1, type: "spring" }}
+                      className="w-14 h-14 rounded-full bg-emerald-500 flex items-center justify-center"
+                    >
+                      <Check className="w-8 h-8 text-white" strokeWidth={3} />
+                    </motion.div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", duration: 0.5 }}
+                    className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center"
+                  >
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.1, type: "spring" }}
+                      className="w-14 h-14 rounded-full bg-red-500 flex items-center justify-center"
+                    >
+                      <X className="w-8 h-8 text-white" strokeWidth={3} />
+                    </motion.div>
                   </motion.div>
                 )}
-
-                {/* Status text */}
-                <div className="text-center mb-4">
-                  <p className={`text-sm ${isError ? 'text-red-400' : isSuccess ? 'text-emerald-400' : 'text-gray-400'}`}>
-                    {getStatusText()}
-                  </p>
-                  {isError && errorMessage && (
-                    <p className="text-xs text-red-400/70 mt-1 max-w-[280px] mx-auto break-words">
-                      {errorMessage}
-                    </p>
-                  )}
-                </div>
-
-                {/* Explorer link for success */}
-                {isSuccess && signature && (
-                  <a
-                    href={`https://solscan.io/tx/${signature}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 text-sm text-[#6366f1] hover:text-[#818cf8] transition-colors mb-4"
-                  >
-                    <span>View on Solscan</span>
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                )}
-
-                {/* Close button */}
-                {(isSuccess || isError) && (
-                  <button
-                    onClick={onClose}
-                    className="w-full py-3 rounded-xl font-medium transition-all bg-[#6366f1] hover:bg-[#5558e3] text-white"
-                  >
-                    Close
-                  </button>
-                )}
-
-                {/* Cancel hint during loading */}
-                {isLoading && status === 'signing' && (
-                  <p className="text-center text-xs text-gray-500 mt-4">
-                    Check your wallet to confirm the transaction
-                  </p>
-                )}
               </div>
+
+              {/* Status Text */}
+              <h3 className={`text-xl font-semibold mb-2 ${
+                isSuccess ? 'text-emerald-400' : isError ? 'text-red-400' : 'text-white'
+              }`}>
+                {getStatusText()}
+              </h3>
+
+              {/* Swap Summary - Only show on success */}
+              {isSuccess && (
+                <motion.p
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-gray-400 text-sm mb-4"
+                >
+                  {inputAmount} {inputToken.symbol} → {outputAmount} {outputToken.symbol}
+                </motion.p>
+              )}
+
+              {/* Error message */}
+              {isError && errorMessage && (
+                <p className="text-gray-500 text-sm mb-4 max-w-[280px] mx-auto">
+                  {errorMessage.length > 100 ? errorMessage.slice(0, 100) + '...' : errorMessage}
+                </p>
+              )}
+
+              {/* Loading hint */}
+              {isLoading && (
+                <p className="text-gray-500 text-sm">
+                  {status === 'signing' ? 'Check your wallet' : 'Please wait...'}
+                </p>
+              )}
+
+              {/* Explorer Link */}
+              {isSuccess && signature && (
+                <motion.a
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.2 }}
+                  href={`https://solscan.io/tx/${signature}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm text-indigo-400 hover:text-indigo-300 transition-colors mt-2 mb-6"
+                >
+                  View transaction
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </motion.a>
+              )}
+
+              {/* Close Button */}
+              {(isSuccess || isError) && (
+                <motion.button
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  onClick={onClose}
+                  className={`w-full py-3 rounded-xl font-medium transition-all mt-4 ${
+                    isSuccess 
+                      ? 'bg-emerald-500 hover:bg-emerald-600 text-white' 
+                      : 'bg-gray-800 hover:bg-gray-700 text-white'
+                  }`}
+                >
+                  {isSuccess ? 'Done' : 'Close'}
+                </motion.button>
+              )}
             </div>
           </motion.div>
         </>
