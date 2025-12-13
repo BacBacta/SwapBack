@@ -331,6 +331,9 @@ export function SimpleSwapCard() {
       
       // Si on arrive ici, le swap est terminé
       if (result && result.signature) {
+        // Mettre à jour le status à confirmed IMMÉDIATEMENT
+        setTxStatus('confirmed');
+        
         // Mettre à jour la signature immédiatement
         setTxSignature(result.signature);
         
