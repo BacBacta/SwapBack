@@ -69,6 +69,27 @@ const PRIORITY_FEE_MICRO_LAMPORTS = 100_000;
 const COMPUTE_UNITS = 400_000;
 
 // ============================================================================
+// HELPERS
+// ============================================================================
+
+/**
+ * Convertit une string ou PublicKey en PublicKey de manière sécurisée
+ */
+function toPublicKey(value: PublicKey | string): PublicKey {
+  if (typeof value === 'string') {
+    return new PublicKey(value);
+  }
+  if (value instanceof PublicKey) {
+    return value;
+  }
+  // Fallback: essayer de créer depuis l'objet
+  if (value && typeof (value as { toBase58?: () => string }).toBase58 === 'function') {
+    return value as PublicKey;
+  }
+  throw new Error(`Cannot convert to PublicKey: ${JSON.stringify(value)}`);
+}
+
+// ============================================================================
 // TYPES
 // ============================================================================
 
@@ -375,13 +396,17 @@ export class TrueNativeSwap {
   async getBestNativeRoute(
     params: TrueNativeSwapParams
   ): Promise<TrueNativeRoute | null> {
-    const { inputMint, outputMint, amountIn, userPublicKey } = params;
+    // Convertir les mints en PublicKey de manière sécurisée
+    const inputMintPk = toPublicKey(params.inputMint);
+    const outputMintPk = toPublicKey(params.outputMint);
+    const userPk = toPublicKey(params.userPublicKey);
+    const amountIn = params.amountIn;
 
     const quotes = await this.getNativeQuotes(
-      inputMint,
-      outputMint,
+      inputMintPk,
+      outputMintPk,
       amountIn,
-      userPublicKey
+      userPk
     );
 
     if (quotes.length === 0) {
@@ -705,7 +730,12 @@ export class TrueNativeSwap {
   async buildNativeSwapTransaction(
     params: TrueNativeSwapParams
   ): Promise<TrueNativeSwapResult | null> {
-    const { userPublicKey, inputMint, outputMint, amountIn, minAmountOut } = params;
+    // Convertir les mints en PublicKey de manière sécurisée
+    const userPublicKey = toPublicKey(params.userPublicKey);
+    const inputMint = toPublicKey(params.inputMint);
+    const outputMint = toPublicKey(params.outputMint);
+    const amountIn = params.amountIn;
+    const minAmountOut = params.minAmountOut;
 
     logger.info("TrueNativeSwap", "Building true native swap transaction", {
       inputMint: inputMint.toBase58().slice(0, 8),
