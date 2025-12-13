@@ -18,7 +18,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { TokenSelectorModal } from "./TokenSelectorModal";
 import { AdvancedOptionsPanel } from "./AdvancedOptionsPanel";
 import { TransactionStatusModal, TransactionStatus } from "./TransactionStatusModal";
-import { SwapModeSelector, RouteVisualization, FiatEquivalent, SIMPLE_MODE_CONFIG, ADVANCED_MODE_CONFIG, type SwapModeConfig } from "./swap";
+import { SwapModeSelector, RouteVisualization, SingleTokenFiat, SIMPLE_MODE_CONFIG, ADVANCED_MODE_CONFIG, type SwapModeConfig } from "./swap";
 import { useTokenData } from "../hooks/useTokenData";
 import { useNativeSwap } from "../hooks/useNativeSwap";
 import { useEnhancedNativeSwap } from "../hooks/useEnhancedNativeSwap";
@@ -511,9 +511,9 @@ export function SimpleSwapCard() {
                   <ChevronRight className="w-4 h-4 text-gray-400" />
                 </button>
               </div>
-              {/* Valeur USD en temps réel avec FiatEquivalent amélioré */}
+              {/* Valeur USD en temps réel avec SingleTokenFiat */}
               {inputAmount && parseFloat(inputAmount) > 0 && (
-                <FiatEquivalent
+                <SingleTokenFiat
                   tokenSymbol={inputToken.symbol}
                   amount={parseFloat(inputAmount)}
                   compact
@@ -567,9 +567,9 @@ export function SimpleSwapCard() {
                   <ChevronRight className="w-4 h-4 text-gray-400" />
                 </button>
               </div>
-              {/* Valeur USD en temps réel pour l'output avec FiatEquivalent amélioré */}
+              {/* Valeur USD en temps réel pour l'output avec SingleTokenFiat */}
               {quote && quote.outputAmountFormatted > 0 && (
-                <FiatEquivalent
+                <SingleTokenFiat
                   tokenSymbol={outputToken.symbol}
                   amount={quote.outputAmountFormatted}
                   compact

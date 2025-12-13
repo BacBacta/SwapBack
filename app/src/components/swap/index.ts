@@ -46,6 +46,7 @@ export type {
 
 export {
   FiatEquivalent,
+  SingleTokenFiat,
 } from './FiatEquivalent';
 
 export type {
@@ -53,6 +54,7 @@ export type {
   TokenAmount,
   FiatEquivalentProps,
   PriceData,
+  SingleTokenFiatProps,
 } from './FiatEquivalent';
 
 // ============================================================================

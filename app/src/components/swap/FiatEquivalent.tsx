@@ -462,4 +462,105 @@ function formatTimeAgo(timestamp: number): string {
   return `il y a ${hours}h`;
 }
 
+// ============================================================================
+// SINGLE TOKEN FIAT DISPLAY (SIMPLE VERSION)
+// ============================================================================
+
+export interface SingleTokenFiatProps {
+  tokenSymbol: string;
+  amount: number;
+  compact?: boolean;
+  className?: string;
+  currency?: FiatCurrency;
+}
+
+// Mapping symbole -> mint pour les tokens courants
+const SYMBOL_TO_MINT: Record<string, string> = {
+  'SOL': 'So11111111111111111111111111111111111111112',
+  'USDC': 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+  'USDT': 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
+  'BONK': 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
+  'JUP': 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',
+  'RAY': '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R',
+  'ORCA': 'orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE',
+  'BACK': 'BACKbZT8waKnwQZjrJD2qo3ND74z95AdcHBKSqCsaDVr',
+  'PYTH': 'HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3',
+  'W': '85VBFQZC9TZkfaptBWjvUw7YbZjy52A6mjtPGjstQAmQ',
+  'WIF': 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm',
+  'RENDER': 'rndrizKT3MK1iimdxRdWabcF7Zg7AR5T4nud4EkHBof',
+  'JTO': 'jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL',
+};
+
+/**
+ * Simple component to display fiat equivalent for a single token
+ * Used for inline display in swap cards
+ */
+export function SingleTokenFiat({
+  tokenSymbol,
+  amount,
+  compact = true,
+  className = '',
+  currency = 'USD',
+}: SingleTokenFiatProps) {
+  const [fiatValue, setFiatValue] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    const fetchPrice = async () => {
+      setLoading(true);
+      
+      const mint = SYMBOL_TO_MINT[tokenSymbol.toUpperCase()];
+      if (!mint) {
+        setFiatValue(null);
+        setLoading(false);
+        return;
+      }
+      
+      const priceData = await fetchTokenPrice(mint, currency);
+      if (priceData) {
+        setFiatValue(amount * priceData.price);
+      } else {
+        setFiatValue(null);
+      }
+      setLoading(false);
+    };
+    
+    if (amount > 0) {
+      fetchPrice();
+    } else {
+      setFiatValue(null);
+      setLoading(false);
+    }
+  }, [tokenSymbol, amount, currency]);
+  
+  const formatFiat = (value: number | null) => {
+    if (value === null) return '';
+    
+    return new Intl.NumberFormat(CURRENCY_LOCALES[currency], {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  };
+  
+  if (loading) {
+    return (
+      <span className={`text-xs text-gray-500 ${className}`}>
+        <span className="inline-block w-12 h-3 bg-gray-700 rounded animate-pulse" />
+      </span>
+    );
+  }
+  
+  if (fiatValue === null || fiatValue === 0) {
+    return null;
+  }
+  
+  return (
+    <span className={`text-xs text-gray-400 ${className}`}>
+      ≈ {formatFiat(fiatValue)}
+    </span>
+  );
+}
+
 export default FiatEquivalent;
