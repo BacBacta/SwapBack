@@ -18,8 +18,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { TokenSelectorModal } from "./TokenSelectorModal";
 import { AdvancedOptionsPanel } from "./AdvancedOptionsPanel";
 import { TransactionStatusModal, TransactionStatus } from "./TransactionStatusModal";
+import { SwapModeSelector, RouteVisualization, FiatEquivalent } from "./swap";
 import { useTokenData } from "../hooks/useTokenData";
 import { useNativeSwap } from "../hooks/useNativeSwap";
+import { useEnhancedNativeSwap } from "../hooks/useEnhancedNativeSwap";
 import toast from "react-hot-toast";
 
 // Interface pour l'historique des transactions
@@ -103,6 +105,17 @@ export function SimpleSwapCard() {
     slippageConfig,
     minVenueScore,
   } = useNativeSwap();
+  
+  // Hook amélioré pour slippage EMA, simulation, cache
+  const {
+    mode: swapMode,
+    setSwapMode,
+    slippageEstimator,
+    getAnalytics,
+  } = useEnhancedNativeSwap();
+  
+  // État pour afficher la visualisation des routes
+  const [showRouteViz, setShowRouteViz] = useState(false);
 
   // État principal
   const [inputToken, setInputToken] = useState<TokenInfo>(TOKENS.SOL);
@@ -411,19 +424,34 @@ export function SimpleSwapCard() {
         {/* Card principale - Thème simplifié */}
         <div className="card-simple">
           
-          {/* Header */}
+          {/* Header avec mode toggle */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-emerald-400" />
               <span className="font-semibold text-white">Swap</span>
             </div>
-            <button
-              onClick={() => setShowAdvanced(true)}
-              className="p-2 rounded-lg hover:bg-white/5 transition-colors"
-              aria-label="Paramètres avancés"
-            >
-              <Settings className="w-5 h-5 text-gray-400" />
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Mode Simple/Avancé */}
+              <SwapModeSelector
+                config={{
+                  mode: swapMode,
+                  showPriceImpact: true,
+                  showRoute: swapMode === 'advanced',
+                  showSlippageDetails: swapMode === 'advanced',
+                  showRebateDetails: true,
+                  autoRefreshQuote: true,
+                }}
+                onChange={(config) => setSwapMode(config.mode)}
+                compact
+              />
+              <button
+                onClick={() => setShowAdvanced(true)}
+                className="p-2 rounded-lg hover:bg-white/5 transition-colors"
+                aria-label="Paramètres avancés"
+              >
+                <Settings className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
           </div>
 
           {/* Corps */}
@@ -478,11 +506,14 @@ export function SimpleSwapCard() {
                   <ChevronRight className="w-4 h-4 text-gray-400" />
                 </button>
               </div>
-              {/* Valeur USD en temps réel */}
-              {inputAmount && parseFloat(inputAmount) > 0 && inputTokenData.usdPrice > 0 && (
-                <div className="mt-1 text-xs text-gray-500">
-                  ≈ ${(parseFloat(inputAmount) * inputTokenData.usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
-                </div>
+              {/* Valeur USD en temps réel avec FiatEquivalent amélioré */}
+              {inputAmount && parseFloat(inputAmount) > 0 && (
+                <FiatEquivalent
+                  tokenSymbol={inputToken.symbol}
+                  amount={parseFloat(inputAmount)}
+                  compact
+                  className="mt-1"
+                />
               )}
             </div>
 
@@ -531,11 +562,14 @@ export function SimpleSwapCard() {
                   <ChevronRight className="w-4 h-4 text-gray-400" />
                 </button>
               </div>
-              {/* Valeur USD en temps réel pour l'output */}
-              {quote && quote.outputAmountFormatted > 0 && outputTokenData.usdPrice > 0 && (
-                <div className="mt-1 text-xs text-gray-500">
-                  ≈ ${(quote.outputAmountFormatted * outputTokenData.usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
-                </div>
+              {/* Valeur USD en temps réel pour l'output avec FiatEquivalent amélioré */}
+              {quote && quote.outputAmountFormatted > 0 && (
+                <FiatEquivalent
+                  tokenSymbol={outputToken.symbol}
+                  amount={quote.outputAmountFormatted}
+                  compact
+                  className="mt-1"
+                />
               )}
             </div>
 
@@ -571,16 +605,37 @@ export function SimpleSwapCard() {
                     </span>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-1">
-                  {quote.venues.map((venue, i) => (
-                    <span 
-                      key={i}
-                      className="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-medium"
-                    >
-                      ✓ {venue}
-                    </span>
-                  ))}
-                </div>
+                {/* Visualisation des routes améliorée en mode avancé */}
+                {swapMode === 'advanced' ? (
+                  <RouteVisualization
+                    route={{
+                      venues: quote.venues.map((venue, i) => ({
+                        name: venue,
+                        percentage: 100 / quote.venues.length,
+                        outputAmount: quote.outputAmountFormatted / quote.venues.length,
+                        priceImpactBps: quote.priceImpact * 100 / quote.venues.length,
+                      })),
+                      totalOutput: quote.outputAmountFormatted,
+                      jupiterComparison: quote.npiAmount > 0 ? {
+                        swapbackBetter: true,
+                        differencePercent: (quote.npiAmount / quote.outputAmountFormatted) * 100,
+                        jupiterOutput: quote.outputAmountFormatted - quote.npiAmount,
+                      } : undefined,
+                    }}
+                    compact
+                  />
+                ) : (
+                  <div className="flex flex-wrap gap-1">
+                    {quote.venues.map((venue, i) => (
+                      <span 
+                        key={i}
+                        className="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-medium"
+                      >
+                        ✓ {venue}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div className="flex flex-col gap-1 mt-2 text-xs text-gray-500">
                   <div className="flex justify-between">
                     <span>NPI généré:</span>
