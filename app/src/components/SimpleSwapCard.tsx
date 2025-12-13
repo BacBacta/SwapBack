@@ -611,22 +611,32 @@ export function SimpleSwapCard() {
                   )}
                 </div>
                 {/* Visualisation des routes améliorée en mode avancé */}
-                {swapMode === 'advanced' ? (
+                {swapMode === 'advanced' && quote.venues && quote.venues.length > 0 ? (
                   <RouteVisualization
-                    route={{
-                      venues: quote.venues.map((venue, i) => ({
-                        name: venue,
-                        percentage: 100 / quote.venues.length,
-                        outputAmount: quote.outputAmountFormatted / quote.venues.length,
-                        priceImpactBps: quote.priceImpact * 100 / quote.venues.length,
-                      })),
-                      totalOutput: quote.outputAmountFormatted,
-                      jupiterComparison: quote.npiAmount > 0 ? {
-                        swapbackBetter: true,
-                        differencePercent: (quote.npiAmount / quote.outputAmountFormatted) * 100,
-                        jupiterOutput: quote.outputAmountFormatted - quote.npiAmount,
-                      } : undefined,
+                    inputToken={{
+                      symbol: inputToken.symbol,
+                      amount: parseFloat(inputAmount) || 0,
+                      logoURI: inputToken.logoURI,
                     }}
+                    outputToken={{
+                      symbol: outputToken.symbol,
+                      amount: quote.outputAmountFormatted,
+                      logoURI: outputToken.logoURI,
+                    }}
+                    venues={quote.venues.map((venue, i) => ({
+                      venue: venue,
+                      weight: 100 / quote.venues.length,
+                      outputAmount: quote.outputAmountFormatted / quote.venues.length,
+                      priceImpactBps: Math.floor((quote.priceImpact || 0) * 100 / quote.venues.length),
+                      latencyMs: 0,
+                      estimatedNpiBps: 10,
+                    }))}
+                    jupiterBenchmark={quote.npiAmount > 0 ? {
+                      outputAmount: quote.outputAmountFormatted - quote.npiAmount,
+                      priceImpactBps: Math.floor((quote.priceImpact || 0) * 100),
+                    } : undefined}
+                    estimatedRebate={quote.cashbackAmount || 0}
+                    estimatedNpi={quote.npiAmount || 0}
                     compact
                   />
                 ) : (
