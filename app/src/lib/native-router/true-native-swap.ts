@@ -513,7 +513,7 @@ export class TrueNativeSwap {
       programId: ROUTER_PROGRAM_ID,
       keys: [
         { pubkey: planPda, isSigner: false, isWritable: true },
-        { pubkey: userPublicKey, isSigner: true, isWritable: true },
+        { pubkey: safeUser, isSigner: true, isWritable: true },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
       data: argsData,
@@ -643,9 +643,9 @@ export class TrueNativeSwap {
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
-      // DEX accounts (remaining accounts)
+      // DEX accounts (remaining accounts) - normaliser chaque pubkey
       ...route.dexAccounts.accounts.map((pubkey) => ({
-        pubkey,
+        pubkey: toPublicKey(pubkey),
         isSigner: false,
         isWritable: true,
       })),
