@@ -2388,6 +2388,17 @@ export class NativeRouterService {
   
   /**
    * Sérialise les arguments SwapArgs pour l'instruction
+   * DOIT correspondre EXACTEMENT à la structure dans l'IDL:
+   * - amount_in: u64
+   * - min_out: u64
+   * - slippage_tolerance: Option<u16>
+   * - twap_slices: Option<u8>
+   * - use_dynamic_plan: bool
+   * - plan_account: Option<Pubkey>
+   * - use_bundle: bool
+   * - primary_oracle_account: Pubkey
+   * - fallback_oracle_account: Option<Pubkey>
+   * - jupiter_route: Option<JupiterRouteParams>
    */
   private serializeSwapArgs(args: {
     amountIn: BN;
@@ -2397,10 +2408,10 @@ export class NativeRouterService {
     useBundle: boolean;
     primaryOracleAccount: PublicKey;
     venues: { venue: PublicKey; weight: number }[];
-    maxStalenessOverride?: number; // En secondes (10-300)
+    maxStalenessOverride?: number; // Non utilisé - gardé pour compatibilité API
     jupiterCpi?: JupiterCpiData | null; // Données Jupiter CPI pour le swap
   }): Buffer {
-    // Sérialisation manuelle selon le format Anchor
+    // Sérialisation manuelle selon le format Anchor - EXACTEMENT selon l'IDL
     const buffers: Buffer[] = [];
     
     // amount_in: u64
@@ -2467,45 +2478,7 @@ export class NativeRouterService {
       );
     }
     
-    // jupiter_swap_ix_data: Option<Vec<u8>>
-    buffers.push(Buffer.from([0])); // None
-    
-    // liquidity_estimate: Option<u64>
-    buffers.push(Buffer.from([0])); // None
-    
-    // volatility_bps: Option<u16>
-    buffers.push(Buffer.from([0])); // None
-    
-    // min_venue_score: Option<u16>
-    const minScoreBuf = Buffer.alloc(3);
-    minScoreBuf.writeUInt8(1, 0); // Some
-    minScoreBuf.writeUInt16LE(2500, 1); // 25% minimum
-    buffers.push(minScoreBuf);
-    
-    // slippage_per_venue: Option<Vec<...>>
-    buffers.push(Buffer.from([0])); // None
-    
-    // token decimals: Option<u8> x2
-    buffers.push(Buffer.from([0])); // None
-    buffers.push(Buffer.from([0])); // None
-    
-    // max_staleness_override: Option<i64>
-    // Si fourni, permet d'augmenter le seuil de staleness (10-300s)
-    if (args.maxStalenessOverride && args.maxStalenessOverride > 0) {
-      // Clamp entre 10 et 300 secondes côté client aussi
-      const clampedStaleness = Math.max(10, Math.min(300, args.maxStalenessOverride));
-      const stalenessBuf = Buffer.alloc(9);
-      stalenessBuf.writeUInt8(1, 0); // Some
-      // i64 little-endian
-      const bn = new BN(clampedStaleness);
-      bn.toArrayLike(Buffer, "le", 8).copy(stalenessBuf, 1);
-      buffers.push(stalenessBuf);
-    } else {
-      buffers.push(Buffer.from([0])); // None - utiliser défaut (300s)
-    }
-    
-    // jito_bundle: Option<...>
-    buffers.push(Buffer.from([0])); // None
+    // FIN de SwapArgs selon l'IDL - ne pas ajouter de champs supplémentaires!
     
     return Buffer.concat(buffers);
   }
