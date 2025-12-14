@@ -617,6 +617,7 @@ export class TrueNativeSwap {
       useDynamicPlan: true, // <- LA CLÉ !
       useBundle: false,
       planAccount: planPda,
+      primaryOracleAccount: oracleConfig.primary,
       maxStalenessOverride: MAX_STALENESS_SECS,
     });
 
@@ -659,6 +660,31 @@ export class TrueNativeSwap {
 
   /**
    * Sérialise les arguments SwapArgs pour le mode Dynamic Plan
+   * 
+   * DOIT correspondre EXACTEMENT à la structure dans l'IDL déployée:
+   * 
+   * Référence: target/idl/swapback_router.json - SwapArgs (lignes 3293-3420)
+   * 
+   * Champs (dans l'ordre):
+   * 1.  amount_in: u64
+   * 2.  min_out: u64
+   * 3.  slippage_tolerance: Option<u16>
+   * 4.  twap_slices: Option<u8>
+   * 5.  use_dynamic_plan: bool
+   * 6.  plan_account: Option<Pubkey>
+   * 7.  use_bundle: bool
+   * 8.  primary_oracle_account: Pubkey
+   * 9.  fallback_oracle_account: Option<Pubkey>
+   * 10. jupiter_route: Option<JupiterRouteParams>
+   * 11. jupiter_swap_ix_data: Option<Vec<u8>>
+   * 12. liquidity_estimate: Option<u64>
+   * 13. volatility_bps: Option<u16>
+   * 14. min_venue_score: Option<u16>
+   * 15. slippage_per_venue: Option<Vec<VenueSlippage>>
+   * 16. token_a_decimals: Option<u8>
+   * 17. token_b_decimals: Option<u8>
+   * 18. max_staleness_override: Option<i64>
+   * 19. jito_bundle: Option<JitoBundleConfig>
    */
   private serializeSwapArgs(args: {
     amountIn: BN;
@@ -666,58 +692,91 @@ export class TrueNativeSwap {
     useDynamicPlan: boolean;
     useBundle: boolean;
     planAccount: PublicKey;
+    primaryOracleAccount: PublicKey;
     maxStalenessOverride?: number;
+    tokenADecimals?: number;
+    tokenBDecimals?: number;
   }): Buffer {
-    const amountInBuffer = Buffer.alloc(8);
-    args.amountIn.toArrayLike(Buffer, "le", 8).copy(amountInBuffer);
-
-    const minOutBuffer = Buffer.alloc(8);
-    args.minOut.toArrayLike(Buffer, "le", 8).copy(minOutBuffer);
-
-    // Boolean flags
-    const useDynamicPlanFlag = args.useDynamicPlan ? 1 : 0;
-    const useBundleFlag = args.useBundle ? 1 : 0;
-
-    // Plan account (Option<Pubkey>)
-    const planAccountBuffer = Buffer.concat([
-      Buffer.from([1]), // Some
-      args.planAccount.toBuffer(),
-    ]);
-
-    // maxStalenessOverride (Option<i64>)
-    const stalenessBuffer = args.maxStalenessOverride
-      ? Buffer.concat([
-          Buffer.from([1]),
-          (() => {
-            const buf = Buffer.alloc(8);
-            buf.writeBigInt64LE(BigInt(args.maxStalenessOverride));
-            return buf;
-          })(),
-        ])
-      : Buffer.from([0]);
-
-    // slippage_tolerance (None)
-    const slippageBuffer = Buffer.from([0]);
-
-    // venues (empty - using plan)
-    const venuesBuffer = Buffer.from([0, 0, 0, 0]);
-
-    // jupiter_route (None)
-    const jupiterRouteBuffer = Buffer.from([0]);
-
-    return Buffer.concat([
-      amountInBuffer,
-      minOutBuffer,
-      slippageBuffer,
-      Buffer.from([useDynamicPlanFlag]),
-      Buffer.from([useBundleFlag]),
-      // primary_oracle_account (None - using accounts)
-      Buffer.from([0]),
-      venuesBuffer,
-      stalenessBuffer,
-      jupiterRouteBuffer,
-      planAccountBuffer,
-    ]);
+    const buffers: Buffer[] = [];
+    
+    // 1. amount_in: u64
+    buffers.push(args.amountIn.toArrayLike(Buffer, "le", 8));
+    
+    // 2. min_out: u64
+    buffers.push(args.minOut.toArrayLike(Buffer, "le", 8));
+    
+    // 3. slippage_tolerance: Option<u16> - None (using min_out)
+    buffers.push(Buffer.from([0]));
+    
+    // 4. twap_slices: Option<u8> - None
+    buffers.push(Buffer.from([0]));
+    
+    // 5. use_dynamic_plan: bool
+    buffers.push(Buffer.from([args.useDynamicPlan ? 1 : 0]));
+    
+    // 6. plan_account: Option<Pubkey>
+    if (args.useDynamicPlan && args.planAccount) {
+      buffers.push(Buffer.from([1])); // Some
+      buffers.push(args.planAccount.toBuffer());
+    } else {
+      buffers.push(Buffer.from([0])); // None
+    }
+    
+    // 7. use_bundle: bool
+    buffers.push(Buffer.from([args.useBundle ? 1 : 0]));
+    
+    // 8. primary_oracle_account: Pubkey
+    buffers.push(args.primaryOracleAccount.toBuffer());
+    
+    // 9. fallback_oracle_account: Option<Pubkey> - None
+    buffers.push(Buffer.from([0]));
+    
+    // 10. jupiter_route: Option<JupiterRouteParams> - None (using dynamic plan)
+    buffers.push(Buffer.from([0]));
+    
+    // 11. jupiter_swap_ix_data: Option<Vec<u8>> - None
+    buffers.push(Buffer.from([0]));
+    
+    // 12. liquidity_estimate: Option<u64> - None
+    buffers.push(Buffer.from([0]));
+    
+    // 13. volatility_bps: Option<u16> - None
+    buffers.push(Buffer.from([0]));
+    
+    // 14. min_venue_score: Option<u16> - None
+    buffers.push(Buffer.from([0]));
+    
+    // 15. slippage_per_venue: Option<Vec<VenueSlippage>> - None
+    buffers.push(Buffer.from([0]));
+    
+    // 16. token_a_decimals: Option<u8>
+    if (args.tokenADecimals !== undefined) {
+      buffers.push(Buffer.from([1, args.tokenADecimals]));
+    } else {
+      buffers.push(Buffer.from([0]));
+    }
+    
+    // 17. token_b_decimals: Option<u8>
+    if (args.tokenBDecimals !== undefined) {
+      buffers.push(Buffer.from([1, args.tokenBDecimals]));
+    } else {
+      buffers.push(Buffer.from([0]));
+    }
+    
+    // 18. max_staleness_override: Option<i64>
+    if (args.maxStalenessOverride !== undefined && args.maxStalenessOverride > 0) {
+      const staleBuf = Buffer.alloc(9);
+      staleBuf.writeUInt8(1, 0); // Some
+      staleBuf.writeBigInt64LE(BigInt(args.maxStalenessOverride), 1);
+      buffers.push(staleBuf);
+    } else {
+      buffers.push(Buffer.from([0]));
+    }
+    
+    // 19. jito_bundle: Option<JitoBundleConfig> - None
+    buffers.push(Buffer.from([0]));
+    
+    return Buffer.concat(buffers);
   }
 
   // ==========================================================================

@@ -1820,17 +1820,30 @@ export class NativeRouterService {
   
   /**
    * Sérialise les arguments SwapArgs pour l'instruction
-   * DOIT correspondre EXACTEMENT à la structure dans l'IDL:
-   * - amount_in: u64
-   * - min_out: u64
-   * - slippage_tolerance: Option<u16>
-   * - twap_slices: Option<u8>
-   * - use_dynamic_plan: bool
-   * - plan_account: Option<Pubkey>
-   * - use_bundle: bool
-   * - primary_oracle_account: Pubkey
-   * - fallback_oracle_account: Option<Pubkey>
-   * - jupiter_route: Option<JupiterRouteParams>
+   * DOIT correspondre EXACTEMENT à la structure dans l'IDL déployée:
+   * 
+   * Référence: target/idl/swapback_router.json - SwapArgs (lignes 3293-3420)
+   * 
+   * Champs (dans l'ordre):
+   * 1.  amount_in: u64
+   * 2.  min_out: u64
+   * 3.  slippage_tolerance: Option<u16>
+   * 4.  twap_slices: Option<u8>
+   * 5.  use_dynamic_plan: bool
+   * 6.  plan_account: Option<Pubkey>
+   * 7.  use_bundle: bool
+   * 8.  primary_oracle_account: Pubkey
+   * 9.  fallback_oracle_account: Option<Pubkey>
+   * 10. jupiter_route: Option<JupiterRouteParams>
+   * 11. jupiter_swap_ix_data: Option<Vec<u8>>
+   * 12. liquidity_estimate: Option<u64>
+   * 13. volatility_bps: Option<u16>
+   * 14. min_venue_score: Option<u16>
+   * 15. slippage_per_venue: Option<Vec<VenueSlippage>>
+   * 16. token_a_decimals: Option<u8>
+   * 17. token_b_decimals: Option<u8>
+   * 18. max_staleness_override: Option<i64>
+   * 19. jito_bundle: Option<JitoBundleConfig>
    */
   private serializeSwapArgs(args: {
     amountIn: BN;
@@ -1840,46 +1853,88 @@ export class NativeRouterService {
     useBundle: boolean;
     primaryOracleAccount: PublicKey;
     venues: { venue: PublicKey; weight: number }[];
-    maxStalenessOverride?: number; // Non utilisé - gardé pour compatibilité API
+    maxStalenessOverride?: number;
+    tokenADecimals?: number;
+    tokenBDecimals?: number;
   }): Buffer {
     // Sérialisation manuelle selon le format Anchor - EXACTEMENT selon l'IDL
     const buffers: Buffer[] = [];
     
-    // amount_in: u64
+    // 1. amount_in: u64
     buffers.push(args.amountIn.toArrayLike(Buffer, "le", 8));
     
-    // min_out: u64
+    // 2. min_out: u64
     buffers.push(args.minOut.toArrayLike(Buffer, "le", 8));
     
-    // slippage_tolerance: Option<u16>
+    // 3. slippage_tolerance: Option<u16>
     const slippageBuf = Buffer.alloc(3);
     slippageBuf.writeUInt8(1, 0); // Some
     slippageBuf.writeUInt16LE(args.slippageTolerance, 1);
     buffers.push(slippageBuf);
     
-    // twap_slices: Option<u8>
+    // 4. twap_slices: Option<u8>
     buffers.push(Buffer.from([0])); // None
     
-    // use_dynamic_plan: bool
+    // 5. use_dynamic_plan: bool
     buffers.push(Buffer.from([args.useDynamicPlan ? 1 : 0]));
     
-    // plan_account: Option<Pubkey>
+    // 6. plan_account: Option<Pubkey>
     buffers.push(Buffer.from([0])); // None
     
-    // use_bundle: bool
+    // 7. use_bundle: bool
     buffers.push(Buffer.from([args.useBundle ? 1 : 0]));
     
-    // primary_oracle_account: Pubkey
+    // 8. primary_oracle_account: Pubkey
     buffers.push(args.primaryOracleAccount.toBuffer());
     
-    // fallback_oracle_account: Option<Pubkey>
+    // 9. fallback_oracle_account: Option<Pubkey>
     buffers.push(Buffer.from([0])); // None
     
-    // jupiter_route: Option<JupiterRouteParams>
+    // 10. jupiter_route: Option<JupiterRouteParams>
     // Note: headless router n'utilise pas Jupiter CPI, on met None
     buffers.push(Buffer.from([0])); // None
     
-    // FIN de SwapArgs selon l'IDL - ne pas ajouter de champs supplémentaires!
+    // 11. jupiter_swap_ix_data: Option<Vec<u8>> - None
+    buffers.push(Buffer.from([0]));
+    
+    // 12. liquidity_estimate: Option<u64> - None
+    buffers.push(Buffer.from([0]));
+    
+    // 13. volatility_bps: Option<u16> - None
+    buffers.push(Buffer.from([0]));
+    
+    // 14. min_venue_score: Option<u16> - None
+    buffers.push(Buffer.from([0]));
+    
+    // 15. slippage_per_venue: Option<Vec<VenueSlippage>> - None
+    buffers.push(Buffer.from([0]));
+    
+    // 16. token_a_decimals: Option<u8>
+    if (args.tokenADecimals !== undefined) {
+      buffers.push(Buffer.from([1, args.tokenADecimals])); // Some(decimals)
+    } else {
+      buffers.push(Buffer.from([0])); // None
+    }
+    
+    // 17. token_b_decimals: Option<u8>
+    if (args.tokenBDecimals !== undefined) {
+      buffers.push(Buffer.from([1, args.tokenBDecimals])); // Some(decimals)
+    } else {
+      buffers.push(Buffer.from([0])); // None
+    }
+    
+    // 18. max_staleness_override: Option<i64>
+    if (args.maxStalenessOverride !== undefined && args.maxStalenessOverride > 0) {
+      const staleBuf = Buffer.alloc(9);
+      staleBuf.writeUInt8(1, 0); // Some
+      staleBuf.writeBigInt64LE(BigInt(args.maxStalenessOverride), 1);
+      buffers.push(staleBuf);
+    } else {
+      buffers.push(Buffer.from([0])); // None
+    }
+    
+    // 19. jito_bundle: Option<JitoBundleConfig> - None
+    buffers.push(Buffer.from([0]));
     
     return Buffer.concat(buffers);
   }

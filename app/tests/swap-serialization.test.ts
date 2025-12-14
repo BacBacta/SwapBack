@@ -5,6 +5,7 @@
  * Vérifie que les arguments et comptes sont correctement sérialisés selon l'IDL.
  * 
  * Référence: docs/ai/solana-native-router-a2z.md
+ * Référence IDL: target/idl/swapback_router.json - SwapArgs (lignes 3293-3420)
  * 
  * @vitest-environment node
  */
@@ -33,8 +34,28 @@ function getDiscriminator(instructionName: string): Buffer {
 }
 
 /**
- * Serialize SwapArgs according to IDL
- * This should match exactly what the on-chain program expects
+ * Serialize SwapArgs according to IDL (ALL 19 fields)
+ * 
+ * Champs (dans l'ordre):
+ * 1.  amount_in: u64
+ * 2.  min_out: u64
+ * 3.  slippage_tolerance: Option<u16>
+ * 4.  twap_slices: Option<u8>
+ * 5.  use_dynamic_plan: bool
+ * 6.  plan_account: Option<Pubkey>
+ * 7.  use_bundle: bool
+ * 8.  primary_oracle_account: Pubkey
+ * 9.  fallback_oracle_account: Option<Pubkey>
+ * 10. jupiter_route: Option<JupiterRouteParams>
+ * 11. jupiter_swap_ix_data: Option<Vec<u8>>
+ * 12. liquidity_estimate: Option<u64>
+ * 13. volatility_bps: Option<u16>
+ * 14. min_venue_score: Option<u16>
+ * 15. slippage_per_venue: Option<Vec<VenueSlippage>>
+ * 16. token_a_decimals: Option<u8>
+ * 17. token_b_decimals: Option<u8>
+ * 18. max_staleness_override: Option<i64>
+ * 19. jito_bundle: Option<JitoBundleConfig>
  */
 function serializeSwapArgs(args: {
   amountIn: BN;
@@ -44,16 +65,19 @@ function serializeSwapArgs(args: {
   useBundle: boolean;
   primaryOracleAccount: PublicKey;
   jupiterRoute?: { swapInstruction: Buffer; expectedInputAmount: BN } | null;
+  maxStalenessOverride?: number;
+  tokenADecimals?: number;
+  tokenBDecimals?: number;
 }): Buffer {
   const buffers: Buffer[] = [];
   
-  // amount_in: u64
+  // 1. amount_in: u64
   buffers.push(args.amountIn.toArrayLike(Buffer, "le", 8));
   
-  // min_out: u64
+  // 2. min_out: u64
   buffers.push(args.minOut.toArrayLike(Buffer, "le", 8));
   
-  // slippage_tolerance: Option<u16>
+  // 3. slippage_tolerance: Option<u16>
   if (args.slippageTolerance !== null) {
     const slippageBuf = Buffer.alloc(3);
     slippageBuf.writeUInt8(1, 0); // Some
@@ -63,25 +87,25 @@ function serializeSwapArgs(args: {
     buffers.push(Buffer.from([0])); // None
   }
   
-  // twap_slices: Option<u8>
+  // 4. twap_slices: Option<u8>
   buffers.push(Buffer.from([0])); // None
   
-  // use_dynamic_plan: bool
+  // 5. use_dynamic_plan: bool
   buffers.push(Buffer.from([args.useDynamicPlan ? 1 : 0]));
   
-  // plan_account: Option<Pubkey>
+  // 6. plan_account: Option<Pubkey>
   buffers.push(Buffer.from([0])); // None
   
-  // use_bundle: bool
+  // 7. use_bundle: bool
   buffers.push(Buffer.from([args.useBundle ? 1 : 0]));
   
-  // primary_oracle_account: Pubkey
+  // 8. primary_oracle_account: Pubkey
   buffers.push(args.primaryOracleAccount.toBuffer());
   
-  // fallback_oracle_account: Option<Pubkey>
+  // 9. fallback_oracle_account: Option<Pubkey>
   buffers.push(Buffer.from([0])); // None
   
-  // jupiter_route: Option<JupiterRouteParams>
+  // 10. jupiter_route: Option<JupiterRouteParams>
   if (args.jupiterRoute && args.jupiterRoute.swapInstruction.length > 0) {
     buffers.push(Buffer.from([1])); // Some
     
@@ -96,6 +120,48 @@ function serializeSwapArgs(args: {
   } else {
     buffers.push(Buffer.from([0])); // None
   }
+  
+  // 11. jupiter_swap_ix_data: Option<Vec<u8>> - None
+  buffers.push(Buffer.from([0]));
+  
+  // 12. liquidity_estimate: Option<u64> - None
+  buffers.push(Buffer.from([0]));
+  
+  // 13. volatility_bps: Option<u16> - None
+  buffers.push(Buffer.from([0]));
+  
+  // 14. min_venue_score: Option<u16> - None
+  buffers.push(Buffer.from([0]));
+  
+  // 15. slippage_per_venue: Option<Vec<VenueSlippage>> - None
+  buffers.push(Buffer.from([0]));
+  
+  // 16. token_a_decimals: Option<u8>
+  if (args.tokenADecimals !== undefined) {
+    buffers.push(Buffer.from([1, args.tokenADecimals]));
+  } else {
+    buffers.push(Buffer.from([0]));
+  }
+  
+  // 17. token_b_decimals: Option<u8>
+  if (args.tokenBDecimals !== undefined) {
+    buffers.push(Buffer.from([1, args.tokenBDecimals]));
+  } else {
+    buffers.push(Buffer.from([0]));
+  }
+  
+  // 18. max_staleness_override: Option<i64>
+  if (args.maxStalenessOverride !== undefined && args.maxStalenessOverride > 0) {
+    const staleBuf = Buffer.alloc(9);
+    staleBuf.writeUInt8(1, 0); // Some
+    staleBuf.writeBigInt64LE(BigInt(args.maxStalenessOverride), 1);
+    buffers.push(staleBuf);
+  } else {
+    buffers.push(Buffer.from([0]));
+  }
+  
+  // 19. jito_bundle: Option<JitoBundleConfig> - None
+  buffers.push(Buffer.from([0]));
   
   return Buffer.concat(buffers);
 }
@@ -115,11 +181,11 @@ describe("Instruction Discriminator", () => {
 });
 
 // ============================================================================
-// TEST SUITE: SwapArgs Serialization
+// TEST SUITE: SwapArgs Serialization (ALL 19 FIELDS)
 // ============================================================================
 
 describe("SwapArgs Serialization", () => {
-  it("should serialize minimal SwapArgs (no jupiter_route) correctly", () => {
+  it("should serialize minimal SwapArgs (all None options) correctly", () => {
     const oracle = new PublicKey("7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE");
     
     const buffer = serializeSwapArgs({
@@ -132,7 +198,7 @@ describe("SwapArgs Serialization", () => {
       jupiterRoute: null,
     });
     
-    // Expected structure:
+    // Expected structure with ALL 19 fields:
     // - amount_in: 8 bytes
     // - min_out: 8 bytes
     // - slippage_tolerance None: 1 byte
@@ -143,9 +209,18 @@ describe("SwapArgs Serialization", () => {
     // - primary_oracle_account: 32 bytes
     // - fallback_oracle_account None: 1 byte
     // - jupiter_route None: 1 byte
-    // Total: 8 + 8 + 1 + 1 + 1 + 1 + 1 + 32 + 1 + 1 = 55 bytes
+    // - jupiter_swap_ix_data None: 1 byte
+    // - liquidity_estimate None: 1 byte
+    // - volatility_bps None: 1 byte
+    // - min_venue_score None: 1 byte
+    // - slippage_per_venue None: 1 byte
+    // - token_a_decimals None: 1 byte
+    // - token_b_decimals None: 1 byte
+    // - max_staleness_override None: 1 byte
+    // - jito_bundle None: 1 byte
+    // Total: 8 + 8 + 1 + 1 + 1 + 1 + 1 + 32 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 = 64 bytes
     
-    expect(buffer.length).toBe(55);
+    expect(buffer.length).toBe(64);
   });
 
   it("should serialize SwapArgs with jupiter_route correctly", () => {
@@ -166,14 +241,12 @@ describe("SwapArgs Serialization", () => {
     });
     
     // Expected structure:
-    // - Base: 54 bytes (excluding jupiter_route None byte)
-    // - jupiter_route Some: 1 byte
-    // - swap_instruction length (u32): 4 bytes
-    // - swap_instruction data: 100 bytes
-    // - expected_input_amount: 8 bytes
-    // Total: 54 + 1 + 4 + 100 + 8 = 167 bytes
+    // - Base (up to jupiter_route): 54 bytes
+    // - jupiter_route Some: 1 byte + 4 bytes (len) + 100 bytes (data) + 8 bytes (amount) = 113 bytes extra
+    // - Remaining 9 fields (all None): 9 bytes
+    // Total: 54 + 113 + 9 = 176 bytes
     
-    expect(buffer.length).toBe(167);
+    expect(buffer.length).toBe(176);
   });
 
   it("should serialize slippage_tolerance as Some correctly", () => {
@@ -190,13 +263,52 @@ describe("SwapArgs Serialization", () => {
     });
     
     // slippage_tolerance Some adds 2 bytes for the u16 value
-    // Total: 55 + 2 = 57 bytes
-    expect(buffer.length).toBe(57);
+    // Total: 64 + 2 = 66 bytes
+    expect(buffer.length).toBe(66);
     
     // Check the slippage value is correctly serialized
     // Position: after amount_in (8) + min_out (8) = 16
     expect(buffer[16]).toBe(1); // Some
     expect(buffer.readUInt16LE(17)).toBe(50); // 50 bps
+  });
+
+  it("should serialize max_staleness_override correctly", () => {
+    const oracle = new PublicKey("7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE");
+    
+    const buffer = serializeSwapArgs({
+      amountIn: new BN(1000000),
+      minOut: new BN(900000),
+      slippageTolerance: null,
+      useDynamicPlan: false,
+      useBundle: false,
+      primaryOracleAccount: oracle,
+      jupiterRoute: null,
+      maxStalenessOverride: 60, // 60 seconds
+    });
+    
+    // max_staleness_override Some adds 8 bytes for the i64 value
+    // Total: 64 + 8 = 72 bytes
+    expect(buffer.length).toBe(72);
+  });
+
+  it("should serialize token decimals correctly", () => {
+    const oracle = new PublicKey("7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE");
+    
+    const buffer = serializeSwapArgs({
+      amountIn: new BN(1000000),
+      minOut: new BN(900000),
+      slippageTolerance: null,
+      useDynamicPlan: false,
+      useBundle: false,
+      primaryOracleAccount: oracle,
+      jupiterRoute: null,
+      tokenADecimals: 9, // SOL
+      tokenBDecimals: 6, // USDC
+    });
+    
+    // Each Some<u8> adds 1 byte for the value
+    // Total: 64 + 1 + 1 = 66 bytes
+    expect(buffer.length).toBe(66);
   });
 });
 
