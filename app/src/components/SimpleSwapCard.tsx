@@ -800,8 +800,8 @@ export function SimpleSwapCard() {
         onSlippageChange={setSlippage}
         mevProtection={mevProtection}
         onMevProtectionChange={setMevProtection}
-        trueNativeMode={trueNativeMode}
-        onTrueNativeModeChange={setTrueNativeMode}
+        trueNativeMode={true}
+        onTrueNativeModeChange={() => {}}
         quote={quote}
         inputToken={inputToken}
         outputToken={outputToken}
