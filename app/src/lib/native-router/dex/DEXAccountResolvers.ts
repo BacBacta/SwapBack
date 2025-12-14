@@ -12,20 +12,99 @@
  */
 
 import { Connection, PublicKey } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from "@solana/spl-token";
+import { Buffer } from "buffer";
 import { logger } from "@/lib/logger";
 import { DEX_PROGRAMS } from "../headless/router";
 import { toPublicKey } from "../utils/publicKeyUtils";
+import type { RaydiumPoolConfig } from "@/sdk/config/raydium-pools";
+
+if (typeof globalThis !== "undefined" && typeof (globalThis as any).Buffer === "undefined") {
+  (globalThis as any).Buffer = Buffer;
+}
 import { getRaydiumPool } from "@/sdk/config/raydium-pools";
 
 const RESOLVER_CACHE_TTL_MS = 60_000; // short-lived cache to absorb bursty API errors
 const MAX_FETCH_ATTEMPTS = 2;
 
 const meteoraPairCache = new Map<string, { timestamp: number; pair: PublicKey | null }>();
-const raydiumPoolCache = new Map<string, { timestamp: number; pool: PublicKey | null }>();
+const raydiumPoolCache = new Map<string, { timestamp: number; pool: RaydiumPoolConfig | null }>();
+const serumMarketMetaCache = new Map<string, { timestamp: number; meta: SerumMarketMeta }>();
+const saberPoolTokenAccountsCache = new Map<
+  string,
+  { timestamp: number; tokenAccounts: Array<{ address: PublicKey; mint: PublicKey; amount: bigint }> }
+>();
+
+const SERUM_MARKET_CACHE_TTL_MS = 5 * 60 * 1000;
+
+interface SerumMarketMeta {
+  bids: PublicKey;
+  asks: PublicKey;
+  eventQueue: PublicKey;
+  coinVault: PublicKey;
+  pcVault: PublicKey;
+  vaultSigner: PublicKey;
+}
+
+async function loadSerumMarketMeta(
+  connection: Connection,
+  market: PublicKey,
+  programId: PublicKey
+): Promise<SerumMarketMeta | null> {
+  const cacheKey = `${market.toBase58()}::${programId.toBase58()}`;
+  const now = Date.now();
+  const cached = serumMarketMetaCache.get(cacheKey);
+
+  if (cached && now - cached.timestamp < SERUM_MARKET_CACHE_TTL_MS) {
+    return cached.meta;
+  }
+
+  try {
+    const accountInfo = await connection.getAccountInfo(market);
+    if (!accountInfo) {
+      logger.warn("RaydiumResolver", "Serum market account missing", {
+        market: market.toBase58(),
+      });
+      return null;
+    }
+
+    const { MARKET_STATE_LAYOUT_V3 } = await import("@project-serum/serum/lib/market");
+    const decoded = MARKET_STATE_LAYOUT_V3.decode(accountInfo.data);
+    const nonceBuffer = decoded.vaultSignerNonce?.toArrayLike
+      ? decoded.vaultSignerNonce.toArrayLike(Buffer, "le", 8)
+      : Buffer.alloc(8);
+
+    const vaultSigner = await PublicKey.createProgramAddress(
+      [market.toBuffer(), nonceBuffer],
+      programId
+    );
+
+    const meta: SerumMarketMeta = {
+      bids: decoded.bids,
+      asks: decoded.asks,
+      eventQueue: decoded.eventQueue,
+      coinVault: decoded.baseVault,
+      pcVault: decoded.quoteVault,
+      vaultSigner,
+    };
+
+    serumMarketMetaCache.set(cacheKey, { timestamp: now, meta });
+    return meta;
+  } catch (error) {
+    logger.error("RaydiumResolver", "Failed to decode Serum market", {
+      market: market.toBase58(),
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
 
 const getPairCacheKey = (mintA: string, mintB: string) =>
   mintA < mintB ? `${mintA}:${mintB}` : `${mintB}:${mintA}`;
+
+const LIFINITY_PROGRAM = DEX_PROGRAMS.LIFINITY;
+const SABER_PROGRAM = DEX_PROGRAMS.SABER;
 
 // ============================================================================
 // TYPES
@@ -48,6 +127,302 @@ export interface DEXAccounts {
     feeRate?: number;
     tickSpacing?: number;
   };
+}
+
+// ============================================================================
+// LIFINITY
+// ============================================================================
+
+type LifinityPoolInfo = {
+  amm: string;
+  poolMint: string;
+  feeAccount: string;
+  configAccount: string;
+  pythAccount: string;
+  pythPcAccount: string;
+  poolCoinTokenAccount: string;
+  poolCoinMint: string;
+  poolPcTokenAccount: string;
+  poolPcMint: string;
+};
+
+async function findLifinityPool(
+  inputMint: PublicKey,
+  outputMint: PublicKey
+): Promise<LifinityPoolInfo | null> {
+  try {
+    const { getPoolList } = await import("@lifinity/sdk");
+    const pools = getPoolList() as Record<string, LifinityPoolInfo>;
+    const input = inputMint.toBase58();
+    const output = outputMint.toBase58();
+
+    for (const pool of Object.values(pools)) {
+      if (
+        (pool.poolCoinMint === input && pool.poolPcMint === output) ||
+        (pool.poolCoinMint === output && pool.poolPcMint === input)
+      ) {
+        return pool;
+      }
+    }
+    return null;
+  } catch (error) {
+    logger.error("LifinityResolver", "Failed to load Lifinity pool list", {
+      inputMint: inputMint.toBase58(),
+      outputMint: outputMint.toBase58(),
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+export async function getLifinityAccounts(
+  connection: Connection,
+  inputMint: PublicKey | string,
+  outputMint: PublicKey | string,
+  userPublicKey: PublicKey | string
+): Promise<DEXAccounts | null> {
+  try {
+    const safeInputMint = toPublicKey(inputMint);
+    const safeOutputMint = toPublicKey(outputMint);
+    const safeUser = toPublicKey(userPublicKey);
+
+    const pool = await findLifinityPool(safeInputMint, safeOutputMint);
+    if (!pool) {
+      logger.warn("LifinityResolver", "No Lifinity pool found for pair", {
+        inputMint: safeInputMint.toBase58(),
+        outputMint: safeOutputMint.toBase58(),
+      });
+      return null;
+    }
+
+    const amm = new PublicKey(pool.amm);
+    const authority = PublicKey.findProgramAddressSync([amm.toBuffer()], LIFINITY_PROGRAM)[0];
+
+    const userSourceAccount = await getAssociatedTokenAddress(safeInputMint, safeUser);
+    const userDestinationAccount = await getAssociatedTokenAddress(safeOutputMint, safeUser);
+
+    // NOTE: L'ordre ci-dessous suit l'IDL Lifinity (authority, amm, ...).
+    // Le CPI on-chain SwapBack doit aussi être compatible côté metas (writable/readonly),
+    // sinon la simulation échouera même si les comptes sont corrects.
+    return {
+      accounts: [
+        authority,
+        amm,
+        safeUser, // userTransferAuthority (signer)
+        userSourceAccount,
+        userDestinationAccount,
+        new PublicKey(
+          safeInputMint.equals(new PublicKey(pool.poolCoinMint))
+            ? pool.poolCoinTokenAccount
+            : pool.poolPcTokenAccount
+        ),
+        new PublicKey(
+          safeInputMint.equals(new PublicKey(pool.poolCoinMint))
+            ? pool.poolPcTokenAccount
+            : pool.poolCoinTokenAccount
+        ),
+        new PublicKey(pool.poolMint),
+        new PublicKey(pool.feeAccount),
+        TOKEN_PROGRAM_ID,
+        new PublicKey(pool.pythAccount),
+        new PublicKey(pool.pythPcAccount),
+        new PublicKey(pool.configAccount),
+        LIFINITY_PROGRAM, // programme (required by invoke)
+      ],
+      vaultTokenAccountA: new PublicKey(pool.poolCoinTokenAccount),
+      vaultTokenAccountB: new PublicKey(pool.poolPcTokenAccount),
+      meta: {
+        venue: "LIFINITY",
+        poolAddress: pool.amm,
+      },
+    };
+  } catch (error) {
+    logger.error("LifinityResolver", "Unexpected error", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+// ============================================================================
+// SABER
+// ============================================================================
+
+type SaberStaticPool = {
+  address: string;
+  tokenA: string;
+  tokenB: string;
+  name: string;
+};
+
+// Pool list minimal et déterministe (répliqué depuis SaberService pour éviter une dépendance croisée).
+const SABER_POOLS: SaberStaticPool[] = [
+  {
+    name: "USDC-USDT",
+    address: "YAkoNb6HKmSxQN9L8hiBE5tPJRsniSSMzND1boHmZxe",
+    tokenA: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    tokenB: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+  },
+  {
+    name: "mSOL-SOL",
+    address: "Lee1XZJfJ9Hm2K1qTyeCz1LXNc1YBZaKZszvNY4KCDw",
+    tokenA: "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+    tokenB: "So11111111111111111111111111111111111111112",
+  },
+  {
+    name: "stSOL-SOL",
+    address: "8CpmKczw1K64RhPfYn8YLdJSEQdE4zy7NWFJVyMYQP1r",
+    tokenA: "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj",
+    tokenB: "So11111111111111111111111111111111111111112",
+  },
+];
+
+function findSaberPool(inputMint: PublicKey, outputMint: PublicKey): SaberStaticPool | null {
+  const input = inputMint.toBase58();
+  const output = outputMint.toBase58();
+  for (const pool of SABER_POOLS) {
+    if ((pool.tokenA === input && pool.tokenB === output) || (pool.tokenA === output && pool.tokenB === input)) {
+      return pool;
+    }
+  }
+  return null;
+}
+
+async function getSaberReferencedTokenAccounts(
+  connection: Connection,
+  swapInfo: PublicKey
+): Promise<Array<{ address: PublicKey; mint: PublicKey; amount: bigint }>> {
+  const cacheKey = swapInfo.toBase58();
+  const now = Date.now();
+  const cached = saberPoolTokenAccountsCache.get(cacheKey);
+  if (cached && now - cached.timestamp < RESOLVER_CACHE_TTL_MS) {
+    return cached.tokenAccounts;
+  }
+
+  const info = await connection.getAccountInfo(swapInfo);
+  if (!info) {
+    throw new Error("Saber swapInfo account missing");
+  }
+
+  // Strategy: extract all possible Pubkeys from the data and keep the ones
+  // that are valid SPL token accounts (owner=Tokenkeg, size=165).
+  const data = info.data;
+  const candidates = new Set<string>();
+  for (let off = 0; off + 32 <= data.length; off += 1) {
+    try {
+      candidates.add(new PublicKey(data.slice(off, off + 32)).toBase58());
+    } catch {
+      // ignore
+    }
+  }
+
+  const pubkeys = Array.from(candidates).map((s) => new PublicKey(s));
+  const tokenAccounts: Array<{ address: PublicKey; mint: PublicKey; amount: bigint }> = [];
+  const batchSize = 100;
+  for (let i = 0; i < pubkeys.length; i += batchSize) {
+    const slice = pubkeys.slice(i, i + batchSize);
+    const infos = await connection.getMultipleAccountsInfo(slice);
+    for (let j = 0; j < infos.length; j++) {
+      const ai = infos[j];
+      if (!ai) continue;
+      if (!ai.owner.equals(TOKEN_PROGRAM_ID)) continue;
+      if (ai.data.length !== 165) continue;
+      const mint = new PublicKey(ai.data.slice(0, 32));
+      const amount = ai.data.readBigUInt64LE(64);
+      tokenAccounts.push({ address: slice[j], mint, amount });
+    }
+  }
+
+  saberPoolTokenAccountsCache.set(cacheKey, { timestamp: now, tokenAccounts });
+  return tokenAccounts;
+}
+
+export async function getSaberAccounts(
+  connection: Connection,
+  inputMint: PublicKey | string,
+  outputMint: PublicKey | string,
+  userPublicKey: PublicKey | string
+): Promise<DEXAccounts | null> {
+  try {
+    const safeInputMint = toPublicKey(inputMint);
+    const safeOutputMint = toPublicKey(outputMint);
+    const safeUser = toPublicKey(userPublicKey);
+
+    const pool = findSaberPool(safeInputMint, safeOutputMint);
+    if (!pool) {
+      logger.warn("SaberResolver", "No Saber pool config found", {
+        inputMint: safeInputMint.toBase58(),
+        outputMint: safeOutputMint.toBase58(),
+      });
+      return null;
+    }
+
+    const swapInfo = new PublicKey(pool.address);
+    const swapAuthority = PublicKey.findProgramAddressSync([swapInfo.toBuffer()], SABER_PROGRAM)[0];
+
+    const userSourceAccount = await getAssociatedTokenAddress(safeInputMint, safeUser);
+    const userDestinationAccount = await getAssociatedTokenAddress(safeOutputMint, safeUser);
+
+    const tokenAccounts = await getSaberReferencedTokenAccounts(connection, swapInfo);
+    if (tokenAccounts.length < 2) {
+      logger.warn("SaberResolver", "Failed to discover Saber pool token accounts", {
+        swapInfo: swapInfo.toBase58(),
+        found: tokenAccounts.length,
+      });
+      return null;
+    }
+
+    const forMint = (mint: PublicKey) => tokenAccounts.filter((t) => t.mint.equals(mint));
+
+    const inputCandidates = forMint(safeInputMint);
+    const outputCandidates = forMint(safeOutputMint);
+    if (!inputCandidates.length || !outputCandidates.length) {
+      logger.warn("SaberResolver", "Pool token accounts missing expected mints", {
+        swapInfo: swapInfo.toBase58(),
+        inputMint: safeInputMint.toBase58(),
+        outputMint: safeOutputMint.toBase58(),
+      });
+      return null;
+    }
+
+    // Use the largest balance account for each mint as the pool vault.
+    const pickLargest = (items: Array<{ address: PublicKey; mint: PublicKey; amount: bigint }>) =>
+      items.reduce((best, cur) => (cur.amount > best.amount ? cur : best));
+
+    const swapSource = pickLargest(inputCandidates).address;
+    const swapDestination = pickLargest(outputCandidates).address;
+
+    // Admin fee destination is typically a separate token account. Prefer same output mint.
+    const nonVaultOutput = outputCandidates
+      .filter((x) => !x.address.equals(swapDestination))
+      .map((x) => x.address);
+    const adminFeeDestination = nonVaultOutput[0] ?? swapDestination;
+
+    return {
+      accounts: [
+        swapInfo, // 0
+        swapAuthority, // 1
+        safeUser, // 2 (signer)
+        userSourceAccount, // 3
+        swapSource, // 4
+        swapDestination, // 5
+        userDestinationAccount, // 6
+        adminFeeDestination, // 7
+        TOKEN_PROGRAM_ID, // 8
+        SYSVAR_CLOCK_PUBKEY, // 9
+        SABER_PROGRAM, // 10 (required by invoke)
+      ],
+      meta: {
+        venue: "SABER",
+        poolAddress: pool.address,
+      },
+    };
+  } catch (error) {
+    logger.error("SaberResolver", "Unexpected error", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
 }
 
 export interface PoolInfo {
@@ -165,8 +540,9 @@ function deriveTickArrays(
  * 9.  tick_array_1
  * 10. tick_array_2
  * 11. oracle
+ * 12. ORCA_WHIRLPOOL_PROGRAM (compte programme, requis par `invoke`)
  * 
- * Total: 11 comptes (ORCA_SWAP_ACCOUNT_COUNT)
+ * Total: 11 comptes CPI + 1 compte programme (12 au total côté client)
  */
 export async function getOrcaWhirlpoolAccounts(
   connection: Connection,
@@ -238,6 +614,7 @@ export async function getOrcaWhirlpoolAccounts(
         tickArrays[1],          // 9. tick_array_1
         tickArrays[2],          // 10. tick_array_2
         oracle,                 // 11. oracle
+        ORCA_WHIRLPOOL_PROGRAM, // 12. Orca program (required by CPI invoke)
       ],
       // Exposer les vaults pour vault_token_account_a/b dans SwapToC
       vaultTokenAccountA: tokenVaultA,
@@ -608,7 +985,7 @@ const RAYDIUM_AMM_PROGRAM = new PublicKey("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wF
 async function findRaydiumPool(
   inputMint: PublicKey,
   outputMint: PublicKey
-): Promise<PublicKey | null> {
+): Promise<RaydiumPoolConfig | null> {
   try {
     const inputMintStr = inputMint.toBase58();
     const outputMintStr = outputMint.toBase58();
@@ -623,69 +1000,16 @@ async function findRaydiumPool(
       return cached.pool;
     }
 
-    // Fast-path: use local static config for well-known pools to avoid API flakiness
     const staticPool = getRaydiumPool(inputMint, outputMint);
     if (staticPool) {
-      raydiumPoolCache.set(cacheKey, { timestamp: now, pool: staticPool.ammAddress });
-      logger.debug("RaydiumResolver", "Resolved pool from static config", {
-        cacheKey,
-        ammAddress: staticPool.ammAddress.toBase58(),
-      });
-      return staticPool.ammAddress;
+      raydiumPoolCache.set(cacheKey, { timestamp: now, pool: staticPool });
+      return staticPool;
     }
 
-    let lastError: string | undefined;
-    for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
-      try {
-        const response = await fetch(
-          `https://transaction-v1.raydium.io/pools/info/mint?mint1=${inputMintStr}&mint2=${outputMintStr}`,
-          { signal: AbortSignal.timeout(5000) }
-        );
-        
-        if (!response.ok) {
-          lastError = `status_${response.status}`;
-          logger.warn("RaydiumResolver", "Raydium pool API error", {
-            status: response.status,
-            attempt,
-            inputMint: inputMintStr,
-            outputMint: outputMintStr,
-          });
-          continue;
-        }
-        
-        const data = await response.json();
-        if (!data.success || !data.data?.[0]) {
-          logger.warn("RaydiumResolver", "Pool API returned empty response", {
-            inputMint: inputMintStr,
-            outputMint: outputMintStr,
-          });
-          raydiumPoolCache.set(cacheKey, { timestamp: now, pool: null });
-          break;
-        }
-        
-        const resolved = new PublicKey(data.data[0].id);
-        raydiumPoolCache.set(cacheKey, { timestamp: now, pool: resolved });
-        return resolved;
-      } catch (error) {
-        lastError = error instanceof Error ? error.message : String(error);
-        logger.error("RaydiumResolver", "Failed to fetch Raydium pool", {
-          attempt,
-          inputMint: inputMintStr,
-          outputMint: outputMintStr,
-          error: lastError,
-        });
-      }
-    }
-
-    if (cached?.pool) {
-      logger.warn("RaydiumResolver", "Using stale cached pool after repeated failures", {
-        cacheKey,
-        ageMs: now - cached.timestamp,
-        lastError,
-      });
-      raydiumPoolCache.set(cacheKey, { timestamp: now, pool: cached.pool });
-      return cached.pool;
-    }
+    logger.warn("RaydiumResolver", "No Raydium pool config found", {
+      inputMint: inputMintStr,
+      outputMint: outputMintStr,
+    });
 
     raydiumPoolCache.set(cacheKey, { timestamp: now, pool: null });
     return null;
@@ -711,29 +1035,66 @@ export async function getRaydiumAccounts(
   try {
     const safeInputMint = toPublicKey(inputMint);
     const safeOutputMint = toPublicKey(outputMint);
-    const poolConfig = getRaydiumPool(safeInputMint, safeOutputMint);
-    const poolId = poolConfig?.ammAddress ?? (await findRaydiumPool(safeInputMint, safeOutputMint));
+    const safeUser = toPublicKey(userPublicKey);
+    const poolConfig = await findRaydiumPool(safeInputMint, safeOutputMint);
 
-    if (!poolId) {
-      console.warn("[RaydiumResolver] No Raydium pool found");
+    if (!poolConfig) {
+      logger.warn("RaydiumResolver", "No Raydium pool found for pair", {
+        inputMint: safeInputMint.toBase58(),
+        outputMint: safeOutputMint.toBase58(),
+      });
       return null;
     }
 
+    const serumMeta = await loadSerumMarketMeta(
+      connection,
+      poolConfig.serumMarket,
+      poolConfig.serumProgramId
+    );
+
+    if (!serumMeta) {
+      logger.warn("RaydiumResolver", "Missing Serum metadata for market", {
+        market: poolConfig.serumMarket.toBase58(),
+      });
+      return null;
+    }
+
+    const userSourceAccount = await getAssociatedTokenAddress(safeInputMint, safeUser);
+    const userDestinationAccount = await getAssociatedTokenAddress(safeOutputMint, safeUser);
+
     return {
       accounts: [
-        RAYDIUM_AMM_PROGRAM,
-        poolId,
+        TOKEN_PROGRAM_ID,                      // 0. SPL token program
+        poolConfig.ammAddress,                 // 1. AMM pool state
+        poolConfig.ammAuthority,               // 2. AMM authority
+        poolConfig.ammOpenOrders,              // 3. AMM open orders
+        poolConfig.poolCoinTokenAccount,       // 4. AMM coin vault
+        poolConfig.poolPcTokenAccount,         // 5. AMM pc vault
+        poolConfig.serumProgramId,             // 6. Serum DEX program
+        poolConfig.serumMarket,                // 7. Serum market
+        serumMeta.bids,                        // 8. Serum bids
+        serumMeta.asks,                        // 9. Serum asks
+        serumMeta.eventQueue,                  // 10. Serum event queue
+        serumMeta.coinVault,                   // 11. Serum coin vault
+        serumMeta.pcVault,                     // 12. Serum pc vault
+        serumMeta.vaultSigner,                 // 13. Serum vault signer PDA
+        userSourceAccount,                     // 14. User source ATA
+        userDestinationAccount,                // 15. User destination ATA
+        safeUser,                              // 16. User authority (signer)
+        RAYDIUM_AMM_PROGRAM,                   // 17. Raydium program (required by CPI invoke)
       ],
-      vaultTokenAccountA: poolConfig?.poolCoinTokenAccount,
-      vaultTokenAccountB: poolConfig?.poolPcTokenAccount,
+      vaultTokenAccountA: poolConfig.poolCoinTokenAccount,
+      vaultTokenAccountB: poolConfig.poolPcTokenAccount,
       meta: {
         venue: 'RAYDIUM_AMM',
-        poolAddress: poolId.toBase58(),
-        feeRate: (poolConfig?.feeBps ?? 25) / 10_000,
+        poolAddress: poolConfig.ammAddress.toBase58(),
+        feeRate: poolConfig.feeBps / 10_000,
       },
     };
   } catch (error) {
-    console.error("[RaydiumResolver] Error:", error);
+    logger.error("RaydiumResolver", "Unexpected error", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 }
@@ -742,7 +1103,15 @@ export async function getRaydiumAccounts(
 // UNIFIED RESOLVER
 // ============================================================================
 
-export type SupportedVenue = 'ORCA_WHIRLPOOL' | 'METEORA_DLMM' | 'PHOENIX' | 'RAYDIUM_AMM';
+export type SupportedVenue =
+  | 'ORCA_WHIRLPOOL'
+  | 'METEORA_DLMM'
+  | 'PHOENIX'
+  | 'RAYDIUM_AMM'
+  | 'LIFINITY'
+  | 'SABER'
+  | 'SANCTUM'
+  | 'RAYDIUM_CLMM';
 
 /**
  * Résout les comptes pour n'importe quel DEX supporté
@@ -764,6 +1133,16 @@ export async function getDEXAccounts(
       return getPhoenixAccounts(connection, inputMint, outputMint, userPublicKey);
     case 'RAYDIUM_AMM':
       return getRaydiumAccounts(connection, inputMint, outputMint, userPublicKey);
+    case 'LIFINITY':
+      return getLifinityAccounts(connection, inputMint, outputMint, userPublicKey);
+    case 'SABER':
+      return getSaberAccounts(connection, inputMint, outputMint, userPublicKey);
+    case 'SANCTUM':
+      console.warn('[DEXResolver] SANCTUM resolver not implemented yet');
+      return null;
+    case 'RAYDIUM_CLMM':
+      console.warn('[DEXResolver] RAYDIUM_CLMM resolver not implemented yet');
+      return null;
     default:
       console.warn(`[DEXResolver] Unknown venue: ${venue}`);
       return null;
@@ -783,7 +1162,14 @@ export async function getAllDEXAccounts(
   const safeInputMint = toPublicKey(inputMint);
   const safeOutputMint = toPublicKey(outputMint);
   const safeUser = toPublicKey(userPublicKey);
-  const venues: SupportedVenue[] = ['ORCA_WHIRLPOOL', 'METEORA_DLMM', 'PHOENIX', 'RAYDIUM_AMM'];
+  const venues: SupportedVenue[] = [
+    'ORCA_WHIRLPOOL',
+    'METEORA_DLMM',
+    'PHOENIX',
+    'RAYDIUM_AMM',
+    'LIFINITY',
+    'SABER',
+  ];
   
   const results = await Promise.allSettled(
     venues.map(venue => getDEXAccounts(connection, venue, safeInputMint, safeOutputMint, safeUser))
@@ -806,6 +1192,8 @@ export default {
   getMeteoraAccounts,
   getPhoenixAccounts,
   getRaydiumAccounts,
+  getLifinityAccounts,
+  getSaberAccounts,
   getDEXAccounts,
   getAllDEXAccounts,
 };

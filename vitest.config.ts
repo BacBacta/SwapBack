@@ -33,6 +33,7 @@ export default defineConfig({
       "@/store": path.resolve(__dirname, "./app/src/store"),
       "@/idl": path.resolve(__dirname, "./app/src/idl"),
       "@/utils": path.resolve(__dirname, "./app/src/utils"),
+      "@/sdk": path.resolve(__dirname, "./app/src/sdk"),
       "@": path.resolve(__dirname, "./sdk/src"),
     },
   },

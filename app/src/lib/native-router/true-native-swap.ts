@@ -28,6 +28,7 @@ import {
   TOKEN_PROGRAM_ID,
   getAssociatedTokenAddress,
   createAssociatedTokenAccountInstruction,
+  createSyncNativeInstruction,
 } from "@solana/spl-token";
 import BN from "bn.js";
 import { logger } from "@/lib/logger";
@@ -628,6 +629,14 @@ export class TrueNativeSwap {
       }
     });
 
+    // IMPORTANT: plusieurs CPI on-chain utilisent `invoke(&instruction, account_slice)`.
+    // Dans ce cas, le runtime exige que le compte programme (exécutable) soit inclus
+    // dans la liste des comptes passée à l'invocation.
+    // Pour ne pas casser les indices stricts utilisés par les CPIs, on l'ajoute en fin.
+    if (route.venueProgramId && !normalizedDexAccounts.some((k) => k.equals(route.venueProgramId))) {
+      normalizedDexAccounts.push(route.venueProgramId);
+    }
+
     // Obtenir les oracles
     const oracleConfig = getOracleFeedsForPair(
       inputMint.toBase58(),
@@ -716,6 +725,146 @@ export class TrueNativeSwap {
     if (!venueScoreInfo) {
       console.log("[TrueNativeSwap] venue_score not initialized, using placeholder");
     }
+
+    // Construire les metas des remaining accounts DEX avec les bons flags.
+    // IMPORTANT:
+    // - Les programmes (exécutables) doivent rester readonly.
+    // - Certains CPIs exigent explicitement que l'utilisateur soit signer dans la slice (ex Raydium user_owner).
+    const remainingDexKeys = normalizedDexAccounts.map((pubkey, index) => {
+      let isSigner = false;
+      let isWritable = true;
+
+      // Program accounts (exécutables) doivent être readonly.
+      if (
+        pubkey.equals(TOKEN_PROGRAM_ID) ||
+        pubkey.equals(DEX_PROGRAM_IDS.RAYDIUM_AMM) ||
+        pubkey.equals(DEX_PROGRAM_IDS.RAYDIUM_CLMM) ||
+        pubkey.equals(DEX_PROGRAM_IDS.ORCA_WHIRLPOOL) ||
+        pubkey.equals(DEX_PROGRAM_IDS.METEORA_DLMM) ||
+        pubkey.equals(DEX_PROGRAM_IDS.PHOENIX) ||
+        pubkey.equals(DEX_PROGRAM_IDS.LIFINITY) ||
+        pubkey.equals(DEX_PROGRAM_IDS.SANCTUM) ||
+        pubkey.equals(DEX_PROGRAM_IDS.SABER)
+      ) {
+        isWritable = false;
+      }
+
+      // L'utilisateur (owner/authority) doit être signer dans certaines slices.
+      if (pubkey.equals(safeUser)) {
+        isSigner = true;
+        isWritable = false;
+      }
+
+      // Ajustements par venue (alignés avec les CPI on-chain)
+      if (route.venue === "RAYDIUM_AMM") {
+        // cpi_raydium.rs: indices readonly: 0,2,6,13 ; signer readonly: 16
+        if (index === 0 || index === 2 || index === 6 || index === 13) {
+          isWritable = false;
+        }
+        if (index === 16) {
+          isSigner = true;
+          isWritable = false;
+        }
+        // Le compte programme Raydium est inclus en extra pour satisfaire `invoke`
+        if (index === 17) {
+          isWritable = false;
+        }
+      }
+
+      if (route.venue === "ORCA_WHIRLPOOL") {
+        // cpi_orca.rs: token_program readonly (0), token_authority signer readonly (1)
+        if (index === 0) {
+          isWritable = false;
+        }
+        if (index === 1) {
+          isSigner = true;
+          isWritable = false;
+        }
+        // Le compte programme Orca est inclus en extra pour satisfaire `invoke`
+        if (index === 11) {
+          isWritable = false;
+        }
+      }
+
+      if (route.venue === "METEORA_DLMM") {
+        // cpi_meteora.rs: user signer readonly (10), token programs readonly (11,12), program readonly (14)
+        if (index === 10) {
+          isSigner = true;
+          isWritable = false;
+        }
+        if (index === 11 || index === 12 || index === 14) {
+          isWritable = false;
+        }
+      }
+
+      if (route.venue === "PHOENIX") {
+        // Phoenix: programme readonly (index 0 dans notre resolver actuel)
+        if (index === 0) {
+          isWritable = false;
+        }
+      }
+
+      if (route.venue === "LIFINITY") {
+        // cpi_lifinity.rs: userTransferAuthority signer (2). token program readonly (9). programme readonly (extra).
+        // Note: certains flags exacts (writable/readonly) sont imposés côté programme on-chain.
+        if (index === 2) {
+          isSigner = true;
+          isWritable = false;
+        }
+        if (index === 9) {
+          isWritable = false;
+        }
+        // Le compte programme Lifinity est inclus en extra pour satisfaire `invoke`
+        if (pubkey.equals(DEX_PROGRAM_IDS.LIFINITY)) {
+          isWritable = false;
+        }
+      }
+
+      if (route.venue === "SABER") {
+        // cpi_saber.rs: swap_info readonly (0), swap_authority readonly (1), user signer readonly (2), token program readonly (8), clock readonly (9)
+        if (index === 0 || index === 1 || index === 8 || index === 9) {
+          isWritable = false;
+        }
+        if (index === 2) {
+          isSigner = true;
+          isWritable = false;
+        }
+        // Le compte programme Saber est inclus en extra pour satisfaire `invoke`
+        if (pubkey.equals(DEX_PROGRAM_IDS.SABER)) {
+          isWritable = false;
+        }
+      }
+
+      if (route.venue === "SANCTUM") {
+        // cpi_sanctum.rs: user signer (1), token programs readonly (6,7), instructions sysvar readonly (8)
+        if (index === 1) {
+          isSigner = true;
+          isWritable = false;
+        }
+        if (index === 6 || index === 7 || index === 8) {
+          isWritable = false;
+        }
+        if (pubkey.equals(DEX_PROGRAM_IDS.SANCTUM)) {
+          isWritable = false;
+        }
+      }
+
+      if (route.venue === "RAYDIUM_CLMM") {
+        // cpi_raydium_clmm.rs: payer signer (0), token program readonly (8), program readonly (extra)
+        if (index === 0) {
+          isSigner = true;
+          isWritable = false;
+        }
+        if (index === 8) {
+          isWritable = false;
+        }
+        if (pubkey.equals(DEX_PROGRAM_IDS.RAYDIUM_CLMM)) {
+          isWritable = false;
+        }
+      }
+
+      return { pubkey, isSigner, isWritable };
+    });
     
     const keys = [
       // 1. state
@@ -763,11 +912,7 @@ export class TrueNativeSwap {
       // 20. system_program
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       // DEX accounts (remaining accounts)
-      ...normalizedDexAccounts.map((pubkey) => ({
-        pubkey,
-        isSigner: false,
-        isWritable: true,
-      })),
+      ...remainingDexKeys,
     ];
 
     return new TransactionInstruction({
@@ -958,6 +1103,52 @@ export class TrueNativeSwap {
     );
 
     // Créer ATA si nécessaire
+
+    // Input side: gérer WSOL (wrap SOL -> WSOL) quand inputMint est So111...
+    // - Créer l'ATA WSOL si absent
+    // - Transférer uniquement le déficit (si solde WSOL < amountIn)
+    // - syncNative pour refléter les lamports dans le amount SPL
+    if (inputMint.equals(SOL_MINT)) {
+      const userTokenAccountA = await getAssociatedTokenAddress(
+        inputMint,
+        userPublicKey
+      );
+
+      const inputAtaInfo = await this.connection.getAccountInfo(userTokenAccountA);
+      if (!inputAtaInfo) {
+        instructions.push(
+          createAssociatedTokenAccountInstruction(
+            userPublicKey,
+            userTokenAccountA,
+            userPublicKey,
+            inputMint
+          )
+        );
+      }
+
+      let currentWsolAmount = 0;
+      try {
+        if (inputAtaInfo) {
+          const bal = await this.connection.getTokenAccountBalance(userTokenAccountA);
+          currentWsolAmount = Number(bal.value.amount);
+        }
+      } catch {
+        currentWsolAmount = 0;
+      }
+
+      const deficit = Math.max(0, amountIn - currentWsolAmount);
+      if (deficit > 0) {
+        instructions.push(
+          SystemProgram.transfer({
+            fromPubkey: userPublicKey,
+            toPubkey: userTokenAccountA,
+            lamports: deficit,
+          })
+        );
+        instructions.push(createSyncNativeInstruction(userTokenAccountA));
+      }
+    }
+
     const userTokenAccountB = await getAssociatedTokenAddress(
       outputMint,
       userPublicKey

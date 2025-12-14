@@ -9,9 +9,24 @@ use crate::{ErrorCode, SwapToC, LIFINITY_PROGRAM_ID};
 /// Lifinity swap discriminator
 const SWAP_DISCRIMINATOR: [u8; 8] = [248, 198, 158, 145, 225, 117, 135, 200];
 
-/// Account indices for Lifinity swap (v2)
-const AMM_INDEX: usize = 0;
-const AUTHORITY_INDEX: usize = 1;
+/// Account indices for Lifinity swap (IDL: lifinity_amm.swap)
+///
+/// Ordre attendu (SDK @lifinity) :
+/// 0  authority (readonly)
+/// 1  amm (readonly)
+/// 2  userTransferAuthority (signer)
+/// 3  sourceInfo (mut)
+/// 4  destinationInfo (mut)
+/// 5  swapSource (mut)
+/// 6  swapDestination (mut)
+/// 7  poolMint (mut)
+/// 8  feeAccount (mut)
+/// 9  tokenProgram (readonly)
+/// 10 pythAccount (readonly)
+/// 11 pythPcAccount (readonly)
+/// 12 configAccount (mut)
+const AUTHORITY_INDEX: usize = 0;
+const AMM_INDEX: usize = 1;
 const USER_TRANSFER_AUTHORITY_INDEX: usize = 2;
 const SOURCE_INFO_INDEX: usize = 3;
 const DESTINATION_INFO_INDEX: usize = 4;
@@ -20,9 +35,9 @@ const SWAP_DESTINATION_INDEX: usize = 6;
 const POOL_MINT_INDEX: usize = 7;
 const FEE_ACCOUNT_INDEX: usize = 8;
 const TOKEN_PROGRAM_INDEX: usize = 9;
-const ORACLE_MAIN_ACCOUNT_INDEX: usize = 10;
-const ORACLE_SUB_ACCOUNT_INDEX: usize = 11;
-const ORACLE_PC_ACCOUNT_INDEX: usize = 12;
+const PYTH_ACCOUNT_INDEX: usize = 10;
+const PYTH_PC_ACCOUNT_INDEX: usize = 11;
+const CONFIG_ACCOUNT_INDEX: usize = 12;
 
 /// Minimum accounts for Lifinity swap
 pub const LIFINITY_SWAP_ACCOUNT_COUNT: usize = 13;
@@ -84,21 +99,22 @@ pub fn swap(
     data.extend_from_slice(&amount_in.to_le_bytes());
     data.extend_from_slice(&min_out.to_le_bytes());
 
-    // Build account metas
-    let account_metas: Vec<AccountMeta> = account_slice
+    // Build account metas (IDL exact, sans inclure les comptes "extra" comme le compte programme
+    // ajouté côté client pour satisfaire les contraintes de invoke).
+    let required_accounts = &account_slice[..LIFINITY_SWAP_ACCOUNT_COUNT];
+    let account_metas: Vec<AccountMeta> = required_accounts
         .iter()
         .enumerate()
         .map(|(i, info)| {
-            let is_writable = matches!(i, 
-                AMM_INDEX |
-                SOURCE_INFO_INDEX | 
-                DESTINATION_INFO_INDEX |
-                SWAP_SOURCE_INDEX |
-                SWAP_DESTINATION_INDEX |
-                POOL_MINT_INDEX |
-                FEE_ACCOUNT_INDEX
-            );
-            
+            // NOTE: écriture explicite (évite toute ambiguïté `matches!(..., a | b | c)`)
+            let is_writable = i == SOURCE_INFO_INDEX
+                || i == DESTINATION_INFO_INDEX
+                || i == SWAP_SOURCE_INDEX
+                || i == SWAP_DESTINATION_INDEX
+                || i == POOL_MINT_INDEX
+                || i == FEE_ACCOUNT_INDEX
+                || i == CONFIG_ACCOUNT_INDEX;
+
             if is_writable {
                 AccountMeta::new(*info.key, info.is_signer)
             } else {
@@ -113,6 +129,8 @@ pub fn swap(
         data,
     };
 
+    // IMPORTANT: on passe `account_slice` (potentiellement avec comptes extra) à invoke afin que
+    // le compte programme Lifinity (exécutable) soit bien présent dans AccountInfos.
     invoke(&instruction, account_slice)
         .map_err(|e| {
             msg!("Lifinity swap failed: {:?}", e);

@@ -3339,6 +3339,17 @@
             }
           },
           {
+            "name": "direct_dex_venue",
+            "docs": [
+              "Direct DEX venue program ID for native swaps (bypasses Jupiter)",
+              "When Some(venue), executes CPI directly to the specified DEX",
+              "Supported: Orca Whirlpool, Raydium CLMM, Meteora, Phoenix, Lifinity, Sanctum, Saber"
+            ],
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
             "name": "jupiter_route",
             "type": {
               "option": {

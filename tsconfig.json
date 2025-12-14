@@ -26,6 +26,13 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
+      "@/lib/*": ["./app/src/lib/*"],
+      "@/hooks/*": ["./app/src/hooks/*"],
+      "@/components/*": ["./app/src/components/*"],
+      "@/config/*": ["./app/src/config/*"],
+      "@/store/*": ["./app/src/store/*"],
+      "@/idl/*": ["./app/src/idl/*"],
+      "@/utils/*": ["./app/src/utils/*"],
       "@/app/*": ["./app/src/*"],
       "@/sdk/*": ["./sdk/src/*"]
     }

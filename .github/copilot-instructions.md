@@ -1,9 +1,29 @@
 # SwapBack — Instructions Globales (Copilot Chat)
 
-## Contrainte CRITIQUE : MAINNET
-- Le programme `swapback_router` est déjà déployé sur Solana MAINNET.
-- NE PAS proposer ni implémenter de modifications on-chain (Anchor/Rust) sans demande explicite.
-- Les corrections doivent être côté app/SDK/scripts/tests/config.
+## Architecture CRITIQUE : VRAI DEX ROUTER (pas wrapper Jupiter)
+- SwapBack Router doit faire des **CPI directs vers les DEX** (Orca Whirlpool, Raydium CLMM, etc.)
+- **INTERDIT** : Exiger jupiter_route comme dépendance obligatoire pour les swaps
+- Le mode "native swap" doit fonctionner **sans Jupiter** via CPI direct vers les pools DEX
+
+## 🚫 BLOCAGE JUPITER — CONDITION STRICTE
+**L'utilisation de Jupiter comme fallback ou option est conditionnée par la réussite du router natif.**
+
+**TANT QUE l'utilisateur ne confirme pas explicitement que:**
+1. Le routeur natif est fonctionnel
+2. Les swaps passent avec succès via CPI direct vers les DEX
+
+**L'agent ne devra AUCUNEMENT:**
+- Définir Jupiter comme option ou fallback
+- Proposer Jupiter comme alternative
+- Implémenter du code utilisant Jupiter
+- Suggérer d'activer Jupiter
+
+**Seuls les DEX natifs sont autorisés:** Orca Whirlpool, Raydium CLMM, Meteora, Phoenix, Lifinity, Sanctum, Saber
+
+## Contrainte MAINNET
+- Le programme `swapback_router` est déployé sur Solana MAINNET.
+- Modifications on-chain autorisées pour implémenter le vrai DEX router.
+- Tester via simulateTransaction avant tout déploiement.
 
 ## Règles anti-régression
 - Interdit: hardcoder des prix/quotes (sauf mocks en tests).

@@ -61,28 +61,30 @@ export interface RaydiumPoolConfig {
 export const RAYDIUM_POOLS: Record<string, RaydiumPoolConfig> = {
   "SOL/USDC": {
     symbol: "SOL/USDC",
-    ammAddress: new PublicKey("8HoQnePLqPj4M7PUDzfw8e3Ymdwgc7NLGnaTUapubyvu"),
+    // NOTE: `ammAddress` is the Raydium AMM state account (owner = Raydium AMM program).
+    // The LP mint for SOL/USDC is `8HoQne...` (Token program, 82 bytes) and must NOT be used as AMM state.
+    ammAddress: new PublicKey("58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2"),
     ammAuthority: new PublicKey("5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1"),
-    ammOpenOrders: new PublicKey("HRk9CMrpq7Jn9sh7mzxE8CChHGvjHfbv56NXJbNCb9Z"),
+    ammOpenOrders: new PublicKey("HmiHHzq4Fym9e1D4qzLS6LDDM3tNsCTBPDWHTLZ763jY"),
     ammTargetOrders: new PublicKey(
-      "CuieVDEDtLo7FypA9SbLM9saXFdb1dsshEkyErMqkRQq"
+      "CZza3Ej4Mc58MnxWA385itCC9jCo3L1D7zc3LKy1bZMR"
     ),
     poolCoinTokenAccount: new PublicKey(
       "DQyrAcCrDXQ7NeoqGgDCZwBvWDcYmFCjSb9JtteuvPpz"
     ),
     poolPcTokenAccount: new PublicKey(
-      "HLmqeL62xR1QoZ1HKKbXRrdN1p3phKpxRMb2VVopvBB"
+      "HLmqeL62xR1QoZ1HKKbXRrdN1p3phKpxRMb2VVopvBBz"
     ),
     poolWithdrawQueue: new PublicKey(
-      "G7xeGGLevkRwB5f44QNgQtrPKBdMfkT6ZZwpS9xcC97n"
+      "11111111111111111111111111111111"
     ),
     poolTempLpTokenAccount: new PublicKey(
-      "Awpt6N7ZYPBa4vG4BQNFhFxDj7FbH2PqAaro6rKEceMj"
+      "11111111111111111111111111111111"
     ),
     serumProgramId: new PublicKey(
-      "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin"
+      "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX"
     ),
-    serumMarket: new PublicKey("9wFFyRfZBsuAha4YcuxcXLKwMxJR43S7fPfQLusDBzvT"),
+    serumMarket: new PublicKey("8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6"),
     tokenMintA: new PublicKey("So11111111111111111111111111111111111111112"), // Wrapped SOL
     tokenMintB: new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"), // USDC
     feeBps: 25, // 0.25%
