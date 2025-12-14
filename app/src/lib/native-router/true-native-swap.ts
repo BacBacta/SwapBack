@@ -697,6 +697,13 @@ export class TrueNativeSwap {
     const vaultTokenAccountA = route.dexAccounts.vaultTokenAccountA ?? accounts.userTokenAccountA;
     const vaultTokenAccountB = route.dexAccounts.vaultTokenAccountB ?? accounts.userTokenAccountB;
     
+    // Vérifier si user_rebate existe, sinon utiliser placeholder
+    const userRebateAccountInfo = await this.connection.getAccountInfo(accounts.userRebate);
+    const userRebateKey = userRebateAccountInfo ? accounts.userRebate : ROUTER_PROGRAM_ID;
+    if (!userRebateAccountInfo) {
+      console.log("[TrueNativeSwap] user_rebate not initialized, using placeholder");
+    }
+    
     const keys = [
       // 1. state
       { pubkey: accounts.state, isSigner: false, isWritable: true },
@@ -730,8 +737,8 @@ export class TrueNativeSwap {
       { pubkey: ROUTER_PROGRAM_ID, isSigner: false, isWritable: false },
       // 14. user_rebate_account (optional)
       { pubkey: ROUTER_PROGRAM_ID, isSigner: false, isWritable: false },
-      // 15. user_rebate (optional, PDA)
-      { pubkey: accounts.userRebate, isSigner: false, isWritable: true },
+      // 15. user_rebate (optional, PDA) - use placeholder if not initialized
+      { pubkey: userRebateKey, isSigner: false, isWritable: userRebateAccountInfo !== null },
       // 16. rebate_vault (writable, PDA)
       { pubkey: accounts.rebateVault, isSigner: false, isWritable: true },
       // 17. oracle_cache (optional, PDA)
