@@ -2359,20 +2359,17 @@ export class NativeRouterService {
       { pubkey: NONE_ACCOUNT, isSigner: false, isWritable: false },
       // 13. buyback_state (optional - None)
       { pubkey: NONE_ACCOUNT, isSigner: false, isWritable: false },
-      // 14. user_rebate_account (TokenAccount USDC for direct transfer - DISABLED)
+      // 14. user_rebate_account (optional - TokenAccount USDC for direct transfer)
       { pubkey: NONE_ACCOUNT, isSigner: false, isWritable: false },
-      // 15. user_rebate PDA (UserRebate account for deferred claim - credits stored here)
-      // Pass if exists, otherwise program will skip rebate credit
-      { pubkey: userRebatePdaExists ? accounts.userRebatePda : NONE_ACCOUNT, isSigner: false, isWritable: userRebatePdaExists },
-      // 16. rebate_vault
+      // 15. rebate_vault
       { pubkey: accounts.rebateVault, isSigner: false, isWritable: true },
-      // 17. oracle_cache (optional - seulement si existe)
+      // 16. oracle_cache (optional - seulement si existe)
       { pubkey: oracleCacheExists ? accounts.oracleCache : NONE_ACCOUNT, isSigner: false, isWritable: oracleCacheExists },
-      // 18. venue_score (optional - seulement si existe)
+      // 17. venue_score (optional - seulement si existe)
       { pubkey: venueScoreExists ? accounts.venueScore : NONE_ACCOUNT, isSigner: false, isWritable: venueScoreExists },
-      // 19. token_program
+      // 18. token_program
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      // 20. system_program
+      // 19. system_program
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       // remaining_accounts: Jupiter Program ID + comptes de l'instruction Jupiter
       // Le programme on-chain exige Jupiter Program ID comme PREMIER compte
