@@ -59,7 +59,9 @@ interface AdvancedOptionsPanelProps {
   onSlippageChange: (value: number) => void;
   mevProtection: boolean;
   onMevProtectionChange: (value: boolean) => void;
+  /** @deprecated Toujours true maintenant - routage natif par défaut */
   trueNativeMode?: boolean;
+  /** @deprecated No-op - le mode natif est toujours actif */
   onTrueNativeModeChange?: (value: boolean) => void;
   quote: QuoteResult | null;
   inputToken: TokenInfo;
@@ -78,8 +80,7 @@ export function AdvancedOptionsPanel({
   onSlippageChange,
   mevProtection,
   onMevProtectionChange,
-  trueNativeMode = false,
-  onTrueNativeModeChange,
+  // trueNativeMode et onTrueNativeModeChange sont deprecated - toujours natif maintenant
   quote,
   inputToken,
   outputToken,
@@ -297,40 +298,16 @@ export function AdvancedOptionsPanel({
                     )}
                   </div>
 
-                  {/* 🔥 True Native Routing */}
-                  {onTrueNativeModeChange && (
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <label className="text-sm font-medium text-gray-300">
-                          🔥 Routage 100% Natif
-                        </label>
-                        <button
-                          onClick={() => onTrueNativeModeChange(!trueNativeMode)}
-                          className={`
-                            relative w-12 h-6 rounded-full transition-colors
-                            ${trueNativeMode ? "bg-orange-500" : "bg-gray-700"}
-                          `}
-                        >
-                          <motion.div
-                            animate={{ x: trueNativeMode ? 24 : 2 }}
-                            className="absolute top-1 w-4 h-4 bg-white rounded-full"
-                          />
-                        </button>
-                      </div>
-                      <p className="text-sm text-gray-500">
-                        Appelle directement les DEX (Raydium, Orca, Meteora) sans passer par Jupiter.
-                        <span className="text-orange-400 block mt-1">
-                          ⚠️ Mode expérimental - Limité aux paires supportées
-                        </span>
-                      </p>
-                      {trueNativeMode && (
-                        <div className="mt-3 flex items-center gap-2 text-orange-400 text-sm">
-                          <Zap className="w-4 h-4" />
-                          Routage 100% natif activé
-                        </div>
-                      )}
+                  {/* 🔥 True Native Routing - Toujours actif maintenant */}
+                  <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                    <div className="flex items-center gap-2 text-green-400 text-sm">
+                      <Zap className="w-4 h-4" />
+                      <span className="font-medium">Routage DEX Natif actif</span>
                     </div>
-                  )}
+                    <p className="text-xs text-gray-400 mt-1">
+                      Appel direct aux DEX (Orca Whirlpool, Raydium CLMM, Meteora) via CPI
+                    </p>
+                  </div>
 
                   {/* Canal d'exécution */}
                   <div>
