@@ -92,3 +92,11 @@ simulate-swap-report.json
 # Cache directories
 .turbo/
 .cache/
+
+# Temporary test scripts (dev debugging)
+check-*.mjs
+check-*.ts
+test-*.mjs
+scripts/analyze-pool-structure.js
+scripts/check-pool-tick.js
+scripts/find-tick-arrays*.js
