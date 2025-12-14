@@ -582,16 +582,51 @@ export function useNativeSwap() {
         return swapResult;
       } catch (err) {
         const message = err instanceof Error ? err.message : "Erreur lors du swap natif";
+        const normalized = message.toLowerCase();
+
+        // Log detailed error for debugging
         logger.error("useNativeSwap", "True native swap error", {
           error: message,
           stack: err instanceof Error ? err.stack : null,
+          inputMint: params.inputMint?.toString?.() ?? "unknown",
+          outputMint: params.outputMint?.toString?.() ?? "unknown",
+          venue: trueNativeRoute?.venue,
         });
+
+        // Check for specific error types and provide helpful messages
+        if (normalized.includes("0xbc4") || normalized.includes("3012") || normalized.includes("accountnotinitialized")) {
+          setError(
+            "Compte token non initialisé. Assurez-vous d'avoir un compte wSOL " +
+            "ou le token source dans votre wallet."
+          );
+        } else if (normalized.includes("0x1772") || normalized.includes("oraclestale")) {
+          setError(
+            "Oracle obsolète ou non disponible pour cette paire. " +
+            "Cette paire n'est pas supportée par le routage natif."
+          );
+        } else if (normalized.includes("0x65") || normalized.includes("instructionfallbacknotfound")) {
+          // Log warning but DO NOT fallback to Jupiter per user request
+          logger.warn("useNativeSwap", "Dynamic Plan instruction error", {
+            venue: trueNativeRoute?.venue,
+          });
+          setError(
+            "Erreur d'instruction Dynamic Plan. " +
+            "Veuillez réessayer ou contacter le support."
+          );
+        } else if (normalized.includes("insufficient") || normalized.includes("0x1")) {
+          setError(
+            "Solde insuffisant pour effectuer ce swap. " +
+            "Vérifiez que vous avez assez de tokens."
+          );
+        } else {
+          setError(message);
+        }
+
         if (err instanceof Error) {
           console.error("[useNativeSwap] True native swap exception", err);
         } else {
           console.error("[useNativeSwap] True native swap exception", { err });
         }
-        setError(message);
         return null;
       } finally {
         setLoading(false);

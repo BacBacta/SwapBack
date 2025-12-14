@@ -174,10 +174,14 @@ export interface NativeSwapResult {
   signature: string;
   inputAmount: number;
   outputAmount: number;
+  inputMint?: string;
+  outputMint?: string;
   venues: string[];
   rebateAmount: number;
   npiGenerated: number;
-  transactionFee: number;
+  transactionFee?: number;
+  boostApplied?: number;
+  success?: boolean;
 }
 
 /** VenueScore on-chain account data */

@@ -1294,6 +1294,10 @@ pub struct SwapArgs {
     pub use_bundle: bool,                // Whether to use MEV bundling
     pub primary_oracle_account: Pubkey,  // Primary oracle account for price validation
     pub fallback_oracle_account: Option<Pubkey>, // Optional fallback oracle account
+    /// Direct DEX venue program ID for native swaps (bypasses Jupiter)
+    /// When Some(venue), executes CPI directly to the specified DEX
+    /// Supported: Orca Whirlpool, Raydium CLMM, Meteora, Phoenix, Lifinity, Sanctum, Saber
+    pub direct_dex_venue: Option<Pubkey>,
     pub jupiter_route: Option<JupiterRouteParams>,
     /// Jupiter instruction data for CPI replay (provided by keeper/SDK)
     pub jupiter_swap_ix_data: Option<Vec<u8>>,
@@ -1822,7 +1826,18 @@ pub mod swap_toc_processor {
 
         let oracle_observation =
             get_oracle_price(&ctx.accounts.primary_oracle, fallback_account, &clock, args.max_staleness_override)?;
-        let expected_out = calculate_expected_output(args.amount_in, oracle_observation.price)?;
+        
+        // Calculate expected output with proper decimal handling
+        // Oracle price is in 8 decimals (e.g., $130.95 = 13_095_000_000)
+        // We need to convert from token_a_decimals to token_b_decimals
+        let token_a_decimals = args.token_a_decimals.unwrap_or(6);
+        let token_b_decimals = args.token_b_decimals.unwrap_or(6);
+        let expected_out = calculate_expected_output_with_decimals(
+            args.amount_in,
+            oracle_observation.price,
+            token_a_decimals,
+            token_b_decimals,
+        )?;
 
         // Calculate min_out: Use dynamic slippage if enabled, else user-provided tolerance
         let min_out = if let Some(dynamic_slippage) = slippage_bps_effective {
@@ -1848,12 +1863,13 @@ pub mod swap_toc_processor {
             }
         }
 
-        // Execute real swap via Jupiter or configured DEX
+        // Execute real swap via native DEX or Jupiter fallback
         let start_time = clock.unix_timestamp;
         let amount_out = process_single_swap(
             &mut ctx,
             args.amount_in,
             min_out,
+            args.direct_dex_venue,
             args.jupiter_route.as_ref(),
         )?;
 
@@ -2576,6 +2592,46 @@ pub mod swap_toc_processor {
         Ok(expected_out)
     }
 
+    /// Calculate expected output with proper decimal handling
+    /// Oracle price is normalized to 8 decimals (e.g., $130.95 = 13_095_000_000)
+    /// Formula: expected_out = amount_in * oracle_price / 10^(input_decimals + oracle_decimals - output_decimals)
+    fn calculate_expected_output_with_decimals(
+        amount_in: u64,
+        oracle_price: u64,
+        token_a_decimals: u8,
+        token_b_decimals: u8,
+    ) -> Result<u64> {
+        const ORACLE_DECIMALS: i32 = 8;
+        
+        // Calculate the divisor exponent
+        // divisor = 10^(input_decimals + oracle_decimals - output_decimals)
+        let exponent = (token_a_decimals as i32) + ORACLE_DECIMALS - (token_b_decimals as i32);
+        
+        let result = (amount_in as u128)
+            .checked_mul(oracle_price as u128)
+            .ok_or(ErrorCode::InvalidOraclePrice)?;
+        
+        let expected_out = if exponent >= 0 {
+            let divisor = 10u128.checked_pow(exponent as u32)
+                .ok_or(ErrorCode::InvalidOraclePrice)?;
+            result.checked_div(divisor)
+                .ok_or(ErrorCode::InvalidOraclePrice)?
+        } else {
+            // Negative exponent means multiply
+            let multiplier = 10u128.checked_pow((-exponent) as u32)
+                .ok_or(ErrorCode::InvalidOraclePrice)?;
+            result.checked_mul(multiplier)
+                .ok_or(ErrorCode::InvalidOraclePrice)?
+        };
+        
+        // Ensure result fits in u64
+        if expected_out > u64::MAX as u128 {
+            return err!(ErrorCode::InvalidOraclePrice);
+        }
+        
+        Ok(expected_out as u64)
+    }
+
     fn calculate_min_output_with_slippage(
         expected_out: u64,
         slippage_tolerance: u16,
@@ -2593,71 +2649,54 @@ pub mod swap_toc_processor {
         Ok(min_out)
     }
 
-    /// Execute a single swap via Jupiter CPI using delta-based amount calculation.
-    /// This is the core swap function that delegates to the Jupiter aggregator
-    /// and measures actual token balance changes for accurate amount_out.
+    /// Execute a single swap via direct DEX CPI.
+    /// REQUIRES direct_dex_venue - Jupiter is disabled until native router is validated.
     fn process_single_swap<'info>(
         ctx: &mut Context<'_, '_, '_, 'info, SwapToC<'info>>,
         amount_in: u64,
         min_out: u64,
-        jupiter_route: Option<&JupiterRouteParams>,
+        direct_dex_venue: Option<Pubkey>,
+        _jupiter_route: Option<&JupiterRouteParams>, // DISABLED - kept for IDL compatibility
     ) -> Result<u64> {
-        // Require Jupiter route for single swaps
-        let route = jupiter_route.ok_or(ErrorCode::MissingJupiterRoute)?;
-
-        // Validate route parameters match swap request
-        require_eq!(
-            route.expected_input_amount,
-            amount_in,
-            ErrorCode::InvalidJupiterRoute
-        );
-
-        // Get remaining accounts for Jupiter CPI
         let remaining_accounts = ctx.remaining_accounts;
-        require!(
-            remaining_accounts.len() >= cpi_jupiter::JUPITER_SWAP_ACCOUNT_COUNT.min(1),
+        
+        // ===== NATIVE DEX SWAP MODE (REQUIRED) =====
+        // Jupiter is DISABLED until native router is validated by user confirmation.
+        // direct_dex_venue MUST be specified with a valid DEX program ID.
+        let dex_program = direct_dex_venue.ok_or_else(|| {
+            msg!("ERROR: direct_dex_venue is required. Jupiter fallback is DISABLED.");
+            msg!("Supported DEX programs: Orca Whirlpool, Raydium CLMM, Meteora, Phoenix, Lifinity, Sanctum, Saber");
             ErrorCode::DexExecutionFailed
-        );
-
-        // Find Jupiter program in remaining accounts (can be at any position)
-        // The client passes accountsInOrder exactly as received from Jupiter API,
-        // preserving the indices that the instruction data references.
-        let jupiter_program = remaining_accounts
-            .iter()
-            .find(|acc| *acc.key == JUPITER_PROGRAM_ID)
-            .ok_or(ErrorCode::DexExecutionFailed)?;
-
-        // IMPORTANT: Pass ALL remaining_accounts to CPI
-        // The Jupiter instruction data was compiled with indices relative to the full
-        // account list. If we modify the order, the indices in swap_instruction become incorrect.
-        // Jupiter will use its own program ID from the Instruction.program_id field,
-        // so having it also in the accounts list is fine (it may be referenced by inner instructions).
+        })?;
+        
         require!(
             remaining_accounts.len() >= 2,
             ErrorCode::DexExecutionFailed
         );
-
-        // Execute Jupiter swap via CPI with delta-based amount tracking
-        // This measures actual balance changes for accurate amount_out
-        let amount_out = cpi_jupiter::swap_with_balance_deltas(
-            jupiter_program,
-            remaining_accounts, // Pass ALL accounts to preserve instruction indices
-            &ctx.accounts.user_token_account_a.to_account_info(),
-            &ctx.accounts.user_token_account_b.to_account_info(),
+        
+        // Execute direct CPI to the specified DEX
+        let amount_out = execute_dex_swap(
+            ctx,
+            dex_program,
             amount_in,
             min_out,
-            &route.swap_instruction,
-            &[], // No signer seeds needed - user signs directly
+            remaining_accounts,
+            false, // not a fallback
+            None,  // no Jupiter route needed
         )?;
+        
+        process_swap_fees_and_rebates(ctx, amount_in, amount_out, min_out, dex_program)
+    }
 
-        emit!(VenueExecuted {
-            venue: JUPITER_PROGRAM_ID,
-            amount_in,
-            amount_out,
-            success: true,
-            fallback_used: false,
-        });
-
+    /// Process fees, rebates, and state updates after a successful swap
+    /// This is shared logic used by both native DEX swaps and Jupiter swaps
+    fn process_swap_fees_and_rebates<'info>(
+        ctx: &mut Context<'_, '_, '_, 'info, SwapToC<'info>>,
+        amount_in: u64,
+        amount_out: u64,
+        min_out: u64,
+        venue: Pubkey,
+    ) -> Result<u64> {
         // Calculate and distribute fees/rebates
         let user_boost = ctx
             .accounts
@@ -2784,6 +2823,7 @@ pub mod swap_toc_processor {
             ctx,
             slice_amount,
             slice_min_out,
+            args.direct_dex_venue,
             args.jupiter_route.as_ref(),
         )?;
 

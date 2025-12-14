@@ -489,10 +489,8 @@ export class TrueNativeSwap {
     const fallbackLenBuffer = Buffer.alloc(4);
     fallbackLenBuffer.writeUInt32LE(0);
 
-    // Discriminator pour create_plan
-    const discriminator = Buffer.from([
-      0x18, 0x11, 0x91, 0xf2, 0x25, 0x3a, 0x9f, 0x64,
-    ]);
+    // Discriminator pour create_plan - from IDL: [77, 43, 141, 254, 212, 118, 41, 186]
+    const discriminator = Buffer.from([77, 43, 141, 254, 212, 118, 41, 186]);
 
     const argsData = Buffer.concat([
       discriminator,
@@ -538,6 +536,8 @@ export class TrueNativeSwap {
     rebateVault: PublicKey;
     userRebate: PublicKey;
     config: PublicKey;
+    oracleCache: PublicKey;
+    venueScore: PublicKey;
   }> {
     const [state] = PublicKey.findProgramAddressSync(
       [Buffer.from("router_state")],
@@ -557,8 +557,12 @@ export class TrueNativeSwap {
       safeUser
     );
 
+    // Note: vault_token_account_a/b sont les vaults du DEX pool, pas des PDAs du router
+    // Ils sont fournis par les DEX resolvers (getOrcaWhirlpoolAccounts, etc.)
+
+    // Rebate vault PDA - seeds: ["rebate_vault", state]
     const [rebateVault] = PublicKey.findProgramAddressSync(
-      [Buffer.from("rebate_vault")],
+      [Buffer.from("rebate_vault"), state.toBuffer()],
       ROUTER_PROGRAM_ID
     );
 
@@ -567,8 +571,9 @@ export class TrueNativeSwap {
       ROUTER_PROGRAM_ID
     );
 
+    // Config PDA - seed: "router_config"
     const [config] = PublicKey.findProgramAddressSync(
-      [Buffer.from("config")],
+      [Buffer.from("router_config")],
       ROUTER_PROGRAM_ID
     );
 
@@ -579,6 +584,9 @@ export class TrueNativeSwap {
       rebateVault,
       userRebate,
       config,
+      // oracleCache and venueScore are computed per-oracle, returned as defaults
+      oracleCache: PublicKey.default,
+      venueScore: PublicKey.default,
     };
   }
 
@@ -641,24 +649,96 @@ export class TrueNativeSwap {
     const discriminator = Buffer.from([187, 201, 212, 51, 16, 155, 236, 60]);
     const data = Buffer.concat([discriminator, argsBuffer]);
 
-    // Construire les keys
+    // Oracle cache PDA - seeds: ["oracle_cache", primary_oracle]
+    const [oracleCache] = PublicKey.findProgramAddressSync(
+      [Buffer.from("oracle_cache"), oracleConfig.primary.toBuffer()],
+      ROUTER_PROGRAM_ID
+    );
+
+    // Venue score PDA - seeds: ["venue_score", state]
+    const [venueScore] = PublicKey.findProgramAddressSync(
+      [Buffer.from("venue_score"), accounts.state.toBuffer()],
+      ROUTER_PROGRAM_ID
+    );
+
+    /**
+     * Construire les keys dans l'ordre EXACT de l'IDL:
+     * 
+     * 1.  state (writable)
+     * 2.  user (signer, writable)
+     * 3.  primary_oracle
+     * 4.  fallback_oracle (optional)
+     * 5.  user_token_account_a (writable)
+     * 6.  user_token_account_b (writable)
+     * 7.  vault_token_account_a (writable) - DEX pool vault, NOT a router PDA
+     * 8.  vault_token_account_b (writable) - DEX pool vault, NOT a router PDA
+     * 9.  plan (optional)
+     * 10. user_nft (optional, PDA)
+     * 11. buyback_program (optional)
+     * 12. buyback_usdc_vault (optional, writable)
+     * 13. buyback_state (optional, writable)
+     * 14. user_rebate_account (optional, writable)
+     * 15. user_rebate (optional, PDA)
+     * 16. rebate_vault (writable, PDA)
+     * 17. oracle_cache (optional, PDA)
+     * 18. venue_score (optional, PDA)
+     * 19. token_program
+     * 20. system_program
+     * 
+     * Note: vault_token_account_a/b sont les vaults du DEX pool (Orca/Meteora/etc),
+     * PAS des PDAs du router. Ils sont extraits des dexAccounts lors de la résolution.
+     */
+    
+    // Utiliser les vaults du DEX si disponibles, sinon fallback vers user token accounts
+    // (le programme ne les utilise pas vraiment pour les swaps DEX car tout passe par remaining_accounts)
+    const vaultTokenAccountA = route.dexAccounts.vaultTokenAccountA ?? accounts.userTokenAccountA;
+    const vaultTokenAccountB = route.dexAccounts.vaultTokenAccountB ?? accounts.userTokenAccountB;
+    
     const keys = [
+      // 1. state
       { pubkey: accounts.state, isSigner: false, isWritable: true },
+      // 2. user
       { pubkey: safeUser, isSigner: true, isWritable: true },
+      // 3. primary_oracle
       { pubkey: oracleConfig.primary, isSigner: false, isWritable: false },
-      // Fallback oracle (optional)
-      ...(oracleConfig.fallback
-        ? [{ pubkey: oracleConfig.fallback, isSigner: false, isWritable: false }]
-        : []),
+      // 4. fallback_oracle (optional) - pass primary as placeholder if none
+      { 
+        pubkey: oracleConfig.fallback ?? oracleConfig.primary, 
+        isSigner: false, 
+        isWritable: false 
+      },
+      // 5. user_token_account_a
       { pubkey: accounts.userTokenAccountA, isSigner: false, isWritable: true },
+      // 6. user_token_account_b
       { pubkey: accounts.userTokenAccountB, isSigner: false, isWritable: true },
-      { pubkey: accounts.rebateVault, isSigner: false, isWritable: true },
-      { pubkey: accounts.userRebate, isSigner: false, isWritable: true },
-      { pubkey: accounts.config, isSigner: false, isWritable: false },
+      // 7. vault_token_account_a - DEX pool vault
+      { pubkey: vaultTokenAccountA, isSigner: false, isWritable: true },
+      // 8. vault_token_account_b - DEX pool vault
+      { pubkey: vaultTokenAccountB, isSigner: false, isWritable: true },
+      // 9. plan (optional but we're using dynamic plan)
       { pubkey: planPda, isSigner: false, isWritable: true },
+      // 10. user_nft (optional) - use a placeholder, program will handle None
+      { pubkey: ROUTER_PROGRAM_ID, isSigner: false, isWritable: false },
+      // 11. buyback_program (optional)
+      { pubkey: ROUTER_PROGRAM_ID, isSigner: false, isWritable: false },
+      // 12. buyback_usdc_vault (optional)
+      { pubkey: ROUTER_PROGRAM_ID, isSigner: false, isWritable: false },
+      // 13. buyback_state (optional)
+      { pubkey: ROUTER_PROGRAM_ID, isSigner: false, isWritable: false },
+      // 14. user_rebate_account (optional)
+      { pubkey: ROUTER_PROGRAM_ID, isSigner: false, isWritable: false },
+      // 15. user_rebate (optional, PDA)
+      { pubkey: accounts.userRebate, isSigner: false, isWritable: true },
+      // 16. rebate_vault (writable, PDA)
+      { pubkey: accounts.rebateVault, isSigner: false, isWritable: true },
+      // 17. oracle_cache (optional, PDA)
+      { pubkey: oracleCache, isSigner: false, isWritable: true },
+      // 18. venue_score (optional, PDA)
+      { pubkey: venueScore, isSigner: false, isWritable: true },
+      // 19. token_program
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      // 20. system_program
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
       // DEX accounts (remaining accounts)
       ...normalizedDexAccounts.map((pubkey) => ({
         pubkey,
