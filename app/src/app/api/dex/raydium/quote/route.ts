@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
-const RAYDIUM_API_BASE = 'https://api-v3.raydium.io';
+const RAYDIUM_API_BASE = 'https://transaction-v1.raydium.io';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -28,7 +28,8 @@ export async function GET(request: NextRequest) {
     quoteUrl.searchParams.set('inputMint', inputMint);
     quoteUrl.searchParams.set('outputMint', outputMint);
     quoteUrl.searchParams.set('amount', amount);
-    quoteUrl.searchParams.set('slippage', '50'); // 0.5%
+    quoteUrl.searchParams.set('slippageBps', '50'); // 0.5%
+    quoteUrl.searchParams.set('txVersion', 'V0');
     if (poolId) {
       quoteUrl.searchParams.set('poolId', poolId);
     }

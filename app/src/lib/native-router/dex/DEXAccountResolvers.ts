@@ -16,6 +16,7 @@ import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { logger } from "@/lib/logger";
 import { DEX_PROGRAMS } from "../headless/router";
 import { toPublicKey } from "../utils/publicKeyUtils";
+import { getRaydiumPool } from "@/sdk/config/raydium-pools";
 
 const RESOLVER_CACHE_TTL_MS = 60_000; // short-lived cache to absorb bursty API errors
 const MAX_FETCH_ATTEMPTS = 2;
@@ -622,11 +623,22 @@ async function findRaydiumPool(
       return cached.pool;
     }
 
+    // Fast-path: use local static config for well-known pools to avoid API flakiness
+    const staticPool = getRaydiumPool(inputMint, outputMint);
+    if (staticPool) {
+      raydiumPoolCache.set(cacheKey, { timestamp: now, pool: staticPool.ammAddress });
+      logger.debug("RaydiumResolver", "Resolved pool from static config", {
+        cacheKey,
+        ammAddress: staticPool.ammAddress.toBase58(),
+      });
+      return staticPool.ammAddress;
+    }
+
     let lastError: string | undefined;
     for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
       try {
         const response = await fetch(
-          `https://api-v3.raydium.io/pools/info/mint?mint1=${inputMintStr}&mint2=${outputMintStr}`,
+          `https://transaction-v1.raydium.io/pools/info/mint?mint1=${inputMintStr}&mint2=${outputMintStr}`,
           { signal: AbortSignal.timeout(5000) }
         );
         
@@ -699,33 +711,25 @@ export async function getRaydiumAccounts(
   try {
     const safeInputMint = toPublicKey(inputMint);
     const safeOutputMint = toPublicKey(outputMint);
-    const poolId = await findRaydiumPool(safeInputMint, safeOutputMint);
+    const poolConfig = getRaydiumPool(safeInputMint, safeOutputMint);
+    const poolId = poolConfig?.ammAddress ?? (await findRaydiumPool(safeInputMint, safeOutputMint));
+
     if (!poolId) {
       console.warn("[RaydiumResolver] No Raydium pool found");
       return null;
     }
-    
-    // Récupérer les données du pool
-    const accountInfo = await connection.getAccountInfo(poolId);
-    if (!accountInfo) return null;
-    
-    const data = accountInfo.data;
-    
-    // Parser les comptes du pool AMM
-    // Structure: status(8), nonce(8), maxOrder(8), depth(8), etc.
-    // Puis les pubkeys: coinVault, pcVault, coinMint, pcMint, lpMint, openOrders, market, etc.
-    const offset = 32; // Skip discriminator et flags
-    
+
     return {
       accounts: [
         RAYDIUM_AMM_PROGRAM,
         poolId,
-        // Les autres comptes seront dérivés par le programme
       ],
+      vaultTokenAccountA: poolConfig?.poolCoinTokenAccount,
+      vaultTokenAccountB: poolConfig?.poolPcTokenAccount,
       meta: {
         venue: 'RAYDIUM_AMM',
         poolAddress: poolId.toBase58(),
-        feeRate: 0.0025, // Raydium AMM = 0.25%
+        feeRate: (poolConfig?.feeBps ?? 25) / 10_000,
       },
     };
   } catch (error) {

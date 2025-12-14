@@ -470,7 +470,7 @@ async function fetchRaydiumQuote(
   amountIn: number
 ): Promise<VenueQuoteResult> {
   const startTime = Date.now();
-  const url = `https://api-v3.raydium.io/compute/swap-base-in?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountIn}&slippageBps=50`;
+  const url = `https://transaction-v1.raydium.io/compute/swap-base-in?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountIn}&slippageBps=50&txVersion=V0`;
   
   const response = await fetchWithFallback(url, 'RAYDIUM');
   

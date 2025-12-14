@@ -119,13 +119,13 @@ describe("API Route: /api/cors-proxy GET", () => {
       text: () => Promise.resolve(JSON.stringify({ data: {} })),
     });
 
-    const request = createMockGetRequest("https://api-v3.raydium.io/compute/swap-base-in?inputMint=SOL");
+    const request = createMockGetRequest("https://transaction-v1.raydium.io/compute/swap-base-in?inputMint=SOL");
     
     const response = await GET(request);
     expect(response.status).toBe(200);
     
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("api-v3.raydium.io"),
+      expect.stringContaining("transaction-v1.raydium.io"),
       expect.any(Object)
     );
   });
@@ -265,7 +265,7 @@ describe("API Route: /api/cors-proxy POST", () => {
 
     const bodyData = { inputMint: "SOL", outputMint: "USDC", amount: "1000" };
     const request = createMockPostRequest(
-      "https://api-v3.raydium.io/compute/swap-base-in",
+      "https://transaction-v1.raydium.io/compute/swap-base-in",
       bodyData
     );
     
@@ -293,6 +293,7 @@ describe("API Route: /api/cors-proxy Domain Whitelist", () => {
   const allowedDomains = [
     "api.jup.ag",
     "quote-api.jup.ag",
+    "transaction-v1.raydium.io",
     "api-v3.raydium.io",
     "api.mainnet.orca.so",
     "dlmm-api.meteora.ag",

@@ -29,6 +29,7 @@ import {
 import BN from "bn.js";
 import { getOracleFeedsForPair } from "../../../config/oracles";
 import { toPublicKey } from "../utils/publicKeyUtils";
+import { getRaydiumPool } from "@/sdk/config/raydium-pools";
 
 // ============================================================================
 // CONSTANTS
@@ -556,10 +557,10 @@ async function fetchRaydiumQuote(
 ): Promise<VenueQuote | null> {
   const startTime = Date.now();
   try {
-    // Raydium API v3
+    // Raydium Trade API v1 (transaction-v1)
     const response = await fetch(
-      `https://api-v3.raydium.io/compute/swap-base-in?` +
-      `inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountIn}&slippageBps=50`,
+      `https://transaction-v1.raydium.io/compute/swap-base-in?` +
+      `inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountIn}&slippageBps=50&txVersion=V0`,
       { signal: AbortSignal.timeout(3000) }
     );
     
@@ -881,15 +882,9 @@ export class NativeRouterService {
     try {
       // Pour Raydium, on peut fetcher la TVL depuis l'API
       if (venue === "RAYDIUM_AMM") {
-        const response = await fetch(
-          `https://api-v3.raydium.io/pools/info/mint?mint1=${safeInputMint}&mint2=${safeOutputMint}`,
-          { signal: AbortSignal.timeout(2000) }
-        );
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.data?.[0]?.tvl) {
-            return Math.floor(parseFloat(data.data[0].tvl) * 1_000_000);
-          }
+        const pool = getRaydiumPool(safeInputMint, safeOutputMint);
+        if (pool?.minLiquidityUsd) {
+          return Math.floor(pool.minLiquidityUsd * 1_000_000); // convertir USD -> 6 decimals
         }
       }
     } catch {
@@ -1974,30 +1969,24 @@ export class NativeRouterService {
     inputMint: PublicKey,
     outputMint: PublicKey
   ): Promise<PublicKey[]> {
-    // Fetch le pool Raydium pour cette paire
-    try {
-      const response = await fetch(
-        `https://api-v3.raydium.io/pools/info/mint?` +
-        `mint1=${inputMint.toString()}&mint2=${outputMint.toString()}&poolType=standard`,
-        { signal: AbortSignal.timeout(3000) }
-      );
-      
-      if (!response.ok) return [];
-      
-      const data = await response.json();
-      if (!data.success || !data.data?.[0]) return [];
-      
-      const pool = data.data[0];
-      
-      // Retourner les comptes nécessaires pour le swap Raydium
-      return [
-        new PublicKey(pool.id), // Pool ID
-        new PublicKey(pool.marketId), // Serum Market
-        // ... autres comptes nécessaires
-      ];
-    } catch {
+    const poolConfig = getRaydiumPool(inputMint, outputMint);
+    if (!poolConfig) {
+      logger.warn("NativeRouter", "Raydium pool config missing", {
+        inputMint: inputMint.toBase58(),
+        outputMint: outputMint.toBase58(),
+      });
       return [];
     }
+
+    return [
+      poolConfig.ammAddress,
+      poolConfig.serumMarket,
+      poolConfig.poolCoinTokenAccount,
+      poolConfig.poolPcTokenAccount,
+      poolConfig.ammOpenOrders,
+      poolConfig.ammTargetOrders,
+      poolConfig.ammAuthority,
+    ];
   }
   
   /**

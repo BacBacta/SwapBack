@@ -59,7 +59,7 @@ applyTo: "programs/**/swapback_router/**,app/**/native-router/**,app/**/useNativ
 
 | DEX | Endpoint Type | URL |
 |-----|--------------|-----|
-| Raydium | Quote API | `https://api-v3.raydium.io/compute/swap-base-in` |
+| Raydium | Quote API | `https://transaction-v1.raydium.io/compute/swap-base-in` |
 | Orca | Whirlpool SDK | Via `@orca-so/whirlpools-sdk` |
 | Meteora | DLMM API | `https://dlmm-api.meteora.ag/` |
 | Phoenix | SDK | Via `@ellipsis-labs/phoenix-sdk` |

@@ -26,7 +26,7 @@ const CORS_HEADERS = {
 
 // DEX APIs
 const DEX_APIS = {
-  raydium: "https://api-v3.raydium.io",
+  raydium: "https://transaction-v1.raydium.io",
   orca: "https://api.mainnet.orca.so",
   meteora: "https://dlmm-api.meteora.ag",
   // Phoenix nécessite un SDK, on utilise une estimation basée sur les prix
@@ -164,7 +164,7 @@ async function fetchRaydiumQuote(
   try {
     const response = await fetch(
       `${DEX_APIS.raydium}/compute/swap-base-in?` +
-      `inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=${slippageBps}`,
+      `inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=${slippageBps}&txVersion=V0`,
       { 
         signal: AbortSignal.timeout(5000),
         headers: { 'Accept': 'application/json' }

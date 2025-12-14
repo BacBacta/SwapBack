@@ -22,6 +22,7 @@ const DEFAULT_ALLOWED_DOMAINS = [
   'api.jup.ag',
   'quote-api.jup.ag',
   'public.jupiterapi.com',
+  'transaction-v1.raydium.io',
   'api-v3.raydium.io',
   'api.raydium.io',
   'api.mainnet.orca.so',

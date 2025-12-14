@@ -175,7 +175,7 @@ async function benchmarkVenueQuotes(
         let url = "";
         
         if (venue === "raydium") {
-          url = `https://api-v3.raydium.io/compute/swap-base-in?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=50`;
+          url = `https://transaction-v1.raydium.io/compute/swap-base-in?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=50&txVersion=V0`;
         } else if (venue === "orca") {
           url = `https://api.mainnet.orca.so/v1/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippage=0.5`;
         } else if (venue === "meteora") {
@@ -241,7 +241,7 @@ async function benchmarkParallelQuotes(
     
     try {
       const [raydium, orca, jupiter] = await Promise.allSettled([
-        fetch(`https://api-v3.raydium.io/compute/swap-base-in?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=50`, { signal: AbortSignal.timeout(3000) }),
+        fetch(`https://transaction-v1.raydium.io/compute/swap-base-in?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=50&txVersion=V0`, { signal: AbortSignal.timeout(3000) }),
         fetch(`https://api.mainnet.orca.so/v1/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippage=0.5`, { signal: AbortSignal.timeout(3000) }),
         fetch(`https://quote-api.jup.ag/v6/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=50`, { signal: AbortSignal.timeout(3000) }),
       ]);
