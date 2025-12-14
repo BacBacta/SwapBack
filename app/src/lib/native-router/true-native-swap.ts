@@ -703,6 +703,19 @@ export class TrueNativeSwap {
     if (!userRebateAccountInfo) {
       console.log("[TrueNativeSwap] user_rebate not initialized, using placeholder");
     }
+
+    // Vérifier oracle_cache et venue_score (optionnels) avant de les passer
+    const oracleCacheInfo = await this.connection.getAccountInfo(oracleCache);
+    const oracleCacheKey = oracleCacheInfo ? oracleCache : ROUTER_PROGRAM_ID;
+    if (!oracleCacheInfo) {
+      console.log("[TrueNativeSwap] oracle_cache not initialized, using placeholder");
+    }
+
+    const venueScoreInfo = await this.connection.getAccountInfo(venueScore);
+    const venueScoreKey = venueScoreInfo ? venueScore : ROUTER_PROGRAM_ID;
+    if (!venueScoreInfo) {
+      console.log("[TrueNativeSwap] venue_score not initialized, using placeholder");
+    }
     
     const keys = [
       // 1. state
@@ -742,9 +755,9 @@ export class TrueNativeSwap {
       // 16. rebate_vault (writable, PDA)
       { pubkey: accounts.rebateVault, isSigner: false, isWritable: true },
       // 17. oracle_cache (optional, PDA)
-      { pubkey: oracleCache, isSigner: false, isWritable: true },
+      { pubkey: oracleCacheKey, isSigner: false, isWritable: oracleCacheInfo !== null },
       // 18. venue_score (optional, PDA)
-      { pubkey: venueScore, isSigner: false, isWritable: true },
+      { pubkey: venueScoreKey, isSigner: false, isWritable: venueScoreInfo !== null },
       // 19. token_program
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       // 20. system_program
