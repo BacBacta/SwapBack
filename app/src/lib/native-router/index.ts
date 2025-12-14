@@ -1864,7 +1864,11 @@ export class NativeRouterService {
     route: NativeRouteQuote,
     jupiterCpi: JupiterCpiData
   ): Promise<VersionedTransaction> {
-    const { userPublicKey, inputMint, outputMint, amountIn, minAmountOut } = params;
+    // Normaliser les inputs pour éviter les erreurs toBase58
+    const userPublicKey = toPublicKey(params.userPublicKey);
+    const inputMint = toPublicKey(params.inputMint);
+    const outputMint = toPublicKey(params.outputMint);
+    const { amountIn, minAmountOut } = params;
     
     logger.info("NativeRouter", "Building swap transaction", {
       amountIn,

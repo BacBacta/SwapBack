@@ -329,79 +329,48 @@ export function useEnhancedNativeSwap() {
           throw new Error("Impossible d'obtenir une quote");
         }
 
-        // 2. Simulation pré-exécution (mode avancé)
-        if (mode === 'advanced' || params.simulateFirst) {
-          setProgressStatus('simulating');
-          params.onProgress?.('simulating');
-          
-          const slippageBps = params.slippageBps ?? quote.recommendedSlippageBps;
-          const minAmountOut = Math.floor(quote.outputAmount * (10000 - slippageBps) / 10000);
-          
-          const txResult = await nativeRouter.buildSwapTransaction(
-            publicKey,
-            safeInputMint,
-            safeOutputMint,
-            params.amount,
-            minAmountOut,
-            quote.venues[0]?.venue ?? 'raydium'
-          );
-          
-          if (!txResult) {
-            throw new Error("Impossible de construire la transaction");
-          }
-          
-          const simResult = await simulator.simulateTransaction(txResult.transaction);
-          
-          if (!simResult.success) {
-            throw new Error(
-              simResult.parsedError?.userMessage ?? 
-              simResult.errorMessage ?? 
-              "La simulation a échoué"
-            );
-          }
-        }
-
-        // 3. Exécution réelle
-        setProgressStatus('preparing');
-        params.onProgress?.('preparing');
-        
+        // 2. Calcul slippage et minAmountOut
         const slippageBps = params.slippageBps ?? quote.recommendedSlippageBps;
         const minAmountOut = Math.floor(quote.outputAmount * (10000 - slippageBps) / 10000);
 
-        const txResult = await nativeRouter.buildSwapTransaction(
-          publicKey,
-          safeInputMint,
-          safeOutputMint,
-          params.amount,
+        // 3. Exécution via executeSwap (gère simulation, signature, envoi)
+        setProgressStatus('preparing');
+        params.onProgress?.('preparing');
+        
+        logger.info("useEnhancedNativeSwap", "Executing swap via executeSwap", {
+          inputMint: safeInputMint.toBase58(),
+          outputMint: safeOutputMint.toBase58(),
+          amount: params.amount,
           minAmountOut,
-          quote.venues[0]?.venue ?? 'raydium'
-        );
-        
-        if (!txResult) {
-          throw new Error("Impossible de construire la transaction");
-        }
-
-        setProgressStatus('signing');
-        params.onProgress?.('signing');
-        
-        const signedTx = await signTransaction(txResult.transaction);
-        
-        setProgressStatus('sending');
-        params.onProgress?.('sending');
-        
-        const signature = await connection.sendRawTransaction(signedTx.serialize(), {
-          skipPreflight: params.useMevProtection,
-          maxRetries: 3,
+          slippageBps,
+          mode,
         });
+
+        const result = await nativeRouter.executeSwap(
+          {
+            inputMint: safeInputMint,
+            outputMint: safeOutputMint,
+            amountIn: params.amount,
+            minAmountOut,
+            slippageBps,
+            userPublicKey: publicKey,
+            boostBps: userBoostBps,
+            useJitoBundle: params.useMevProtection ?? false,
+          },
+          async (tx) => {
+            setProgressStatus('signing');
+            params.onProgress?.('signing');
+            const signed = await signTransaction(tx);
+            setProgressStatus('sending');
+            params.onProgress?.('sending');
+            return signed;
+          }
+        );
         
         setProgressStatus('confirming');
         params.onProgress?.('confirming');
-        
-        const confirmation = await connection.confirmTransaction(signature, 'confirmed');
-        
-        if (confirmation.value.err) {
-          throw new Error(`Transaction échouée: ${JSON.stringify(confirmation.value.err)}`);
-        }
+
+        const signature = result.signature;
 
         setProgressStatus('confirmed');
         params.onProgress?.('confirmed');
