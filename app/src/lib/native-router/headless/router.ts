@@ -1759,7 +1759,8 @@ export class NativeRouterService {
       venueScoreExists,
     });
     
-    // Comptes selon l'ordre de l'IDL swap_toc:
+    // Comptes selon l'ordre de l'IDL swap_toc (20 comptes):
+    // Référence: target/idl/swapback_router.json - swap_toc accounts
     // Pour les comptes optionnels qui n'existent pas, on utilise le program ID du router
     // Anchor traite cela comme "None" pour Option<Account>
     const NONE_ACCOUNT = this.programId;
@@ -1793,15 +1794,17 @@ export class NativeRouterService {
       { pubkey: NONE_ACCOUNT, isSigner: false, isWritable: false },
       // 14. user_rebate_account (optional - TokenAccount USDC for direct transfer)
       { pubkey: NONE_ACCOUNT, isSigner: false, isWritable: false },
-      // 15. rebate_vault
+      // 15. user_rebate PDA (optional - pour tracking des rebates différés)
+      { pubkey: userRebatePdaExists ? accounts.userRebatePda : NONE_ACCOUNT, isSigner: false, isWritable: userRebatePdaExists },
+      // 16. rebate_vault
       { pubkey: accounts.rebateVault, isSigner: false, isWritable: true },
-      // 16. oracle_cache (optional - seulement si existe)
+      // 17. oracle_cache (optional - seulement si existe)
       { pubkey: oracleCacheExists ? accounts.oracleCache : NONE_ACCOUNT, isSigner: false, isWritable: oracleCacheExists },
-      // 17. venue_score (optional - seulement si existe)
+      // 18. venue_score (optional - seulement si existe)
       { pubkey: venueScoreExists ? accounts.venueScore : NONE_ACCOUNT, isSigner: false, isWritable: venueScoreExists },
-      // 18. token_program
+      // 19. token_program
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      // 19. system_program
+      // 20. system_program
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       // remaining_accounts: Venue accounts pour le CPI
       ...venueAccounts.map(pubkey => ({

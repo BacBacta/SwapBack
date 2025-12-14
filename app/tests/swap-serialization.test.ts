@@ -317,10 +317,11 @@ describe("SwapArgs Serialization", () => {
 // ============================================================================
 
 describe("Accounts Order (IDL compliance)", () => {
-  const IDL_ACCOUNT_COUNT = 19; // According to swap_toc IDL
+  const IDL_ACCOUNT_COUNT = 20; // According to swap_toc IDL (user_rebate is separate from user_rebate_account)
 
-  it("should have exactly 19 fixed accounts", () => {
+  it("should have exactly 20 fixed accounts", () => {
     // The accounts list from the IDL
+    // Référence: target/idl/swapback_router.json - swap_toc accounts
     const accounts = [
       "state",
       "user",
@@ -336,6 +337,7 @@ describe("Accounts Order (IDL compliance)", () => {
       "buyback_usdc_vault",
       "buyback_state",
       "user_rebate_account",
+      "user_rebate",           // <-- Ce compte était manquant!
       "rebate_vault",
       "oracle_cache",
       "venue_score",
