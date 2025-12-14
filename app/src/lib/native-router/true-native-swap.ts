@@ -634,15 +634,18 @@ export class TrueNativeSwap {
       outputMint.toBase58()
     );
 
-    // Sérialiser SwapArgs avec use_dynamic_plan=true
+    // Sérialiser SwapArgs avec direct_dex_venue pour native swap
     const argsBuffer = this.serializeSwapArgs({
       amountIn: new BN(amountIn),
       minOut: new BN(minAmountOut),
-      useDynamicPlan: true, // <- LA CLÉ !
+      useDynamicPlan: false, // Not using dynamic plan - direct DEX swap
       useBundle: false,
       planAccount: planPda,
       primaryOracleAccount: oracleConfig.primary,
+      directDexVenue: route.venueProgramId, // <-- THE KEY for native swap!
       maxStalenessOverride: MAX_STALENESS_SECS,
+      tokenADecimals: 9, // SOL default
+      tokenBDecimals: 6, // USDC default
     });
 
     // Discriminator pour swap_toc
@@ -771,16 +774,17 @@ export class TrueNativeSwap {
    * 7.  use_bundle: bool
    * 8.  primary_oracle_account: Pubkey
    * 9.  fallback_oracle_account: Option<Pubkey>
-   * 10. jupiter_route: Option<JupiterRouteParams>
-   * 11. jupiter_swap_ix_data: Option<Vec<u8>>
-   * 12. liquidity_estimate: Option<u64>
-   * 13. volatility_bps: Option<u16>
-   * 14. min_venue_score: Option<u16>
-   * 15. slippage_per_venue: Option<Vec<VenueSlippage>>
-   * 16. token_a_decimals: Option<u8>
-   * 17. token_b_decimals: Option<u8>
-   * 18. max_staleness_override: Option<i64>
-   * 19. jito_bundle: Option<JitoBundleConfig>
+   * 10. direct_dex_venue: Option<Pubkey> <-- IMPORTANT pour native swap!
+   * 11. jupiter_route: Option<JupiterRouteParams>
+   * 12. jupiter_swap_ix_data: Option<Vec<u8>>
+   * 13. liquidity_estimate: Option<u64>
+   * 14. volatility_bps: Option<u16>
+   * 15. min_venue_score: Option<u16>
+   * 16. slippage_per_venue: Option<Vec<VenueSlippage>>
+   * 17. token_a_decimals: Option<u8>
+   * 18. token_b_decimals: Option<u8>
+   * 19. max_staleness_override: Option<i64>
+   * 20. jito_bundle: Option<JitoBundleConfig>
    */
   private serializeSwapArgs(args: {
     amountIn: BN;
@@ -789,6 +793,7 @@ export class TrueNativeSwap {
     useBundle: boolean;
     planAccount: PublicKey;
     primaryOracleAccount: PublicKey;
+    directDexVenue?: PublicKey;
     maxStalenessOverride?: number;
     tokenADecimals?: number;
     tokenBDecimals?: number;
@@ -827,39 +832,47 @@ export class TrueNativeSwap {
     // 9. fallback_oracle_account: Option<Pubkey> - None
     buffers.push(Buffer.from([0]));
     
-    // 10. jupiter_route: Option<JupiterRouteParams> - None (using dynamic plan)
+    // 10. direct_dex_venue: Option<Pubkey> - The DEX program for native swap!
+    if (args.directDexVenue) {
+      buffers.push(Buffer.from([1])); // Some
+      buffers.push(args.directDexVenue.toBuffer());
+    } else {
+      buffers.push(Buffer.from([0])); // None
+    }
+    
+    // 11. jupiter_route: Option<JupiterRouteParams> - None (using direct DEX)
     buffers.push(Buffer.from([0]));
     
-    // 11. jupiter_swap_ix_data: Option<Vec<u8>> - None
+    // 12. jupiter_swap_ix_data: Option<Vec<u8>> - None
     buffers.push(Buffer.from([0]));
     
-    // 12. liquidity_estimate: Option<u64> - None
+    // 13. liquidity_estimate: Option<u64> - None
     buffers.push(Buffer.from([0]));
     
-    // 13. volatility_bps: Option<u16> - None
+    // 14. volatility_bps: Option<u16> - None
     buffers.push(Buffer.from([0]));
     
-    // 14. min_venue_score: Option<u16> - None
+    // 15. min_venue_score: Option<u16> - None
     buffers.push(Buffer.from([0]));
     
-    // 15. slippage_per_venue: Option<Vec<VenueSlippage>> - None
+    // 16. slippage_per_venue: Option<Vec<VenueSlippage>> - None
     buffers.push(Buffer.from([0]));
     
-    // 16. token_a_decimals: Option<u8>
+    // 17. token_a_decimals: Option<u8>
     if (args.tokenADecimals !== undefined) {
       buffers.push(Buffer.from([1, args.tokenADecimals]));
     } else {
       buffers.push(Buffer.from([0]));
     }
     
-    // 17. token_b_decimals: Option<u8>
+    // 18. token_b_decimals: Option<u8>
     if (args.tokenBDecimals !== undefined) {
       buffers.push(Buffer.from([1, args.tokenBDecimals]));
     } else {
       buffers.push(Buffer.from([0]));
     }
     
-    // 18. max_staleness_override: Option<i64>
+    // 19. max_staleness_override: Option<i64>
     if (args.maxStalenessOverride !== undefined && args.maxStalenessOverride > 0) {
       const staleBuf = Buffer.alloc(9);
       staleBuf.writeUInt8(1, 0); // Some
