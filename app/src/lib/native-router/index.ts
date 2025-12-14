@@ -35,6 +35,7 @@ import { HermesClient } from "@pythnetwork/hermes-client";
 import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
 import { PYTH_FEED_IDS, getPythFeedIdByMint } from "@/sdk/config/pyth-feeds";
 import { getAllALTs } from "@/lib/alt/swapbackALT";
+import { toPublicKey } from "./utils/publicKeyUtils";
 
 // ============================================================================
 // CONSTANTS
@@ -1241,12 +1242,15 @@ export class NativeRouterService {
    * Inclut Jupiter comme benchmark pour comparaison
    */
   async getMultiVenueQuotes(
-    inputMint: PublicKey,
-    outputMint: PublicKey,
+    inputMint: PublicKey | string,
+    outputMint: PublicKey | string,
     amountIn: number
   ): Promise<VenueQuote[]> {
-    const inputMintStr = inputMint.toString();
-    const outputMintStr = outputMint.toString();
+    // Normaliser les inputs
+    const safeInputMint = toPublicKey(inputMint);
+    const safeOutputMint = toPublicKey(outputMint);
+    const inputMintStr = safeInputMint.toBase58();
+    const outputMintStr = safeOutputMint.toBase58();
     
     logger.info("NativeRouter", "Fetching multi-venue quotes via API proxy", {
       inputMint: inputMintStr,
@@ -1402,15 +1406,18 @@ export class NativeRouterService {
    * Utilise notre API proxy /api/price pour éviter CORS
    */
   private async getLocalEstimatedQuotes(
-    inputMint: PublicKey,
-    outputMint: PublicKey,
+    inputMint: PublicKey | string,
+    outputMint: PublicKey | string,
     amountIn: number
   ): Promise<VenueQuote[]> {
     const quotes: VenueQuote[] = [];
     
     try {
-      const inputMintStr = inputMint.toBase58();
-      const outputMintStr = outputMint.toBase58();
+      // Normaliser les inputs
+      const safeInputMint = toPublicKey(inputMint);
+      const safeOutputMint = toPublicKey(outputMint);
+      const inputMintStr = safeInputMint.toBase58();
+      const outputMintStr = safeOutputMint.toBase58();
       
       // Utiliser notre API proxy /api/price pour éviter CORS
       const [inputPriceRes, outputPriceRes] = await Promise.all([
@@ -1510,13 +1517,17 @@ export class NativeRouterService {
    * Utilise le scoring on-chain et le slippage dynamique
    */
   async buildNativeRoute(
-    inputMint: PublicKey,
-    outputMint: PublicKey,
+    inputMint: PublicKey | string,
+    outputMint: PublicKey | string,
     amountIn: number,
     slippageBps?: number
   ): Promise<NativeRouteQuote | null> {
+    // Normaliser les inputs
+    const safeInputMint = toPublicKey(inputMint);
+    const safeOutputMint = toPublicKey(outputMint);
+
     // 1. Récupérer les quotes
-    const quotes = await this.getMultiVenueQuotes(inputMint, outputMint, amountIn);
+    const quotes = await this.getMultiVenueQuotes(safeInputMint, safeOutputMint, amountIn);
     
     if (quotes.length === 0) {
       logger.warn("NativeRouter", "No venue quotes available");
@@ -1543,8 +1554,8 @@ export class NativeRouterService {
       
       // Estimer TVL et volatilité
       const [poolTvl, volatilityBps] = await Promise.all([
-        this.estimatePoolTvl(inputMint, outputMint, bestVenue.venue),
-        this.getOracleVolatility(inputMint),
+        this.estimatePoolTvl(safeInputMint, safeOutputMint, bestVenue.venue),
+        this.getOracleVolatility(safeInputMint),
       ]);
       
       // Calculer slippage dynamique
@@ -1572,8 +1583,8 @@ export class NativeRouterService {
     
     // 6. Calculer le NPI RÉEL en comparant avec le prix du marché (Jupiter)
     const { npi: realNpiBps, jupiterOutput } = await this.calculateRealNPI(
-      inputMint,
-      outputMint,
+      safeInputMint,
+      safeOutputMint,
       amountIn,
       bestQuote.outputAmount
     );
@@ -1629,14 +1640,17 @@ export class NativeRouterService {
    * - Le NPI n'est pas critique, on retourne 0 si timeout
    */
   async calculateRealNPI(
-    inputMint: PublicKey,
-    outputMint: PublicKey,
+    inputMint: PublicKey | string,
+    outputMint: PublicKey | string,
     amountIn: number,
     nativeOutput: number
   ): Promise<{ npi: number; jupiterOutput: number }> {
     try {
-      const inputMintStr = inputMint.toBase58();
-      const outputMintStr = outputMint.toBase58();
+      // Normaliser les inputs
+      const safeInputMint = toPublicKey(inputMint);
+      const safeOutputMint = toPublicKey(outputMint);
+      const inputMintStr = safeInputMint.toBase58();
+      const outputMintStr = safeOutputMint.toBase58();
       
       // Détecter si on est côté client (browser) ou serveur
       const isClient = typeof window !== 'undefined';
@@ -1749,9 +1763,9 @@ export class NativeRouterService {
    * Dérive les PDAs nécessaires pour le swap
    */
   async deriveSwapAccounts(
-    userPublicKey: PublicKey,
-    inputMint: PublicKey,
-    outputMint: PublicKey
+    userPublicKey: PublicKey | string,
+    inputMint: PublicKey | string,
+    outputMint: PublicKey | string
   ): Promise<{
     routerState: PublicKey;
     rebateVault: PublicKey;
@@ -1765,6 +1779,11 @@ export class NativeRouterService {
     oracleCache: PublicKey;
     venueScore: PublicKey;
   }> {
+    // Normaliser les inputs
+    const safeUserPublicKey = toPublicKey(userPublicKey);
+    const safeInputMint = toPublicKey(inputMint);
+    const safeOutputMint = toPublicKey(outputMint);
+    
     // Router State PDA
     const [routerState] = PublicKey.findProgramAddressSync(
       [Buffer.from("router_state")],
@@ -1780,32 +1799,32 @@ export class NativeRouterService {
     // Vault token accounts (ATAs du RouterState pour chaque token)
     // Ces comptes doivent être créés avec init-router-vaults.js
     const vaultTokenAccountA = await getAssociatedTokenAddress(
-      inputMint,
+      safeInputMint,
       routerState,
       true // allowOwnerOffCurve = true car routerState est un PDA
     );
     const vaultTokenAccountB = await getAssociatedTokenAddress(
-      outputMint,
+      safeOutputMint,
       routerState,
       true // allowOwnerOffCurve = true car routerState est un PDA
     );
     
     // User token accounts (ATAs)
-    const userTokenAccountA = await getAssociatedTokenAddress(inputMint, userPublicKey);
-    const userTokenAccountB = await getAssociatedTokenAddress(outputMint, userPublicKey);
+    const userTokenAccountA = await getAssociatedTokenAddress(safeInputMint, safeUserPublicKey);
+    const userTokenAccountB = await getAssociatedTokenAddress(safeOutputMint, safeUserPublicKey);
     
     // User USDC account for rebates
-    const userRebateAccount = await getAssociatedTokenAddress(USDC_MINT, userPublicKey);
+    const userRebateAccount = await getAssociatedTokenAddress(USDC_MINT, safeUserPublicKey);
     
     // User NFT PDA (from cNFT program)
     const [userNftPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("user_nft"), userPublicKey.toBuffer()],
+      [Buffer.from("user_nft"), safeUserPublicKey.toBuffer()],
       CNFT_PROGRAM_ID
     );
     
     // User Rebate PDA (for deferred claim model - 48h delay)
     const [userRebatePda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("user_rebate"), userPublicKey.toBuffer()],
+      [Buffer.from("user_rebate"), safeUserPublicKey.toBuffer()],
       this.programId
     );
     
@@ -2588,17 +2607,22 @@ export class NativeRouterService {
     params: NativeSwapParams,
     signTransaction: (tx: VersionedTransaction) => Promise<VersionedTransaction>
   ): Promise<NativeSwapResult> {
+    // Normaliser les inputs
+    const safeInputMint = toPublicKey(params.inputMint);
+    const safeOutputMint = toPublicKey(params.outputMint);
+    const safeUserPublicKey = toPublicKey(params.userPublicKey);
+
     logger.info("NativeRouter", "Executing native swap", {
-      inputMint: params.inputMint.toString(),
-      outputMint: params.outputMint.toString(),
+      inputMint: safeInputMint.toBase58(),
+      outputMint: safeOutputMint.toBase58(),
       amountIn: params.amountIn,
       useJito: params.useJitoBundle,
     });
     
     // 1. Construire la route
     const route = await this.buildNativeRoute(
-      params.inputMint,
-      params.outputMint,
+      safeInputMint,
+      safeOutputMint,
       params.amountIn,
       params.slippageBps
     );
@@ -2613,18 +2637,18 @@ export class NativeRouterService {
 
     // 2. Récupérer Jupiter CPI + vérifier la compatibilité du slippage
     const jupiterCpi = await getJupiterCpiData(
-      params.inputMint.toBase58(),
-      params.outputMint.toBase58(),
+      safeInputMint.toBase58(),
+      safeOutputMint.toBase58(),
       params.amountIn.toString(),
       params.slippageBps ?? 50,
-      params.userPublicKey.toBase58(),
+      safeUserPublicKey.toBase58(),
       this.connection
     );
 
     if (!jupiterCpi || !jupiterCpi.swapInstruction) {
       logger.error("NativeRouter", "Cannot proceed without Jupiter CPI data", {
-        inputMint: params.inputMint.toBase58().slice(0, 8),
-        outputMint: params.outputMint.toBase58().slice(0, 8),
+        inputMint: safeInputMint.toBase58().slice(0, 8),
+        outputMint: safeOutputMint.toBase58().slice(0, 8),
         amount: params.amountIn,
       });
       throw new Error(
@@ -2779,15 +2803,19 @@ export class NativeRouterService {
    * Compare les prix entre plusieurs venues et retourne le meilleur
    */
   compareVenuePrices = async (
-    inputMint: PublicKey,
-    outputMint: PublicKey,
+    inputMint: PublicKey | string,
+    outputMint: PublicKey | string,
     amountIn: number
   ): Promise<{
     venues: VenueQuote[];
     bestVenue: string;
     priceDifferenceBps: number;
   }> => {
-    const quotes = await this.getMultiVenueQuotes(inputMint, outputMint, amountIn);
+    // Normaliser les inputs
+    const safeInputMint = toPublicKey(inputMint);
+    const safeOutputMint = toPublicKey(outputMint);
+    
+    const quotes = await this.getMultiVenueQuotes(safeInputMint, safeOutputMint, amountIn);
     
     if (quotes.length === 0) {
       return { venues: [], bestVenue: "", priceDifferenceBps: 0 };

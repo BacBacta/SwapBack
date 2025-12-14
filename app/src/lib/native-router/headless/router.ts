@@ -28,6 +28,7 @@ import {
 } from "@solana/spl-token";
 import BN from "bn.js";
 import { getOracleFeedsForPair } from "../../../config/oracles";
+import { toPublicKey } from "../utils/publicKeyUtils";
 
 // ============================================================================
 // CONSTANTS
@@ -866,10 +867,14 @@ export class NativeRouterService {
    * Estime la TVL du pool pour le calcul de slippage
    */
   async estimatePoolTvl(
-    inputMint: PublicKey,
-    outputMint: PublicKey,
+    inputMint: PublicKey | string,
+    outputMint: PublicKey | string,
     venue: keyof typeof DEX_PROGRAMS
   ): Promise<number> {
+    // Normaliser les inputs
+    const safeInputMint = toPublicKey(inputMint);
+    const safeOutputMint = toPublicKey(outputMint);
+    
     // Default: 10M USDC equivalent (conservative)
     const DEFAULT_TVL = 10_000_000_000_000; // 10M avec 6 decimals
     
@@ -877,7 +882,7 @@ export class NativeRouterService {
       // Pour Raydium, on peut fetcher la TVL depuis l'API
       if (venue === "RAYDIUM_AMM") {
         const response = await fetch(
-          `https://api-v3.raydium.io/pools/info/mint?mint1=${inputMint}&mint2=${outputMint}`,
+          `https://api-v3.raydium.io/pools/info/mint?mint1=${safeInputMint}&mint2=${safeOutputMint}`,
           { signal: AbortSignal.timeout(2000) }
         );
         if (response.ok) {
@@ -897,16 +902,19 @@ export class NativeRouterService {
   /**
    * Récupère la volatilité depuis l'oracle
    */
-  async getOracleVolatility(tokenMint: PublicKey): Promise<number> {
+  async getOracleVolatility(tokenMint: PublicKey | string): Promise<number> {
+    // Normaliser l'input
+    const safeTokenMint = toPublicKey(tokenMint);
+    
     // Pour l'instant, retourne une volatilité estimée
     // Une vraie implémentation lirait les données de volatilité depuis Pyth/Switchboard
     
     // Volatilité par défaut: 100 bps (1%)
     // SOL/stables ont généralement une volatilité plus élevée
-    if (tokenMint.equals(SOL_MINT)) {
+    if (safeTokenMint.equals(SOL_MINT)) {
       return 200; // 2% volatilité pour SOL
     }
-    if (tokenMint.equals(USDC_MINT)) {
+    if (safeTokenMint.equals(USDC_MINT)) {
       return 10; // 0.1% volatilité pour USDC
     }
     
@@ -919,12 +927,16 @@ export class NativeRouterService {
    * Inclut Jupiter comme benchmark pour comparaison
    */
   async getMultiVenueQuotes(
-    inputMint: PublicKey,
-    outputMint: PublicKey,
+    inputMint: PublicKey | string,
+    outputMint: PublicKey | string,
     amountIn: number
   ): Promise<VenueQuote[]> {
-    const inputMintStr = inputMint.toString();
-    const outputMintStr = outputMint.toString();
+    // Normaliser les inputs
+    const safeInputMint = toPublicKey(inputMint);
+    const safeOutputMint = toPublicKey(outputMint);
+    
+    const inputMintStr = safeInputMint.toString();
+    const outputMintStr = safeOutputMint.toString();
     
     logger.info("NativeRouter", "Fetching multi-venue quotes via API proxy", {
       inputMint: inputMintStr,
@@ -1080,15 +1092,19 @@ export class NativeRouterService {
    * Utilise notre API proxy /api/price pour éviter CORS
    */
   private async getLocalEstimatedQuotes(
-    inputMint: PublicKey,
-    outputMint: PublicKey,
+    inputMint: PublicKey | string,
+    outputMint: PublicKey | string,
     amountIn: number
   ): Promise<VenueQuote[]> {
     const quotes: VenueQuote[] = [];
     
+    // Normaliser les inputs
+    const safeInputMint = toPublicKey(inputMint);
+    const safeOutputMint = toPublicKey(outputMint);
+    
     try {
-      const inputMintStr = inputMint.toBase58();
-      const outputMintStr = outputMint.toBase58();
+      const inputMintStr = safeInputMint.toBase58();
+      const outputMintStr = safeOutputMint.toBase58();
       
       // Utiliser notre API proxy /api/price pour éviter CORS
       const [inputPriceRes, outputPriceRes] = await Promise.all([
@@ -1188,13 +1204,17 @@ export class NativeRouterService {
    * Utilise le scoring on-chain et le slippage dynamique
    */
   async buildNativeRoute(
-    inputMint: PublicKey,
-    outputMint: PublicKey,
+    inputMint: PublicKey | string,
+    outputMint: PublicKey | string,
     amountIn: number,
     slippageBps?: number
   ): Promise<NativeRouteQuote | null> {
+    // Normaliser les inputs
+    const safeInputMint = toPublicKey(inputMint);
+    const safeOutputMint = toPublicKey(outputMint);
+    
     // 1. Récupérer les quotes
-    const quotes = await this.getMultiVenueQuotes(inputMint, outputMint, amountIn);
+    const quotes = await this.getMultiVenueQuotes(safeInputMint, safeOutputMint, amountIn);
     
     if (quotes.length === 0) {
       logger.warn("NativeRouter", "No venue quotes available");
@@ -1221,8 +1241,8 @@ export class NativeRouterService {
       
       // Estimer TVL et volatilité
       const [poolTvl, volatilityBps] = await Promise.all([
-        this.estimatePoolTvl(inputMint, outputMint, bestVenue.venue),
-        this.getOracleVolatility(inputMint),
+        this.estimatePoolTvl(safeInputMint, safeOutputMint, bestVenue.venue),
+        this.getOracleVolatility(safeInputMint),
       ]);
       
       // Calculer slippage dynamique
@@ -1307,14 +1327,18 @@ export class NativeRouterService {
    * - Le NPI n'est pas critique, on retourne 0 si timeout
    */
   async calculateRealNPI(
-    inputMint: PublicKey,
-    outputMint: PublicKey,
+    inputMint: PublicKey | string,
+    outputMint: PublicKey | string,
     amountIn: number,
     nativeOutput: number
   ): Promise<{ npi: number; jupiterOutput: number }> {
+    // Normaliser les inputs
+    const safeInputMint = toPublicKey(inputMint);
+    const safeOutputMint = toPublicKey(outputMint);
+    
     try {
-      const inputMintStr = inputMint.toBase58();
-      const outputMintStr = outputMint.toBase58();
+      const inputMintStr = safeInputMint.toBase58();
+      const outputMintStr = safeOutputMint.toBase58();
       
       // Détecter si on est côté client (browser) ou serveur
       const isClient = typeof window !== 'undefined';
@@ -1427,9 +1451,9 @@ export class NativeRouterService {
    * Dérive les PDAs nécessaires pour le swap
    */
   async deriveSwapAccounts(
-    userPublicKey: PublicKey,
-    inputMint: PublicKey,
-    outputMint: PublicKey
+    userPublicKey: PublicKey | string,
+    inputMint: PublicKey | string,
+    outputMint: PublicKey | string
   ): Promise<{
     routerState: PublicKey;
     rebateVault: PublicKey;
@@ -1443,6 +1467,11 @@ export class NativeRouterService {
     oracleCache: PublicKey;
     venueScore: PublicKey;
   }> {
+    // Normaliser les inputs
+    const safeUserPublicKey = toPublicKey(userPublicKey);
+    const safeInputMint = toPublicKey(inputMint);
+    const safeOutputMint = toPublicKey(outputMint);
+    
     // Router State PDA
     const [routerState] = PublicKey.findProgramAddressSync(
       [Buffer.from("router_state")],
@@ -1458,32 +1487,32 @@ export class NativeRouterService {
     // Vault token accounts (ATAs du RouterState pour chaque token)
     // Ces comptes doivent être créés avec init-router-vaults.js
     const vaultTokenAccountA = await getAssociatedTokenAddress(
-      inputMint,
+      safeInputMint,
       routerState,
       true // allowOwnerOffCurve = true car routerState est un PDA
     );
     const vaultTokenAccountB = await getAssociatedTokenAddress(
-      outputMint,
+      safeOutputMint,
       routerState,
       true // allowOwnerOffCurve = true car routerState est un PDA
     );
     
     // User token accounts (ATAs)
-    const userTokenAccountA = await getAssociatedTokenAddress(inputMint, userPublicKey);
-    const userTokenAccountB = await getAssociatedTokenAddress(outputMint, userPublicKey);
+    const userTokenAccountA = await getAssociatedTokenAddress(safeInputMint, safeUserPublicKey);
+    const userTokenAccountB = await getAssociatedTokenAddress(safeOutputMint, safeUserPublicKey);
     
     // User USDC account for rebates
-    const userRebateAccount = await getAssociatedTokenAddress(USDC_MINT, userPublicKey);
+    const userRebateAccount = await getAssociatedTokenAddress(USDC_MINT, safeUserPublicKey);
     
     // User NFT PDA (from cNFT program)
     const [userNftPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("user_nft"), userPublicKey.toBuffer()],
+      [Buffer.from("user_nft"), safeUserPublicKey.toBuffer()],
       CNFT_PROGRAM_ID
     );
     
     // User Rebate PDA (for deferred claim model - 48h delay)
     const [userRebatePda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("user_rebate"), userPublicKey.toBuffer()],
+      [Buffer.from("user_rebate"), safeUserPublicKey.toBuffer()],
       this.programId
     );
     
@@ -1521,7 +1550,12 @@ export class NativeRouterService {
     params: NativeSwapParams,
     route: NativeRouteQuote
   ): Promise<VersionedTransaction> {
-    const { userPublicKey, inputMint, outputMint, amountIn, minAmountOut } = params;
+    const { amountIn, minAmountOut } = params;
+    
+    // Normaliser les inputs
+    const safeUserPublicKey = toPublicKey(params.userPublicKey);
+    const safeInputMint = toPublicKey(params.inputMint);
+    const safeOutputMint = toPublicKey(params.outputMint);
     
     logger.info("NativeRouter", "Building swap transaction", {
       amountIn,
@@ -1530,7 +1564,7 @@ export class NativeRouterService {
     });
     
     // Dériver les comptes
-    const accounts = await this.deriveSwapAccounts(userPublicKey, inputMint, outputMint);
+    const accounts = await this.deriveSwapAccounts(safeUserPublicKey, safeInputMint, safeOutputMint);
     
     const instructions: TransactionInstruction[] = [];
     
@@ -1543,10 +1577,10 @@ export class NativeRouterService {
     if (!ataChecks[0]) {
       instructions.push(
         createAssociatedTokenAccountInstruction(
-          userPublicKey,
+          safeUserPublicKey,
           accounts.userTokenAccountA,
-          userPublicKey,
-          inputMint
+          safeUserPublicKey,
+          safeInputMint
         )
       );
     }
@@ -1554,10 +1588,10 @@ export class NativeRouterService {
     if (!ataChecks[1]) {
       instructions.push(
         createAssociatedTokenAccountInstruction(
-          userPublicKey,
+          safeUserPublicKey,
           accounts.userTokenAccountB,
-          userPublicKey,
-          outputMint
+          safeUserPublicKey,
+          safeOutputMint
         )
       );
     }
@@ -1571,30 +1605,30 @@ export class NativeRouterService {
 
     if (!vaultAtaChecks[0]) {
       logger.info("NativeRouter", "Creating router vault ATA (token A)", {
-        mint: inputMint.toBase58(),
+        mint: safeInputMint.toBase58(),
         vault: accounts.vaultTokenAccountA.toBase58(),
       });
       instructions.push(
         createAssociatedTokenAccountInstruction(
-          userPublicKey,
+          safeUserPublicKey,
           accounts.vaultTokenAccountA,
           accounts.routerState,
-          inputMint
+          safeInputMint
         )
       );
     }
 
     if (!vaultAtaChecks[1]) {
       logger.info("NativeRouter", "Creating router vault ATA (token B)", {
-        mint: outputMint.toBase58(),
+        mint: safeOutputMint.toBase58(),
         vault: accounts.vaultTokenAccountB.toBase58(),
       });
       instructions.push(
         createAssociatedTokenAccountInstruction(
-          userPublicKey,
+          safeUserPublicKey,
           accounts.vaultTokenAccountB,
           accounts.routerState,
-          outputMint
+          safeOutputMint
         )
       );
     }
@@ -1607,10 +1641,10 @@ export class NativeRouterService {
 
     // Construire l'instruction swap_toc
     const swapInstruction = await this.buildSwapToCInstruction(
-      userPublicKey,
+      safeUserPublicKey,
       accounts,
-      inputMint,
-      outputMint,
+      safeInputMint,
+      safeOutputMint,
       amountIn,
       minAmountOut,
       venueWeights,
@@ -1624,7 +1658,7 @@ export class NativeRouterService {
     const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash();
     
     const messageV0 = new TransactionMessage({
-      payerKey: userPublicKey,
+      payerKey: safeUserPublicKey,
       recentBlockhash: blockhash,
       instructions,
     }).compileToV0Message();
@@ -1638,29 +1672,34 @@ export class NativeRouterService {
    * Construit l'instruction swap_toc
    */
   private async buildSwapToCInstruction(
-    userPublicKey: PublicKey,
+    userPublicKey: PublicKey | string,
     accounts: Awaited<ReturnType<typeof this.deriveSwapAccounts>>,
-    inputMint: PublicKey,
-    outputMint: PublicKey,
+    inputMint: PublicKey | string,
+    outputMint: PublicKey | string,
     amountIn: number,
     minAmountOut: number,
     venueWeights: { venue: PublicKey; weight: number }[],
     bestVenue: VenueQuote,
     maxStalenessSecs?: number
   ): Promise<TransactionInstruction> {
+    // Normaliser les inputs
+    const safeUserPublicKey = toPublicKey(userPublicKey);
+    const safeInputMint = toPublicKey(inputMint);
+    const safeOutputMint = toPublicKey(outputMint);
+    
     // Obtenir les oracles pour cette paire de tokens AVANT la sérialisation
     // IMPORTANT: Ne PAS fallback silencieusement sur DEFAULT_ORACLE
     let primaryOracle: PublicKey;
     let fallbackOracle: PublicKey | null = null;
     
     try {
-      const oracleConfig = getOracleFeedsForPair(inputMint.toBase58(), outputMint.toBase58());
+      const oracleConfig = getOracleFeedsForPair(safeInputMint.toBase58(), safeOutputMint.toBase58());
       primaryOracle = oracleConfig.primary;
       fallbackOracle = oracleConfig.fallback || null;
       
       logger.info("NativeRouter", "Using oracles for pair", {
-        inputMint: inputMint.toBase58().slice(0, 8),
-        outputMint: outputMint.toBase58().slice(0, 8),
+        inputMint: safeInputMint.toBase58().slice(0, 8),
+        outputMint: safeOutputMint.toBase58().slice(0, 8),
         primary: primaryOracle.toBase58().slice(0, 8),
         fallback: fallbackOracle?.toBase58().slice(0, 8) || "none",
       });
@@ -1668,13 +1707,13 @@ export class NativeRouterService {
       // NE PAS fallback silencieusement - renvoyer une erreur explicite
       const errorMsg = e instanceof Error ? e.message : "Unknown error";
       logger.error("NativeRouter", "No oracle configured for pair", {
-        inputMint: inputMint.toBase58(),
-        outputMint: outputMint.toBase58(),
+        inputMint: safeInputMint.toBase58(),
+        outputMint: safeOutputMint.toBase58(),
         error: errorMsg,
       });
       throw new Error(
         `Swap impossible: aucun oracle configuré pour la paire ` +
-        `${inputMint.toBase58().slice(0, 8)}.../${outputMint.toBase58().slice(0, 8)}... ` +
+        `${safeInputMint.toBase58().slice(0, 8)}.../${safeOutputMint.toBase58().slice(0, 8)}... ` +
         `Veuillez contacter le support ou utiliser une autre paire.`
       );
     }
@@ -1703,7 +1742,7 @@ export class NativeRouterService {
     const data = Buffer.concat([discriminator, argsBuffer]);
     
     // Récupérer les comptes du DEX pour le CPI
-    const venueAccounts = await this.getVenueAccounts(bestVenue, inputMint, outputMint);
+    const venueAccounts = await this.getVenueAccounts(bestVenue, safeInputMint, safeOutputMint);
     
     // Vérifier quels comptes optionnels existent on-chain
     const [userNftExists, userRebatePdaExists, oracleCacheExists, venueScoreExists] = await Promise.all([
@@ -1729,7 +1768,7 @@ export class NativeRouterService {
       // 1. state
       { pubkey: accounts.routerState, isSigner: false, isWritable: true },
       // 2. user
-      { pubkey: userPublicKey, isSigner: true, isWritable: true },
+      { pubkey: safeUserPublicKey, isSigner: true, isWritable: true },
       // 3. primary_oracle (Pyth ou Switchboard selon la paire)
       { pubkey: primaryOracle, isSigner: false, isWritable: false },
       // 4. fallback_oracle (optional - utiliser si disponible)
@@ -1971,17 +2010,22 @@ export class NativeRouterService {
     params: NativeSwapParams,
     signTransaction: (tx: VersionedTransaction) => Promise<VersionedTransaction>
   ): Promise<NativeSwapResult> {
+    // Normaliser les inputs
+    const safeInputMint = toPublicKey(params.inputMint);
+    const safeOutputMint = toPublicKey(params.outputMint);
+    const safeUserPublicKey = toPublicKey(params.userPublicKey);
+    
     logger.info("NativeRouter", "Executing native swap", {
-      inputMint: params.inputMint.toString(),
-      outputMint: params.outputMint.toString(),
+      inputMint: safeInputMint.toBase58(),
+      outputMint: safeOutputMint.toBase58(),
       amountIn: params.amountIn,
       useJito: params.useJitoBundle,
     });
     
     // 1. Construire la route
     const route = await this.buildNativeRoute(
-      params.inputMint,
-      params.outputMint,
+      safeInputMint,
+      safeOutputMint,
       params.amountIn,
       params.slippageBps
     );
@@ -1990,13 +2034,21 @@ export class NativeRouterService {
       throw new Error("Impossible de trouver une route native");
     }
     
+    // Créer params normalisés pour les appels internes
+    const normalizedParams = {
+      ...params,
+      inputMint: safeInputMint,
+      outputMint: safeOutputMint,
+      userPublicKey: safeUserPublicKey,
+    };
+    
     // 2. Construire la transaction
-    const transaction = await this.buildSwapTransaction(params, route);
+    const transaction = await this.buildSwapTransaction(normalizedParams, route);
     
     // 3. Ajouter tip Jito si demandé (pour protection MEV)
     if (params.useJitoBundle) {
       const tipInstruction = createJitoTipInstruction(
-        params.userPublicKey,
+        safeUserPublicKey,
         DEFAULT_JITO_TIP_LAMPORTS
       );
       

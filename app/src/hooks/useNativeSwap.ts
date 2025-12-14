@@ -160,8 +160,11 @@ export function useNativeSwap() {
       setError(null);
 
       try {
-        const inputMintStr = params.inputMint.toString();
-        const outputMintStr = params.outputMint.toString();
+        // Normaliser les PublicKey pour éviter les erreurs toBase58
+        const safeInputMint = toPublicKey(params.inputMint);
+        const safeOutputMint = toPublicKey(params.outputMint);
+        const inputMintStr = safeInputMint.toBase58();
+        const outputMintStr = safeOutputMint.toBase58();
         
         // ============================================================
         // Décision de routing centralisée via decideSwapRoute
@@ -196,10 +199,10 @@ export function useNativeSwap() {
           boostBps: userBoostBps,
         });
 
-        // Récupérer la route native
+        // Récupérer la route native (utiliser les mints normalisés)
         const route = await nativeRouter.buildNativeRoute(
-          params.inputMint,
-          params.outputMint,
+          safeInputMint,
+          safeOutputMint,
           params.amount,
           params.slippageBps ?? 50
         );
@@ -363,11 +366,15 @@ export function useNativeSwap() {
         params.onProgress?.('signing');
         console.log("[useNativeSwap] Calling nativeRouter.executeSwap...");
 
+        // Normaliser les PublicKey pour l'exécution
+        const safeInputMint = toPublicKey(params.inputMint);
+        const safeOutputMint = toPublicKey(params.outputMint);
+
         // 3. Exécuter via le router natif (avec MEV protection si activée)
         const result = await nativeRouter.executeSwap(
           {
-            inputMint: params.inputMint,
-            outputMint: params.outputMint,
+            inputMint: safeInputMint,
+            outputMint: safeOutputMint,
             amountIn: params.amount,
             minAmountOut,
             slippageBps,

@@ -33,6 +33,7 @@ import {
 } from "@/lib/swap-routing";
 import { useBoostCalculations } from "./useBoostCalculations";
 import { logger } from "@/lib/logger";
+import { toPublicKey } from "@/lib/native-router/utils/publicKeyUtils";
 
 // ============================================================================
 // TYPES
@@ -187,8 +188,11 @@ export function useEnhancedNativeSwap() {
       const quoteId = `Q-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       
       try {
-        const inputMintStr = params.inputMint.toString();
-        const outputMintStr = params.outputMint.toString();
+        // Normaliser les PublicKey pour éviter les erreurs toBase58
+        const safeInputMint = toPublicKey(params.inputMint);
+        const safeOutputMint = toPublicKey(params.outputMint);
+        const inputMintStr = safeInputMint.toBase58();
+        const outputMintStr = safeOutputMint.toBase58();
         const cacheKey = `${inputMintStr}-${outputMintStr}-${params.amount}`;
         
         // Vérifier le cache
@@ -224,10 +228,10 @@ export function useEnhancedNativeSwap() {
           return null;
         }
 
-        // Récupérer la route native
+        // Récupérer la route native (utiliser les mints normalisés)
         const route = await nativeRouter.buildNativeRoute(
-          params.inputMint,
-          params.outputMint,
+          safeInputMint,
+          safeOutputMint,
           params.amount,
           params.slippageBps ?? 50
         );
@@ -311,6 +315,10 @@ export function useEnhancedNativeSwap() {
       swapCount.total++;
 
       try {
+        // Normaliser les PublicKey
+        const safeInputMint = toPublicKey(params.inputMint);
+        const safeOutputMint = toPublicKey(params.outputMint);
+
         // 1. Quote fraîche
         let quote = currentQuote;
         if (!quote || quote.expiresAt < Date.now() || params.forceRefresh) {
@@ -331,8 +339,8 @@ export function useEnhancedNativeSwap() {
           
           const txResult = await nativeRouter.buildSwapTransaction(
             publicKey,
-            params.inputMint,
-            params.outputMint,
+            safeInputMint,
+            safeOutputMint,
             params.amount,
             minAmountOut,
             quote.venues[0]?.venue ?? 'raydium'
@@ -362,8 +370,8 @@ export function useEnhancedNativeSwap() {
 
         const txResult = await nativeRouter.buildSwapTransaction(
           publicKey,
-          params.inputMint,
-          params.outputMint,
+          safeInputMint,
+          safeOutputMint,
           params.amount,
           minAmountOut,
           quote.venues[0]?.venue ?? 'raydium'
