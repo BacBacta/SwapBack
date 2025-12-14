@@ -582,7 +582,15 @@ export function useNativeSwap() {
         return swapResult;
       } catch (err) {
         const message = err instanceof Error ? err.message : "Erreur lors du swap natif";
-        logger.error("useNativeSwap", "True native swap error", { error: message });
+        logger.error("useNativeSwap", "True native swap error", {
+          error: message,
+          stack: err instanceof Error ? err.stack : null,
+        });
+        if (err instanceof Error) {
+          console.error("[useNativeSwap] True native swap exception", err);
+        } else {
+          console.error("[useNativeSwap] True native swap exception", { err });
+        }
         setError(message);
         return null;
       } finally {

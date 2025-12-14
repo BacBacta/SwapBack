@@ -604,6 +604,22 @@ export class TrueNativeSwap {
     );
     const [planPda] = this.deriveSwapPlanAddress(safeUser);
 
+    const normalizedDexAccounts = route.dexAccounts.accounts.map((pubkey, index) => {
+      try {
+        return toPublicKey(pubkey);
+      } catch (error) {
+        logger.error("TrueNativeSwap", "Invalid DEX account key", {
+          venue: route.venue,
+          index,
+          account: pubkey,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error instanceof Error
+          ? error
+          : new Error(`Invalid DEX account at index ${index}`);
+      }
+    });
+
     // Obtenir les oracles
     const oracleConfig = getOracleFeedsForPair(
       inputMint.toBase58(),
@@ -643,9 +659,9 @@ export class TrueNativeSwap {
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
-      // DEX accounts (remaining accounts) - normaliser chaque pubkey
-      ...route.dexAccounts.accounts.map((pubkey) => ({
-        pubkey: toPublicKey(pubkey),
+      // DEX accounts (remaining accounts)
+      ...normalizedDexAccounts.map((pubkey) => ({
+        pubkey,
         isSigner: false,
         isWritable: true,
       })),
