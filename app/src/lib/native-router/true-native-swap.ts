@@ -885,20 +885,14 @@ export class TrueNativeSwap {
     const { blockhash, lastValidBlockHeight } =
       await this.connection.getLatestBlockhash();
 
-    // Charger les ALTs
-    const alts = await getAllALTs(this.connection);
-    const lookupTables = await Promise.all(
-      alts.map((alt) => this.connection.getAddressLookupTable(alt))
-    );
-    const validLookupTables = lookupTables
-      .filter((res) => res.value !== null)
-      .map((res) => res.value!);
+    // Charger les ALTs (déjà des AddressLookupTableAccount prêts à l'emploi)
+    const lookupTables = await getAllALTs(this.connection);
 
     const messageV0 = new TransactionMessage({
       payerKey: userPublicKey,
       recentBlockhash: blockhash,
       instructions,
-    }).compileToV0Message(validLookupTables);
+    }).compileToV0Message(lookupTables);
 
     const transaction = new VersionedTransaction(messageV0);
 
