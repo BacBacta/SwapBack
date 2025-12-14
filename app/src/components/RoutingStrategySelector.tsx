@@ -10,15 +10,15 @@ interface Props {
 const STRATEGY_INFO: Record<RoutingStrategy, { label: string; description: string }> = {
   smart: {
     label: "Intelligent Split",
-    description: "Mix Jupiter + TWAP automatique",
+    description: "CPI natif + TWAP automatique",
   },
   aggressive: {
     label: "Rapide",
-    description: "100% Jupiter pour exécution immédiate",
+    description: "CPI direct DEX pour exécution immédiate",
   },
   defensive: {
-    label: "Defensif",
-    description: "TWAP privilegie pour gros ordres",
+    label: "Défensif",
+    description: "TWAP privilégié pour gros ordres",
   },
 };
 

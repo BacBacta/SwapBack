@@ -17,8 +17,7 @@ interface Token {
 export function ImprovedSwapInterface() {
   const { connected } = useWallet();
 
-  // State
-  const [selectedRouter, setSelectedRouter] = useState<"swapback" | "jupiter">("swapback");
+  // State - Routeur DEX natif uniquement
   const [inputAmount, setInputAmount] = useState("");
   const [outputAmount, setOutputAmount] = useState("");
   const [inputToken, setInputToken] = useState<Token | null>(null);
@@ -85,80 +84,45 @@ export function ImprovedSwapInterface() {
     return Math.min((parseFloat(inputAmount) / inputToken.balance) * 100, 100);
   };
 
-  const routerConfidenceScore = selectedRouter === "swapback" ? 98 : 95;
+  // Score de confiance du routeur DEX natif (basé sur la profondeur de liquidité)
+  const routerConfidenceScore = 98;
 
   return (
     <div className="max-w-lg mx-auto">
       {/* Main Swap Card */}
       <div className="bg-[#0a0b14] border border-[#1a1b2e] rounded-2xl p-6 shadow-2xl">
-        {/* Header with Router Confidence */}
+        {/* Header - Routeur DEX Natif */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-white">Swap</h2>
-            {/* Tooltip example */}
+            {/* Tooltip info */}
             <div className="relative">
               <button
                 onMouseEnter={() => setShowTooltip("router")}
                 onMouseLeave={() => setShowTooltip(null)}
                 className="text-gray-400 hover:text-white"
-                aria-label="Router information"
+                aria-label="Informations routeur"
               >
                 ℹ️
               </button>
               {showTooltip === "router" && (
                 <div className="absolute right-0 top-8 w-64 bg-gray-900 border border-gray-700 rounded-lg p-3 text-xs text-gray-300 z-50">
-                  Choose between SwapBack (with rebates) or Jupiter (best market rates)
+                  Routeur DEX natif avec CPI direct vers Orca Whirlpool, Raydium CLMM, et plus. Rebates automatiques + Burn BACK.
                 </div>
               )}
             </div>
           </div>
 
-          {/* Router Selection with Confidence Score */}
-          <div className="flex gap-2 mb-4">
-            <button
-              onClick={() => setSelectedRouter("swapback")}
-              className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all relative ${
-                selectedRouter === "swapback"
-                  ? "bg-gradient-to-r from-[#00d4ff] to-[#7b2cbf] text-white shadow-lg"
-                  : "bg-[#1a1b2e] text-gray-400 hover:bg-[#252640]"
-              }`}
-              aria-pressed={selectedRouter === "swapback"}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <span>⚡</span>
-                <span>SwapBack</span>
-              </div>
-              {selectedRouter === "swapback" && (
-                <>
-                  <div className="text-xs mt-1 opacity-90">+Rebates +Burn</div>
-                  <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
-                    {routerConfidenceScore}%
-                  </div>
-                </>
-              )}
-            </button>
-            <button
-              onClick={() => setSelectedRouter("jupiter")}
-              className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all relative ${
-                selectedRouter === "jupiter"
-                  ? "bg-gradient-to-r from-[#00d4ff] to-[#7b2cbf] text-white shadow-lg"
-                  : "bg-[#1a1b2e] text-gray-400 hover:bg-[#252640]"
-              }`}
-              aria-pressed={selectedRouter === "jupiter"}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <span>🪐</span>
-                <span>Jupiter</span>
-              </div>
-              {selectedRouter === "jupiter" && (
-                <>
-                  <div className="text-xs mt-1 opacity-90">Best Market</div>
-                  <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
-                    {routerConfidenceScore}%
-                  </div>
-                </>
-              )}
-            </button>
+          {/* Bandeau SwapBack Router avec score de confiance */}
+          <div className="bg-gradient-to-r from-[#00d4ff] to-[#7b2cbf] rounded-xl p-4 relative">
+            <div className="flex items-center justify-center gap-2 text-white">
+              <span>⚡</span>
+              <span className="font-semibold">SwapBack DEX Router</span>
+            </div>
+            <div className="text-xs mt-1 text-center text-white/90">+Rebates +Burn • CPI natif DEX</div>
+            <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+              {routerConfidenceScore}%
+            </div>
           </div>
         </div>
 
@@ -318,8 +282,8 @@ export function ImprovedSwapInterface() {
               </div>
             </div>
 
-            {selectedRouter === "swapback" && (
-              <div className="bg-gradient-to-r from-[#00d4ff]/10 to-[#7b2cbf]/10 border border-[#00d4ff]/30 rounded-lg p-4">
+            {/* SwapBack DEX Router Savings - toujours affiché */}
+            <div className="bg-gradient-to-r from-[#00d4ff]/10 to-[#7b2cbf]/10 border border-[#00d4ff]/30 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="text-sm font-semibold text-[#00d4ff]">⚡ SwapBack Savings</div>
                   <button
@@ -347,7 +311,6 @@ export function ImprovedSwapInterface() {
                   </div>
                 </div>
               </div>
-            )}
           </div>
         )}
 

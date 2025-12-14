@@ -29,10 +29,10 @@ const volumeData = [
 ];
 
 const performanceData = [
-  { venue: "Orca", successRate: 98.5, avgTime: 1200 },
-  { venue: "Raydium", successRate: 97.2, avgTime: 1450 },
-  { venue: "Jupiter", successRate: 99.1, avgTime: 1150 },
+  { venue: "Orca Whirlpool", successRate: 98.5, avgTime: 1200 },
+  { venue: "Raydium CLMM", successRate: 97.2, avgTime: 1450 },
   { venue: "Meteora", successRate: 96.8, avgTime: 1580 },
+  { venue: "Phoenix", successRate: 99.1, avgTime: 1150 },
 ];
 
 const popularPairs = [

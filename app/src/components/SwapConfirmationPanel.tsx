@@ -5,7 +5,7 @@
  * 
  * Remplace les multiples modales par un panneau coulissant unique qui affiche :
  * - Résumé du swap
- * - Comparaison des prix (SwapBack vs Jupiter)
+ * - Comparaison des prix (SwapBack vs marché)
  * - Impact de prix
  * - Bouton de confirmation
  */
@@ -40,10 +40,17 @@ interface QuoteComparison {
     priceImpact: number;
     fee: number;
   };
+  /** @deprecated Renommé en `market` - comparaison marché générique */
   jupiter?: {
     outputAmount: number;
     priceImpact: number;
     fee: number;
+  };
+  market?: {
+    outputAmount: number;
+    priceImpact: number;
+    fee: number;
+    source?: string; // ex: "Orca", "Raydium", "CoinGecko"
   };
 }
 
@@ -74,8 +81,10 @@ export function SwapConfirmationPanel({
 }: SwapConfirmationPanelProps) {
   
   // Calculer les avantages SwapBack
-  const savings = quote && quote.jupiter 
-    ? (quote.swapback.netAmount - quote.jupiter.outputAmount)
+  // Support du legacy `jupiter` ou du nouveau `market`
+  const marketQuote = quote?.market || quote?.jupiter;
+  const savings = quote && marketQuote 
+    ? (quote.swapback.netAmount - marketQuote.outputAmount)
     : 0;
   
   const isBetter = savings > 0;
@@ -138,8 +147,8 @@ export function SwapConfirmationPanel({
             </div>
           </div>
 
-          {/* Comparaison avec Jupiter */}
-          {quote && quote.jupiter && (
+          {/* Comparaison avec le marché */}
+          {quote && marketQuote && (
             <div className="card-simple p-4">
               <div className="label-clean mb-3">Comparaison</div>
               
@@ -160,14 +169,14 @@ export function SwapConfirmationPanel({
                 </div>
               </div>
 
-              {/* Jupiter */}
+              {/* Marché (Orca/Raydium/etc) */}
               <div className={`quote-row ${!isBetter ? 'selected' : ''}`}>
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-gradient-to-br from-orange-500 to-purple-500 rounded-full" />
-                  <span className="quote-source">Jupiter</span>
+                  <div className="w-6 h-6 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-full" />
+                  <span className="quote-source">{marketQuote.source || 'Marché'}</span>
                 </div>
                 <div className="text-right">
-                  <div className="quote-amount">{formatAmount(quote.jupiter.outputAmount)}</div>
+                  <div className="quote-amount">{formatAmount(marketQuote.outputAmount)}</div>
                 </div>
               </div>
 

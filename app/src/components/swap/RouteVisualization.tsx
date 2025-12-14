@@ -4,10 +4,10 @@
  * 🗺️ Route Visualization Component
  * 
  * Affiche visuellement la route de swap:
- * - Graphique donut pour la répartition des venues
+ * - Graphique donut pour la répartition des venues DEX
  * - Chemin animé du swap
  * - Détails de chaque venue
- * - Comparaison avec Jupiter
+ * - Comparaison avec le prix marché
  * 
  * @author SwapBack Team
  * @date January 2025
@@ -42,7 +42,13 @@ export interface RouteVisualizationProps {
     logoURI?: string;
   };
   venues: RouteVenue[];
+  /** @deprecated Use marketBenchmark instead */
   jupiterBenchmark?: {
+    outputAmount: number;
+    priceImpactBps: number;
+  };
+  /** Benchmark du prix marché pour comparaison */
+  marketBenchmark?: {
     outputAmount: number;
     priceImpactBps: number;
   };
@@ -62,7 +68,8 @@ const VENUE_COLORS: Record<string, string> = {
   'METEORA_DLMM': '#FF6B6B',
   'PHOENIX': '#FFD93D',
   'LIFINITY': '#6BCB77',
-  'JUPITER': '#1F2937',
+  'SANCTUM': '#8B5CF6',
+  'SABER': '#F97316',
   'default': '#6B7280',
 };
 
@@ -73,7 +80,8 @@ const VENUE_ICONS: Record<string, string> = {
   'METEORA_DLMM': '☄️',
   'PHOENIX': '🔥',
   'LIFINITY': '♾️',
-  'JUPITER': '🪐',
+  'SANCTUM': '🏛️',
+  'SABER': '⚔️',
   'default': '📊',
 };
 
@@ -86,10 +94,14 @@ export function RouteVisualization({
   outputToken,
   venues,
   jupiterBenchmark,
+  marketBenchmark,
   estimatedRebate,
   estimatedNpi,
   compact = false,
 }: RouteVisualizationProps) {
+  // Support legacy jupiterBenchmark prop
+  const benchmark = marketBenchmark || jupiterBenchmark;
+  
   // Calculer les données du graphique donut
   const donutData = useMemo(() => {
     const total = venues.reduce((sum, v) => sum + v.weight, 0);
@@ -112,20 +124,20 @@ export function RouteVisualization({
     });
   }, [venues]);
   
-  // Calculer l'amélioration par rapport à Jupiter
+  // Calculer l'amélioration par rapport au prix marché
   const improvement = useMemo(() => {
-    if (!jupiterBenchmark) return null;
+    if (!benchmark) return null;
     
     const totalOutput = venues.reduce((sum, v) => sum + v.outputAmount, 0);
-    const diff = totalOutput - jupiterBenchmark.outputAmount;
-    const percentImprovement = (diff / jupiterBenchmark.outputAmount) * 100;
+    const diff = totalOutput - benchmark.outputAmount;
+    const percentImprovement = (diff / benchmark.outputAmount) * 100;
     
     return {
       absolute: diff,
       percent: percentImprovement,
       isBetter: diff > 0,
     };
-  }, [venues, jupiterBenchmark]);
+  }, [venues, benchmark]);
   
   if (compact) {
     return (
@@ -153,7 +165,7 @@ export function RouteVisualization({
           >
             <TrendingUp className="w-3 h-3 text-green-400" />
             <span className="text-xs text-green-400 font-medium">
-              +{improvement.percent.toFixed(2)}% vs Jupiter
+              +{improvement.percent.toFixed(2)}% vs marché
             </span>
           </motion.div>
         )}

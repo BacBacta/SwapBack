@@ -156,7 +156,6 @@ export function SimpleSwapCard() {
   // Paramètres (cachés par défaut)
   const [slippage, setSlippage] = useState(slippageConfig.BASE_SLIPPAGE_BPS / 100); // Utiliser config dynamique
   const [mevProtection, setMevProtection] = useState(useMevProtection);
-  const [trueNativeMode, setTrueNativeMode] = useState(useTrueNativeRouting);
 
   // Token data
   const inputTokenData = useTokenData(inputToken.mint);
@@ -333,15 +332,9 @@ export function SimpleSwapCard() {
         onProgress, // Callback pour mise à jour du statut en temps réel
       };
       
-      if (trueNativeMode) {
-        // 🔥 VRAI routage natif - appelle directement les DEX
-        console.log("[SimpleSwapCard] Using TRUE NATIVE routing (no Jupiter)...");
-        result = await executeTrueNativeSwap(swapParams, 0);
-      } else {
-        // Routage standard via Jupiter CPI
-        console.log("[SimpleSwapCard] Executing swap via Jupiter CPI...");
-        result = await executeSwap(swapParams, 0);
-      }
+      // 🔥 Toujours utiliser le VRAI routage natif - appelle directement les DEX
+      console.log("[SimpleSwapCard] Using TRUE NATIVE routing (direct DEX CPI)...");
+      result = await executeTrueNativeSwap(swapParams, 0);
       
       console.log("[SimpleSwapCard] Swap result:", result);
       
@@ -651,7 +644,7 @@ export function SimpleSwapCard() {
                       latencyMs: 0,
                       estimatedNpiBps: 10,
                     }))}
-                    jupiterBenchmark={quote.npiAmount > 0 ? {
+                    marketBenchmark={quote.npiAmount > 0 ? {
                       outputAmount: quote.outputAmountFormatted - quote.npiAmount,
                       priceImpactBps: Math.floor((quote.priceImpact || 0) * 100),
                     } : undefined}
