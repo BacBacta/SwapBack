@@ -954,20 +954,26 @@ export class TrueNativeSwap {
       );
     }
 
-    // 3. Créer le plan
+    // 3. Créer le plan (seulement s'il n'existe pas déjà)
     const [planPda] = this.deriveSwapPlanAddress(userPublicKey);
-    const expiresAt = Math.floor(Date.now() / 1000) + 60; // Expire dans 1 minute
-
-    instructions.push(
-      await this.buildCreatePlanInstruction(userPublicKey, {
-        inputMint,
-        outputMint,
-        amountIn,
-        minOut: minAmountOut,
-        venue: route.venue,
-        expiresAt,
-      })
-    );
+    const planAccountInfo = await this.connection.getAccountInfo(planPda);
+    
+    if (!planAccountInfo) {
+      const expiresAt = Math.floor(Date.now() / 1000) + 60; // Expire dans 1 minute
+      instructions.push(
+        await this.buildCreatePlanInstruction(userPublicKey, {
+          inputMint,
+          outputMint,
+          amountIn,
+          minOut: minAmountOut,
+          venue: route.venue,
+          expiresAt,
+        })
+      );
+      console.log("[TrueNativeSwap] Creating new plan:", planPda.toBase58());
+    } else {
+      console.log("[TrueNativeSwap] Plan already exists, reusing:", planPda.toBase58());
+    }
 
     // 4. Ajouter l'instruction de swap
     instructions.push(
