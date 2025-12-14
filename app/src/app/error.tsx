@@ -5,7 +5,7 @@
  * Capte les erreurs serveur et client
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { logError } from "@/lib/errorLogger";
 
 export default function Error({
@@ -15,7 +15,32 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const [isChunkError, setIsChunkError] = useState(false);
+  const [reloadCountdown, setReloadCountdown] = useState(3);
+
   useEffect(() => {
+    // Détecter les erreurs de chargement de chunk (après redéploiement)
+    const isChunkLoadError = 
+      error.name === "ChunkLoadError" ||
+      error.message.includes("Loading chunk") ||
+      error.message.includes("Failed to fetch dynamically imported module");
+
+    if (isChunkLoadError) {
+      setIsChunkError(true);
+      // Auto-reload après 3 secondes
+      const interval = setInterval(() => {
+        setReloadCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            window.location.reload();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+
     // Log l'erreur
     logError(error, {
       component: "NextJS Error Page",
@@ -28,6 +53,28 @@ export default function Error({
 
     console.error("🔴 Next.js Error Page:", error);
   }, [error]);
+
+  // UI spéciale pour les erreurs de chunk (cache navigateur)
+  if (isChunkError) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-gray-800 rounded-lg shadow-xl p-6 text-center space-y-4">
+          <div className="text-4xl mb-4">🔄</div>
+          <h1 className="text-xl font-bold text-white">Mise à jour détectée</h1>
+          <p className="text-gray-400">
+            Une nouvelle version de l'application est disponible.
+            Rechargement automatique dans <span className="text-cyan-400 font-bold">{reloadCountdown}</span> secondes...
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-3 px-4 rounded-lg transition"
+          >
+            Recharger maintenant
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
