@@ -12,7 +12,6 @@
  */
 
 import { Connection, PublicKey } from "@solana/web3.js";
-import { createRequire } from "module";
 import { SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from "@solana/spl-token";
 import { Buffer } from "buffer";
@@ -663,33 +662,16 @@ const USDT_MINT = new PublicKey("Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB");
 // sans dépendre de l'API Meteora (qui peut timeout).
 const METEORA_KNOWN_SOL_USDC_LBPAIR = new PublicKey("5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6");
 
-const requireCjs = createRequire(import.meta.url);
-
 async function loadMeteoraDLMMClass(): Promise<any> {
   // @meteora-ag/dlmm exports: default = DLMM class
-  // We support both ESM import() and CJS require() to avoid tsx/source resolution pitfalls.
-  try {
-    const mod: any = await import("@meteora-ag/dlmm");
-    const DLMM = mod?.DLMM ?? mod?.default ?? mod;
-    if (DLMM?.create) return DLMM;
-  } catch {
-    // ignore
-  }
-
-  const req: any = requireCjs("@meteora-ag/dlmm");
-  const DLMM = req?.DLMM ?? req?.default ?? req;
-  return DLMM;
+  // IMPORTANT: keep this file browser-bundle-friendly (Next.js). Avoid Node-only `module`/CJS fallbacks.
+  const mod: any = await import("@meteora-ag/dlmm");
+  return mod?.DLMM ?? mod?.default ?? mod;
 }
 
 async function loadMeteoraDlmmModule(): Promise<any> {
-  try {
-    const mod: any = await import("@meteora-ag/dlmm");
-    return mod;
-  } catch {
-    // ignore
-  }
-
-  return requireCjs("@meteora-ag/dlmm");
+  // IMPORTANT: keep this file browser-bundle-friendly (Next.js). Avoid Node-only `module`/CJS fallbacks.
+  return import("@meteora-ag/dlmm");
 }
 
 let meteoraLbPairMemcmpCache:
