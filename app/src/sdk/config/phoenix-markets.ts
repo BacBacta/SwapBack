@@ -41,18 +41,6 @@ const DEFAULT_PHOENIX_MARKETS: PhoenixMarketConfig[] = [
     makerFeeBps: -1,
     takerFeeBps: 5,
   },
-  {
-    symbol: 'SOL/USDT',
-    marketAddress: new PublicKey('5Dy6cZqy7ZTPJZ7pfPzKMFMUKKVpPxaM6dVB8FRkD2mT'),
-    baseMint: new PublicKey(SOL_MINT),
-    quoteMint: new PublicKey(USDT_MINT),
-    baseDecimals: 9,
-    quoteDecimals: 6,
-    lotSize: 0.01,
-    tickSize: 0.0001,
-    makerFeeBps: -1,
-    takerFeeBps: 5,
-  },
 ];
 
 let phoenixMarketMap: PhoenixMarketMap | null = null;

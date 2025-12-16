@@ -51,8 +51,6 @@ import {
 } from "../app/src/lib/native-router/dex/DEXAccountResolvers";
 
 const USDT_MINT = new PublicKey("Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB");
-const BONK_MINT = new PublicKey("DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263");
-const WIF_MINT = new PublicKey("EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm");
 
 type SwapCase = {
   name: string;
@@ -155,17 +153,20 @@ function parsePairsArg(pairsArg: string): SwapCase[] {
 }
 
 function defaultMatrixCasesForVenue(venue: SupportedVenue, amountInLamports: number): SwapCase[] {
-  // Objectif: couvrir 1–2 paires supplémentaires par venue.
-  // IMPORTANT: en simulateTransaction, on ne peut *financer* que SOL facilement.
-  // On choisit donc des paires avec input SOL et oracles sponsorisés (cf app/src/config/oracles.ts).
-  // Certaines venues n'ont pas de pool/market pour ces paires sur mainnet: on les classe en UNSUPPORTED.
-  return [
+  // Objectif: au moins 1–2 paires supplémentaires par venue.
+  // On utilise des tokens avec oracles sponsorisés (cf app/src/config/oracles.ts).
+  const cases: SwapCase[] = [
     { name: "SOL→USDC", inputMint: SOL_MINT, outputMint: USDC_MINT, amountInLamports },
-    // Paires additionnelles (peuvent être UNSUPPORTED selon la venue)
-    { name: "SOL→USDT", inputMint: SOL_MINT, outputMint: USDT_MINT, amountInLamports },
-    { name: "SOL→BONK", inputMint: SOL_MINT, outputMint: BONK_MINT, amountInLamports },
-    { name: "SOL→WIF", inputMint: SOL_MINT, outputMint: WIF_MINT, amountInLamports },
   ];
+
+  // Lifinity : SOL/USDT est généralement disponible dans le pool list.
+  // Meteora DLMM : SOL/USDT n'existe pas en DLMM API, donc on ne l'ajoute pas par défaut.
+  // Phoenix : nécessite un market address explicite; on évite SOL/USDT par défaut.
+  if (venue === "LIFINITY") {
+    cases.push({ name: "SOL→USDT", inputMint: SOL_MINT, outputMint: USDT_MINT, amountInLamports });
+  }
+
+  return cases;
 }
 
 async function ensureAta(
@@ -275,8 +276,7 @@ async function main() {
 
   const swapper = new TrueNativeSwap(connection);
 
-  type SummaryStatus = "OK" | "FAIL" | "UNSUPPORTED" | "BLOCKED";
-  const summary: Array<{ venue: string; caseName: string; status: SummaryStatus; detail?: string }> = [];
+  const summary: Array<{ venue: string; caseName: string; ok: boolean; error?: string }> = [];
 
   for (const venue of venues) {
     const cases: SwapCase[] = matrixMode
@@ -297,14 +297,15 @@ async function main() {
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.log(`DEX resolver threw for venue=${venue} case=${swapCase.name}: ${msg}`);
-        summary.push({ venue, caseName: swapCase.name, status: "FAIL", detail: `resolver_throw: ${msg}` });
-        process.exitCode = 1; // vrai bug: le resolver a throw
+        summary.push({ venue, caseName: swapCase.name, ok: false, error: msg });
+        process.exitCode = 1;
         continue;
       }
       if (!dex) {
-        const msg = "DEX resolver returned null (unsupported pair / no pool / no market config)";
+        const msg = "DEX resolver returned null (unsupported pair?)";
         console.log(`${msg} venue=${venue} case=${swapCase.name}`);
-        summary.push({ venue, caseName: swapCase.name, status: "UNSUPPORTED", detail: msg });
+        summary.push({ venue, caseName: swapCase.name, ok: false, error: msg });
+        process.exitCode = 1;
         continue;
       }
 
@@ -421,29 +422,17 @@ async function main() {
     }
 
       if (sim.value.err) {
-        const errStr = JSON.stringify(sim.value.err);
-        const logs = sim.value.logs ?? [];
-
-        // Cas connus "externes" (pas forcément un bug du router): classifier en BLOCKED.
-        const isLifinityFrozen =
-          venue === "LIFINITY" &&
-          (logs.some((l) => l.includes("ProgramIsFrozen")) || logs.some((l) => l.includes("Error Number: 6034")));
-
-        if (isLifinityFrozen) {
-          summary.push({ venue, caseName: swapCase.name, status: "BLOCKED", detail: "Lifinity ProgramIsFrozen (6034)" });
-        } else {
-          summary.push({ venue, caseName: swapCase.name, status: "FAIL", detail: errStr });
-          process.exitCode = 1;
-        }
+        summary.push({ venue, caseName: swapCase.name, ok: false, error: JSON.stringify(sim.value.err) });
+        process.exitCode = 1;
       } else {
-        summary.push({ venue, caseName: swapCase.name, status: "OK" });
+        summary.push({ venue, caseName: swapCase.name, ok: true });
       }
     }
   }
 
   console.log("\n================ SUMMARY ================");
   for (const row of summary) {
-    console.log(`${row.status} | ${row.venue} | ${row.caseName}${row.detail ? ` | ${row.detail}` : ""}`);
+    console.log(`${row.ok ? "OK" : "FAIL"} | ${row.venue} | ${row.caseName}${row.error ? ` | ${row.error}` : ""}`);
   }
 }
 

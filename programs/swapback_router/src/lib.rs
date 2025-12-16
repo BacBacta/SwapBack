@@ -2031,7 +2031,13 @@ pub mod swap_toc_processor {
         let mut total_amount_out: u64 = 0;
         let mut account_cursor: usize = 0;
 
-        for venue_weight in venues {
+        for (venue_index, venue_weight) in venues.iter().enumerate() {
+            // Jupiter est interdit tant que le routeur natif n'est pas explicitement validé.
+            require!(
+                venue_weight.venue != JUPITER_PROGRAM_ID,
+                ErrorCode::DexNotImplemented
+            );
+
             let amount_in = (total_amount_in as u128)
                 .checked_mul(venue_weight.weight as u128)
                 .ok_or(ErrorCode::InvalidOraclePrice)?
@@ -2072,7 +2078,23 @@ pub mod swap_toc_processor {
                 base_min_out_per_venue
             };
 
-            let required_accounts = required_account_len_for_dex(&venue_weight.venue)?;
+            // IMPORTANT: certaines venues (ex: Meteora DLMM) ont des comptes dynamiques
+            // (bin arrays). En l'absence d'un champ "length" explicite par venue dans le plan,
+            // on ne peut pas parser plusieurs venues après Meteora.
+            let required_accounts = if venue_weight.venue == METEORA_DLMM_PROGRAM_ID {
+                let remaining_for_venue = remaining_accounts.len().saturating_sub(account_cursor);
+                require!(
+                    remaining_for_venue >= cpi_meteora::METEORA_SWAP_ACCOUNT_COUNT,
+                    ErrorCode::DexExecutionFailed
+                );
+                require!(
+                    venue_index + 1 == venues.len(),
+                    ErrorCode::DexExecutionFailed
+                );
+                remaining_for_venue
+            } else {
+                required_account_len_for_dex(&venue_weight.venue)?
+            };
             if account_cursor
                 .checked_add(required_accounts)
                 .unwrap_or(usize::MAX)
@@ -2229,7 +2251,7 @@ pub mod swap_toc_processor {
         min_out: u64,
         account_slice: &[AccountInfo],
         is_fallback: bool,
-        jupiter_route: Option<&JupiterRouteParams>,
+        _jupiter_route: Option<&JupiterRouteParams>,
     ) -> Result<u64> {
         match dex_program {
             RAYDIUM_AMM_PROGRAM_ID => {
@@ -2254,18 +2276,17 @@ pub mod swap_toc_processor {
                 });
                 Ok(amount_out)
             }
+            // Jupiter est STRICTEMENT désactivé tant que le routeur natif n'est pas validé.
+            // NOTE: on garde les types/IDL pour compat, mais on refuse l'exécution.
             JUPITER_PROGRAM_ID => {
-                let route_params = jupiter_route.ok_or(ErrorCode::MissingJupiterRoute)?;
-                let amount_out =
-                    cpi_jupiter::swap(ctx, account_slice, amount_in, min_out, route_params)?;
                 emit!(VenueExecuted {
                     venue: dex_program,
                     amount_in,
-                    amount_out,
-                    success: true,
+                    amount_out: 0,
+                    success: false,
                     fallback_used: is_fallback,
                 });
-                Ok(amount_out)
+                err!(ErrorCode::DexNotImplemented)
             }
             // ============================================
             // NEW DEX INTEGRATIONS (Dec 2025)
@@ -2367,7 +2388,8 @@ pub mod swap_toc_processor {
         } else if *program_id == SABER_PROGRAM_ID {
             Ok(cpi_saber::SABER_SWAP_ACCOUNT_COUNT)
         } else if *program_id == JUPITER_PROGRAM_ID {
-            Ok(cpi_jupiter::JUPITER_SWAP_ACCOUNT_COUNT)
+            // Jupiter est désactivé: ne pas permettre le slicing de comptes.
+            err!(ErrorCode::DexNotImplemented)
         } else {
             Ok(0)
         }
@@ -2668,19 +2690,34 @@ pub mod swap_toc_processor {
             msg!("Supported DEX programs: Orca Whirlpool, Raydium CLMM, Meteora, Phoenix, Lifinity, Sanctum, Saber");
             ErrorCode::DexExecutionFailed
         })?;
-        
-        require!(
-            remaining_accounts.len() >= 2,
-            ErrorCode::DexExecutionFailed
-        );
-        
+
+        require!(dex_program != JUPITER_PROGRAM_ID, ErrorCode::DexNotImplemented);
+
+        // En mode direct, certaines venues ont des comptes dynamiques (ex: Meteora DLMM bin arrays).
+        // - Phoenix/Lifinity/etc: slice strict sur ABI fixe.
+        // - Meteora DLMM: passer tous les comptes fournis (>= minimum requis).
+        let account_slice: &[AccountInfo] = if dex_program == METEORA_DLMM_PROGRAM_ID {
+            require!(
+                remaining_accounts.len() >= cpi_meteora::METEORA_SWAP_ACCOUNT_COUNT,
+                ErrorCode::DexExecutionFailed
+            );
+            remaining_accounts
+        } else {
+            let required_accounts = required_account_len_for_dex(&dex_program)?;
+            require!(
+                required_accounts > 0 && remaining_accounts.len() >= required_accounts,
+                ErrorCode::DexExecutionFailed
+            );
+            &remaining_accounts[0..required_accounts]
+        };
+
         // Execute direct CPI to the specified DEX
         let amount_out = execute_dex_swap(
             ctx,
             dex_program,
             amount_in,
             min_out,
-            remaining_accounts,
+            account_slice,
             false, // not a fallback
             None,  // no Jupiter route needed
         )?;
@@ -2695,7 +2732,7 @@ pub mod swap_toc_processor {
         amount_in: u64,
         amount_out: u64,
         min_out: u64,
-        venue: Pubkey,
+        _venue: Pubkey,
     ) -> Result<u64> {
         // Calculate and distribute fees/rebates
         let user_boost = ctx

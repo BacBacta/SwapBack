@@ -6,31 +6,38 @@ use anchor_spl::token::spl_token::state::Account as SplAccount;
 
 use crate::{ErrorCode, SwapToC, PHOENIX_PROGRAM_ID};
 
-/// Phoenix swap discriminator (new order instruction)
-const NEW_ORDER_DISCRIMINATOR: u8 = 0;
+/// Phoenix swap discriminator
+///
+/// Phoenix v1 encodes instructions as a u8 discriminator. For Swap, this is 0.
+/// (Matches phoenix-sdk `swapInstructionDiscriminator`.)
+const SWAP_INSTRUCTION_DISCRIMINATOR: u8 = 0;
+
+/// OrderPacket enum discriminators (matches phoenix-sdk `orderPacketBeet` ordering)
+const ORDER_PACKET_IMMEDIATE_OR_CANCEL: u8 = 2;
+
+/// coption tag values (metaplex beet)
+const COPTION_NONE: u8 = 0;
+const COPTION_SOME: u8 = 1;
+
+/// Self-trade behavior (matches phoenix-sdk `SelfTradeBehavior`)
+const SELF_TRADE_DECREMENT_TAKE: u8 = 2;
+
+/// Phoenix default match limit (matches phoenix-sdk DEFAULT_MATCH_LIMIT)
+const PHOENIX_DEFAULT_MATCH_LIMIT: u64 = 2048;
 
 /// Account indices for Phoenix swap
 const PHOENIX_PROGRAM_INDEX: usize = 0;
 const LOG_AUTHORITY_INDEX: usize = 1;
 const MARKET_INDEX: usize = 2;
 const TRADER_INDEX: usize = 3;
-const SEAT_INDEX: usize = 4;
-const BASE_ACCOUNT_INDEX: usize = 5;
-const QUOTE_ACCOUNT_INDEX: usize = 6;
-const BASE_VAULT_INDEX: usize = 7;
-const QUOTE_VAULT_INDEX: usize = 8;
-const TOKEN_PROGRAM_INDEX: usize = 9;
+const BASE_ACCOUNT_INDEX: usize = 4;
+const QUOTE_ACCOUNT_INDEX: usize = 5;
+const BASE_VAULT_INDEX: usize = 6;
+const QUOTE_VAULT_INDEX: usize = 7;
+const TOKEN_PROGRAM_INDEX: usize = 8;
 
-/// Minimum accounts for Phoenix swap
-pub const PHOENIX_SWAP_ACCOUNT_COUNT: usize = 10;
-
-/// Phoenix order types
-#[repr(u8)]
-pub enum PhoenixOrderType {
-    Limit = 0,
-    ImmediateOrCancel = 1,  // IOC - what we use for swaps
-    PostOnly = 2,
-}
+/// Minimum accounts for Phoenix swap (matches phoenix-sdk createSwapInstruction keys)
+pub const PHOENIX_SWAP_ACCOUNT_COUNT: usize = 9;
 
 /// Phoenix side
 #[repr(u8)]
@@ -38,6 +45,14 @@ pub enum PhoenixSide {
     Bid = 0,  // Buy base with quote
     Ask = 1,  // Sell base for quote
 }
+
+/// Phoenix MarketHeader offsets (bytes) for values we need.
+///
+/// Layout is defined in phoenix-sdk `MarketHeader` beet struct:
+/// [discriminant:u64][status:u64][marketSizeParams:3*u64][baseParams:72][baseLotSize:u64][quoteParams:72][quoteLotSize:u64]...
+const PHOENIX_BASE_LOT_SIZE_OFFSET: usize = 112;
+const PHOENIX_QUOTE_LOT_SIZE_OFFSET: usize = 192;
+const PHOENIX_REQUIRED_HEADER_LEN: usize = PHOENIX_QUOTE_LOT_SIZE_OFFSET + 8;
 
 /// Execute a swap through Phoenix CLOB (Central Limit Order Book)
 /// 
@@ -68,6 +83,19 @@ pub fn swap(
         return err!(ErrorCode::DexExecutionFailed);
     }
 
+    // Basic account sanity checks to catch ordering mistakes early.
+    let phoenix_program = &account_slice[PHOENIX_PROGRAM_INDEX];
+    if phoenix_program.key() != PHOENIX_PROGRAM_ID {
+        msg!("Phoenix: program account mismatch");
+        return err!(ErrorCode::DexExecutionFailed);
+    }
+
+    let token_program = &account_slice[TOKEN_PROGRAM_INDEX];
+    if token_program.key() != anchor_spl::token::ID {
+        msg!("Phoenix: token program mismatch");
+        return err!(ErrorCode::DexExecutionFailed);
+    }
+
     let base_account = &account_slice[BASE_ACCOUNT_INDEX];
     let quote_account = &account_slice[QUOTE_ACCOUNT_INDEX];
 
@@ -75,54 +103,81 @@ pub fn swap(
     let user_token_a_key = ctx.accounts.user_token_account_a.key();
     let user_token_b_key = ctx.accounts.user_token_account_b.key();
 
-    // Determine if this is a bid (buy base) or ask (sell base)
-    let (side, _source_account, destination_account) = 
-        if base_account.key() == user_token_a_key && quote_account.key() == user_token_b_key {
-            // Selling quote to get base = Bid
-            (PhoenixSide::Bid, quote_account, base_account)
-        } else if base_account.key() == user_token_b_key && quote_account.key() == user_token_a_key {
-            // Selling base to get quote = Ask
-            (PhoenixSide::Ask, base_account, quote_account)
-        } else if quote_account.key() == user_token_a_key && base_account.key() == user_token_b_key {
-            // Selling base for quote = Ask
-            (PhoenixSide::Ask, base_account, quote_account)
-        } else {
-            msg!("Phoenix: token account mismatch");
-            return err!(ErrorCode::DexExecutionFailed);
-        };
+    // Determine side from router token accounts:
+    // - user_token_account_a = input token account
+    // - user_token_account_b = output token account
+    // Phoenix Swap expects baseAccount and quoteAccount (ATAs for market base/quote mints).
+    // Bid: input is quote, output is base
+    // Ask: input is base, output is quote
+    let (side, _source_account, destination_account) = if quote_account.key() == user_token_a_key
+        && base_account.key() == user_token_b_key
+    {
+        (PhoenixSide::Bid, quote_account, base_account)
+    } else if base_account.key() == user_token_a_key && quote_account.key() == user_token_b_key {
+        (PhoenixSide::Ask, base_account, quote_account)
+    } else {
+        msg!("Phoenix: token account mismatch");
+        return err!(ErrorCode::DexExecutionFailed);
+    };
+
+    // Parse lot sizes from market header to convert raw SPL amounts to Phoenix lots.
+    let (base_lot_size, quote_lot_size) = read_market_lot_sizes(&account_slice[MARKET_INDEX])?;
+    if base_lot_size == 0 || quote_lot_size == 0 {
+        msg!("Phoenix: invalid lot sizes");
+        return err!(ErrorCode::DexExecutionFailed);
+    }
+
+    let (num_base_lots, num_quote_lots, min_base_lots_to_fill, min_quote_lots_to_fill) = match side {
+        PhoenixSide::Ask => {
+            // Sell base for quote: in = base atoms, out = quote atoms
+            let in_base_lots = amount_in.checked_div(base_lot_size).unwrap_or(0);
+            let min_quote_lots = div_ceil(min_out, quote_lot_size)?;
+            (in_base_lots, 0u64, 0u64, min_quote_lots)
+        }
+        PhoenixSide::Bid => {
+            // Buy base with quote: in = quote atoms, out = base atoms
+            let in_quote_lots = amount_in.checked_div(quote_lot_size).unwrap_or(0);
+            let min_base_lots = div_ceil(min_out, base_lot_size)?;
+            (0u64, in_quote_lots, min_base_lots, 0u64)
+        }
+    };
+
+    if num_base_lots == 0 && num_quote_lots == 0 {
+        msg!("Phoenix: amount_in too small for lot size");
+        return err!(ErrorCode::DexExecutionFailed);
+    }
 
     // Read pre-swap balance
     let pre_amount = read_token_amount(destination_account)?;
 
-    // Build Phoenix new order instruction data
-    // Phoenix uses a custom binary format for orders
-    let mut data = Vec::with_capacity(32);
-    data.push(NEW_ORDER_DISCRIMINATOR);
-    
-    // Order params (simplified IOC market order)
-    data.push(PhoenixOrderType::ImmediateOrCancel as u8);
+    // Build Phoenix Swap instruction args:
+    // [u8 discriminator][OrderPacket enum]
+    // OrderPacket::ImmediateOrCancel layout matches phoenix-sdk beet serialization.
+    let mut data = Vec::with_capacity(1 + 1 + 64);
+    data.push(SWAP_INSTRUCTION_DISCRIMINATOR);
+    data.push(ORDER_PACKET_IMMEDIATE_OR_CANCEL);
+    // ImmediateOrCancel fields
     data.push(side as u8);
-    
-    // Price in ticks (0 = market order for IOC)
-    data.extend_from_slice(&0u64.to_le_bytes());
-    
-    // Size in base lots
-    data.extend_from_slice(&amount_in.to_le_bytes());
-    
-    // Min output (slippage protection)
-    data.extend_from_slice(&min_out.to_le_bytes());
-    
-    // Self trade behavior (decrement take)
-    data.push(0u8);
-    
-    // Match limit (max matches)
-    data.extend_from_slice(&u16::MAX.to_le_bytes());
-    
-    // Client order ID
+    // priceInTicks: None (market)
+    write_coption_u64(&mut data, None);
+    // numBaseLots / numQuoteLots budgets
+    data.extend_from_slice(&num_base_lots.to_le_bytes());
+    data.extend_from_slice(&num_quote_lots.to_le_bytes());
+    // minBaseLotsToFill / minQuoteLotsToFill
+    data.extend_from_slice(&min_base_lots_to_fill.to_le_bytes());
+    data.extend_from_slice(&min_quote_lots_to_fill.to_le_bytes());
+    // selfTradeBehavior
+    data.push(SELF_TRADE_DECREMENT_TAKE);
+    // matchLimit: Some(DEFAULT_MATCH_LIMIT)
+    write_coption_u64(&mut data, Some(PHOENIX_DEFAULT_MATCH_LIMIT));
+    // clientOrderId
     data.extend_from_slice(&0u128.to_le_bytes());
-    
-    // Use only deposited funds
-    data.push(1u8);
+    // useOnlyDepositedFunds: false
+    data.push(0u8);
+    // lastValidSlot: None
+    write_coption_u64(&mut data, None);
+    // lastValidUnixTimestampInSeconds: None
+    write_coption_u64(&mut data, None);
 
     // Build account metas
     let account_metas: Vec<AccountMeta> = account_slice
@@ -131,7 +186,6 @@ pub fn swap(
         .map(|(i, info)| {
             let is_writable = matches!(i, 
                 MARKET_INDEX | 
-                SEAT_INDEX |
                 BASE_ACCOUNT_INDEX | 
                 QUOTE_ACCOUNT_INDEX |
                 BASE_VAULT_INDEX |
@@ -171,6 +225,49 @@ pub fn swap(
 
     msg!("Phoenix swap success: {} in -> {} out", amount_in, amount_out);
     Ok(amount_out)
+}
+
+fn read_market_lot_sizes(market: &AccountInfo) -> Result<(u64, u64)> {
+    let data = market
+        .try_borrow_data()
+        .map_err(|_| error!(ErrorCode::DexExecutionFailed))?;
+    if data.len() < PHOENIX_REQUIRED_HEADER_LEN {
+        msg!("Phoenix: market header too short");
+        return err!(ErrorCode::DexExecutionFailed);
+    }
+
+    let base_lot_size = u64::from_le_bytes(
+        data[PHOENIX_BASE_LOT_SIZE_OFFSET..PHOENIX_BASE_LOT_SIZE_OFFSET + 8]
+            .try_into()
+            .map_err(|_| error!(ErrorCode::DexExecutionFailed))?,
+    );
+    let quote_lot_size = u64::from_le_bytes(
+        data[PHOENIX_QUOTE_LOT_SIZE_OFFSET..PHOENIX_QUOTE_LOT_SIZE_OFFSET + 8]
+            .try_into()
+            .map_err(|_| error!(ErrorCode::DexExecutionFailed))?,
+    );
+
+    Ok((base_lot_size, quote_lot_size))
+}
+
+fn div_ceil(n: u64, d: u64) -> Result<u64> {
+    if d == 0 {
+        return err!(ErrorCode::DexExecutionFailed);
+    }
+    Ok(n
+        .checked_add(d - 1)
+        .ok_or_else(|| error!(ErrorCode::DexExecutionFailed))?
+        / d)
+}
+
+fn write_coption_u64(buf: &mut Vec<u8>, value: Option<u64>) {
+    match value {
+        None => buf.push(COPTION_NONE),
+        Some(v) => {
+            buf.push(COPTION_SOME);
+            buf.extend_from_slice(&v.to_le_bytes());
+        }
+    }
 }
 
 fn read_token_amount(account: &AccountInfo) -> Result<u64> {

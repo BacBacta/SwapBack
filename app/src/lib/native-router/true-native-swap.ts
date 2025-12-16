@@ -1,16 +1,13 @@
 /**
  * 🔀 True Native Swap Module
- * 
- * Ce module implémente le VRAI routage natif vers les DEX (Raydium, Orca, Meteora)
- * SANS passer par Jupiter. Il utilise le mode Dynamic Plan du programme on-chain.
- * 
- * Flux:
- * 1. Créer un SwapPlan on-chain avec les venues natives
- * 2. Appeler swap_toc avec use_dynamic_plan=true
- * 3. Le programme exécute directement les CPI vers les DEX
- * 
- * @author SwapBack Team
- * @date January 2025
+ *
+ * Implémente le swap natif vers les DEX (Raydium, Orca, Meteora, etc.)
+ * SANS passer par Jupiter.
+ *
+ * V1 (best-venue, single CPI):
+ * - Sélectionne la meilleure venue off-chain
+ * - Appelle `swap_toc` avec `direct_dex_venue` (use_dynamic_plan=false)
+ * - AUCUN write on-chain (pas de SwapPlan) pour le chemin direct
  */
 
 import {
@@ -26,9 +23,11 @@ import {
 } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
+  TOKEN_2022_PROGRAM_ID,
   getAssociatedTokenAddress,
   createAssociatedTokenAccountInstruction,
   createSyncNativeInstruction,
+  getMint,
 } from "@solana/spl-token";
 import BN from "bn.js";
 import { logger } from "@/lib/logger";
@@ -127,9 +126,20 @@ export interface TrueNativeSwapResult {
 
 export class TrueNativeSwap {
   private connection: Connection;
+  private mintDecimalsCache = new Map<string, number>();
 
   constructor(connection: Connection) {
     this.connection = connection;
+  }
+
+  private async getMintDecimals(mint: PublicKey): Promise<number> {
+    const key = mint.toBase58();
+    const cached = this.mintDecimalsCache.get(key);
+    if (cached !== undefined) return cached;
+
+    const mintInfo = await getMint(this.connection, mint);
+    this.mintDecimalsCache.set(key, mintInfo.decimals);
+    return mintInfo.decimals;
   }
 
   // ==========================================================================
@@ -611,7 +621,6 @@ export class TrueNativeSwap {
       inputMint,
       outputMint
     );
-    const [planPda] = this.deriveSwapPlanAddress(safeUser);
 
     const normalizedDexAccounts = route.dexAccounts.accounts.map((pubkey, index) => {
       try {
@@ -643,35 +652,48 @@ export class TrueNativeSwap {
       outputMint.toBase58()
     );
 
+    const [tokenADecimals, tokenBDecimals] = await Promise.all([
+      this.getMintDecimals(inputMint),
+      this.getMintDecimals(outputMint),
+    ]);
+
+    logger.debug("TrueNativeSwap", "Native swap oracle + params", {
+      inputMint: inputMint.toBase58(),
+      outputMint: outputMint.toBase58(),
+      amountIn,
+      slippageBps: params.slippageBps,
+      primaryOracle: oracleConfig.primary.toBase58(),
+      fallbackOracle: oracleConfig.fallback?.toBase58() ?? null,
+      maxStalenessSecs: MAX_STALENESS_SECS,
+      rpcEndpoint: (this.connection as any)?.rpcEndpoint ?? undefined,
+      tokenADecimals,
+      tokenBDecimals,
+    });
+
     // Sérialiser SwapArgs avec direct_dex_venue pour native swap
     const argsBuffer = this.serializeSwapArgs({
       amountIn: new BN(amountIn),
       minOut: new BN(minAmountOut),
       useDynamicPlan: false, // Not using dynamic plan - direct DEX swap
       useBundle: false,
-      planAccount: planPda,
+      // NOTE: plan_account n'est utilisé que si useDynamicPlan=true.
+      // On passe un placeholder ici pour éviter de dériver/embarquer un PDA inutile.
+      planAccount: ROUTER_PROGRAM_ID,
       primaryOracleAccount: oracleConfig.primary,
       directDexVenue: route.venueProgramId, // <-- THE KEY for native swap!
       maxStalenessOverride: MAX_STALENESS_SECS,
-      tokenADecimals: 9, // SOL default
-      tokenBDecimals: 6, // USDC default
+      tokenADecimals,
+      tokenBDecimals,
     });
 
     // Discriminator pour swap_toc
     const discriminator = Buffer.from([187, 201, 212, 51, 16, 155, 236, 60]);
     const data = Buffer.concat([discriminator, argsBuffer]);
 
-    // Oracle cache PDA - seeds: ["oracle_cache", primary_oracle]
-    const [oracleCache] = PublicKey.findProgramAddressSync(
-      [Buffer.from("oracle_cache"), oracleConfig.primary.toBuffer()],
-      ROUTER_PROGRAM_ID
-    );
-
-    // Venue score PDA - seeds: ["venue_score", state]
-    const [venueScore] = PublicKey.findProgramAddressSync(
-      [Buffer.from("venue_score"), accounts.state.toBuffer()],
-      ROUTER_PROGRAM_ID
-    );
+    // IMPORTANT (taille de tx): oracle_cache / venue_score sont optionnels.
+    // Ne pas les dériver / inclure par défaut pour rester sous la limite de taille des tx.
+    const oracleCacheKey = ROUTER_PROGRAM_ID;
+    const venueScoreKey = ROUTER_PROGRAM_ID;
 
     /**
      * Construire les keys dans l'ordre EXACT de l'IDL:
@@ -701,30 +723,14 @@ export class TrueNativeSwap {
      * PAS des PDAs du router. Ils sont extraits des dexAccounts lors de la résolution.
      */
     
-    // Utiliser les vaults du DEX si disponibles, sinon fallback vers user token accounts
-    // (le programme ne les utilise pas vraiment pour les swaps DEX car tout passe par remaining_accounts)
-    const vaultTokenAccountA = route.dexAccounts.vaultTokenAccountA ?? accounts.userTokenAccountA;
-    const vaultTokenAccountB = route.dexAccounts.vaultTokenAccountB ?? accounts.userTokenAccountB;
-    
-    // Vérifier si user_rebate existe, sinon utiliser placeholder
-    const userRebateAccountInfo = await this.connection.getAccountInfo(accounts.userRebate);
-    const userRebateKey = userRebateAccountInfo ? accounts.userRebate : ROUTER_PROGRAM_ID;
-    if (!userRebateAccountInfo) {
-      console.log("[TrueNativeSwap] user_rebate not initialized, using placeholder");
-    }
+    // En mode direct DEX, vault_token_account_a/b ne sont pas utilisés par le CPI (les comptes DEX sont en remaining_accounts).
+    // Pour éviter d'embarquer des vaults de pool (souvent uniques) et gonfler la taille de la transaction,
+    // on pointe vers les ATAs user.
+    const vaultTokenAccountA = accounts.userTokenAccountA;
+    const vaultTokenAccountB = accounts.userTokenAccountB;
 
-    // Vérifier oracle_cache et venue_score (optionnels) avant de les passer
-    const oracleCacheInfo = await this.connection.getAccountInfo(oracleCache);
-    const oracleCacheKey = oracleCacheInfo ? oracleCache : ROUTER_PROGRAM_ID;
-    if (!oracleCacheInfo) {
-      console.log("[TrueNativeSwap] oracle_cache not initialized, using placeholder");
-    }
-
-    const venueScoreInfo = await this.connection.getAccountInfo(venueScore);
-    const venueScoreKey = venueScoreInfo ? venueScore : ROUTER_PROGRAM_ID;
-    if (!venueScoreInfo) {
-      console.log("[TrueNativeSwap] venue_score not initialized, using placeholder");
-    }
+    // user_rebate est optionnel : placeholder par défaut pour limiter la taille.
+    const userRebateKey = ROUTER_PROGRAM_ID;
 
     // Construire les metas des remaining accounts DEX avec les bons flags.
     // IMPORTANT:
@@ -737,6 +743,7 @@ export class TrueNativeSwap {
       // Program accounts (exécutables) doivent être readonly.
       if (
         pubkey.equals(TOKEN_PROGRAM_ID) ||
+        pubkey.equals(TOKEN_2022_PROGRAM_ID) ||
         pubkey.equals(DEX_PROGRAM_IDS.RAYDIUM_AMM) ||
         pubkey.equals(DEX_PROGRAM_IDS.RAYDIUM_CLMM) ||
         pubkey.equals(DEX_PROGRAM_IDS.ORCA_WHIRLPOOL) ||
@@ -798,8 +805,8 @@ export class TrueNativeSwap {
       }
 
       if (route.venue === "PHOENIX") {
-        // Phoenix: programme readonly (index 0 dans notre resolver actuel)
-        if (index === 0) {
+        // cpi_phoenix.rs: programme readonly (0), log_authority readonly (1), trader signer readonly (3), token_program readonly (9)
+        if (index === 0 || index === 1 || index === 9) {
           isWritable = false;
         }
       }
@@ -813,6 +820,10 @@ export class TrueNativeSwap {
         }
         if (index === 9) {
           isWritable = false;
+        }
+        // Lifinity Anchor exige configAccount mut; éviter toute escalade impossible en CPI.
+        if (index === 12) {
+          isWritable = true;
         }
         // Le compte programme Lifinity est inclus en extra pour satisfaire `invoke`
         if (pubkey.equals(DEX_PROGRAM_IDS.LIFINITY)) {
@@ -887,8 +898,8 @@ export class TrueNativeSwap {
       { pubkey: vaultTokenAccountA, isSigner: false, isWritable: true },
       // 8. vault_token_account_b - DEX pool vault
       { pubkey: vaultTokenAccountB, isSigner: false, isWritable: true },
-      // 9. plan (optional but we're using dynamic plan)
-      { pubkey: planPda, isSigner: false, isWritable: true },
+      // 9. plan (optional) - placeholder (direct DEX swap: useDynamicPlan=false)
+      { pubkey: ROUTER_PROGRAM_ID, isSigner: false, isWritable: false },
       // 10. user_nft (optional) - use a placeholder, program will handle None
       { pubkey: ROUTER_PROGRAM_ID, isSigner: false, isWritable: false },
       // 11. buyback_program (optional)
@@ -900,13 +911,13 @@ export class TrueNativeSwap {
       // 14. user_rebate_account (optional)
       { pubkey: ROUTER_PROGRAM_ID, isSigner: false, isWritable: false },
       // 15. user_rebate (optional, PDA) - use placeholder if not initialized
-      { pubkey: userRebateKey, isSigner: false, isWritable: userRebateAccountInfo !== null },
+      { pubkey: userRebateKey, isSigner: false, isWritable: false },
       // 16. rebate_vault (writable, PDA)
       { pubkey: accounts.rebateVault, isSigner: false, isWritable: true },
       // 17. oracle_cache (optional, PDA)
-      { pubkey: oracleCacheKey, isSigner: false, isWritable: oracleCacheInfo !== null },
+      { pubkey: oracleCacheKey, isSigner: false, isWritable: false },
       // 18. venue_score (optional, PDA)
-      { pubkey: venueScoreKey, isSigner: false, isWritable: venueScoreInfo !== null },
+      { pubkey: venueScoreKey, isSigner: false, isWritable: false },
       // 19. token_program
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       // 20. system_program
@@ -1165,33 +1176,12 @@ export class TrueNativeSwap {
       );
     }
 
-    // 3. Créer le plan (seulement s'il n'existe pas déjà)
-    const [planPda] = this.deriveSwapPlanAddress(userPublicKey);
-    const planAccountInfo = await this.connection.getAccountInfo(planPda);
-    
-    if (!planAccountInfo) {
-      const expiresAt = Math.floor(Date.now() / 1000) + 60; // Expire dans 1 minute
-      instructions.push(
-        await this.buildCreatePlanInstruction(userPublicKey, {
-          inputMint,
-          outputMint,
-          amountIn,
-          minOut: minAmountOut,
-          venue: route.venue,
-          expiresAt,
-        })
-      );
-      console.log("[TrueNativeSwap] Creating new plan:", planPda.toBase58());
-    } else {
-      console.log("[TrueNativeSwap] Plan already exists, reusing:", planPda.toBase58());
-    }
-
-    // 4. Ajouter l'instruction de swap
+    // 3. Ajouter l'instruction de swap (chemin direct: pas de SwapPlan)
     instructions.push(
       await this.buildNativeSwapInstruction(userPublicKey, route, params)
     );
 
-    // 5. Construire la transaction versionnée
+    // 4. Construire la transaction versionnée
     const { blockhash, lastValidBlockHeight } =
       await this.connection.getLatestBlockhash();
 
@@ -1205,6 +1195,9 @@ export class TrueNativeSwap {
     }).compileToV0Message(lookupTables);
 
     const transaction = new VersionedTransaction(messageV0);
+
+    // Toujours retourner le PDA pour compat/debug (même si non créé en V1 direct)
+    const [planPda] = this.deriveSwapPlanAddress(userPublicKey);
 
     return {
       transaction,

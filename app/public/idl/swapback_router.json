@@ -1,5 +1,5 @@
 {
-  "address": "9ttege5TrSQzHbYFSuTPLAS16NYTUPRuVpkyEwVFD2Fh",
+  "address": "APHj6L2b2bA2q62jwYZp38dqbTxQUqwatqdUum1trPnN",
   "metadata": {
     "name": "swapback_router",
     "version": "0.1.0",
@@ -910,7 +910,7 @@
         {
           "name": "buyback_program",
           "optional": true,
-          "address": "EoVjmALZdkU3N9uehxVV4n9C6ukRa8QrbZRMHKBD2KUf"
+          "address": "7wCCwRXxWvMY2DJDRrnhFg3b8jVPb5vVPxLH5YAGL6eJ"
         },
         {
           "name": "buyback_usdc_vault",
