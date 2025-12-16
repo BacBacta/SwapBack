@@ -26,7 +26,7 @@ import bs58 from "bs58";
 if (typeof globalThis !== "undefined" && typeof (globalThis as any).Buffer === "undefined") {
   (globalThis as any).Buffer = Buffer;
 }
-import { getRaydiumPool } from "@/sdk/config/raydium-pools";
+import { getAllRaydiumPools, getRaydiumPool } from "@/sdk/config/raydium-pools";
 
 const RESOLVER_CACHE_TTL_MS = 60_000; // short-lived cache to absorb bursty API errors
 const MAX_FETCH_ATTEMPTS = 2;
@@ -1607,10 +1607,339 @@ export async function getPhoenixAccounts(
 
 const RAYDIUM_AMM_PROGRAM = new PublicKey("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8");
 
+type RaydiumAmmLayout = {
+  dataSize: number;
+  offsets: {
+    tokenMintA: number;
+    tokenMintB: number;
+    ammOpenOrders: number;
+    poolCoinTokenAccount: number;
+    poolPcTokenAccount: number;
+    serumProgramId: number;
+    serumMarket: number;
+  };
+};
+
+let raydiumAmmLayoutCache:
+  | {
+      timestamp: number;
+      layout: RaydiumAmmLayout;
+    }
+  | null = null;
+
+const RAYDIUM_LAYOUT_CACHE_TTL_MS = 10 * 60 * 1000;
+
+function findAllOccurrences(haystack: Buffer, needle: Buffer): number[] {
+  const offsets: number[] = [];
+  const n = needle.length;
+  for (let i = 0; i <= haystack.length - n; i++) {
+    if (haystack.subarray(i, i + n).equals(needle)) offsets.push(i);
+  }
+  return offsets;
+}
+
+function pickBestOffset(candidates: number[], opts: { label: string }): number | null {
+  if (candidates.length === 0) return null;
+  const aligned = candidates.filter((o) => o % 8 === 0);
+  const chosen = (aligned.length > 0 ? aligned : candidates).slice().sort((a, b) => a - b)[0];
+  if (candidates.length > 1) {
+    logger.debug("RaydiumResolver", "Multiple candidate offsets; picking best", {
+      label: opts.label,
+      chosen,
+      candidates: candidates.slice(0, 8),
+      candidatesCount: candidates.length,
+    });
+  }
+  return chosen;
+}
+
+function readPubkeyAt(data: Buffer, offset: number): PublicKey {
+  return new PublicKey(data.subarray(offset, offset + 32));
+}
+
+function pickBestMintOffsets(mintAOffsets: number[], mintBOffsets: number[]): { a: number; b: number } | null {
+  if (mintAOffsets.length === 0 || mintBOffsets.length === 0) return null;
+
+  const aAligned = mintAOffsets.filter((o) => o % 8 === 0);
+  const bAligned = mintBOffsets.filter((o) => o % 8 === 0);
+  const as = aAligned.length > 0 ? aAligned : mintAOffsets;
+  const bs = bAligned.length > 0 ? bAligned : mintBOffsets;
+
+  let best: { a: number; b: number; score: number } | null = null;
+  for (const a of as) {
+    for (const b of bs) {
+      if (a === b) continue;
+      const dist = Math.abs(a - b);
+      const penalty = dist > 256 ? 1_000_000 : 0;
+      const score = dist + penalty;
+      if (!best || score < best.score) best = { a, b, score };
+    }
+  }
+  return best ? { a: best.a, b: best.b } : null;
+}
+
+function getRaydiumAmmAuthorityFromStaticConfig(): PublicKey | null {
+  const knownPool = getAllRaydiumPools()[0];
+  if (!knownPool) return null;
+  return knownPool.ammAuthority;
+}
+
+function isRpcProgramAccountsIndexDisabled(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    msg.includes("excluded from account secondary indexes") ||
+    msg.includes("this RPC method unavailable") ||
+    msg.includes("get accounts owned by program")
+  );
+}
+
+async function getRaydiumAmmLayout(connection: Connection): Promise<RaydiumAmmLayout | null> {
+  const now = Date.now();
+  if (raydiumAmmLayoutCache && now - raydiumAmmLayoutCache.timestamp < RAYDIUM_LAYOUT_CACHE_TTL_MS) {
+    return raydiumAmmLayoutCache.layout;
+  }
+
+  const knownPool = getAllRaydiumPools()[0];
+  if (!knownPool) {
+    logger.warn("RaydiumResolver", "No static Raydium pools available to deduce AMM layout");
+    return null;
+  }
+
+  const info = await connection.getAccountInfo(knownPool.ammAddress);
+  if (!info?.data) {
+    logger.warn("RaydiumResolver", "Known Raydium AMM account missing; cannot deduce layout", {
+      ammAddress: knownPool.ammAddress.toBase58(),
+    });
+    return null;
+  }
+
+  const data = info.data;
+  const dataSize = data.length;
+
+  const mintAOffsets = findAllOccurrences(data, knownPool.tokenMintA.toBuffer());
+  const mintBOffsets = findAllOccurrences(data, knownPool.tokenMintB.toBuffer());
+  const mintOffsets = pickBestMintOffsets(mintAOffsets, mintBOffsets);
+  if (!mintOffsets) {
+    logger.warn("RaydiumResolver", "Failed to deduce Raydium mint offsets", {
+      ammAddress: knownPool.ammAddress.toBase58(),
+      mintAOffsetsCount: mintAOffsets.length,
+      mintBOffsetsCount: mintBOffsets.length,
+    });
+    return null;
+  }
+
+  const offsets = {
+    tokenMintA: mintOffsets.a,
+    tokenMintB: mintOffsets.b,
+    ammOpenOrders: pickBestOffset(findAllOccurrences(data, knownPool.ammOpenOrders.toBuffer()), {
+      label: "ammOpenOrders",
+    }),
+    poolCoinTokenAccount: pickBestOffset(
+      findAllOccurrences(data, knownPool.poolCoinTokenAccount.toBuffer()),
+      { label: "poolCoinTokenAccount" }
+    ),
+    poolPcTokenAccount: pickBestOffset(
+      findAllOccurrences(data, knownPool.poolPcTokenAccount.toBuffer()),
+      { label: "poolPcTokenAccount" }
+    ),
+    serumProgramId: pickBestOffset(findAllOccurrences(data, knownPool.serumProgramId.toBuffer()), {
+      label: "serumProgramId",
+    }),
+    serumMarket: pickBestOffset(findAllOccurrences(data, knownPool.serumMarket.toBuffer()), {
+      label: "serumMarket",
+    }),
+  } as const;
+
+  for (const [k, v] of Object.entries(offsets)) {
+    if (v === null) {
+      logger.warn("RaydiumResolver", "Failed to deduce Raydium AMM layout offset", {
+        field: k,
+        ammAddress: knownPool.ammAddress.toBase58(),
+        dataSize,
+      });
+      return null;
+    }
+  }
+
+  const layout: RaydiumAmmLayout = {
+    dataSize,
+    offsets: offsets as any,
+  };
+
+  // Safety: validate offsets against known pool
+  const roundtrip = {
+    tokenMintA: readPubkeyAt(data, layout.offsets.tokenMintA),
+    tokenMintB: readPubkeyAt(data, layout.offsets.tokenMintB),
+    ammOpenOrders: readPubkeyAt(data, layout.offsets.ammOpenOrders),
+    poolCoinTokenAccount: readPubkeyAt(data, layout.offsets.poolCoinTokenAccount),
+    poolPcTokenAccount: readPubkeyAt(data, layout.offsets.poolPcTokenAccount),
+    serumProgramId: readPubkeyAt(data, layout.offsets.serumProgramId),
+    serumMarket: readPubkeyAt(data, layout.offsets.serumMarket),
+  };
+
+  const ok =
+    roundtrip.tokenMintA.equals(knownPool.tokenMintA) &&
+    roundtrip.tokenMintB.equals(knownPool.tokenMintB) &&
+    roundtrip.ammOpenOrders.equals(knownPool.ammOpenOrders) &&
+    roundtrip.poolCoinTokenAccount.equals(knownPool.poolCoinTokenAccount) &&
+    roundtrip.poolPcTokenAccount.equals(knownPool.poolPcTokenAccount) &&
+    roundtrip.serumProgramId.equals(knownPool.serumProgramId) &&
+    roundtrip.serumMarket.equals(knownPool.serumMarket);
+
+  if (!ok) {
+    logger.error("RaydiumResolver", "Raydium AMM layout deduction failed roundtrip validation", {
+      ammAddress: knownPool.ammAddress.toBase58(),
+      dataSize,
+      offsets: layout.offsets,
+      expected: {
+        tokenMintA: knownPool.tokenMintA.toBase58(),
+        tokenMintB: knownPool.tokenMintB.toBase58(),
+        ammOpenOrders: knownPool.ammOpenOrders.toBase58(),
+        poolCoinTokenAccount: knownPool.poolCoinTokenAccount.toBase58(),
+        poolPcTokenAccount: knownPool.poolPcTokenAccount.toBase58(),
+        serumProgramId: knownPool.serumProgramId.toBase58(),
+        serumMarket: knownPool.serumMarket.toBase58(),
+      },
+      got: {
+        tokenMintA: roundtrip.tokenMintA.toBase58(),
+        tokenMintB: roundtrip.tokenMintB.toBase58(),
+        ammOpenOrders: roundtrip.ammOpenOrders.toBase58(),
+        poolCoinTokenAccount: roundtrip.poolCoinTokenAccount.toBase58(),
+        poolPcTokenAccount: roundtrip.poolPcTokenAccount.toBase58(),
+        serumProgramId: roundtrip.serumProgramId.toBase58(),
+        serumMarket: roundtrip.serumMarket.toBase58(),
+      },
+    });
+    return null;
+  }
+
+  raydiumAmmLayoutCache = { timestamp: now, layout };
+  return layout;
+}
+
+function decodeRaydiumPoolFromAmmState(
+  ammAddress: PublicKey,
+  data: Buffer,
+  layout: RaydiumAmmLayout,
+  ammAuthority: PublicKey
+): RaydiumPoolConfig {
+  const tokenMintA = readPubkeyAt(data, layout.offsets.tokenMintA);
+  const tokenMintB = readPubkeyAt(data, layout.offsets.tokenMintB);
+  const ammOpenOrders = readPubkeyAt(data, layout.offsets.ammOpenOrders);
+  const poolCoinTokenAccount = readPubkeyAt(data, layout.offsets.poolCoinTokenAccount);
+  const poolPcTokenAccount = readPubkeyAt(data, layout.offsets.poolPcTokenAccount);
+  const serumProgramId = readPubkeyAt(data, layout.offsets.serumProgramId);
+  const serumMarket = readPubkeyAt(data, layout.offsets.serumMarket);
+
+  return {
+    symbol: `${tokenMintA.toBase58().slice(0, 6)}/${tokenMintB.toBase58().slice(0, 6)}`,
+    ammAddress,
+    ammAuthority,
+    ammOpenOrders,
+    // Champs requis par l'interface mais non utilisés par notre CPI Raydium actuel.
+    ammTargetOrders: PublicKey.default,
+    poolCoinTokenAccount,
+    poolPcTokenAccount,
+    poolWithdrawQueue: PublicKey.default,
+    poolTempLpTokenAccount: PublicKey.default,
+    serumProgramId,
+    serumMarket,
+    tokenMintA,
+    tokenMintB,
+    feeBps: 0,
+    minLiquidityUsd: 0,
+  };
+}
+
+async function findRaydiumPoolOnChain(
+  connection: Connection,
+  inputMint: PublicKey,
+  outputMint: PublicKey
+): Promise<RaydiumPoolConfig | null> {
+  const layout = await getRaydiumAmmLayout(connection);
+  if (!layout) return null;
+
+  const ammAuthority = getRaydiumAmmAuthorityFromStaticConfig();
+  if (!ammAuthority) {
+    logger.warn("RaydiumResolver", "Missing Raydium AMM authority (no static pools?)");
+    return null;
+  }
+
+  try {
+    const query = async (a: PublicKey, b: PublicKey) =>
+      connection.getProgramAccounts(RAYDIUM_AMM_PROGRAM, {
+        filters: [
+          { dataSize: layout.dataSize },
+          { memcmp: { offset: layout.offsets.tokenMintA, bytes: a.toBase58() } },
+          { memcmp: { offset: layout.offsets.tokenMintB, bytes: b.toBase58() } },
+        ],
+      });
+
+    let candidates = await query(inputMint, outputMint);
+    if (candidates.length === 0) {
+      candidates = await query(outputMint, inputMint);
+    }
+
+    if (candidates.length === 0) return null;
+
+    candidates.sort((x, y) => x.pubkey.toBase58().localeCompare(y.pubkey.toBase58()));
+    const chosen = candidates[0];
+    const decoded = decodeRaydiumPoolFromAmmState(chosen.pubkey, chosen.account.data, layout, ammAuthority);
+
+    const mA = decoded.tokenMintA;
+    const mB = decoded.tokenMintB;
+    const matches =
+      (mA.equals(inputMint) && mB.equals(outputMint)) || (mA.equals(outputMint) && mB.equals(inputMint));
+    if (!matches) {
+      logger.warn("RaydiumResolver", "Raydium on-chain candidate did not match requested mints", {
+        requested: {
+          inputMint: inputMint.toBase58(),
+          outputMint: outputMint.toBase58(),
+        },
+        decoded: {
+          tokenMintA: mA.toBase58(),
+          tokenMintB: mB.toBase58(),
+        },
+        ammAddress: chosen.pubkey.toBase58(),
+      });
+      return null;
+    }
+
+    if (candidates.length > 1) {
+      logger.warn("RaydiumResolver", "Multiple Raydium AMM pools found for pair; picking first", {
+        inputMint: inputMint.toBase58(),
+        outputMint: outputMint.toBase58(),
+        picked: chosen.pubkey.toBase58(),
+        count: candidates.length,
+      });
+    }
+
+    return decoded;
+  } catch (error) {
+    if (isRpcProgramAccountsIndexDisabled(error)) {
+      logger.warn("RaydiumResolver", "RPC does not support getProgramAccounts for Raydium AMM; on-chain discovery disabled", {
+        inputMint: inputMint.toBase58(),
+        outputMint: outputMint.toBase58(),
+        rpcHint: "Use an indexed RPC (e.g. Helius/Triton/QuickNode) if you want dynamic Raydium pool discovery",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+
+    logger.error("RaydiumResolver", "Raydium on-chain discovery failed", {
+      inputMint: inputMint.toBase58(),
+      outputMint: outputMint.toBase58(),
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
 /**
  * Trouve le pool Raydium AMM pour une paire
  */
 async function findRaydiumPool(
+  connection: Connection,
   inputMint: PublicKey,
   outputMint: PublicKey
 ): Promise<RaydiumPoolConfig | null> {
@@ -1632,6 +1961,17 @@ async function findRaydiumPool(
     if (staticPool) {
       raydiumPoolCache.set(cacheKey, { timestamp: now, pool: staticPool });
       return staticPool;
+    }
+
+    const onChainPool = await findRaydiumPoolOnChain(connection, inputMint, outputMint);
+    if (onChainPool) {
+      logger.info("RaydiumResolver", "Resolved Raydium AMM pool via on-chain discovery", {
+        inputMint: inputMintStr,
+        outputMint: outputMintStr,
+        ammAddress: onChainPool.ammAddress.toBase58(),
+      });
+      raydiumPoolCache.set(cacheKey, { timestamp: now, pool: onChainPool });
+      return onChainPool;
     }
 
     logger.warn("RaydiumResolver", "No Raydium pool config found", {
@@ -1664,7 +2004,7 @@ export async function getRaydiumAccounts(
     const safeInputMint = toPublicKey(inputMint);
     const safeOutputMint = toPublicKey(outputMint);
     const safeUser = toPublicKey(userPublicKey);
-    const poolConfig = await findRaydiumPool(safeInputMint, safeOutputMint);
+    const poolConfig = await findRaydiumPool(connection, safeInputMint, safeOutputMint);
 
     if (!poolConfig) {
       logger.warn("RaydiumResolver", "No Raydium pool found for pair", {
