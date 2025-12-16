@@ -21,6 +21,7 @@ import { DEX_PROGRAMS } from "../headless/router";
 import { toPublicKey } from "../utils/publicKeyUtils";
 import type { RaydiumPoolConfig } from "@/sdk/config/raydium-pools";
 import { getPhoenixMarketConfig, PHOENIX_PROGRAM_ID as PHOENIX_PROGRAM } from "@/sdk/config/phoenix-markets";
+import bs58 from "bs58";
 
 if (typeof globalThis !== "undefined" && typeof (globalThis as any).Buffer === "undefined") {
   (globalThis as any).Buffer = Buffer;
@@ -640,6 +641,16 @@ export async function getOrcaWhirlpoolAccounts(
 
 const METEORA_DLMM_PROGRAM = new PublicKey("LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo");
 
+const METEORA_DLMM_API_TIMEOUT_MS = 15_000;
+
+const WSOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
+const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+const USDT_MINT = new PublicKey("Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB");
+
+// Paire SOL/USDC connue (mainnet) utilisée uniquement pour déduire les offsets memcmp de l'account lb_pair
+// sans dépendre de l'API Meteora (qui peut timeout).
+const METEORA_KNOWN_SOL_USDC_LBPAIR = new PublicKey("5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6");
+
 const requireCjs = createRequire(import.meta.url);
 
 async function loadMeteoraDLMMClass(): Promise<any> {
@@ -656,6 +667,292 @@ async function loadMeteoraDLMMClass(): Promise<any> {
   const req: any = requireCjs("@meteora-ag/dlmm");
   const DLMM = req?.DLMM ?? req?.default ?? req;
   return DLMM;
+}
+
+async function loadMeteoraDlmmModule(): Promise<any> {
+  try {
+    const mod: any = await import("@meteora-ag/dlmm");
+    return mod;
+  } catch {
+    // ignore
+  }
+
+  return requireCjs("@meteora-ag/dlmm");
+}
+
+let meteoraLbPairMemcmpCache:
+  | { tokenXOffset: number; tokenYOffset: number; lbPairDiscriminatorB58: string }
+  | null = null;
+
+function findSubarrayOffsets(haystack: Buffer, needle: Buffer): number[] {
+  const hits: number[] = [];
+  if (needle.length === 0 || haystack.length < needle.length) return hits;
+  for (let i = 0; i <= haystack.length - needle.length; i++) {
+    let match = true;
+    for (let j = 0; j < needle.length; j++) {
+      if (haystack[i + j] !== needle[j]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) hits.push(i);
+  }
+  return hits;
+}
+
+async function findDLMMPairViaApi(tokenX: PublicKey, tokenY: PublicKey): Promise<PublicKey | null> {
+  const tokenXStr = tokenX.toBase58();
+  const tokenYStr = tokenY.toBase58();
+  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const response = await fetch(
+        `https://dlmm-api.meteora.ag/pair/all_by_groups?include_pool_token=true`,
+        { signal: AbortSignal.timeout(METEORA_DLMM_API_TIMEOUT_MS) }
+      );
+
+      if (!response.ok) {
+        continue;
+      }
+
+      // eslint-disable-next-line no-await-in-loop
+      const pairs = await response.json();
+      for (const group of pairs.groups || []) {
+        for (const pair of group.pairs || []) {
+          if (
+            (pair.mint_x === tokenXStr && pair.mint_y === tokenYStr) ||
+            (pair.mint_x === tokenYStr && pair.mint_y === tokenXStr)
+          ) {
+            return new PublicKey(pair.address);
+          }
+        }
+      }
+      return null;
+    } catch {
+      // try again
+    }
+  }
+
+  return null;
+}
+
+async function getMeteoraLbPairMemcmpLayout(connection: Connection): Promise<
+  { tokenXOffset: number; tokenYOffset: number; lbPairDiscriminatorB58: string } | null
+> {
+  if (meteoraLbPairMemcmpCache) return meteoraLbPairMemcmpCache;
+
+  try {
+    const mod: any = await loadMeteoraDlmmModule();
+    const idl: any = mod?.IDL;
+    const lbPairAcc = idl?.accounts?.find((a: any) => (a?.name ?? "").toLowerCase() === "lbpair");
+    const discArr: number[] | undefined = lbPairAcc?.discriminator;
+    if (!Array.isArray(discArr) || discArr.length !== 8) {
+      throw new Error("Missing/invalid lbPair discriminator in Meteora IDL");
+    }
+    const lbPairDiscriminatorB58 = bs58.encode(Buffer.from(discArr));
+
+    // We deduce token mint offsets by inspecting a known-good LB pair account data.
+    // Prefer a known SOL/USDC lb_pair pubkey (no API dependency), then fall back to API discovery.
+    let knownPair: PublicKey | null = METEORA_KNOWN_SOL_USDC_LBPAIR;
+    let info = await connection.getAccountInfo(knownPair);
+    if (!info?.data) {
+      knownPair = await findDLMMPairViaApi(WSOL_MINT, USDC_MINT);
+      if (!knownPair) {
+        logger.warn("MeteoraResolver", "Unable to locate a WSOL/USDC pair for layout deduction", {
+          wsol: WSOL_MINT.toBase58(),
+          usdc: USDC_MINT.toBase58(),
+        });
+        return null;
+      }
+      info = await connection.getAccountInfo(knownPair);
+    }
+
+    const data = info?.data;
+    if (!data) {
+      logger.warn("MeteoraResolver", "Known WSOL/USDC lb_pair account missing", {
+        lbPair: knownPair.toBase58(),
+      });
+      return null;
+    }
+
+    const wsolBytes = WSOL_MINT.toBuffer();
+    const usdcBytes = USDC_MINT.toBuffer();
+
+    // token_x_mint and token_y_mint are contiguous pubkeys in the LB pair struct.
+    const wsolHits = findSubarrayOffsets(data, wsolBytes);
+    const usdcHits = findSubarrayOffsets(data, usdcBytes);
+
+    let tokenXOffset: number | null = null;
+    for (const i of wsolHits) {
+      if (i + 64 <= data.length && data.subarray(i + 32, i + 64).equals(usdcBytes)) {
+        tokenXOffset = i;
+        break;
+      }
+    }
+    if (tokenXOffset === null) {
+      for (const i of usdcHits) {
+        if (i + 64 <= data.length && data.subarray(i + 32, i + 64).equals(wsolBytes)) {
+          tokenXOffset = i;
+          break;
+        }
+      }
+    }
+
+    if (tokenXOffset === null) {
+      logger.warn("MeteoraResolver", "Failed to deduce Meteora lb_pair mint offsets", {
+        lbPair: knownPair.toBase58(),
+        wsolHits: wsolHits.slice(0, 5),
+        usdcHits: usdcHits.slice(0, 5),
+      });
+      return null;
+    }
+
+    meteoraLbPairMemcmpCache = {
+      tokenXOffset,
+      tokenYOffset: tokenXOffset + 32,
+      lbPairDiscriminatorB58,
+    };
+    return meteoraLbPairMemcmpCache;
+  } catch (error) {
+    logger.warn("MeteoraResolver", "Failed to prepare Meteora lb_pair memcmp layout", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+async function findMeteoraLbPairsByMintsOnChain(
+  connection: Connection,
+  mintA: PublicKey,
+  mintB: PublicKey
+): Promise<PublicKey[]> {
+  const layout = await getMeteoraLbPairMemcmpLayout(connection);
+  if (!layout) return [];
+
+  const filtersBase = [
+    {
+      memcmp: {
+        offset: 0,
+        bytes: layout.lbPairDiscriminatorB58,
+      },
+    },
+  ];
+
+  const mintA58 = mintA.toBase58();
+  const mintB58 = mintB.toBase58();
+
+  const queries = [
+    [
+      ...filtersBase,
+      { memcmp: { offset: layout.tokenXOffset, bytes: mintA58 } },
+      { memcmp: { offset: layout.tokenYOffset, bytes: mintB58 } },
+    ],
+    [
+      ...filtersBase,
+      { memcmp: { offset: layout.tokenXOffset, bytes: mintB58 } },
+      { memcmp: { offset: layout.tokenYOffset, bytes: mintA58 } },
+    ],
+  ];
+
+  const pubkeys: PublicKey[] = [];
+  for (const filters of queries) {
+    let lastErr: string | undefined;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const accounts = await connection.getProgramAccounts(METEORA_DLMM_PROGRAM, {
+          filters: filters as any,
+          dataSlice: { offset: 0, length: 0 },
+        });
+        for (const a of accounts) pubkeys.push(a.pubkey);
+        break;
+      } catch (e) {
+        lastErr = e instanceof Error ? e.message : String(e);
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((r) => setTimeout(r, 400 * attempt));
+      }
+    }
+
+    if (lastErr) {
+      logger.warn("MeteoraResolver", "getProgramAccounts memcmp query failed", {
+        mintA: mintA58,
+        mintB: mintB58,
+        error: lastErr,
+      });
+    }
+  }
+
+  // Deduplicate
+  const seen = new Set<string>();
+  return pubkeys.filter((pk) => {
+    const k = pk.toBase58();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+async function findDLMMPairViaOnChainMints(
+  connection: Connection,
+  tokenIn: PublicKey,
+  tokenOut: PublicKey
+): Promise<PublicKey | null> {
+  const DLMM = await loadMeteoraDLMMClass();
+  if (!DLMM?.create) return null;
+
+  const candidates = await findMeteoraLbPairsByMintsOnChain(connection, tokenIn, tokenOut);
+  if (candidates.length === 0) return null;
+
+  // Filter candidates to those where the bitmap extension PDA exists.
+  const bitmapPdas = candidates.map((pair) =>
+    PublicKey.findProgramAddressSync([Buffer.from("bitmap"), pair.toBuffer()], METEORA_DLMM_PROGRAM)[0]
+  );
+
+  const bitmapInfos: Array<ReturnType<typeof connection.getAccountInfo> extends Promise<infer T> ? T : any> = [];
+  for (let i = 0; i < bitmapPdas.length; i += 100) {
+    const slice = bitmapPdas.slice(i, i + 100);
+    // eslint-disable-next-line no-await-in-loop
+    const infos = await connection.getMultipleAccountsInfo(slice);
+    bitmapInfos.push(...infos);
+  }
+
+  const candidatesWithBitmap = candidates.filter((_, i) => Boolean(bitmapInfos[i]));
+  const shortList = (candidatesWithBitmap.length > 0 ? candidatesWithBitmap : candidates).slice(0, 24);
+
+  for (const candidate of shortList) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const dlmm = await DLMM.create(connection, candidate);
+      const tokenXMint: PublicKey = dlmm.tokenX.publicKey;
+      const tokenYMint: PublicKey = dlmm.tokenY.publicKey;
+
+      const swapForY = tokenXMint.equals(tokenIn);
+      if (!swapForY && !tokenYMint.equals(tokenIn)) {
+        continue;
+      }
+
+      // eslint-disable-next-line no-await-in-loop
+      const binArrayAccounts: Array<{ publicKey: PublicKey }> = await dlmm.getBinArrayForSwap(swapForY, 5);
+      if (binArrayAccounts.length === 0) continue;
+
+      logger.warn("MeteoraResolver", "Resolved DLMM pair via on-chain memcmp + validation", {
+        inputMint: tokenIn.toBase58(),
+        outputMint: tokenOut.toBase58(),
+        pair: candidate.toBase58(),
+        candidateCount: candidates.length,
+      });
+      return candidate;
+    } catch {
+      // try next
+    }
+  }
+
+  logger.warn("MeteoraResolver", "On-chain memcmp candidates found but none validated", {
+    inputMint: tokenIn.toBase58(),
+    outputMint: tokenOut.toBase58(),
+    candidateCount: candidates.length,
+  });
+  return null;
 }
 
 /**
@@ -762,6 +1059,27 @@ async function findDLMMPair(
         lastError,
       });
     }
+
+    // Generic on-chain fallback (server-only): targeted search via getProgramAccounts+memcmp.
+    // This avoids depending on Meteora API availability for common pairs like SOL/USDC.
+    if (typeof window === "undefined") {
+      try {
+        const resolved = await findDLMMPairViaOnChainMints(connection, tokenX, tokenY);
+        if (resolved) {
+          meteoraPairCache.set(cacheKey, { timestamp: now, pair: resolved });
+          return resolved;
+        }
+      } catch (error) {
+        logger.warn("MeteoraResolver", "On-chain memcmp DLMM pair lookup failed", {
+          inputMint: tokenXStr,
+          outputMint: tokenYStr,
+          error: error instanceof Error ? error.message : String(error),
+          lastError,
+        });
+      }
+    }
+
+    // The old SOL/USDT-only scan fallback was replaced by the generic on-chain memcmp fallback above.
 
     if (cached?.pair) {
       logger.warn("MeteoraResolver", "Using stale cached DLMM pair after repeated failures", {

@@ -41,6 +41,20 @@ const DEFAULT_PHOENIX_MARKETS: PhoenixMarketConfig[] = [
     makerFeeBps: -1,
     takerFeeBps: 5,
   },
+  {
+    symbol: 'SOL/USDT',
+    // Source: Phoenix SDK master_config.json (mainnet-beta)
+    // https://raw.githubusercontent.com/Ellipsis-Labs/phoenix-sdk/master/master_config.json
+    marketAddress: new PublicKey('3J9LfemPBLowAJgpG3YdYPB9n6pUk7HEjwgS6Y5ToSFg'),
+    baseMint: new PublicKey(SOL_MINT),
+    quoteMint: new PublicKey(USDT_MINT),
+    baseDecimals: 9,
+    quoteDecimals: 6,
+    lotSize: 0.01,
+    tickSize: 0.0001,
+    makerFeeBps: -1,
+    takerFeeBps: 5,
+  },
 ];
 
 let phoenixMarketMap: PhoenixMarketMap | null = null;

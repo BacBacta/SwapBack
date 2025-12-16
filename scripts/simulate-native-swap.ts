@@ -159,10 +159,12 @@ function defaultMatrixCasesForVenue(venue: SupportedVenue, amountInLamports: num
     { name: "SOL→USDC", inputMint: SOL_MINT, outputMint: USDC_MINT, amountInLamports },
   ];
 
-  // Lifinity : SOL/USDT est généralement disponible dans le pool list.
-  // Meteora DLMM : SOL/USDT n'existe pas en DLMM API, donc on ne l'ajoute pas par défaut.
-  // Phoenix : nécessite un market address explicite; on évite SOL/USDT par défaut.
-  if (venue === "LIFINITY") {
+  // Deuxième paire simple (toujours input=SOL pour éviter les problèmes de funding): SOL→USDT.
+  // - Phoenix: market SOL/USDT ajouté dans la config.
+  // - Meteora DLMM: résolution via API puis fallback on-chain.
+  // - Orca/Lifinity: dépend des pools disponibles.
+  // - Raydium AMM: notre resolver est basé sur une liste de pools configurés et SOL/USDT n'y est pas présent.
+  if (["LIFINITY", "METEORA_DLMM", "PHOENIX", "ORCA_WHIRLPOOL"].includes(venue)) {
     cases.push({ name: "SOL→USDT", inputMint: SOL_MINT, outputMint: USDT_MINT, amountInLamports });
   }
 
