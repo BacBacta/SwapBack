@@ -1,5 +1,8 @@
 # Agent Rules — SwapBack RouterSwap (Mainnet)
 
+> Source de vérité des instructions agent (dont “Sources & Références” + policy):
+> - `.github/copilot-instructions.md`
+
 ## Priorités
 1) Corriger l'obtention de quotes natives (et/ou la fallback strategy).
 2) Corriger les erreurs oracles (0x1772) via config/gating/audit.
