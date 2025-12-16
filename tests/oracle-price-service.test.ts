@@ -186,7 +186,7 @@ describe("OraclePriceService", () => {
   // ============================================================================
 
   describe("Switchboard Fallback", () => {
-    it("should fallback to Switchboard when Pyth fails", async () => {
+    it("should throw when Pyth fails (Switchboard disabled)", async () => {
       const mockMint = "So11111111111111111111111111111111111111112";
 
       switchboardSpy.mockRestore();
@@ -211,15 +211,10 @@ describe("OraclePriceService", () => {
       };
       mockConnection.getAccountInfo.mockResolvedValueOnce(mockSwitchboardData);
 
-      const result = await service.getTokenPrice(mockMint);
-
-      // Should successfully fallback to Switchboard
-      expect(result).toBeDefined();
-      expect(result.provider).toBe("switchboard");
-      expect(result.price).toBeCloseTo(100.0, 2);
-
-      // Verify both were attempted
-      expect(mockConnection.getAccountInfo).toHaveBeenCalledTimes(2);
+      // Switchboard v2 is deprecated/disabled in config; expect no oracle price.
+      await expect(service.getTokenPrice(mockMint)).rejects.toThrow(
+        /No oracle price available/
+      );
     });
 
     it("should throw error when both Pyth and Switchboard fail", async () => {

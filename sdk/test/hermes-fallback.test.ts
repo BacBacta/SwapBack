@@ -38,7 +38,10 @@ describe("OraclePriceService Hermes Fallback", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockConnection = new Connection("mock-url");
-    oracleService = new OraclePriceService(mockConnection, 5000);
+    oracleService = new OraclePriceService(mockConnection, 5000, {
+      enableHermesFallback: true,
+      hermesEndpoint: "https://hermes.pyth.network",
+    });
   });
 
   it("should return pyth-hermes source when on-chain Pyth data is stale", async () => {

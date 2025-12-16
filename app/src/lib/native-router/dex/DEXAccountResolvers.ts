@@ -199,6 +199,18 @@ export async function getLifinityAccounts(
     }
 
     const amm = new PublicKey(pool.amm);
+    // Sanity check: ensure the pool account exists on-chain.
+    // This also makes unit tests deterministic (mock connections returning null should yield no accounts).
+    const ammInfo = await connection.getAccountInfo(amm);
+    if (!ammInfo) {
+      logger.warn("LifinityResolver", "Lifinity pool account missing", {
+        amm: amm.toBase58(),
+        inputMint: safeInputMint.toBase58(),
+        outputMint: safeOutputMint.toBase58(),
+      });
+      return null;
+    }
+
     const authority = PublicKey.findProgramAddressSync([amm.toBuffer()], LIFINITY_PROGRAM)[0];
 
     const userSourceAccount = await getAssociatedTokenAddress(safeInputMint, safeUser);

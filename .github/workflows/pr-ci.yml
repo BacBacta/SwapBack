@@ -104,7 +104,7 @@ jobs:
         run: npm ci
 
       - name: 🧪 Run unit tests
-        run: npm test -- --coverage --reporter=verbose
+        run: npm run test:unit -- --coverage --reporter=verbose
         env:
           CI: true
 
