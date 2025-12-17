@@ -1,4 +1,4 @@
-import { createRequire } from 'node:module';
+import { createRequire } from 'module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import webpack from 'webpack';

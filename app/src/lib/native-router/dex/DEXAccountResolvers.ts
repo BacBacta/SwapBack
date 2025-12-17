@@ -676,7 +676,9 @@ async function loadMeteoraDLMMClass(): Promise<any> {
     const msg = e instanceof Error ? e.message : String(e);
     const isNode = typeof process !== "undefined" && !!process.versions?.node;
     if (isNode && msg.includes("does not provide an export named 'BN'")) {
-      const nodeModule: any = await import("node:module");
+      // Prevent webpack from trying to resolve the `node:` URI scheme at bundle-time.
+      // This branch is only ever executed in Node runtimes.
+      const nodeModule: any = await import(/* webpackIgnore: true */ "node:module");
       const createRequire = nodeModule?.createRequire;
       if (typeof createRequire !== "function") throw e;
       const req = createRequire(import.meta.url);
