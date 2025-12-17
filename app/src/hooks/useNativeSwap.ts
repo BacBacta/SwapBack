@@ -19,7 +19,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey, VersionedTransaction } from "@solana/web3.js";
+import { PublicKey, SendTransactionError, VersionedTransaction } from "@solana/web3.js";
 import { 
   getNativeRouter, 
   type NativeRouteQuote, 
@@ -646,7 +646,19 @@ export function useNativeSwap() {
             lastValidBlockHeight: result.lastValidBlockHeight,
           });
         } catch (sendErr) {
-          const msg = sendErr instanceof Error ? sendErr.message : String(sendErr);
+          let msg = sendErr instanceof Error ? sendErr.message : String(sendErr);
+          // Si l'échec vient du préflight (simulation RPC) après signature,
+          // récupérer les logs complets pour isoler le programme/instruction fautif.
+          if (sendErr instanceof SendTransactionError) {
+            try {
+              const logs = await sendErr.getLogs(connection);
+              if (logs?.length) {
+                msg += `\nLogs (preflight):\n${logs.join("\n")}`;
+              }
+            } catch {
+              // ignore
+            }
+          }
           const normalizedSend = msg.toLowerCase();
 
           // Cas fréquent: l'utilisateur a mis trop de temps → blockhash expiré

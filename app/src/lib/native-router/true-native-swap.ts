@@ -428,8 +428,13 @@ export class TrueNativeSwap {
       return null;
     }
 
-    // Prendre la meilleure quote
-    const best = quotes[0];
+    // Prendre la meilleure quote non désactivée (défense en profondeur)
+    const best = quotes.find((q) => !DISABLED_BEST_ROUTE_VENUES.has(q.venue));
+
+    if (!best) {
+      logger.warn("TrueNativeSwap", "No eligible native venues (all disabled)");
+      return null;
+    }
 
     return {
       venue: best.venue,
@@ -629,6 +634,15 @@ export class TrueNativeSwap {
     const outputMint = toPublicKey(params.outputMint);
     const amountIn = params.amountIn;
     const minAmountOut = params.minAmountOut;
+
+    // Phoenix (CLOB) n'est pas exécutable sans quote orderbook fiable.
+    // Empêche toute construction d'instruction menant à un IOC 0xF.
+    if (DISABLED_BEST_ROUTE_VENUES.has(route.venue)) {
+      throw new Error(
+        `Venue native temporairement désactivée: ${route.venue}. ` +
+          `Phoenix requiert une quote orderbook pour éviter les IOC failures (0xF).`
+      );
+    }
 
     // Dériver les comptes
     const accounts = await this.deriveSwapAccounts(
@@ -1108,6 +1122,13 @@ export class TrueNativeSwap {
     if (!route) {
       logger.error("TrueNativeSwap", "No native route available");
       return null;
+    }
+
+    if (DISABLED_BEST_ROUTE_VENUES.has(route.venue)) {
+      throw new Error(
+        `Venue native temporairement désactivée: ${route.venue}. ` +
+          `Phoenix requiert une quote orderbook pour éviter les IOC failures (0xF).`
+      );
     }
 
     logger.info("TrueNativeSwap", `Best route: ${route.venue}`, {
