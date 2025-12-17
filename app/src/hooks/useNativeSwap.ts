@@ -556,9 +556,12 @@ export function useNativeSwap() {
             inputMint: safeInputMint,
             outputMint: safeOutputMint,
             amountIn: params.amount,
-            minAmountOut,
+            // minAmountOut est dérivé côté builder depuis route.outputAmount + slippageBps
+            // pour éviter toute divergence en cas de re-quote.
+            minAmountOut: 0,
             slippageBps,
             userPublicKey: publicKey,
+            routeOverride: route,
           });
 
         // Construire la transaction
@@ -750,6 +753,15 @@ export function useNativeSwap() {
           setError(
             "Oracle obsolète ou non disponible pour cette paire. " +
             "Cette paire n'est pas supportée par le routage natif."
+          );
+        } else if (
+          normalized.includes("amountoutbelowminimum") ||
+          normalized.includes("0x1794") ||
+          normalized.includes("6036")
+        ) {
+          setError(
+            "Le minimum reçu (minOut) est trop élevé pour l'état actuel du pool Orca. " +
+            "Actualisez la quote et/ou augmentez légèrement le slippage."
           );
         } else if (normalized.includes("0x65") || normalized.includes("instructionfallbacknotfound")) {
           // Warning: pas de fallback automatique

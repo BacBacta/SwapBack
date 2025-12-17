@@ -117,6 +117,8 @@ export interface TrueNativeSwapParams {
   minAmountOut: number;
   slippageBps: number;
   userPublicKey: PublicKey;
+  /** Optionnel: forcer la route (évite un second choix/quote lors du build) */
+  routeOverride?: TrueNativeRoute;
 }
 
 export interface TrueNativeSwapResult {
@@ -280,17 +282,25 @@ export class TrueNativeSwap {
       );
 
       if (!response.ok) {
-        // Fallback: estimation basée sur les réserves du pool
-        return this.estimateQuoteFromPool(accounts, amountIn);
+        // Pas de fallback estimatif pour Orca Whirlpool (CLMM) : trop imprécis
+        return null;
       }
 
       const data = await response.json();
+      const outputAmount = Number(data.outputAmount ?? 0);
+      const priceImpactBps = Number(
+        data.priceImpactBps ??
+          (typeof data.priceImpact === "number" ? data.priceImpact * 10000 : 0)
+      );
+
+      if (!Number.isFinite(outputAmount) || outputAmount <= 0) return null;
+
       return {
-        outputAmount: data.outputAmount,
-        priceImpactBps: data.priceImpact * 10000,
+        outputAmount,
+        priceImpactBps: Number.isFinite(priceImpactBps) ? priceImpactBps : 0,
       };
     } catch {
-      return this.estimateQuoteFromPool(accounts, amountIn);
+      return null;
     }
   }
 
@@ -1108,17 +1118,26 @@ export class TrueNativeSwap {
     const inputMint = toPublicKey(params.inputMint);
     const outputMint = toPublicKey(params.outputMint);
     const amountIn = params.amountIn;
-    const minAmountOut = params.minAmountOut;
+    const slippageBps = params.slippageBps;
 
     logger.info("TrueNativeSwap", "Building true native swap transaction", {
       inputMint: inputMint.toBase58().slice(0, 8),
       outputMint: outputMint.toBase58().slice(0, 8),
       amountIn,
-      minAmountOut,
+      slippageBps,
     });
 
-    // 1. Obtenir la meilleure route native
-    const route = await this.getBestNativeRoute(params);
+    // 1. Obtenir la meilleure route native (ou utiliser celle déjà calculée)
+    const route =
+      params.routeOverride ??
+      (await this.getBestNativeRoute({
+        inputMint,
+        outputMint,
+        amountIn,
+        minAmountOut: 0,
+        slippageBps,
+        userPublicKey,
+      }));
     if (!route) {
       logger.error("TrueNativeSwap", "No native route available");
       return null;
@@ -1134,6 +1153,18 @@ export class TrueNativeSwap {
     logger.info("TrueNativeSwap", `Best route: ${route.venue}`, {
       outputAmount: route.outputAmount,
       priceImpactBps: route.priceImpactBps,
+    });
+
+    // MinOut strict dérivé de la route réellement utilisée + slippage utilisateur
+    // (évite les divergences quote UI vs quote builder)
+    const minAmountOut = Math.max(
+      0,
+      Math.floor((route.outputAmount * (10_000 - slippageBps)) / 10_000)
+    );
+
+    logger.info("TrueNativeSwap", "Derived minAmountOut", {
+      minAmountOut,
+      slippageBps,
     });
 
     // 2. Créer les instructions

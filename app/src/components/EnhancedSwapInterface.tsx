@@ -1046,9 +1046,10 @@ export function EnhancedSwapInterface() {
           inputMint: new PublicKey(swap.inputToken.mint),
           outputMint: new PublicKey(swap.outputToken.mint),
           amountIn: amountInNumber,
-          minAmountOut: minOutNumber,
+          minAmountOut: 0,
           slippageBps,
           userPublicKey: publicKey,
+          routeOverride: route,
         });
 
         if (!built) {
