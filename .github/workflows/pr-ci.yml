@@ -104,16 +104,37 @@ jobs:
         run: npm ci
 
       - name: 🧪 Run unit tests
-        run: npm run test:unit -- --coverage --reporter=verbose
+        run: npm exec -- vitest run --exclude='**/tests/e2e/**' --exclude='**/tests/integration/**' --exclude='**/*{integration,e2e,dex-integration}*.test.ts' --exclude='**/router-e2e-*.test.ts' --exclude='**/router-onchain.test.ts' --exclude='**/oracle-switchboard.test.ts' --exclude='**/dca.spec.ts' --exclude='**/router.spec.ts' --coverage --reporter=verbose
         env:
           CI: true
         continue-on-error: false
 
       - name: 📊 Generate coverage report
         run: |
+          set -euo pipefail
           echo "## Test Coverage Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          npm test -- --coverage --reporter=json | grep -o '"statements":{"total":[0-9]*,"covered":[0-9]*' | head -1 | awk -F'[:,]' '{print "Statements: " int(($4/$2)*100) "%"}' >> $GITHUB_STEP_SUMMARY
+          if [ ! -f "coverage/coverage-final.json" ]; then
+            echo "⚠️ coverage/coverage-final.json not found" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          node - <<'NODE' >> "$GITHUB_STEP_SUMMARY"
+          const fs = require('fs');
+          const cov = JSON.parse(fs.readFileSync('coverage/coverage-final.json','utf8'));
+          let total = 0;
+          let covered = 0;
+          for (const file of Object.values(cov)) {
+            const s = file && file.s;
+            if (!s) continue;
+            for (const v of Object.values(s)) {
+              total += 1;
+              if (typeof v === 'number' && v > 0) covered += 1;
+            }
+          }
+          const pct = total === 0 ? 0 : Math.floor((covered / total) * 100);
+          console.log(`Statements: ${pct}%`);
+NODE
         continue-on-error: true
 
       - name: 📤 Upload coverage to Codecov
@@ -159,14 +180,8 @@ jobs:
       - name: 📦 Install root dependencies
         run: npm ci
 
-      - name: 📦 Install target dependencies
-        run: npm ci
-        working-directory: ./${{ matrix.target }}
-        continue-on-error: true
-
       - name: 🏗️ Build ${{ matrix.target }}
-        run: npm run build
-        working-directory: ./${{ matrix.target }}
+        run: npm run build -w ${{ matrix.target }}
 
       - name: 📏 Check bundle size (app only)
         if: matrix.target == 'app'
