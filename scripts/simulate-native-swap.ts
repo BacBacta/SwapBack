@@ -131,6 +131,28 @@ function parseArgs(argv: string[]): Record<string, string> {
   return out;
 }
 
+function resolveRpcUrl(rpcArg?: string): string {
+  const raw = (rpcArg ?? "").trim();
+  if (!raw) return "https://api.mainnet-beta.solana.com";
+
+  if (raw.toLowerCase() === "helius") {
+    const key =
+      process.env.NEXT_PUBLIC_HELIUS_API_KEY ||
+      process.env.HELIUS_API_KEY ||
+      "";
+    if (!key) {
+      throw new Error(
+        "RPC=helius demandé, mais aucune clé Helius trouvée. " +
+          "Définissez NEXT_PUBLIC_HELIUS_API_KEY ou HELIUS_API_KEY, " +
+          "ou passez une URL complète via SOLANA_RPC_URL/--rpc."
+      );
+    }
+    return `https://mainnet.helius-rpc.com/?api-key=${key}`;
+  }
+
+  return raw;
+}
+
 function parsePairsArg(pairsArg: string): SwapCase[] {
   // Format: MINT_IN:MINT_OUT[,MINT_IN:MINT_OUT]
   const rawPairs = pairsArg
@@ -237,7 +259,11 @@ async function main() {
     .split(",")
     .map((v) => v.trim())
     .filter(Boolean) as SupportedVenue[];
-  const rpcUrl = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+
+  // Mode "bestRoute": reproduit le chemin UI (quote -> minOut -> build tx) au lieu de forcer une venue.
+  const bestRouteMode = args.bestRoute === "true";
+
+  const rpcUrl = resolveRpcUrl(args.rpc ?? process.env.SOLANA_RPC_URL);
   const keypairPath = resolveKeypairPath({ autoCreate: autoCreateKeypair });
 
   const matrixMode = args.matrix === "true";
@@ -271,7 +297,7 @@ async function main() {
   console.log("RPC:", rpcUrl);
   console.log("User:", user.publicKey.toBase58());
   console.log("Venues:", venues.join(","));
-  console.log("Mode:", matrixMode ? "matrix" : "single");
+  console.log("Mode:", bestRouteMode ? "bestRoute" : matrixMode ? "matrix" : "single");
   if (!matrixMode) {
     console.log("InputMint:", singleInputMint.toBase58());
     console.log("OutputMint:", singleOutputMint.toBase58());
@@ -292,7 +318,10 @@ async function main() {
     return logHit;
   };
 
-  for (const venue of venues) {
+  // En mode bestRoute, on ne force pas une venue: on simule une seule route "best" par case.
+  const venuesToRun = bestRouteMode ? (["BEST_ROUTE"] as any as SupportedVenue[]) : venues;
+
+  for (const venue of venuesToRun) {
     const cases: SwapCase[] = matrixMode
       ? (pairsOverride
           ? pairsOverride.map((c) => ({ ...c, amountInLamports }))
@@ -304,6 +333,89 @@ async function main() {
       console.log("Venue:", venue, "| Case:", swapCase.name);
       console.log("InputMint:", swapCase.inputMint.toBase58());
       console.log("OutputMint:", swapCase.outputMint.toBase58());
+
+      if (bestRouteMode) {
+        // 1) Quote best venue
+        const route = await swapper.getBestNativeRoute({
+          inputMint: swapCase.inputMint,
+          outputMint: swapCase.outputMint,
+          amountIn: swapCase.amountInLamports,
+          minAmountOut: 0,
+          slippageBps,
+          userPublicKey: user.publicKey,
+        });
+
+        if (!route) {
+          const msg = "No native route available (pair unsupported or all quotes failed)";
+          console.log(msg);
+          summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "FAIL", error: msg });
+          process.exitCode = 1;
+          continue;
+        }
+
+        const minAmountOutUi = Math.floor(route.outputAmount * (10000 - slippageBps) / 10000);
+        console.log("Best venue:", route.venue);
+        console.log("Quote outputAmount:", route.outputAmount);
+        console.log("UI minAmountOut:", minAmountOutUi);
+        console.log(
+          "All quotes:",
+          route.allQuotes.map((q) => ({ venue: q.venue, out: q.outputAmount, pi: q.priceImpactBps }))
+        );
+
+        // 2) Build transaction exactly like the app
+        const built = await swapper.buildNativeSwapTransaction({
+          inputMint: swapCase.inputMint,
+          outputMint: swapCase.outputMint,
+          amountIn: swapCase.amountInLamports,
+          minAmountOut: minAmountOutUi,
+          slippageBps,
+          userPublicKey: user.publicKey,
+        });
+
+        if (!built) {
+          const msg = "Failed to build transaction";
+          console.log(msg);
+          summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "FAIL", error: msg });
+          process.exitCode = 1;
+          continue;
+        }
+
+        const tx = built.transaction;
+        try {
+          tx.sign([user]);
+        } catch (e) {
+          console.error("Failed to sign/serialize transaction (likely too large):", e);
+          summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "FAIL", error: "sign_failed" });
+          process.exitCode = 1;
+          continue;
+        }
+
+        const sim = await connection.simulateTransaction(tx, {
+          sigVerify: false,
+          replaceRecentBlockhash: true,
+        });
+
+        console.log("Simulation err:", sim.value.err);
+        console.log("Units:", sim.value.unitsConsumed);
+        if (sim.value.logs) {
+          const head = 400;
+          console.log(`--- logs (first ${head}) ---`);
+          for (const line of sim.value.logs.slice(0, head)) {
+            console.log(line);
+          }
+          if (sim.value.logs.length > head) {
+            console.log(`... (${sim.value.logs.length - head} more)`);
+          }
+        }
+
+        if (sim.value.err) {
+          summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "FAIL", error: JSON.stringify(sim.value.err) });
+          process.exitCode = 1;
+        } else {
+          summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "OK" });
+        }
+        continue;
+      }
 
       let dex: Awaited<ReturnType<typeof getDEXAccounts>>;
       try {

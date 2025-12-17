@@ -664,9 +664,28 @@ const METEORA_KNOWN_SOL_USDC_LBPAIR = new PublicKey("5rCf1DM8LjKTw4YqhnoLcngyZYe
 
 async function loadMeteoraDLMMClass(): Promise<any> {
   // @meteora-ag/dlmm exports: default = DLMM class
-  // IMPORTANT: keep this file browser-bundle-friendly (Next.js). Avoid Node-only `module`/CJS fallbacks.
-  const mod: any = await import("@meteora-ag/dlmm");
-  return mod?.DLMM ?? mod?.default ?? mod;
+  // IMPORTANT:
+  // - In browser/Next.js we keep pure ESM import.
+  // - In Node/tsx scripts, the ESM entry can fail because it imports
+  //   `import { BN } from "@coral-xyz/anchor"` but Anchor's ESM build does not export BN.
+  //   In that case we fallback to the CJS entry via createRequire.
+  try {
+    const mod: any = await import("@meteora-ag/dlmm");
+    return mod?.DLMM ?? mod?.default ?? mod;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const isNode = typeof process !== "undefined" && !!process.versions?.node;
+    if (isNode && msg.includes("does not provide an export named 'BN'")) {
+      const nodeModule: any = await import("node:module");
+      const createRequire = nodeModule?.createRequire;
+      if (typeof createRequire !== "function") throw e;
+      const req = createRequire(import.meta.url);
+      // Load the CJS entry (dist/index.js) which uses require('@coral-xyz/anchor') where BN exists.
+      const mod: any = req("@meteora-ag/dlmm");
+      return mod?.DLMM ?? mod?.default ?? mod;
+    }
+    throw e;
+  }
 }
 
 async function loadMeteoraDlmmModule(): Promise<any> {
