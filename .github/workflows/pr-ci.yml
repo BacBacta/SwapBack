@@ -194,31 +194,24 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
 
-      - name: ☀️ Install Solana CLI
-        run: |
-          sh -c "$(curl -sSfL https://release.solana.com/v1.18.22/install)"
-          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
-
-      - name: ⚓ Install Anchor CLI
-        run: |
-          cargo install --git https://github.com/coral-xyz/anchor --tag v0.30.1 anchor-cli --locked --force
-
       - name: 🔍 Run cargo fmt check
         run: cargo fmt -- --check
         continue-on-error: true
 
       - name: 🔍 Run cargo clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
         continue-on-error: true
 
-      - name: 🏗️ Build Anchor programs
-        run: anchor build
+      - name: 🏗️ Check Rust workspace compiles
+        run: cargo check --workspace --all-targets
 
-      - name: ✅ Verify program builds
+      - name: ✅ Verify program check
         run: |
           echo "## Solana Programs Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          ls -lh target/deploy/*.so >> $GITHUB_STEP_SUMMARY
+          echo "✅ cargo check passed (host compilation)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Note: Full anchor build (BPF target) is performed in deploy workflow." >> $GITHUB_STEP_SUMMARY
 
   # Job 6: PR Summary Comment
   pr-summary:

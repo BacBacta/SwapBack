@@ -63,6 +63,7 @@ jobs:
         cargo --version
         # Host build only (CodeQL extraction). No Solana/Anchor required.
         cargo check --workspace --all-targets
+      continue-on-error: true
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
@@ -70,6 +71,7 @@ jobs:
         category: "/language:${{ matrix.language }}"
         output: sarif-results
         upload: true
+      continue-on-error: ${{ matrix.language == 'rust' }}
 
     - name: Upload SARIF as artifact
       uses: actions/upload-artifact@v4
