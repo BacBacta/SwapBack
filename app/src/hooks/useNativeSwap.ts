@@ -2,7 +2,7 @@
  * 🔄 Hook pour Swaps Natifs SwapBack
  *
  * Ce hook utilise EXCLUSIVEMENT les venues natives (Raydium, Orca, Meteora, Phoenix)
- * via le programme router on-chain SwapBack au lieu de passer par Jupiter.
+ * via le programme router on-chain SwapBack.
  * 
  * Avantages:
  * - Génère du NPI (Native Price Improvement)
@@ -133,7 +133,7 @@ export function useNativeSwap() {
     return isNativeSwapAvailable();
   }, []);
 
-  // Router natif (ancien, utilise Jupiter CPI)
+  // Router natif (legacy)
   const nativeRouter = useMemo(() => {
     return getNativeRouter(connection);
   }, [connection]);
@@ -169,12 +169,10 @@ export function useNativeSwap() {
         // ============================================================
         // Décision de routing centralisée via decideSwapRoute
         // ============================================================
-        // Note: hasJupiterCpi est true ici car on vérifie avant d'obtenir
-        // la quote. Le vrai check jupiterCpi se fait au moment du swap.
         const routeDecision = decideSwapRoute({
           inputMint: inputMintStr,
           outputMint: outputMintStr,
-          hasJupiterCpi: true, // Présumé disponible pour la quote
+          hasJupiterCpi: true,
         });
         
         // Log structuré de la décision
@@ -183,11 +181,6 @@ export function useNativeSwap() {
         // Si route != native, retourner null avec message approprié
         if (routeDecision.route !== "native") {
           const uiMessage = getUIMessageForReason(routeDecision.reason);
-          logger.info("useNativeSwap", "Routing to Jupiter", {
-            reason: routeDecision.reason,
-            inputMint: inputMintStr.slice(0, 8),
-            outputMint: outputMintStr.slice(0, 8),
-          });
           setError(uiMessage);
           return null;
         }
@@ -199,17 +192,23 @@ export function useNativeSwap() {
           boostBps: userBoostBps,
         });
 
-        // Récupérer la route native (utiliser les mints normalisés)
-        const route = await nativeRouter.buildNativeRoute(
-          safeInputMint,
-          safeOutputMint,
-          params.amount,
-          params.slippageBps ?? 50
-        );
+        const slippageBps = params.slippageBps ?? SLIPPAGE_CONFIG.BASE_SLIPPAGE_BPS;
 
-        if (!route || route.venues.length === 0) {
+        // Récupérer la meilleure route native via TrueNativeSwap (cohérent avec executeTrueNativeSwap)
+        const route = await trueNativeSwap.getBestNativeRoute({
+          inputMint: safeInputMint,
+          outputMint: safeOutputMint,
+          amountIn: params.amount,
+          minAmountOut: 0,
+          slippageBps,
+          userPublicKey: publicKey,
+        });
+
+        if (!route || route.allQuotes.length === 0) {
           throw new Error("Aucune venue native disponible pour cette paire");
         }
+
+        setTrueNativeRoute(route);
 
         // Calculer le slippage dynamique si non fourni
         let dynamicSlippageBps = params.slippageBps ?? SLIPPAGE_CONFIG.BASE_SLIPPAGE_BPS;
@@ -235,24 +234,40 @@ export function useNativeSwap() {
           });
         }
 
+        // Estimations (alignées avec executeTrueNativeSwap)
+        const estimatedNpi = Math.floor(route.outputAmount * 0.001);
+        const estimatedRebate = Math.floor(estimatedNpi * 0.7);
+
         // Calculer les rebates avec boost
-        const baseRebate = route.estimatedRebate;
-        const rebateCalc = calculateBoostedRebate(baseRebate, userBoostBps);
+        const baseRebate = estimatedRebate;
+        const rebateCalc = calculateBoostedRebate(estimatedRebate, userBoostBps);
+
+        const venues: VenueQuote[] = route.allQuotes.map((q) => ({
+          venue: q.venue,
+          venueProgramId: q.venueProgramId,
+          inputAmount: q.inputAmount,
+          outputAmount: q.outputAmount,
+          priceImpactBps: q.priceImpactBps,
+          accounts: q.accounts.accounts,
+          instructionData: q.accounts.data,
+          estimatedNpiBps: 0,
+          latencyMs: q.latencyMs,
+        }));
 
         const quote: NativeSwapQuote = {
           // Montants
-          inputAmount: route.totalInputAmount,
-          outputAmount: route.totalOutputAmount,
-          netOutputAmount: route.netOutputAmount,
+          inputAmount: route.inputAmount,
+          outputAmount: route.outputAmount,
+          netOutputAmount: route.outputAmount,
           
           // Route
-          venues: route.venues,
-          bestVenue: route.bestVenue, // Utiliser directement bestVenue de la route
+          venues,
+          bestVenue: route.venue,
           
           // Économie
-          priceImpactBps: route.totalPriceImpactBps,
-          estimatedRebate: route.estimatedRebate,
-          estimatedNpi: route.estimatedNpi,
+          priceImpactBps: route.priceImpactBps,
+          estimatedRebate,
+          estimatedNpi,
           platformFeeBps: route.platformFeeBps,
           
           // Slippage dynamique
@@ -291,7 +306,7 @@ export function useNativeSwap() {
         setQuoteLoading(false);
       }
     },
-    [publicKey, nativeRouter, calculateBoostedRebate]
+    [publicKey, trueNativeSwap, calculateBoostedRebate]
   );
 
   /**
@@ -432,7 +447,7 @@ export function useNativeSwap() {
         ) {
           setError(
             "Transaction trop volumineuse pour le router natif. " +
-            "Réduisez le montant ou utilisez Jupiter direct."
+            "Réduisez le montant puis réessayez."
           );
         } else if (
           normalized.includes("0x177e") ||
@@ -445,8 +460,8 @@ export function useNativeSwap() {
           );
         } else if (normalized.includes("native_slippage_gate")) {
           setError(
-            "Le router natif ne peut pas respecter ce slippage avec Jupiter. " +
-            "Relancez une quote fraîche ou passez via Jupiter directement."
+            "Le swap natif ne peut pas respecter ce slippage. " +
+            "Relancez une quote fraîche ou augmentez légèrement le slippage."
           );
         } else {
           setError(message);
@@ -460,7 +475,7 @@ export function useNativeSwap() {
   );
 
   /**
-   * 🔥 Exécuter un swap via le VRAI routage natif (sans Jupiter)
+  * 🔥 Exécuter un swap via le VRAI routage natif (direct DEX CPI)
    * Appelle directement les DEX (Orca, Raydium, Meteora) via le mode Dynamic Plan
    */
   const executeTrueNativeSwap = useCallback(
@@ -481,7 +496,7 @@ export function useNativeSwap() {
         const safeInputMint = toPublicKey(params.inputMint);
         const safeOutputMint = toPublicKey(params.outputMint);
 
-        logger.info("useNativeSwap", "🔥 Executing TRUE native swap (no Jupiter)", {
+        logger.info("useNativeSwap", "🔥 Executing TRUE native swap (direct DEX CPI)", {
           inputMint: safeInputMint.toBase58().slice(0, 8),
           outputMint: safeOutputMint.toBase58().slice(0, 8),
           amount: params.amount,
@@ -505,7 +520,7 @@ export function useNativeSwap() {
         if (!route) {
           throw new Error(
             "Aucune venue native disponible. Cette paire n'est pas supportée " +
-            "par les DEX natifs (Orca, Raydium, Meteora). Utilisez Jupiter."
+            "par les DEX natifs (Orca, Raydium, Meteora)."
           );
         }
 
@@ -605,7 +620,7 @@ export function useNativeSwap() {
             "Cette paire n'est pas supportée par le routage natif."
           );
         } else if (normalized.includes("0x65") || normalized.includes("instructionfallbacknotfound")) {
-          // Log warning but DO NOT fallback to Jupiter per user request
+          // Warning: pas de fallback automatique
           logger.warn("useNativeSwap", "Dynamic Plan instruction error", {
             venue: trueNativeRoute?.venue,
           });
@@ -769,7 +784,7 @@ export function useNativeSwap() {
       const decision = decideSwapRoute({
         inputMint: inputStr,
         outputMint: outputStr,
-        hasJupiterCpi: true, // Présumé pour le check UI
+        hasJupiterCpi: true,
       });
       
       return decision.route === "native";
@@ -802,7 +817,7 @@ export function useNativeSwap() {
     validateOraclePrices,
     isPairSupported,
     
-    // 🔥 Vrai routage natif (sans Jupiter)
+    // 🔥 Vrai routage natif (direct DEX CPI)
     useTrueNativeRouting,
     setUseTrueNativeRouting,
     executeTrueNativeSwap,

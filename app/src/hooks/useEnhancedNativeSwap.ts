@@ -1,5 +1,5 @@
 /**
- * 🚀 Hook Amélioré pour Swaps Natifs SwapBack (niveau Jupiter Ultra)
+ * 🚀 Hook Amélioré pour Swaps Natifs SwapBack
  *
  * Ce hook étend useNativeSwap avec:
  * - Slippage dynamique avancé (EMA + volatilité + liquidité)
