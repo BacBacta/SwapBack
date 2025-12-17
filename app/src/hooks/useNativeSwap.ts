@@ -524,6 +524,15 @@ export function useNativeSwap() {
           );
         }
 
+        // Sécurité: Phoenix (CLOB) nécessite une quote orderbook. Tant que ce n'est
+        // pas implémenté, on refuse d'exécuter Phoenix pour éviter les IOC failures 0xF.
+        if (route.venue === 'PHOENIX') {
+          throw new Error(
+            "Phoenix est temporairement désactivé pour le swap natif (quote orderbook non implémentée). " +
+            "Veuillez réessayer: une autre venue (Meteora/Orca/Raydium) sera utilisée si disponible."
+          );
+        }
+
         setTrueNativeRoute(route);
 
         const minAmountOut = Math.floor(route.outputAmount * (10000 - slippageBps) / 10000);

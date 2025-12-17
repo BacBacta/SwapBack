@@ -2,7 +2,7 @@
  * API Route: Native Quote
  * 
  * Récupère des quotes depuis les venues natives SwapBack
- * (Raydium, Orca, Meteora, Phoenix) au lieu de Jupiter.
+ * (Raydium, Orca, Meteora) au lieu de Jupiter.
  * 
  * Fonctionnalités:
  * - Quotes temps réel depuis les APIs DEX
@@ -29,7 +29,7 @@ const DEX_APIS = {
   raydium: "https://transaction-v1.raydium.io",
   orca: "https://api.mainnet.orca.so",
   meteora: "https://dlmm-api.meteora.ag",
-  // Phoenix nécessite un SDK, on utilise une estimation basée sur les prix
+  // Phoenix nécessite une quote orderbook (phoenix-sdk). Pas de fallback estimé ici.
 };
 
 // Tokens connus avec leurs décimales
@@ -302,19 +302,8 @@ async function fetchMeteoraQuote(
   }
 }
 
-/**
- * Phoenix n'a pas d'API publique simple, on génère un fallback via /api/price
- * Note: Pour une implémentation complète, utiliser @ellipsis-labs/phoenix-sdk
- */
-async function fetchPhoenixQuote(
-  inputMint: string,
-  outputMint: string,
-  amount: string
-): Promise<VenueQuote | null> {
-  // Phoenix = CLOB avec généralement de meilleurs spreads
-  // Mais sans API publique, on utilise un fallback avec spread minimal
-  return generateFallbackQuote("Phoenix", inputMint, outputMint, amount, 15); // 0.15% spread
-}
+// NOTE: Phoenix (CLOB) requiert une quote orderbook. Tant que ce n'est pas implémenté,
+// on n'expose pas de quote "estimée" pour Phoenix.
 
 /**
  * POST /api/native-quote
@@ -343,10 +332,9 @@ export async function POST(request: NextRequest) {
       fetchRaydiumQuote(inputMint, outputMint, amount, slippageBps),
       fetchOrcaQuote(inputMint, outputMint, amount, slippageBps),
       fetchMeteoraQuote(inputMint, outputMint, amount, slippageBps),
-      fetchPhoenixQuote(inputMint, outputMint, amount),
     ];
 
-    const venueNames = ["Raydium", "Orca", "Meteora", "Phoenix"];
+    const venueNames = ["Raydium", "Orca", "Meteora"];
     const results = await Promise.allSettled(quotePromises);
     
     const quotes: VenueQuote[] = [];

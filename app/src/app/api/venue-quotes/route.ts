@@ -82,11 +82,10 @@ export async function GET(request: NextRequest) {
   let jupiterBenchmark: VenueQuoteResult | null = null;
 
   // Fetch all quotes in parallel
-  const [raydiumResult, orcaResult, meteoraResult, phoenixResult, jupiterResult] = await Promise.allSettled([
+  const [raydiumResult, orcaResult, meteoraResult, jupiterResult] = await Promise.allSettled([
     fetchRaydiumQuote(inputMint, outputMint, amountNum),
     fetchOrcaQuote(inputMint, outputMint, amountNum),
     fetchMeteoraQuote(inputMint, outputMint, amountNum),
-    fetchPhoenixQuote(inputMint, outputMint, amountNum),
     fetchJupiterQuote(inputMint, outputMint, amountNum),
   ]);
 
@@ -94,7 +93,6 @@ export async function GET(request: NextRequest) {
     raydium: raydiumResult.status === 'fulfilled' ? raydiumResult.value : 'rejected',
     orca: orcaResult.status === 'fulfilled' ? orcaResult.value : 'rejected',
     meteora: meteoraResult.status === 'fulfilled' ? meteoraResult.value : 'rejected',
-    phoenix: phoenixResult.status === 'fulfilled' ? phoenixResult.value : 'rejected',
     jupiter: jupiterResult.status === 'fulfilled' ? jupiterResult.value : 'rejected',
   });
 
@@ -109,10 +107,6 @@ export async function GET(request: NextRequest) {
 
   if (meteoraResult.status === 'fulfilled' && meteoraResult.value.outputAmount > 0) {
     quotes.push(meteoraResult.value);
-  }
-
-  if (phoenixResult.status === 'fulfilled' && phoenixResult.value.outputAmount > 0) {
-    quotes.push(phoenixResult.value);
   }
 
   // Process Jupiter (benchmark)
@@ -219,7 +213,7 @@ async function generateSyntheticQuotes(
   const adjustedOutput = Math.floor(baseOutput * conservativeSpread);
   
   // Générer des quotes identiques pour chaque venue (pas de faux avantage)
-  const venues = ['RAYDIUM', 'ORCA', 'METEORA', 'PHOENIX'];
+  const venues = ['RAYDIUM', 'ORCA', 'METEORA'];
   
   const quotes: VenueQuoteResult[] = venues.map(venue => ({
     venue,

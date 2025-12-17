@@ -69,6 +69,11 @@ const MAX_STALENESS_SECS = 120; // 2 minutes
 const PRIORITY_FEE_MICRO_LAMPORTS = 100_000;
 const COMPUTE_UNITS = 400_000;
 
+// Phoenix (CLOB) requiert une quote orderbook (phoenix-sdk). Tant que ce n'est
+// pas implémenté côté client, on l'exclut du best-route pour éviter les IOC
+// failures (custom program error 0xF) dues à un minOut irréaliste.
+const DISABLED_BEST_ROUTE_VENUES = new Set<SupportedVenue>(["PHOENIX"]);
+
 // ============================================================================
 // HELPERS - Using centralized publicKeyUtils
 // ============================================================================
@@ -177,6 +182,10 @@ export class TrueNativeSwap {
 
     // Pour chaque venue disponible, obtenir une quote
     for (const [venue, accounts] of allAccounts) {
+      if (DISABLED_BEST_ROUTE_VENUES.has(venue)) {
+        logger.warn("TrueNativeSwap", `Skipping disabled venue in best-route: ${venue}`);
+        continue;
+      }
       try {
         const startTime = Date.now();
         const quote = await this.getQuoteForVenue(
