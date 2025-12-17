@@ -157,6 +157,14 @@ export function SimpleSwapCard() {
   const [slippage, setSlippage] = useState(slippageConfig.BASE_SLIPPAGE_BPS / 100); // Utiliser config dynamique
   const [mevProtection, setMevProtection] = useState(useMevProtection);
 
+  // Parsing robuste des montants utilisateur (ex: locale FR "0,01" => 0.01)
+  const parseUserAmount = useCallback((raw: string): number => {
+    if (!raw) return 0;
+    const normalized = raw.trim().replace(/\s+/g, "").replace(/,/g, ".");
+    const n = Number.parseFloat(normalized);
+    return Number.isFinite(n) ? n : 0;
+  }, []);
+
   // Token data
   const inputTokenData = useTokenData(inputToken.mint);
   const outputTokenData = useTokenData(outputToken.mint);
@@ -197,7 +205,7 @@ export function SimpleSwapCard() {
     }
     
     // Rafraîchir les prix toutes les 10 secondes pendant qu'on a un montant
-    if (inputAmount && parseFloat(inputAmount) > 0) {
+    if (inputAmount && parseUserAmount(inputAmount) > 0) {
       priceRefreshIntervalRef.current = setInterval(() => {
         // Les hooks useTokenData vont automatiquement rafraîchir
         // On force un re-render léger en mettant à jour un timestamp
@@ -215,9 +223,10 @@ export function SimpleSwapCard() {
 
   // Calculer le montant en unités de base
   const amountInBaseUnits = useMemo(() => {
-    const amount = parseFloat(inputAmount);
+    const amount = parseUserAmount(inputAmount);
     if (!amount || !Number.isFinite(amount)) return 0;
-    return Math.floor(amount * Math.pow(10, inputToken.decimals));
+    const lamports = Math.floor(amount * Math.pow(10, inputToken.decimals));
+    return Number.isFinite(lamports) && lamports > 0 ? lamports : 0;
   }, [inputAmount, inputToken.decimals]);
 
   // Fetch quote via le ROUTER NATIF (pas Jupiter!)
@@ -505,8 +514,11 @@ export function SimpleSwapCard() {
                   inputMode="decimal"
                   value={inputAmount}
                   onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9.]/g, "");
-                    if (value.split(".").length <= 2) {
+                    // Accepte "." ou "," comme séparateur décimal.
+                    const value = e.target.value.replace(/[^0-9.,\s]/g, "");
+                    const dotCount = (value.match(/\./g) || []).length;
+                    const commaCount = (value.match(/,/g) || []).length;
+                    if (dotCount + commaCount <= 1) {
                       setInputAmount(value);
                     }
                   }}
@@ -525,10 +537,10 @@ export function SimpleSwapCard() {
                 </button>
               </div>
               {/* Valeur USD en temps réel avec SingleTokenFiat */}
-              {inputAmount && parseFloat(inputAmount) > 0 && (
+              {inputAmount && parseUserAmount(inputAmount) > 0 && (
                 <SingleTokenFiat
                   tokenSymbol={inputToken.symbol}
-                  amount={parseFloat(inputAmount)}
+                  amount={parseUserAmount(inputAmount)}
                   compact
                   className="mt-1"
                 />
@@ -628,7 +640,7 @@ export function SimpleSwapCard() {
                   <RouteVisualization
                     inputToken={{
                       symbol: inputToken.symbol,
-                      amount: parseFloat(inputAmount) || 0,
+                      amount: parseUserAmount(inputAmount) || 0,
                       logoURI: inputToken.logoURI,
                     }}
                     outputToken={{
@@ -740,7 +752,7 @@ export function SimpleSwapCard() {
                 </span>
               ) : !connected ? (
                 "Connecter le wallet"
-              ) : !inputAmount || parseFloat(inputAmount) === 0 ? (
+              ) : !inputAmount || parseUserAmount(inputAmount) === 0 ? (
                 "Entrez un montant"
               ) : !quote ? (
                 "Calcul du prix..."

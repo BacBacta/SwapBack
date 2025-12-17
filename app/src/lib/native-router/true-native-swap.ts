@@ -1117,7 +1117,7 @@ export class TrueNativeSwap {
     const userPublicKey = toPublicKey(params.userPublicKey);
     const inputMint = toPublicKey(params.inputMint);
     const outputMint = toPublicKey(params.outputMint);
-    const amountIn = params.amountIn;
+    const amountIn = Math.floor(params.amountIn);
     const slippageBps = params.slippageBps;
 
     logger.info("TrueNativeSwap", "Building true native swap transaction", {
@@ -1126,6 +1126,19 @@ export class TrueNativeSwap {
       amountIn,
       slippageBps,
     });
+
+    if (!Number.isFinite(amountIn) || amountIn <= 0) {
+      throw new Error(
+        "Invalid amountIn for native swap: must be > 0 (in base units/lamports). " +
+          "If you typed a decimal amount, ensure it did not round down to 0."
+      );
+    }
+
+    if (!Number.isSafeInteger(amountIn)) {
+      throw new Error(
+        "Invalid amountIn for native swap: amountIn must be a safe integer number of base units."
+      );
+    }
 
     // 1. Obtenir la meilleure route native (ou utiliser celle déjà calculée)
     const route =

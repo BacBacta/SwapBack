@@ -488,6 +488,16 @@ export function useNativeSwap() {
         return null;
       }
 
+      // Garde-fou: éviter d'envoyer un swap à 0 lamport (souvent dû à un parsing/arrondi UI)
+      // qui provoque InvalidAmount (6014) côté programme on-chain.
+      if (!Number.isFinite(params.amount) || params.amount <= 0) {
+        setError(
+          "Montant invalide ou trop petit (arrondi à 0). " +
+            "Augmentez le montant et vérifiez le séparateur décimal (utilisez \".\" ou \" ,\")."
+        );
+        return null;
+      }
+
       setLoading(true);
       setError(null);
 
