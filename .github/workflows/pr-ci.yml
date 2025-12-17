@@ -134,10 +134,11 @@ jobs:
           }
           const pct = total === 0 ? 0 : Math.floor((covered / total) * 100);
           console.log(`Statements: ${pct}%`);
-NODE
+          NODE
         continue-on-error: true
 
       - name: 📤 Upload coverage to Codecov
+        if: ${{ secrets.CODECOV_TOKEN != '' }}
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -283,7 +284,7 @@ NODE
             </details>
             
             ---
-            *Last updated: ${{ github.event.head_commit.timestamp }}*
+            *Last updated: ${{ github.event.pull_request.updated_at }}*
             `;
             
             if (botComment) {
