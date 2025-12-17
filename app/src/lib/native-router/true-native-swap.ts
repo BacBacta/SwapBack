@@ -69,47 +69,6 @@ const MAX_STALENESS_SECS = 120; // 2 minutes
 const PRIORITY_FEE_MICRO_LAMPORTS = 100_000;
 const COMPUTE_UNITS = 400_000;
 
-// Stablecoins (USD ~= 1) used for conservative oracle-based estimates
-const STABLECOIN_MINTS = new Set([
-  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
-  "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", // USDT
-]);
-
-type PythPriceUpdate = {
-  price: number;
-  confidence: number;
-  exponent: number;
-  publishTime: number;
-};
-
-function parsePythPriceUpdateV2(data: Buffer): PythPriceUpdate | null {
-  // Minimum size for PriceUpdateV2
-  if (!data || data.length < 120) return null;
-
-  try {
-    // discriminator (8) + write_authority (32) + verification_level (1)
-    const PRICE_MESSAGE_OFFSET = 8 + 32 + 1;
-    const FEED_ID_SIZE = 32;
-
-    const priceOffset = PRICE_MESSAGE_OFFSET + FEED_ID_SIZE;
-    const confOffset = priceOffset + 8;
-    const exponentOffset = confOffset + 8;
-    const publishTimeOffset = exponentOffset + 4;
-
-    const priceRaw = data.readBigInt64LE(priceOffset);
-    const confRaw = data.readBigUInt64LE(confOffset);
-    const exponent = data.readInt32LE(exponentOffset);
-    const publishTime = Number(data.readBigInt64LE(publishTimeOffset));
-
-    const price = Number(priceRaw) * Math.pow(10, exponent);
-    const confidence = Number(confRaw) * Math.pow(10, exponent);
-
-    return { price, confidence, exponent, publishTime };
-  } catch {
-    return null;
-  }
-}
-
 // ============================================================================
 // HELPERS - Using centralized publicKeyUtils
 // ============================================================================
@@ -181,82 +140,6 @@ export class TrueNativeSwap {
     const mintInfo = await getMint(this.connection, mint);
     this.mintDecimalsCache.set(key, mintInfo.decimals);
     return mintInfo.decimals;
-  }
-
-  private async getFreshOraclePriceUsd(
-    inputMint: PublicKey,
-    outputMint: PublicKey
-  ): Promise<{ priceUsd: number; publishTime: number } | null> {
-    try {
-      const oracleConfig = getOracleFeedsForPair(inputMint.toBase58(), outputMint.toBase58());
-      const accountInfo = await this.connection.getAccountInfo(oracleConfig.primary);
-      if (!accountInfo?.data) return null;
-
-      const parsed = parsePythPriceUpdateV2(accountInfo.data);
-      if (!parsed || !Number.isFinite(parsed.price) || parsed.price <= 0) return null;
-
-      const nowSecs = Math.floor(Date.now() / 1000);
-      const ageSecs = nowSecs - parsed.publishTime;
-      if (ageSecs < 0 || ageSecs > MAX_STALENESS_SECS) {
-        return null;
-      }
-
-      return { priceUsd: parsed.price, publishTime: parsed.publishTime };
-    } catch {
-      return null;
-    }
-  }
-
-  private async estimateOutputUsingOracleForStablePair(params: {
-    inputMint: PublicKey;
-    outputMint: PublicKey;
-    amountIn: number;
-    feeRate: number;
-    extraSafetyBps: number;
-  }): Promise<{ outputAmount: number; priceImpactBps: number } | null> {
-    const { inputMint, outputMint, amountIn, feeRate, extraSafetyBps } = params;
-    const inputMintStr = inputMint.toBase58();
-    const outputMintStr = outputMint.toBase58();
-
-    // Only handle SOL <-> stablecoin. Other pairs need proper venue quotes.
-    const isInputSol = inputMint.equals(SOL_MINT);
-    const isOutputSol = outputMint.equals(SOL_MINT);
-    const isInputStable = STABLECOIN_MINTS.has(inputMintStr);
-    const isOutputStable = STABLECOIN_MINTS.has(outputMintStr);
-
-    if (!((isInputSol && isOutputStable) || (isOutputSol && isInputStable))) {
-      return null;
-    }
-
-    const oracle = await this.getFreshOraclePriceUsd(SOL_MINT, USDC_MINT);
-    if (!oracle) return null;
-
-    const [inDecimals, outDecimals] = await Promise.all([
-      this.getMintDecimals(inputMint),
-      this.getMintDecimals(outputMint),
-    ]);
-
-    const inUi = amountIn / Math.pow(10, inDecimals);
-    const solUsd = oracle.priceUsd;
-
-    let outUi: number;
-    if (isInputSol && isOutputStable) {
-      outUi = inUi * solUsd;
-    } else {
-      // stable -> SOL
-      outUi = inUi / solUsd;
-    }
-
-    // Apply conservative haircut: venue fee + extra safety margin.
-    const haircut = Math.min(0.25, feeRate + extraSafetyBps / 10_000);
-    const outUiAfterFees = Math.max(0, outUi * (1 - haircut));
-
-    const outputAmount = Math.floor(outUiAfterFees * Math.pow(10, outDecimals));
-    const priceImpactBps = Math.round(haircut * 10_000);
-
-    if (!Number.isFinite(outputAmount) || outputAmount <= 0) return null;
-
-    return { outputAmount, priceImpactBps };
   }
 
   // ==========================================================================
@@ -477,25 +360,17 @@ export class TrueNativeSwap {
     amountIn: number,
     accounts: DEXAccounts
   ): Promise<{ outputAmount: number; priceImpactBps: number } | null> {
-    // Phoenix (CLOB) n'a pas d'API REST publique. Une estimation 1:1 est FAUSSE
-    // (ex: SOL->USDC) et produit des minOut irréalistes → IOC failure (custom error 0xF).
-    // On utilise une estimation conservative basée sur l'oracle (uniquement SOL<->stable).
-    const feeRate = accounts.meta.feeRate || 0.001;
-    const extraSafetyBps = 50; // 0.50% safety margin
+    void inputMint;
+    void outputMint;
+    void amountIn;
+    void accounts;
 
-    const oracleEstimate = await this.estimateOutputUsingOracleForStablePair({
-      inputMint,
-      outputMint,
-      amountIn,
-      feeRate,
-      extraSafetyBps,
-    });
-
-    if (!oracleEstimate) {
-      return null;
-    }
-
-    return oracleEstimate;
+    // Phoenix (CLOB) requiert une quote basée sur l'orderbook pour éviter
+    // les IOC failures (custom error 0xF) quand minOut est irréaliste.
+    // Tant qu'une quote orderbook fiable via phoenix-sdk n'est pas implémentée,
+    // on désactive Phoenix au niveau quote pour éviter de sélectionner cette venue.
+    logger.warn("TrueNativeSwap", "Phoenix quote disabled (orderbook quote not implemented)");
+    return null;
   }
 
   /**
