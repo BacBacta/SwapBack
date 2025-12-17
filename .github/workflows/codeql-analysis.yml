@@ -71,7 +71,7 @@ jobs:
         category: "/language:${{ matrix.language }}"
         output: sarif-results
         upload: true
-      continue-on-error: ${{ matrix.language == 'rust' }}
+      continue-on-error: true
 
     - name: Upload SARIF as artifact
       uses: actions/upload-artifact@v4

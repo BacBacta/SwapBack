@@ -107,6 +107,7 @@ jobs:
         run: npm run test:unit -- --coverage --reporter=verbose
         env:
           CI: true
+        continue-on-error: false
 
       - name: 📊 Generate coverage report
         run: |
@@ -155,8 +156,13 @@ jobs:
           node-version: '20.x'
           cache: 'npm'
 
-      - name: 📦 Install dependencies
+      - name: 📦 Install root dependencies
         run: npm ci
+
+      - name: 📦 Install target dependencies
+        run: npm ci
+        working-directory: ./${{ matrix.target }}
+        continue-on-error: true
 
       - name: 🏗️ Build ${{ matrix.target }}
         run: npm run build
