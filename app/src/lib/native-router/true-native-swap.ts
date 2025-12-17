@@ -642,8 +642,14 @@ export class TrueNativeSwap {
     const safeUser = toPublicKey(userPublicKey);
     const inputMint = toPublicKey(params.inputMint);
     const outputMint = toPublicKey(params.outputMint);
-    const amountIn = params.amountIn;
-    const minAmountOut = params.minAmountOut;
+    const amountIn = Math.floor(params.amountIn);
+    const minAmountOut = Math.floor(params.minAmountOut);
+
+    if (!Number.isFinite(amountIn) || amountIn <= 0) {
+      throw new Error(
+        "Invalid amountIn for SwapToc: must be > 0 (in base units/lamports)."
+      );
+    }
 
     // Phoenix (CLOB) n'est pas exécutable sans quote orderbook fiable.
     // Empêche toute construction d'instruction menant à un IOC 0xF.
@@ -1257,8 +1263,14 @@ export class TrueNativeSwap {
     }
 
     // 3. Ajouter l'instruction de swap (chemin direct: pas de SwapPlan)
+    // IMPORTANT: on force l'usage des montants dérivés/validés (évite amount_in=0 → 6014)
+    const effectiveParams: TrueNativeSwapParams = {
+      ...params,
+      amountIn,
+      minAmountOut,
+    };
     instructions.push(
-      await this.buildNativeSwapInstruction(userPublicKey, route, params)
+      await this.buildNativeSwapInstruction(userPublicKey, route, effectiveParams)
     );
 
     // 4. Construire la transaction versionnée

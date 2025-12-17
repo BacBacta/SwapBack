@@ -362,12 +362,21 @@ export async function getSaberAccounts(
     const safeOutputMint = toPublicKey(outputMint);
     const safeUser = toPublicKey(userPublicKey);
 
+    // Saber est un stable-swap: on ne tente la résolution que pour les paires stables connues.
+    // Évite du bruit (SOL/USDC n'a pas de pool Saber dans notre config statique).
+    const SABER_STABLE_MINTS = new Set([
+      "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+      "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", // USDT
+    ]);
+
+    const inStr = safeInputMint.toBase58();
+    const outStr = safeOutputMint.toBase58();
+    if (!SABER_STABLE_MINTS.has(inStr) || !SABER_STABLE_MINTS.has(outStr)) {
+      return null;
+    }
+
     const pool = findSaberPool(safeInputMint, safeOutputMint);
     if (!pool) {
-      logger.warn("SaberResolver", "No Saber pool config found", {
-        inputMint: safeInputMint.toBase58(),
-        outputMint: safeOutputMint.toBase58(),
-      });
       return null;
     }
 
