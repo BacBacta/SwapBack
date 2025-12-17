@@ -47,12 +47,15 @@ interface TokenInfo {
 interface QuoteResult {
   outputAmount: string;
   outputAmountFormatted: number;
+  /** Optionnel: minOut (en unités token) recommandé par la venue sélectionnée */
+  minOutAmountFormatted?: number;
   priceImpact: number;
   cashbackAmount: number;
   npiAmount: number;
   route: string[];
   venues: string[];
   isNativeRoute: boolean;
+  bestVenue?: string;
   dynamicSlippageBps?: number;
   slippageBreakdown?: {
     slippageBps: number;
@@ -253,18 +256,27 @@ export function SimpleSwapCard() {
 
         if (nativeResult && !controller.signal.aborted) {
           const formatted = nativeResult.outputAmount / Math.pow(10, outputToken.decimals);
+          const minOutFormatted =
+            nativeResult.bestVenue === "RAYDIUM_AMM" &&
+            typeof nativeResult.selectedMinOutAmount === "number" &&
+            Number.isFinite(nativeResult.selectedMinOutAmount) &&
+            nativeResult.selectedMinOutAmount > 0
+              ? nativeResult.selectedMinOutAmount / Math.pow(10, outputToken.decimals)
+              : undefined;
           const cashbackFormatted = nativeResult.boostedRebate / Math.pow(10, outputToken.decimals);
           const npiFormatted = nativeResult.estimatedNpi / Math.pow(10, outputToken.decimals);
 
           setQuote({
             outputAmount: nativeResult.outputAmount.toString(),
             outputAmountFormatted: formatted,
+            minOutAmountFormatted: minOutFormatted,
             priceImpact: nativeResult.priceImpactBps / 100,
             cashbackAmount: cashbackFormatted,
             npiAmount: npiFormatted,
             route: nativeResult.venues.map(v => v.venue),
             venues: nativeResult.venues.map(v => v.venue),
             isNativeRoute: true,
+            bestVenue: nativeResult.bestVenue,
             dynamicSlippageBps: nativeResult.dynamicSlippageBps,
             slippageBreakdown: nativeResult.slippageResult,
           } as QuoteResult);
@@ -729,6 +741,17 @@ export function SimpleSwapCard() {
                       {quote.priceImpact.toFixed(2)}%
                     </span>
                   </div>
+
+                  {quote.bestVenue === "RAYDIUM_AMM" &&
+                    typeof quote.minOutAmountFormatted === "number" &&
+                    Number.isFinite(quote.minOutAmountFormatted) && (
+                      <div className="flex justify-between">
+                        <span>Min reçu (Raydium):</span>
+                        <span className="text-gray-300">
+                          {formatAmount(quote.minOutAmountFormatted)} {outputToken.symbol}
+                        </span>
+                      </div>
+                    )}
                 </div>
               </motion.div>
             )}

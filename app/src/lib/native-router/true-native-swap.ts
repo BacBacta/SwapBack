@@ -88,6 +88,8 @@ export interface NativeVenueQuote {
   inputAmount: number;
   outputAmount: number;
   priceImpactBps: number;
+  /** Optionnel: minOut recommandé par le DEX (ex Raydium otherAmountThreshold) */
+  minOutAmount?: number;
   accounts: DEXAccounts;
   latencyMs: number;
 }
@@ -162,7 +164,8 @@ export class TrueNativeSwap {
     inputMint: PublicKey,
     outputMint: PublicKey,
     amountIn: number,
-    userPublicKey: PublicKey
+    userPublicKey: PublicKey,
+    slippageBps?: number
   ): Promise<NativeVenueQuote[]> {
     const safeInputMint = toPublicKey(inputMint);
     const safeOutputMint = toPublicKey(outputMint);
@@ -197,7 +200,8 @@ export class TrueNativeSwap {
           safeInputMint,
           safeOutputMint,
           amountIn,
-          accounts
+          accounts,
+          slippageBps
         );
         const latencyMs = Date.now() - startTime;
 
@@ -214,6 +218,7 @@ export class TrueNativeSwap {
             inputAmount: amountIn,
             outputAmount: quote.outputAmount,
             priceImpactBps: quote.priceImpactBps,
+            minOutAmount: quote.minOutAmount,
             accounts,
             latencyMs,
           });
@@ -243,15 +248,16 @@ export class TrueNativeSwap {
     inputMint: PublicKey,
     outputMint: PublicKey,
     amountIn: number,
-    accounts: DEXAccounts
-  ): Promise<{ outputAmount: number; priceImpactBps: number } | null> {
+    accounts: DEXAccounts,
+    slippageBps?: number
+  ): Promise<{ outputAmount: number; priceImpactBps: number; minOutAmount?: number } | null> {
     switch (venue) {
       case "ORCA_WHIRLPOOL":
         return this.getOrcaQuote(inputMint, outputMint, amountIn, accounts);
       case "METEORA_DLMM":
         return this.getMeteoraQuote(inputMint, outputMint, amountIn, accounts);
       case "RAYDIUM_AMM":
-        return this.getRaydiumQuote(inputMint, outputMint, amountIn, accounts);
+        return this.getRaydiumQuote(inputMint, outputMint, amountIn, accounts, slippageBps);
       case "PHOENIX":
         return this.getPhoenixQuote(inputMint, outputMint, amountIn, accounts);
       default:
@@ -344,8 +350,9 @@ export class TrueNativeSwap {
     inputMint: PublicKey,
     outputMint: PublicKey,
     amountIn: number,
-    accounts: DEXAccounts
-  ): Promise<{ outputAmount: number; priceImpactBps: number } | null> {
+    accounts: DEXAccounts,
+    slippageBps?: number
+  ): Promise<{ outputAmount: number; priceImpactBps: number; minOutAmount?: number } | null> {
     try {
       const response = await fetch(
         `/api/dex/raydium/quote?` +
@@ -354,6 +361,9 @@ export class TrueNativeSwap {
             outputMint: outputMint.toBase58(),
             amount: amountIn.toString(),
             poolId: accounts.meta.poolAddress || "",
+            ...(typeof slippageBps === "number" && Number.isFinite(slippageBps)
+              ? { slippageBps: Math.floor(slippageBps).toString() }
+              : {}),
           }),
         { signal: AbortSignal.timeout(5000) }
       );
@@ -366,6 +376,10 @@ export class TrueNativeSwap {
       return {
         outputAmount: data.outputAmount,
         priceImpactBps: (data.priceImpact || 0) * 10000,
+        minOutAmount:
+          typeof data.minOutAmount === "number" && Number.isFinite(data.minOutAmount)
+            ? data.minOutAmount
+            : undefined,
       };
     } catch {
       return this.estimateQuoteFromPool(accounts, amountIn);
@@ -430,7 +444,8 @@ export class TrueNativeSwap {
       inputMintPk,
       outputMintPk,
       amountIn,
-      userPk
+      userPk,
+      params.slippageBps
     );
 
     if (quotes.length === 0) {
@@ -1174,12 +1189,30 @@ export class TrueNativeSwap {
       priceImpactBps: route.priceImpactBps,
     });
 
-    // MinOut strict dérivé de la route réellement utilisée + slippage utilisateur
-    // (évite les divergences quote UI vs quote builder)
-    const minAmountOut = Math.max(
+    // MinOut strict dérivé de la route réellement utilisée + slippage utilisateur.
+    // IMPORTANT: Raydium renvoie `otherAmountThreshold` (minOut) qui peut inclure
+    // des détails spécifiques (arrondis/frais) et doit être préféré pour éviter
+    // "exceeds desired slippage limit" (custom program error: 0x1e).
+    let minAmountOut = Math.max(
       0,
       Math.floor((route.outputAmount * (10_000 - slippageBps)) / 10_000)
     );
+
+    if (route.venue === "RAYDIUM_AMM") {
+      const raydiumQuote = await this.getRaydiumQuote(
+        inputMint,
+        outputMint,
+        amountIn,
+        route.dexAccounts,
+        slippageBps
+      );
+      if (raydiumQuote?.minOutAmount && Number.isFinite(raydiumQuote.minOutAmount)) {
+        const candidate = Math.max(0, Math.floor(raydiumQuote.minOutAmount));
+        if (candidate > 0) {
+          minAmountOut = candidate;
+        }
+      }
+    }
 
     logger.info("TrueNativeSwap", "Derived minAmountOut", {
       minAmountOut,

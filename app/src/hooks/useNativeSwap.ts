@@ -96,6 +96,9 @@ export interface NativeSwapQuote {
   // Méta
   timestamp: number;
   expiresAt: number;
+
+  /** Optionnel: minOut recommandé par le DEX pour la venue sélectionnée (ex Raydium otherAmountThreshold) */
+  selectedMinOutAmount?: number;
 }
 
 export interface SwapHistoryEntry {
@@ -284,6 +287,11 @@ export function useNativeSwap() {
           // Méta
           timestamp: Date.now(),
           expiresAt: Date.now() + 30000, // 30 secondes de validité
+
+          selectedMinOutAmount:
+            route.venue === "RAYDIUM_AMM"
+              ? (route.allQuotes.find((q) => q.venue === route.venue)?.minOutAmount ?? undefined)
+              : undefined,
         };
 
         setCurrentQuote(quote);
@@ -452,7 +460,10 @@ export function useNativeSwap() {
         } else if (
           normalized.includes("0x177e") ||
           normalized.includes("slippage") ||
-          normalized.includes("slippage exceeded")
+          normalized.includes("slippage exceeded") ||
+          normalized.includes("custom:30") ||
+          normalized.includes("0x1e") ||
+          normalized.includes("exceeds desired slippage")
         ) {
           setError(
             "Le prix a bougé pendant la simulation (slippage dépassé). " +
