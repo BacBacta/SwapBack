@@ -86,7 +86,7 @@ export function calculateDynamicWeights(
     
     // Bonus pour les sources à faible price impact (estimé via la différence net/out)
     if (quote.quote) {
-      const priceImpact = parseFloat(quote.quote.priceImpactPct || "0");
+      const priceImpact = parseFloat(String(quote.quote.priceImpactPct ?? "0"));
       if (priceImpact < 0.1) {
         score *= 1.2; // Bonus 20% pour faible impact
       } else if (priceImpact > 1) {

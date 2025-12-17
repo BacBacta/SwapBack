@@ -18,5 +18,6 @@ export function createProgramWithProvider<T extends Idl>(
   provider: AnchorProvider
 ): Program<T> {
   const normalized = normalizeIdlAddress(idl, programId);
-  return new Program(normalized as Idl, programId, provider) as Program<T>;
+  // Cast through unknown to work around Anchor generics incompatibility
+  return new Program(normalized as Idl, provider) as unknown as Program<T>;
 }

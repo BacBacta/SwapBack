@@ -15,6 +15,7 @@ import {
   Keypair,
   PublicKey,
   Transaction,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import {
   getOrcaWhirlpool,
@@ -39,11 +40,11 @@ class ReadonlyWallet implements Wallet {
     this.payer = keypair;
   }
 
-  async signTransaction<T extends Transaction>(tx: T): Promise<T> {
+  async signTransaction<T extends Transaction | VersionedTransaction>(tx: T): Promise<T> {
     return tx;
   }
 
-  async signAllTransactions<T extends Transaction[]>(txs: T): Promise<T> {
+  async signAllTransactions<T extends Transaction | VersionedTransaction>(txs: T[]): Promise<T[]> {
     return txs;
   }
 }
