@@ -5,7 +5,7 @@
       "id": "swapbackRpcUrl",
       "type": "promptString",
       "description": "SOLANA_RPC_URL (RPC HTTP)",
-      "default": "https://api.mainnet-beta.solana.com"
+      "default": "helius"
     },
     {
       "id": "swapbackKeypairPath",
@@ -32,7 +32,7 @@
       "command": "zsh",
       "args": [
         "-ic",
-        "cd /workspaces/SwapBack && export SOLANA_RPC_URL=\"${input:swapbackRpcUrl}\" SWAPBACK_AUTO_CREATE_KEYPAIR=1 && KP=\"${input:swapbackKeypairPath}\" && if [[ -n \"$KP\" && -f \"$KP\" ]]; then export SOLANA_KEYPAIR=\"$KP\"; else unset SOLANA_KEYPAIR; fi && if [ ! -d node_modules ]; then print -r -- \"[task] node_modules manquant: npm ci\"; npm ci; fi && noglob ./node_modules/.bin/tsx ./scripts/simulate-native-swap.ts --venues=METEORA_DLMM,PHOENIX,LIFINITY"
+        "cd /workspaces/SwapBack && export SOLANA_RPC_URL=\"${input:swapbackRpcUrl}\" HELIUS_API_KEY=\"${input:heliusApiKey}\" NEXT_PUBLIC_HELIUS_API_KEY=\"${input:heliusApiKey}\" SWAPBACK_AUTO_CREATE_KEYPAIR=1 && KP=\"${input:swapbackKeypairPath}\" && if [[ -n \"$KP\" && -f \"$KP\" ]]; then export SOLANA_KEYPAIR=\"$KP\"; else unset SOLANA_KEYPAIR; fi && if [ ! -d node_modules ]; then print -r -- \"[task] node_modules manquant: npm ci\"; npm ci; fi && noglob ./node_modules/.bin/tsx ./scripts/simulate-native-swap.ts --venues=METEORA_DLMM,PHOENIX,LIFINITY"
       ],
       "problemMatcher": [],
       "presentation": {
