@@ -291,62 +291,115 @@ export async function GET(request: Request) {
 
 ---
 
-## Références Complètes
+## 9. Policy d'usage des sources (OBLIGATOIRE)
 
-### A) Router natif A→Z
-- https://github.com/okxlabs/DEX-Router-Solana-V1
-
-### B) Solana Core
-- https://solana.com/docs/core/cpi
-- https://solana.com/docs/core/pda
-- https://solana.com/docs/core/transactions
-- https://solana.com/docs/rpc/http/simulatetransaction
-
-### C) Versioned TX & ALTs
-- https://solana.com/developers/guides/advanced/versions
-- https://solana.com/developers/guides/advanced/lookup-tables
-
-### D) Tokens / SPL
-- https://spl.solana.com/token
-- https://solana.com/docs/tokens
-
-### E) Anchor Errors
-- https://www.anchor-lang.com/docs/features/errors
-
-### F) Pyth Network
-- https://docs.pyth.network/price-feeds/use-real-time-data/pull-integration/solana
-- https://docs.pyth.network/price-feeds/troubleshoot/svm
-- https://docs.pyth.network/price-feeds/core/push-feeds/solana
-- https://docs.pyth.network/price-feeds/fetch-price-updates
-- https://docs.pyth.network/price-feeds/how-pyth-works/hermes
-- https://docs.pyth.network/price-feeds/price-feeds
-
-### G) Switchboard
-- https://docs.switchboard.xyz/product-documentation/aggregator/how-to-use-the-switchboard-oracle-aggregator
-- https://github.com/switchboard-xyz/solana-sdk
-- https://docs.switchboard.xyz/
-
-### H) Orca Whirlpools
-- https://dev.orca.so/SDKs/Overview/
-- https://dev.orca.so/ts/index.html
-
-### I) Meteora DLMM
-- https://docs.meteora.ag/developer-guide/guides/dlmm/typescript-sdk/getting-started
-
-### J) Phoenix
-- https://github.com/Ellipsis-Labs/phoenix-v1
-
-### K) Raydium
-- https://docs.raydium.io/raydium/traders/trade-api
-
-### L) Next.js / CORS
-- https://nextjs.org/docs/app/api-reference/config/next-config-js/headers
-- https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS
-- https://developer.mozilla.org/en-US/docs/Glossary/Preflight_request
-
-### M) Copilot Instructions
-- https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions
+1. **Validation contre source primaire** : Toujours valider les comptes/contraintes d'un swap contre la source primaire (instruction.rs / IDL / repo du programme DEX).
+2. **Simulation obligatoire** : Toujours exécuter `simulateTransaction` et ajuster `ComputeBudget` (setComputeUnitLimit / setComputeUnitPrice) avant envoi réel.
+3. **Versioned TX + LUTs** : Utiliser v0 + Address Lookup Tables dès que le nombre de comptes dépasse ~30 (multi-hop, CLMM, venues complexes).
+4. **Token-2022 / Extensions** : Traiter Token-2022 et ses extensions (transfer fees, interest-bearing, etc.) comme cas standard — impacts possibles sur montants reçus et compatibilité ATA.
+5. **Adapters par venue** : Pour chaque nouveau DEX intégré, créer un adapter documenté avec : accounts map, instruction builder, tests de simulation.
+6. **Sécurité** : Consulter les ressources de sécurité (Sealevel Attacks, Solana lints) avant tout déploiement mainnet.
 
 ---
 
-*Dernière mise à jour: 10 Décembre 2025*
+## Références Complètes (Swap Router Solana)
+
+### A) Solana Core — Transactions / RPC / Tokens
+
+| Source | Description |
+|--------|-------------|
+| [CPI](https://solana.com/docs/core/cpi) | Cross-Program Invocation : comment invoquer un programme depuis un autre |
+| [PDA](https://solana.com/docs/core/pda) | Program Derived Addresses : dérivation d'adresses déterministes |
+| [Accounts](https://solana.com/docs/core/accounts) | Modèle de comptes Solana (ownership, rent, data) |
+| [Fees & Priority Fees](https://solana.com/docs/core/fees) | Calcul des frais, priority fees, compute budget |
+| [simulateTransaction (RPC)](https://solana.com/docs/rpc/http/simulatetransaction) | Simuler une transaction avant envoi |
+| [RPC Docs (hub)](https://solana.com/docs/rpc) | Documentation complète de l'API RPC Solana |
+| [Tokens (overview)](https://solana.com/docs/tokens) | Vue d'ensemble des tokens SPL |
+| [SPL Token Basics](https://solana.com/docs/tokens/basics) | Fondamentaux SPL Token (mint, ATA, transfer) |
+| [Address Lookup Tables](https://solana.com/developers/guides/advanced/lookup-tables) | Réduire la taille des transactions avec LUTs |
+| [Versioned Transactions](https://solana.com/developers/guides/advanced/versions) | Transactions v0 et legacy |
+| [Optimize Compute (Cookbook)](https://solana.com/developers/cookbook/transactions/optimize-compute) | Bonnes pratiques pour optimiser le compute |
+| [ComputeBudgetInstruction (Rust API)](https://docs.rs/solana-compute-budget-interface/latest/solana_compute_budget_interface/enum.ComputeBudgetInstruction.html) | API Rust pour set compute limit/price |
+| [@solana/spl-token (TS)](https://solana-labs.github.io/solana-program-library/token/js/index.html) | SDK TypeScript SPL Token |
+| [Token-2022 (repo)](https://github.com/solana-program/token-2022) | Programme Token-2022 avec extensions |
+
+### B) Anchor Framework
+
+| Source | Description |
+|--------|-------------|
+| [CPI (Anchor)](https://www.anchor-lang.com/docs/basics/cpi) | Invocations cross-program avec Anchor |
+| [SPL Tokens (Anchor)](https://www.anchor-lang.com/docs/tokens/basics) | Gestion des tokens SPL dans Anchor |
+| [Errors (Anchor)](https://www.anchor-lang.com/docs/features/errors) | Gestion des erreurs custom Anchor |
+
+### C) Jupiter — Pattern Agrégation (référence industrielle)
+
+| Source | Description |
+|--------|-------------|
+| [Swap API v6](https://hub.jup.ag/docs/apis/swap-api) | API de swap Jupiter (quote + swap) |
+| [API Reference](https://dev.jup.ag/api-reference) | Référence complète API Jupiter |
+| [Client Rust](https://github.com/jup-ag/jupiter-swap-api-client) | Client Rust officiel Jupiter |
+| [Self-hosted (optionnel)](https://hub.jup.ag/docs/apis/self-hosted) | Héberger son propre nœud Jupiter |
+
+### D) Venues DEX — Instructions Sources
+
+| Venue | Source | Description |
+|-------|--------|-------------|
+| **Orca Whirlpools** | [Hub](https://dev.orca.so/) | Documentation développeur Orca |
+| | [Repo](https://github.com/orca-so/whirlpools) | Code source Whirlpools |
+| | [swap.rs](https://github.com/orca-so/whirlpools/blob/main/programs/whirlpool/src/instructions/swap.rs) | Instruction swap (source vérité) |
+| | [CPI Sample](https://github.com/orca-so/whirlpool-cpi-sample) | Exemple d'intégration CPI |
+| **Raydium AMM** | [instruction.rs](https://github.com/raydium-io/raydium-amm/blob/master/program/src/instruction.rs) | Instructions AMM v4 (source vérité) |
+| **Raydium CLMM** | [swap_router.rs](https://github.com/raydium-io/raydium-amm-v3/blob/master/programs/amm/src/instructions/swap_router_base_in.rs) | Instruction swap router CLMM |
+| | [Trade API](https://docs.raydium.io/raydium/traders/trade-api) | API REST Raydium |
+| **Meteora DLMM** | [SDK Docs](https://docs.meteora.ag/developer-guide/guides/dlmm/typescript-sdk/sdk-functions) | Fonctions SDK (swapQuote, etc.) |
+| | [SDK Repo](https://github.com/MeteoraAg/dlmm-sdk) | Code source SDK DLMM |
+| **Phoenix** | [Program v1](https://github.com/Ellipsis-Labs/phoenix-v1) | Code source programme Phoenix |
+| | [SDK](https://github.com/Ellipsis-Labs/phoenix-sdk) | SDK TypeScript/Rust Phoenix |
+| **OpenBook v2** | [Repo](https://github.com/openbook-dex/openbook-v2) | Orderbook DEX (successeur Serum) |
+
+### E) Oracles
+
+| Source | Description |
+|--------|-------------|
+| [Pyth Pull Integration](https://docs.pyth.network/price-feeds/use-real-time-data/pull-integration/solana) | Intégration Pyth pull model |
+| [Pyth Push Feeds](https://docs.pyth.network/price-feeds/core/push-feeds/solana) | Push feeds sponsorisés (PriceUpdateV2) |
+| [Pyth Troubleshoot SVM](https://docs.pyth.network/price-feeds/troubleshoot/svm) | Debug erreurs Pyth sur Solana |
+| [Pyth Hermes](https://docs.pyth.network/price-feeds/how-pyth-works/hermes) | Architecture Hermes (off-chain) |
+| [Switchboard Aggregator](https://docs.switchboard.xyz/product-documentation/aggregator/how-to-use-the-switchboard-oracle-aggregator) | Utilisation aggregators Switchboard |
+| [Switchboard SDK](https://github.com/switchboard-xyz/solana-sdk) | SDK Solana Switchboard |
+
+### F) Exécution Compétitive / MEV
+
+| Source | Description |
+|--------|-------------|
+| [Jito Docs](https://docs.jito.wtf/) | Bundles, tips, MEV protection |
+
+### G) Sécurité (OBLIGATOIRE)
+
+| Source | Description |
+|--------|-------------|
+| [Sealevel Attacks](https://github.com/coral-xyz/sealevel-attacks) | Catalogue des vulnérabilités Solana (exemples) |
+| [Solana Program Security Course](https://solana.com/fr/developers/courses/program-security) | Cours officiel sécurité programmes |
+| [Solana Lints (Crytic)](https://github.com/crytic/solana-lints) | Linters sécurité Trail of Bits |
+| [Helius Security Guide](https://www.helius.dev/blog/a-hitchhikers-guide-to-solana-program-security) | Guide pratique sécurité Helius |
+| [Solana Open Security Standard (SOSS)](https://canardmandarin.github.io/solana-open-security-standard/) | Standard de sécurité communautaire |
+
+### H) Tooling / Infra
+
+| Source | Description |
+|--------|-------------|
+| [Next.js Headers](https://nextjs.org/docs/app/api-reference/config/next-config-js/headers) | Configuration CORS Next.js |
+| [MDN CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS) | Référence CORS |
+| [Copilot Instructions](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions) | Configuration instructions repo |
+
+### I) Références Internes SwapBack
+
+| Fichier | Description |
+|---------|-------------|
+| `docs/agent/REFERENCE_LIBRARY.md` | Bibliothèque de référence oracles/endpoints |
+| `docs/agent/ROUTER_SWAP_PLAYBOOK.md` | Playbook procédure RouterSwap |
+| `docs/agent/WORKFLOW_CHECKLIST.md` | Checklist workflow agent |
+
+---
+
+*Last reviewed: 2025-12-16*

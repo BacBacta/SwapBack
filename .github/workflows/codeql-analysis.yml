@@ -56,21 +56,13 @@ jobs:
       with:
         toolchain: stable
 
-    - name: Install Solana CLI (for Rust)
+    - name: Check Rust workspace (for Rust)
       if: matrix.language == 'rust'
       run: |
-        sh -c "$(curl -sSfL https://release.solana.com/v1.18.22/install)"
-        echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
-
-    - name: Install Anchor CLI (for Rust)
-      if: matrix.language == 'rust'
-      run: |
-        cargo install --git https://github.com/coral-xyz/anchor --tag v0.30.1 anchor-cli --locked --force
-
-    - name: Build Rust programs with Anchor
-      if: matrix.language == 'rust'
-      run: |
-        anchor build
+        set -euo pipefail
+        cargo --version
+        # Host build only (CodeQL extraction). No Solana/Anchor required.
+        cargo check --workspace --all-targets
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3

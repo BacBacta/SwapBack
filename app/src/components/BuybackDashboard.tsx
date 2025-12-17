@@ -153,6 +153,7 @@ export default function BuybackDashboard() {
       const amount = parseFloat(depositAmount) * 1e6; // USDC decimals
       
       // Get user's USDC token account
+      const USDC_MINT = getUsdcMint();
       const userUsdcAccount = await getAssociatedTokenAddress(
         USDC_MINT,
         publicKey

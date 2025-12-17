@@ -341,7 +341,7 @@ describe('TransactionSimulator', () => {
       );
       
       expect(result.canSwap).toBe(false);
-      expect(result.issues).toContain(expect.stringContaining('Solde SOL insuffisant'));
+      expect(result.issues.join(' ')).toContain('Solde SOL insuffisant');
     });
   });
 });

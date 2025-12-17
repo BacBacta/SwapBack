@@ -992,24 +992,6 @@ async function fetchMeteoraQuote(
     // Meteora DLMM API requiert pair address - pas de quote directe par mints
     // Utiliser directement l'estimation par prix oracle
     
-    if (response.ok) {
-      const data = await response.json();
-      const latencyMs = Date.now() - startTime;
-      
-      if (data.outAmount) {
-        return {
-          venue: "METEORA_DLMM",
-          venueProgramId: DEX_PROGRAMS.METEORA_DLMM,
-          inputAmount: amountIn,
-          outputAmount: parseInt(data.outAmount),
-          priceImpactBps: Math.floor(parseFloat(data.priceImpact || "0") * 10000),
-          accounts: [],
-          estimatedNpiBps: 15, // DLMM peut générer plus de NPI
-          latencyMs,
-        };
-      }
-    }
-    
     // Fallback: utiliser les prix en temps réel pour estimer
     const [inputPrice, outputPrice] = await Promise.all([
       getTokenPrice(inputMint),
@@ -2047,12 +2029,20 @@ export class NativeRouterService {
               wallet: { publicKey: userPublicKey } as any 
             });
             
-            const updateTx = await receiver.getPostUpdateTx(priceUpdates.binary.data);
+            // NOTE: PythSolanaReceiver API changed in v0.12+. Use newTransactionBuilder() + addPostPriceUpdates().
+            // For now, rely on on-chain Pyth Push feeds (sponsored updates) and skip Hermes pull.
+            const builder = receiver.newTransactionBuilder({});
+            await builder.addPostPriceUpdates([priceUpdates.binary.data[0]]);
+            const txs = await builder.buildVersionedTransactions({
+              computeUnitPriceMicroLamports: 100_000,
+              tightComputeBudget: true,
+            });
             
-            // Vérification que les instructions sont valides
-            if (updateTx?.instructions && Array.isArray(updateTx.instructions) && updateTx.instructions.length > 0) {
-              logger.debug("NativeRouter", "Hermes update instructions ready", { count: updateTx.instructions.length });
-              instructions.push(...updateTx.instructions);
+            // Extract instructions from first tx (if any)
+            if (txs.length > 0 && txs[0].tx) {
+              const vTx = txs[0].tx;
+              // VersionedTransaction doesn't expose instructions directly; skip for now.
+              logger.debug("NativeRouter", "Hermes update tx built (using on-chain Pyth Push instead)", { txCount: txs.length });
             }
           } catch (receiverErr) {
             // L'erreur "_bn undefined" vient probablement d'ici

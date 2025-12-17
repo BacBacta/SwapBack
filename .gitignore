@@ -66,6 +66,11 @@ Thumbs.db
 !tsconfig.json
 !Anchor.toml
 !app/public/idl/*.json
+!.vscode/tasks.json
+!app/.vscode/tasks.json
+# Explicit safety: upgrade authority keypairs
+upgrade-authority.json
+**/upgrade-authority.json
 Cargo.lock
 .vercel
 

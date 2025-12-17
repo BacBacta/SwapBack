@@ -38,6 +38,13 @@ const DEFAULT_PYTH_HERMES_ENDPOINT =
 
 type OraclePriceServiceOptions = {
   maxOracleDivergencePercent?: number;
+  /**
+   * If true, allow Hermes (pull oracle) as a fallback when on-chain Pyth is unavailable.
+   * Keep this opt-in to avoid non-deterministic network calls in unit tests.
+   */
+  enableHermesFallback?: boolean;
+  /** Override Hermes endpoint (only used if enableHermesFallback=true). */
+  hermesEndpoint?: string;
 };
 
 type OracleConsensusResult = {
@@ -62,7 +69,8 @@ export class OraclePriceService {
   private cacheExpiryMs: number;
   private readonly maxOracleDivergencePercent: number;
   private hermesClient?: HermesClient;
-  private readonly hermesEndpoint: string;
+  private readonly hermesEndpoint?: string;
+  private readonly enableHermesFallback: boolean;
 
   // Price feed addresses (examples - replace with actual addresses)
   private readonly PRICE_FEEDS = {
@@ -84,10 +92,24 @@ export class OraclePriceService {
     this.maxOracleDivergencePercent =
       options.maxOracleDivergencePercent ??
       DEFAULT_MAX_ORACLE_DIVERGENCE_PERCENT;
-    this.hermesEndpoint = DEFAULT_PYTH_HERMES_ENDPOINT;
+
+    // Hermes fallback is opt-in to keep unit tests deterministic.
+    // If the app wants Hermes, it should explicitly enable it.
+    this.enableHermesFallback =
+      options.enableHermesFallback ??
+      (process.env.SWAPBACK_ENABLE_PYTH_HERMES === "1");
+
+    this.hermesEndpoint =
+      options.hermesEndpoint ??
+      process.env.PYTH_HERMES_ENDPOINT ??
+      process.env.NEXT_PUBLIC_PYTH_PRICE_SERVICE_URL ??
+      undefined;
   }
 
   private getHermesClient(): HermesClient {
+    if (!this.hermesEndpoint) {
+      throw new Error("Hermes endpoint not configured");
+    }
     if (!this.hermesClient) {
       this.hermesClient = new HermesClient(this.hermesEndpoint, {
         timeout: this.cacheExpiryMs,
@@ -207,6 +229,10 @@ export class OraclePriceService {
     const accountPrice = await this.fetchPythPriceFromAccount(mint);
     if (accountPrice) {
       return accountPrice;
+    }
+
+    if (!this.enableHermesFallback) {
+      return null;
     }
 
     return this.fetchPythPriceFromHermes(mint);

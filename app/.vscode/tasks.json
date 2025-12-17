@@ -1,0 +1,44 @@
+{
+  "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "swapbackRpcUrl",
+      "type": "promptString",
+      "description": "SOLANA_RPC_URL (RPC HTTP)",
+      "default": "https://api.mainnet-beta.solana.com"
+    },
+    {
+      "id": "swapbackKeypairPath",
+      "type": "promptString",
+      "description": "Chemin du keypair JSON (SOLANA_KEYPAIR)",
+      "default": "~/.config/solana/id.json"
+    },
+    {
+      "id": "heliusApiKey",
+      "type": "promptString",
+      "description": "Helius API key (non stockée) — utilisé pour https://mainnet.helius-rpc.com/?api-key=...",
+      "default": ""
+    }
+  ],
+  "tasks": [
+    {
+      "label": "SwapBack: Simulate Native Swap (Meteora/Phoenix/Lifinity)",
+      "detail": "Simule RouterSwap sur mainnet (simulateTransaction) pour Meteora/Phoenix/Lifinity",
+      "type": "shell",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "command": "zsh",
+      "args": [
+        "-ic",
+        "cd /workspaces/SwapBack && export SOLANA_RPC_URL=\"${input:swapbackRpcUrl}\" SWAPBACK_AUTO_CREATE_KEYPAIR=1 && KP=\"${input:swapbackKeypairPath}\" && if [[ -n \"$KP\" && -f \"$KP\" ]]; then export SOLANA_KEYPAIR=\"$KP\"; else unset SOLANA_KEYPAIR; fi && if [ ! -d node_modules ]; then print -r -- \"[task] node_modules manquant: npm ci\"; npm ci; fi && noglob ./node_modules/.bin/tsx ./scripts/simulate-native-swap.ts --venues=METEORA_DLMM,PHOENIX,LIFINITY"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    }
+  ]
+}

@@ -43,7 +43,9 @@ const DEFAULT_PHOENIX_MARKETS: PhoenixMarketConfig[] = [
   },
   {
     symbol: 'SOL/USDT',
-    marketAddress: new PublicKey('5Dy6cZqy7ZTPJZ7pfPzKMFMUKKVpPxaM6dVB8FRkD2mT'),
+    // Source: Phoenix SDK master_config.json (mainnet-beta)
+    // https://raw.githubusercontent.com/Ellipsis-Labs/phoenix-sdk/master/master_config.json
+    marketAddress: new PublicKey('3J9LfemPBLowAJgpG3YdYPB9n6pUk7HEjwgS6Y5ToSFg'),
     baseMint: new PublicKey(SOL_MINT),
     quoteMint: new PublicKey(USDT_MINT),
     baseDecimals: 9,

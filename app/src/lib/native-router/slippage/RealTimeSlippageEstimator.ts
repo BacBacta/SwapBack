@@ -356,9 +356,16 @@ export class RealTimeSlippageEstimator {
     withinTolerance: boolean;
     message: string;
   } {
-    const actualSlippageBps = Math.floor(
-      ((expectedOutput - actualOutput) / expectedOutput) * 10000
-    );
+    if (!Number.isFinite(expectedOutput) || expectedOutput <= 0) {
+      return {
+        success: false,
+        actualSlippageBps: 0,
+        withinTolerance: false,
+        message: "Invalid expected output",
+      };
+    }
+
+    const actualSlippageBps = Math.floor(((expectedOutput - actualOutput) / expectedOutput) * 10000);
     
     const withinTolerance = actualSlippageBps <= usedSlippageBps;
     
@@ -372,7 +379,7 @@ export class RealTimeSlippageEstimator {
     }
     
     return {
-      success: actualSlippageBps >= 0, // Pas négatif = pas d'erreur
+      success: withinTolerance,
       actualSlippageBps: Math.max(actualSlippageBps, 0),
       withinTolerance,
       message,

@@ -128,7 +128,7 @@ export function createLogger(module: string): Logger {
 }
 
 // Export for testing or custom configurations
-export { Logger, LoggerConfig, LogLevel };
+export type { Logger, LoggerConfig, LogLevel };
 
 // Default export
 export default logger;

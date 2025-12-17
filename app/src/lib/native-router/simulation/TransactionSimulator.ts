@@ -16,7 +16,6 @@ import {
   Connection,
   VersionedTransaction,
   PublicKey,
-  TransactionMessage,
   SimulatedTransactionResponse,
 } from "@solana/web3.js";
 
@@ -137,21 +136,21 @@ export class TransactionSimulator {
     try {
       // Vérifier le cache
       if (!options.skipCache) {
-        const cacheKey = this.getCacheKey(transaction);
-        const cached = this.simulationCache.get(cacheKey);
-        if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
-          return { ...cached.result, timing: { ...cached.result.timing, simulationMs: 0 } };
+        try {
+          const cacheKey = this.getCacheKey(transaction);
+          const cached = this.simulationCache.get(cacheKey);
+          if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
+            return { ...cached.result, timing: { ...cached.result.timing, simulationMs: 0 } };
+          }
+        } catch {
+          // Cache key generation should never fail the simulation.
         }
       }
       
-      // Remplacer le blockhash si nécessaire (pour éviter erreur blockhash expiré)
-      let txToSimulate = transaction;
-      if (options.replaceRecentBlockhash) {
-        const { blockhash } = await this.connection.getLatestBlockhash();
-        const message = TransactionMessage.decompile(transaction.message);
-        message.recentBlockhash = blockhash;
-        txToSimulate = new VersionedTransaction(message.compileToV0Message());
-      }
+      // NOTE: rely on the RPC's `replaceRecentBlockhash` option for simulation.
+      // Rebuilding the message client-side can fail for some VersionedTransaction shapes
+      // and is unnecessary for simulation.
+      const txToSimulate = transaction;
       
       // Simuler
       const simulationResponse = await this.connection.simulateTransaction(txToSimulate, {
@@ -167,8 +166,12 @@ export class TransactionSimulator {
       
       // Mettre en cache si succès
       if (result.success && !options.skipCache) {
-        const cacheKey = this.getCacheKey(transaction);
-        this.simulationCache.set(cacheKey, { result, timestamp: Date.now() });
+        try {
+          const cacheKey = this.getCacheKey(transaction);
+          this.simulationCache.set(cacheKey, { result, timestamp: Date.now() });
+        } catch {
+          // ignore caching failures
+        }
       }
       
       return result;
@@ -354,7 +357,9 @@ export class TransactionSimulator {
   private parseError(err: unknown, logs: string[]): SimulationError {
     // Extraire le code d'erreur custom
     const errStr = JSON.stringify(err);
-    const customErrorMatch = errStr.match(/Custom\((\d+)\)/);
+    const customErrorMatch =
+      errStr.match(/Custom\((\d+)\)/) ??
+      errStr.match(/"Custom"\s*:\s*(\d+)/);
     
     if (customErrorMatch) {
       const errorCode = parseInt(customErrorMatch[1], 10);
@@ -370,7 +375,9 @@ export class TransactionSimulator {
     }
     
     // Extraire l'index d'instruction
-    const instructionMatch = errStr.match(/InstructionError\[(\d+)/);
+    const instructionMatch =
+      errStr.match(/InstructionError\[(\d+)/) ??
+      errStr.match(/"InstructionError"\s*:\s*\[(\d+)/);
     const instructionIndex = instructionMatch ? parseInt(instructionMatch[1], 10) : undefined;
     
     // Chercher une erreur dans les logs
@@ -429,10 +436,22 @@ export class TransactionSimulator {
    * Génère une clé de cache pour une transaction
    */
   private getCacheKey(transaction: VersionedTransaction): string {
-    // Utiliser les premiers bytes de la transaction sérialisée
-    const serialized = transaction.serialize();
-    const hash = serialized.slice(0, 32);
-    return Buffer.from(hash).toString('hex');
+    // IMPORTANT: do not call `transaction.serialize()` here.
+    // Unsigned transactions can throw on serialize(), which would break simulation in unit tests.
+    // The message bytes are stable and sufficient for a short-lived cache key.
+    try {
+      const serializeFn = (transaction as any).message?.serialize;
+      if (typeof serializeFn === "function") {
+        const messageBytes = serializeFn.call((transaction as any).message) as Uint8Array;
+        const bytes = Buffer.from(messageBytes);
+        return bytes.slice(0, 32).toString("hex");
+      }
+    } catch {
+      // ignore
+    }
+
+    // Last resort: avoid throwing.
+    return Buffer.from(String(Date.now())).toString("hex");
   }
   
   /**

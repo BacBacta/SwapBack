@@ -19,11 +19,13 @@ import { logger } from "@/lib/logger";
 import { DEX_PROGRAMS } from "../headless/router";
 import { toPublicKey } from "../utils/publicKeyUtils";
 import type { RaydiumPoolConfig } from "@/sdk/config/raydium-pools";
+import { getPhoenixMarketConfig, PHOENIX_PROGRAM_ID as PHOENIX_PROGRAM } from "@/sdk/config/phoenix-markets";
+import bs58 from "bs58";
 
 if (typeof globalThis !== "undefined" && typeof (globalThis as any).Buffer === "undefined") {
   (globalThis as any).Buffer = Buffer;
 }
-import { getRaydiumPool } from "@/sdk/config/raydium-pools";
+import { getAllRaydiumPools, getRaydiumPool } from "@/sdk/config/raydium-pools";
 
 const RESOLVER_CACHE_TTL_MS = 60_000; // short-lived cache to absorb bursty API errors
 const MAX_FETCH_ATTEMPTS = 2;
@@ -196,6 +198,18 @@ export async function getLifinityAccounts(
     }
 
     const amm = new PublicKey(pool.amm);
+    // Sanity check: ensure the pool account exists on-chain.
+    // This also makes unit tests deterministic (mock connections returning null should yield no accounts).
+    const ammInfo = await connection.getAccountInfo(amm);
+    if (!ammInfo) {
+      logger.warn("LifinityResolver", "Lifinity pool account missing", {
+        amm: amm.toBase58(),
+        inputMint: safeInputMint.toBase58(),
+        outputMint: safeOutputMint.toBase58(),
+      });
+      return null;
+    }
+
     const authority = PublicKey.findProgramAddressSync([amm.toBuffer()], LIFINITY_PROGRAM)[0];
 
     const userSourceAccount = await getAssociatedTokenAddress(safeInputMint, safeUser);
@@ -638,6 +652,303 @@ export async function getOrcaWhirlpoolAccounts(
 
 const METEORA_DLMM_PROGRAM = new PublicKey("LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo");
 
+const METEORA_DLMM_API_TIMEOUT_MS = 15_000;
+
+const WSOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
+const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+const USDT_MINT = new PublicKey("Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB");
+
+// Paire SOL/USDC connue (mainnet) utilisée uniquement pour déduire les offsets memcmp de l'account lb_pair
+// sans dépendre de l'API Meteora (qui peut timeout).
+const METEORA_KNOWN_SOL_USDC_LBPAIR = new PublicKey("5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6");
+
+async function loadMeteoraDLMMClass(): Promise<any> {
+  // @meteora-ag/dlmm exports: default = DLMM class
+  // IMPORTANT: keep this file browser-bundle-friendly (Next.js). Avoid Node-only `module`/CJS fallbacks.
+  const mod: any = await import("@meteora-ag/dlmm");
+  return mod?.DLMM ?? mod?.default ?? mod;
+}
+
+async function loadMeteoraDlmmModule(): Promise<any> {
+  // IMPORTANT: keep this file browser-bundle-friendly (Next.js). Avoid Node-only `module`/CJS fallbacks.
+  return import("@meteora-ag/dlmm");
+}
+
+let meteoraLbPairMemcmpCache:
+  | { tokenXOffset: number; tokenYOffset: number; lbPairDiscriminatorB58: string }
+  | null = null;
+
+function findSubarrayOffsets(haystack: Buffer, needle: Buffer): number[] {
+  const hits: number[] = [];
+  if (needle.length === 0 || haystack.length < needle.length) return hits;
+  for (let i = 0; i <= haystack.length - needle.length; i++) {
+    let match = true;
+    for (let j = 0; j < needle.length; j++) {
+      if (haystack[i + j] !== needle[j]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) hits.push(i);
+  }
+  return hits;
+}
+
+async function findDLMMPairViaApi(tokenX: PublicKey, tokenY: PublicKey): Promise<PublicKey | null> {
+  const tokenXStr = tokenX.toBase58();
+  const tokenYStr = tokenY.toBase58();
+  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const response = await fetch(
+        `https://dlmm-api.meteora.ag/pair/all_by_groups?include_pool_token=true`,
+        { signal: AbortSignal.timeout(METEORA_DLMM_API_TIMEOUT_MS) }
+      );
+
+      if (!response.ok) {
+        continue;
+      }
+
+      // eslint-disable-next-line no-await-in-loop
+      const pairs = await response.json();
+      for (const group of pairs.groups || []) {
+        for (const pair of group.pairs || []) {
+          if (
+            (pair.mint_x === tokenXStr && pair.mint_y === tokenYStr) ||
+            (pair.mint_x === tokenYStr && pair.mint_y === tokenXStr)
+          ) {
+            return new PublicKey(pair.address);
+          }
+        }
+      }
+      return null;
+    } catch {
+      // try again
+    }
+  }
+
+  return null;
+}
+
+async function getMeteoraLbPairMemcmpLayout(connection: Connection): Promise<
+  { tokenXOffset: number; tokenYOffset: number; lbPairDiscriminatorB58: string } | null
+> {
+  if (meteoraLbPairMemcmpCache) return meteoraLbPairMemcmpCache;
+
+  try {
+    const mod: any = await loadMeteoraDlmmModule();
+    const idl: any = mod?.IDL;
+    const lbPairAcc = idl?.accounts?.find((a: any) => (a?.name ?? "").toLowerCase() === "lbpair");
+    const discArr: number[] | undefined = lbPairAcc?.discriminator;
+    if (!Array.isArray(discArr) || discArr.length !== 8) {
+      throw new Error("Missing/invalid lbPair discriminator in Meteora IDL");
+    }
+    const lbPairDiscriminatorB58 = bs58.encode(Buffer.from(discArr));
+
+    // We deduce token mint offsets by inspecting a known-good LB pair account data.
+    // Prefer a known SOL/USDC lb_pair pubkey (no API dependency), then fall back to API discovery.
+    let knownPair: PublicKey | null = METEORA_KNOWN_SOL_USDC_LBPAIR;
+    let info = await connection.getAccountInfo(knownPair);
+    if (!info?.data) {
+      knownPair = await findDLMMPairViaApi(WSOL_MINT, USDC_MINT);
+      if (!knownPair) {
+        logger.warn("MeteoraResolver", "Unable to locate a WSOL/USDC pair for layout deduction", {
+          wsol: WSOL_MINT.toBase58(),
+          usdc: USDC_MINT.toBase58(),
+        });
+        return null;
+      }
+      info = await connection.getAccountInfo(knownPair);
+    }
+
+    const data = info?.data;
+    if (!data) {
+      logger.warn("MeteoraResolver", "Known WSOL/USDC lb_pair account missing", {
+        lbPair: knownPair.toBase58(),
+      });
+      return null;
+    }
+
+    const wsolBytes = WSOL_MINT.toBuffer();
+    const usdcBytes = USDC_MINT.toBuffer();
+
+    // token_x_mint and token_y_mint are contiguous pubkeys in the LB pair struct.
+    const wsolHits = findSubarrayOffsets(data, wsolBytes);
+    const usdcHits = findSubarrayOffsets(data, usdcBytes);
+
+    let tokenXOffset: number | null = null;
+    for (const i of wsolHits) {
+      if (i + 64 <= data.length && data.subarray(i + 32, i + 64).equals(usdcBytes)) {
+        tokenXOffset = i;
+        break;
+      }
+    }
+    if (tokenXOffset === null) {
+      for (const i of usdcHits) {
+        if (i + 64 <= data.length && data.subarray(i + 32, i + 64).equals(wsolBytes)) {
+          tokenXOffset = i;
+          break;
+        }
+      }
+    }
+
+    if (tokenXOffset === null) {
+      logger.warn("MeteoraResolver", "Failed to deduce Meteora lb_pair mint offsets", {
+        lbPair: knownPair.toBase58(),
+        wsolHits: wsolHits.slice(0, 5),
+        usdcHits: usdcHits.slice(0, 5),
+      });
+      return null;
+    }
+
+    meteoraLbPairMemcmpCache = {
+      tokenXOffset,
+      tokenYOffset: tokenXOffset + 32,
+      lbPairDiscriminatorB58,
+    };
+    return meteoraLbPairMemcmpCache;
+  } catch (error) {
+    logger.warn("MeteoraResolver", "Failed to prepare Meteora lb_pair memcmp layout", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+async function findMeteoraLbPairsByMintsOnChain(
+  connection: Connection,
+  mintA: PublicKey,
+  mintB: PublicKey
+): Promise<PublicKey[]> {
+  const layout = await getMeteoraLbPairMemcmpLayout(connection);
+  if (!layout) return [];
+
+  const filtersBase = [
+    {
+      memcmp: {
+        offset: 0,
+        bytes: layout.lbPairDiscriminatorB58,
+      },
+    },
+  ];
+
+  const mintA58 = mintA.toBase58();
+  const mintB58 = mintB.toBase58();
+
+  const queries = [
+    [
+      ...filtersBase,
+      { memcmp: { offset: layout.tokenXOffset, bytes: mintA58 } },
+      { memcmp: { offset: layout.tokenYOffset, bytes: mintB58 } },
+    ],
+    [
+      ...filtersBase,
+      { memcmp: { offset: layout.tokenXOffset, bytes: mintB58 } },
+      { memcmp: { offset: layout.tokenYOffset, bytes: mintA58 } },
+    ],
+  ];
+
+  const pubkeys: PublicKey[] = [];
+  for (const filters of queries) {
+    let lastErr: string | undefined;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const accounts = await connection.getProgramAccounts(METEORA_DLMM_PROGRAM, {
+          filters: filters as any,
+          dataSlice: { offset: 0, length: 0 },
+        });
+        for (const a of accounts) pubkeys.push(a.pubkey);
+        break;
+      } catch (e) {
+        lastErr = e instanceof Error ? e.message : String(e);
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((r) => setTimeout(r, 400 * attempt));
+      }
+    }
+
+    if (lastErr) {
+      logger.warn("MeteoraResolver", "getProgramAccounts memcmp query failed", {
+        mintA: mintA58,
+        mintB: mintB58,
+        error: lastErr,
+      });
+    }
+  }
+
+  // Deduplicate
+  const seen = new Set<string>();
+  return pubkeys.filter((pk) => {
+    const k = pk.toBase58();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+async function findDLMMPairViaOnChainMints(
+  connection: Connection,
+  tokenIn: PublicKey,
+  tokenOut: PublicKey
+): Promise<PublicKey | null> {
+  const DLMM = await loadMeteoraDLMMClass();
+  if (!DLMM?.create) return null;
+
+  const candidates = await findMeteoraLbPairsByMintsOnChain(connection, tokenIn, tokenOut);
+  if (candidates.length === 0) return null;
+
+  // Filter candidates to those where the bitmap extension PDA exists.
+  const bitmapPdas = candidates.map((pair) =>
+    PublicKey.findProgramAddressSync([Buffer.from("bitmap"), pair.toBuffer()], METEORA_DLMM_PROGRAM)[0]
+  );
+
+  const bitmapInfos: Array<ReturnType<typeof connection.getAccountInfo> extends Promise<infer T> ? T : any> = [];
+  for (let i = 0; i < bitmapPdas.length; i += 100) {
+    const slice = bitmapPdas.slice(i, i + 100);
+    // eslint-disable-next-line no-await-in-loop
+    const infos = await connection.getMultipleAccountsInfo(slice);
+    bitmapInfos.push(...infos);
+  }
+
+  const candidatesWithBitmap = candidates.filter((_, i) => Boolean(bitmapInfos[i]));
+  const shortList = (candidatesWithBitmap.length > 0 ? candidatesWithBitmap : candidates).slice(0, 24);
+
+  for (const candidate of shortList) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const dlmm = await DLMM.create(connection, candidate);
+      const tokenXMint: PublicKey = dlmm.tokenX.publicKey;
+      const tokenYMint: PublicKey = dlmm.tokenY.publicKey;
+
+      const swapForY = tokenXMint.equals(tokenIn);
+      if (!swapForY && !tokenYMint.equals(tokenIn)) {
+        continue;
+      }
+
+      // eslint-disable-next-line no-await-in-loop
+      const binArrayAccounts: Array<{ publicKey: PublicKey }> = await dlmm.getBinArrayForSwap(swapForY, 5);
+      if (binArrayAccounts.length === 0) continue;
+
+      logger.warn("MeteoraResolver", "Resolved DLMM pair via on-chain memcmp + validation", {
+        inputMint: tokenIn.toBase58(),
+        outputMint: tokenOut.toBase58(),
+        pair: candidate.toBase58(),
+        candidateCount: candidates.length,
+      });
+      return candidate;
+    } catch {
+      // try next
+    }
+  }
+
+  logger.warn("MeteoraResolver", "On-chain memcmp candidates found but none validated", {
+    inputMint: tokenIn.toBase58(),
+    outputMint: tokenOut.toBase58(),
+    candidateCount: candidates.length,
+  });
+  return null;
+}
+
 /**
  * Trouve la paire DLMM pour deux tokens
  */
@@ -698,8 +1009,7 @@ async function findDLMMPair(
           inputMint: tokenXStr,
           outputMint: tokenYStr,
         });
-        meteoraPairCache.set(cacheKey, { timestamp: now, pair: null });
-        return null;
+        break;
       } catch (error) {
         lastError = error instanceof Error ? error.message : String(error);
         logger.error("MeteoraResolver", "Failed to resolve DLMM pair", {
@@ -710,6 +1020,60 @@ async function findDLMMPair(
         });
       }
     }
+
+    // Fallback on-chain (no API): ask DLMM SDK to find an existing pair.
+    try {
+      const DLMM = await loadMeteoraDLMMClass();
+      if (!DLMM?.getCustomizablePermissionlessLbPairIfExists) {
+        throw new Error("DLMM.getCustomizablePermissionlessLbPairIfExists not available");
+      }
+
+      // Try both mint orderings (SDK may canonicalize internally, but keep it safe).
+      const direct = await DLMM.getCustomizablePermissionlessLbPairIfExists(connection, tokenX, tokenY);
+      const reversed = direct
+        ? null
+        : await DLMM.getCustomizablePermissionlessLbPairIfExists(connection, tokenY, tokenX);
+
+      const resolved = direct ?? reversed;
+      if (resolved) {
+        logger.warn("MeteoraResolver", "Resolved DLMM pair via on-chain SDK fallback", {
+          inputMint: tokenXStr,
+          outputMint: tokenYStr,
+          pair: resolved.toBase58(),
+          lastError,
+        });
+        meteoraPairCache.set(cacheKey, { timestamp: now, pair: resolved });
+        return resolved;
+      }
+    } catch (error) {
+      logger.warn("MeteoraResolver", "On-chain DLMM pair lookup failed", {
+        inputMint: tokenXStr,
+        outputMint: tokenYStr,
+        error: error instanceof Error ? error.message : String(error),
+        lastError,
+      });
+    }
+
+    // Generic on-chain fallback (server-only): targeted search via getProgramAccounts+memcmp.
+    // This avoids depending on Meteora API availability for common pairs like SOL/USDC.
+    if (typeof window === "undefined") {
+      try {
+        const resolved = await findDLMMPairViaOnChainMints(connection, tokenX, tokenY);
+        if (resolved) {
+          meteoraPairCache.set(cacheKey, { timestamp: now, pair: resolved });
+          return resolved;
+        }
+      } catch (error) {
+        logger.warn("MeteoraResolver", "On-chain memcmp DLMM pair lookup failed", {
+          inputMint: tokenXStr,
+          outputMint: tokenYStr,
+          error: error instanceof Error ? error.message : String(error),
+          lastError,
+        });
+      }
+    }
+
+    // The old SOL/USDT-only scan fallback was replaced by the generic on-chain memcmp fallback above.
 
     if (cached?.pair) {
       logger.warn("MeteoraResolver", "Using stale cached DLMM pair after repeated failures", {
@@ -749,74 +1113,194 @@ export async function getMeteoraAccounts(
     const safeInputMint = toPublicKey(inputMint);
     const safeOutputMint = toPublicKey(outputMint);
     const safeUser = toPublicKey(userPublicKey);
-    
-    // Utiliser l'API pour obtenir la paire avec les vraies reserves
-    const tokenXStr = safeInputMint.toBase58();
-    const tokenYStr = safeOutputMint.toBase58();
-    
-    let pairData: { address: string; reserve_x: string; reserve_y: string; bin_step: number; mint_x: string; mint_y: string } | null = null;
-    
-    try {
-      const response = await fetch(
-        `https://dlmm-api.meteora.ag/pair/all_by_groups?include_pool_token=true`,
-        { signal: AbortSignal.timeout(5000) }
-      );
-      
-      if (response.ok) {
-        const pairs = await response.json();
-        for (const group of pairs.groups || []) {
-          for (const pair of group.pairs || []) {
-            if (
-              (pair.mint_x === tokenXStr && pair.mint_y === tokenYStr) ||
-              (pair.mint_x === tokenYStr && pair.mint_y === tokenXStr)
-            ) {
-              pairData = pair;
-              break;
-            }
-          }
-          if (pairData) break;
-        }
-      }
-    } catch {
-      console.warn("[MeteoraResolver] API fetch failed, falling back to on-chain");
-    }
-    
-    if (!pairData) {
-      console.warn("[MeteoraResolver] No DLMM pair found");
+
+    const lbPair = await findDLMMPair(connection, safeInputMint, safeOutputMint);
+    if (!lbPair) {
+      logger.warn("MeteoraResolver", "No DLMM pair found for mints", {
+        inputMint: safeInputMint.toBase58(),
+        outputMint: safeOutputMint.toBase58(),
+      });
       return null;
     }
-    
-    const lbPair = new PublicKey(pairData.address);
-    const reserveX = new PublicKey(pairData.reserve_x);
-    const reserveY = new PublicKey(pairData.reserve_y);
-    const tokenXMint = new PublicKey(pairData.mint_x);
-    const tokenYMint = new PublicKey(pairData.mint_y);
-    
-    // Récupérer les données de la paire pour le bin actif
-    const accountInfo = await connection.getAccountInfo(lbPair);
-    if (!accountInfo) return null;
-    
-    const data = accountInfo.data;
-    const binStep = data.readUInt16LE(72);
-    const activeId = data.readInt32LE(74);
-    
-    // Dériver les bin arrays autour du bin actif
-    const binArrays: PublicKey[] = [];
-    const binsPerArray = 70;
-    
-    const currentArrayIndex = Math.floor(activeId / binsPerArray);
-    for (let i = -1; i <= 1; i++) {
-      const arrayIndex = currentArrayIndex + i;
-      const [binArrayPda] = PublicKey.findProgramAddressSync(
-        [
-          Buffer.from("bin_array"),
-          lbPair.toBuffer(),
-          Buffer.from(arrayIndex.toString()),
-        ],
-        METEORA_DLMM_PROGRAM
+
+    // Préférer le SDK DLMM pour:
+    // - obtenir les vraies reserves/mints/token programs depuis on-chain,
+    // - obtenir les bin arrays exacts (dynamiques) via getBinArrayForSwap.
+    // IMPORTANT: forcer le chargement du build dist (CJS) via require, sinon tsx peut résoudre vers `source`.
+    let reserveX: PublicKey;
+    let reserveY: PublicKey;
+    let tokenXMint: PublicKey;
+    let tokenYMint: PublicKey;
+    let tokenXProgram: PublicKey;
+    let tokenYProgram: PublicKey;
+    let swapForY: boolean;
+    let binArrays: PublicKey[];
+
+    let pairData:
+      | { address: string; reserve_x: string; reserve_y: string; bin_step: number; mint_x: string; mint_y: string }
+      | null = null;
+
+    try {
+      const DLMM = await loadMeteoraDLMMClass();
+      if (!DLMM?.create) {
+        throw new Error("Meteora DLMM SDK DLMM.create not available");
+      }
+
+      const dlmm = await DLMM.create(connection, lbPair);
+      reserveX = dlmm.tokenX.reserve;
+      reserveY = dlmm.tokenY.reserve;
+      tokenXMint = dlmm.tokenX.publicKey;
+      tokenYMint = dlmm.tokenY.publicKey;
+      tokenXProgram = dlmm.tokenX.owner;
+      tokenYProgram = dlmm.tokenY.owner;
+
+      swapForY = safeInputMint.equals(tokenXMint);
+      if (!swapForY && !safeInputMint.equals(tokenYMint)) {
+        console.warn("[MeteoraResolver] Input mint does not match DLMM token X/Y", {
+          inputMint: safeInputMint.toBase58(),
+          tokenXMint: tokenXMint.toBase58(),
+          tokenYMint: tokenYMint.toBase58(),
+        });
+        return null;
+      }
+
+      const binArrayAccounts: Array<{ publicKey: PublicKey }> = await dlmm.getBinArrayForSwap(
+        swapForY,
+        5
       );
-      binArrays.push(binArrayPda);
+      binArrays = binArrayAccounts.map((a) => a.publicKey);
+      if (binArrays.length === 0) {
+        console.warn("[MeteoraResolver] DLMM.getBinArrayForSwap returned empty set", {
+          lbPair: lbPair.toBase58(),
+          swapForY,
+        });
+        return null;
+      }
+    } catch (sdkError) {
+      // On tente de récupérer les données de paire via API (réserves/mints/bin_step)
+      try {
+        const tokenXStr = safeInputMint.toBase58();
+        const tokenYStr = safeOutputMint.toBase58();
+        const response = await fetch(
+          `https://dlmm-api.meteora.ag/pair/all_by_groups?include_pool_token=true`,
+          { signal: AbortSignal.timeout(5000) }
+        );
+        if (response.ok) {
+          const pairs = await response.json();
+          for (const group of pairs.groups || []) {
+            for (const pair of group.pairs || []) {
+              if (
+                pair.address === lbPair.toBase58() ||
+                (pair.mint_x === tokenXStr && pair.mint_y === tokenYStr) ||
+                (pair.mint_x === tokenYStr && pair.mint_y === tokenXStr)
+              ) {
+                pairData = pair;
+                break;
+              }
+            }
+            if (pairData) break;
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      if (!pairData) {
+        logger.warn("MeteoraResolver", "SDK failed and API did not return pair data", {
+          lbPair: lbPair.toBase58(),
+          error: sdkError instanceof Error ? sdkError.message : String(sdkError),
+        });
+        return null;
+      }
+
+      // Fallback minimal: utiliser l'API reserves/mints et scanner des bin arrays initialisés.
+      // NOTE: on n'utilise PAS les offsets lb_pair (fragiles) pour activeId.
+      reserveX = new PublicKey(pairData.reserve_x);
+      reserveY = new PublicKey(pairData.reserve_y);
+      tokenXMint = new PublicKey(pairData.mint_x);
+      tokenYMint = new PublicKey(pairData.mint_y);
+
+      const [tokenXMintInfo, tokenYMintInfo] = await Promise.all([
+        connection.getAccountInfo(tokenXMint),
+        connection.getAccountInfo(tokenYMint),
+      ]);
+      if (!tokenXMintInfo || !tokenYMintInfo) return null;
+      tokenXProgram = tokenXMintInfo.owner;
+      tokenYProgram = tokenYMintInfo.owner;
+
+      swapForY = safeInputMint.equals(tokenXMint);
+      if (!swapForY && !safeInputMint.equals(tokenYMint)) {
+        console.warn("[MeteoraResolver] Input mint does not match DLMM token X/Y (fallback)", {
+          inputMint: safeInputMint.toBase58(),
+          tokenXMint: tokenXMint.toBase58(),
+          tokenYMint: tokenYMint.toBase58(),
+        });
+        return null;
+      }
+
+      logger.warn("MeteoraResolver", "DLMM SDK unavailable; using fallback bin_array scan", {
+        error: sdkError instanceof Error ? sdkError.message : String(sdkError),
+      });
+
+      // Scanner un petit voisinage autour de 0 (safe) pour trouver des bin arrays initialisés.
+      // Ce fallback est moins fiable que le SDK mais évite de passer des PDAs non initialisées.
+      const desiredBinArrays = 5;
+      const scanRadius = 500;
+      const binArraysFound: PublicKey[] = [];
+      const indices: number[] = [];
+      for (let i = 0; i < scanRadius && indices.length < 2000; i++) {
+        indices.push(i);
+        indices.push(-i);
+      }
+      const i64ToLe = (value: number): Buffer => {
+        const buf = Buffer.alloc(8);
+        let v = BigInt(value);
+        if (v < 0n) v = (1n << 64n) + v;
+        buf.writeBigUInt64LE(v);
+        return buf;
+      };
+      const deriveBinArrayPda = (index: number): PublicKey => {
+        const [pda] = PublicKey.findProgramAddressSync(
+          [Buffer.from("bin_array"), lbPair.toBuffer(), i64ToLe(index)],
+          METEORA_DLMM_PROGRAM
+        );
+        return pda;
+      };
+      const batchSize = 50;
+      for (let offset = 0; offset < indices.length && binArraysFound.length < desiredBinArrays; offset += batchSize) {
+        const batch = indices.slice(offset, offset + batchSize);
+        const candidates = batch.map((idx) => deriveBinArrayPda(idx));
+        const infos = await connection.getMultipleAccountsInfo(candidates);
+        for (let j = 0; j < candidates.length && binArraysFound.length < desiredBinArrays; j++) {
+          const info = infos[j];
+          if (!info) continue;
+          if (!info.owner.equals(METEORA_DLMM_PROGRAM)) continue;
+          binArraysFound.push(candidates[j]);
+        }
+      }
+
+      if (binArraysFound.length === 0) {
+        console.warn("[MeteoraResolver] No initialized bin_array accounts found (fallback)", {
+          lbPair: lbPair.toBase58(),
+        });
+        return null;
+      }
+      binArrays = binArraysFound;
     }
+
+    // Sanity: direction du swap
+    if (!swapForY && !safeInputMint.equals(tokenYMint)) {
+      console.warn("[MeteoraResolver] Input mint does not match DLMM token X/Y", {
+        inputMint: safeInputMint.toBase58(),
+        tokenXMint: tokenXMint.toBase58(),
+        tokenYMint: tokenYMint.toBase58(),
+      });
+      return null;
+    }
+
+    // binStep depuis l'API si disponible, sinon best-effort: 0.
+    // (Le feeRate est purement metadata UI; le swap n'en dépend pas.)
+    const binStep = pairData?.bin_step ?? 0;
     
     // Dériver l'oracle DLMM
     const [oracle] = PublicKey.findProgramAddressSync(
@@ -824,16 +1308,24 @@ export async function getMeteoraAccounts(
       METEORA_DLMM_PROGRAM
     );
     
-    // Calculer les ATAs de l'utilisateur
+    // Calculer les ATAs de l'utilisateur (support Token-2022 via token program owner)
     const { getAssociatedTokenAddress } = await import("@solana/spl-token");
-    const userTokenX = await getAssociatedTokenAddress(tokenXMint, safeUser);
-    const userTokenY = await getAssociatedTokenAddress(tokenYMint, safeUser);
+    const userTokenX = await getAssociatedTokenAddress(tokenXMint, safeUser, false, tokenXProgram);
+    const userTokenY = await getAssociatedTokenAddress(tokenYMint, safeUser, false, tokenYProgram);
     
-    // Bin array bitmap extension
+    // Bin array bitmap extension (doit exister si fourni)
     const [binArrayBitmapExtension] = PublicKey.findProgramAddressSync(
       [Buffer.from("bitmap"), lbPair.toBuffer()],
       METEORA_DLMM_PROGRAM
     );
+    const bitmapInfo = await connection.getAccountInfo(binArrayBitmapExtension);
+    if (!bitmapInfo) {
+      console.warn("[MeteoraResolver] bin_array_bitmap_extension account missing", {
+        lbPair: lbPair.toBase58(),
+        binArrayBitmapExtension: binArrayBitmapExtension.toBase58(),
+      });
+      return null;
+    }
     
     // Event authority
     const [eventAuthority] = PublicKey.findProgramAddressSync(
@@ -852,12 +1344,13 @@ export async function getMeteoraAccounts(
         tokenXMint,                    // 6. token_x_mint
         tokenYMint,                    // 7. token_y_mint
         oracle,                        // 8. oracle
-        PublicKey.default,             // 9. host_fee_in (optional)
+        safeInputMint.equals(tokenXMint) ? userTokenX : userTokenY, // 9. host_fee_in (optional) - use a real SPL token account
         safeUser,                      // 10. user (signer)
-        TOKEN_PROGRAM_ID,              // 11. token_x_program
-        TOKEN_PROGRAM_ID,              // 12. token_y_program
+        tokenXProgram,                 // 11. token_x_program
+        tokenYProgram,                 // 12. token_y_program
         eventAuthority,                // 13. event_authority
         METEORA_DLMM_PROGRAM,          // 14. program
+        ...binArrays,                  // 15.. dynamic bin arrays (writable)
       ],
       // Exposer les reserves pour vault_token_account_a/b
       vaultTokenAccountA: reserveX,
@@ -878,8 +1371,6 @@ export async function getMeteoraAccounts(
 // PHOENIX
 // ============================================================================
 
-const PHOENIX_PROGRAM = new PublicKey("PhoeNiXZ8ByJGLkxNfZRnkUfjvmuYqLR89jjFHGqdXY");
-
 /**
  * Trouve le marché Phoenix pour une paire
  */
@@ -887,28 +1378,18 @@ async function findPhoenixMarket(
   connection: Connection,
   baseMint: PublicKey,
   quoteMint: PublicKey
-): Promise<PublicKey | null> {
-  try {
-    // Phoenix utilise un registre de marchés
-    // Pour l'instant, on utilise les marchés connus
-    const knownMarkets: Record<string, string> = {
-      // SOL/USDC
-      "So11111111111111111111111111111111111111112:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": 
-        "4DoNfFBfF7UokCC2FQzriy7yHK6DY6NVdYpuekQ5pRgg",
-    };
-    
-    const key = `${baseMint.toBase58()}:${quoteMint.toBase58()}`;
-    const reverseKey = `${quoteMint.toBase58()}:${baseMint.toBase58()}`;
-    
-    const marketAddress = knownMarkets[key] || knownMarkets[reverseKey];
-    if (marketAddress) {
-      return new PublicKey(marketAddress);
-    }
-    
-    return null;
-  } catch {
+): Promise<{ market: PublicKey; baseMint: PublicKey; quoteMint: PublicKey } | null> {
+  void connection; // reserved for future SDK-based discovery; keep signature stable
+  const match = getPhoenixMarketConfig(baseMint.toBase58(), quoteMint.toBase58());
+  if (!match) {
     return null;
   }
+
+  return {
+    market: match.config.marketAddress,
+    baseMint: match.config.baseMint,
+    quoteMint: match.config.quoteMint,
+  };
 }
 
 /**
@@ -924,42 +1405,183 @@ export async function getPhoenixAccounts(
     const safeInputMint = toPublicKey(inputMint);
     const safeOutputMint = toPublicKey(outputMint);
     const safeUser = toPublicKey(userPublicKey);
-    const market = await findPhoenixMarket(connection, safeInputMint, safeOutputMint);
-    if (!market) {
+    const marketInfo = await findPhoenixMarket(connection, safeInputMint, safeOutputMint);
+    if (!marketInfo) {
       console.warn("[PhoenixResolver] No Phoenix market found");
       return null;
     }
+
+    const market = marketInfo.market;
+    const baseMint = marketInfo.baseMint;
+    const quoteMint = marketInfo.quoteMint;
     
-    // Récupérer les données du marché
-    const accountInfo = await connection.getAccountInfo(market);
-    if (!accountInfo) return null;
+    // Import du package root (CJS) pour éviter que tsx n'attrape des sources TS de dépendances (beet).
+    // Le module peut exposer les exports sur la racine ou sous `default` selon le loader.
+    const phoenixSdk: any = await import("@ellipsis-labs/phoenix-sdk");
+    const MarketState = phoenixSdk.MarketState ?? phoenixSdk.default?.MarketState;
+    if (!MarketState?.load) {
+      throw new Error("Phoenix SDK MarketState export not found");
+    }
+
+    // Certains marchés Phoenix sont stockés en zstd: utiliser le helper SDK si dispo.
+    const getConfirmedMarketAccountZstd =
+      phoenixSdk.getConfirmedMarketAccountZstd ?? phoenixSdk.default?.getConfirmedMarketAccountZstd;
+    let marketBuffer: Buffer | undefined;
+    if (getConfirmedMarketAccountZstd) {
+      try {
+        marketBuffer = await getConfirmedMarketAccountZstd(connection, market, "confirmed");
+      } catch (error) {
+        // Certains RPC ne supportent pas `base64+zstd`; fallback sur `getAccountInfo` classique.
+        logger.warn("PhoenixResolver", "getConfirmedMarketAccountZstd failed; falling back to getAccountInfo", {
+          market: market.toBase58(),
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    if (!marketBuffer) {
+      marketBuffer = (await connection.getAccountInfo(market, "confirmed"))?.data;
+    }
+
+    // Dernier recours: les gros markets Phoenix (ex SOL/USDT) peuvent dépasser les limites
+    // de `getAccountInfo` en base64 côté web3. Le RPC supporte `base64+zstd`, mais web3
+    // ne le décompresse pas; on fait donc un JSON-RPC raw + décompression zstd.
+    if (!marketBuffer) {
+      try {
+        const rpcEndpoint: string | undefined = (connection as any).rpcEndpoint;
+        if (rpcEndpoint && typeof fetch === "function") {
+          const body = {
+            jsonrpc: "2.0",
+            id: 1,
+            method: "getAccountInfo",
+            params: [market.toBase58(), { encoding: "base64+zstd", commitment: "confirmed" }],
+          };
+          const resp = await fetch(rpcEndpoint, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const json: any = await resp.json();
+          const value = json?.result?.value;
+          const dataEntry = value?.data;
+          if (value && Array.isArray(dataEntry) && dataEntry[0] && dataEntry[1] === "base64+zstd") {
+            const compressed = Buffer.from(String(dataEntry[0]), "base64");
+            const { ZSTDDecoder } = await import("zstddec");
+            const decoder = new ZSTDDecoder();
+            await decoder.init();
+            const decoded = decoder.decode(new Uint8Array(compressed));
+            marketBuffer = Buffer.from(decoded);
+          }
+        }
+      } catch (error) {
+        logger.warn("PhoenixResolver", "Raw base64+zstd fallback failed", {
+          market: market.toBase58(),
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    if (!marketBuffer) return null;
+
+    const marketState = MarketState.load({ address: market, buffer: marketBuffer });
     
-    const data = accountInfo.data;
-    
-    // Dériver le seat (trader state)
-    const [seat] = PublicKey.findProgramAddressSync(
-      [Buffer.from("seat"), market.toBuffer(), safeUser.toBuffer()],
-      PHOENIX_PROGRAM
-    );
-    
-    // Log seat
+    // Log authority
     const [logAuthority] = PublicKey.findProgramAddressSync(
       [Buffer.from("log")],
       PHOENIX_PROGRAM
     );
-    
-    // Vaults
-    const baseVault = new PublicKey(data.subarray(72, 104));
-    const quoteVault = new PublicKey(data.subarray(104, 136));
+
+    const baseVault = marketState.getBaseVaultKey();
+    const quoteVault = marketState.getQuoteVaultKey();
+
+    // Phoenix seat PDA (non requis par l'instruction Swap elle-même, mais attendu
+    // par certaines versions du router/cpi pour compatibilité).
+    // Derivation conforme au phoenix-sdk:
+    // PublicKey.findProgramAddressSync(["seat", market, trader], PHOENIX_PROGRAM)
+    const [seat] = PublicKey.findProgramAddressSync(
+      [Buffer.from("seat"), market.toBuffer(), safeUser.toBuffer()],
+      PHOENIX_PROGRAM
+    );
+
+    // IMPORTANT: SwapBack CPI expects *user SPL token accounts* here (Tokenkeg-owned),
+    // not Phoenix internal PDAs. Phoenix validates the token account owner.
+    const [baseMintInfo, quoteMintInfo] = await Promise.all([
+      connection.getAccountInfo(baseMint, "confirmed"),
+      connection.getAccountInfo(quoteMint, "confirmed"),
+    ]);
+    if (!baseMintInfo || !quoteMintInfo) return null;
+    if (!baseMintInfo.owner.equals(TOKEN_PROGRAM_ID) || !quoteMintInfo.owner.equals(TOKEN_PROGRAM_ID)) {
+      logger.warn("PhoenixResolver", "Phoenix requires Tokenkeg mints; Token-2022 not supported", {
+        baseMint: baseMint.toBase58(),
+        quoteMint: quoteMint.toBase58(),
+        baseMintOwner: baseMintInfo.owner.toBase58(),
+        quoteMintOwner: quoteMintInfo.owner.toBase58(),
+      });
+      return null;
+    }
+
+    const baseAccount = await getAssociatedTokenAddress(baseMint, safeUser, false, TOKEN_PROGRAM_ID);
+    const quoteAccount = await getAssociatedTokenAddress(quoteMint, safeUser, false, TOKEN_PROGRAM_ID);
+
+    const [baseAcctInfo, quoteAcctInfo, baseVaultInfo, quoteVaultInfo] =
+      await connection.getMultipleAccountsInfo([baseAccount, quoteAccount, baseVault, quoteVault], "confirmed");
+
+    logger.debug("PhoenixResolver", "Resolved Phoenix accounts", {
+      market: market.toBase58(),
+      baseMint: baseMint.toBase58(),
+      quoteMint: quoteMint.toBase58(),
+      baseAccount: baseAccount.toBase58(),
+      quoteAccount: quoteAccount.toBase58(),
+      baseVault: baseVault.toBase58(),
+      quoteVault: quoteVault.toBase58(),
+      baseAccountOwner: baseAcctInfo?.owner?.toBase58() ?? null,
+      quoteAccountOwner: quoteAcctInfo?.owner?.toBase58() ?? null,
+      baseVaultOwner: baseVaultInfo?.owner?.toBase58() ?? null,
+      quoteVaultOwner: quoteVaultInfo?.owner?.toBase58() ?? null,
+    });
+
+    // Note: base/quote user ATAs may not exist yet (the tx can create them before CPI).
+    // Only enforce Tokenkeg ownership if the account exists. Vaults must exist and be Tokenkeg-owned.
+    const existsAndBadOwner = (info: { owner: PublicKey } | null) =>
+      info ? !info.owner.equals(TOKEN_PROGRAM_ID) : false;
+    const missingOrBadOwner = (info: { owner: PublicKey } | null) =>
+      !info || !info.owner.equals(TOKEN_PROGRAM_ID);
+
+    if (
+      existsAndBadOwner(baseAcctInfo as any) ||
+      existsAndBadOwner(quoteAcctInfo as any) ||
+      missingOrBadOwner(baseVaultInfo as any) ||
+      missingOrBadOwner(quoteVaultInfo as any)
+    ) {
+      logger.warn("PhoenixResolver", "Phoenix token accounts must be Tokenkeg-owned", {
+        market: market.toBase58(),
+        baseAccount: baseAccount.toBase58(),
+        quoteAccount: quoteAccount.toBase58(),
+        baseVault: baseVault.toBase58(),
+        quoteVault: quoteVault.toBase58(),
+        tokenProgram: TOKEN_PROGRAM_ID.toBase58(),
+        baseAccountOwner: baseAcctInfo?.owner?.toBase58() ?? null,
+        quoteAccountOwner: quoteAcctInfo?.owner?.toBase58() ?? null,
+        baseVaultOwner: baseVaultInfo?.owner?.toBase58() ?? null,
+        quoteVaultOwner: quoteVaultInfo?.owner?.toBase58() ?? null,
+      });
+      return null;
+    }
     
     return {
       accounts: [
+        // IMPORTANT: ordre attendu par l'instruction Phoenix Swap (phoenix-sdk createSwapInstruction)
+        // (program, log, market, trader, baseAcct, quoteAcct, baseVault, quoteVault, tokenProgram)
         PHOENIX_PROGRAM,
-        market,
-        seat,
         logAuthority,
+        market,
+        safeUser,
+        baseAccount,
+        quoteAccount,
         baseVault,
         quoteVault,
+        TOKEN_PROGRAM_ID,
+        // Padding/compat: certaines versions du router attendent 10 remaining accounts.
+        // Le `seat` est ajouté en fin pour ne pas décaler les indices des 9 comptes du Swap.
+        seat,
       ],
       meta: {
         venue: 'PHOENIX',
@@ -979,10 +1601,339 @@ export async function getPhoenixAccounts(
 
 const RAYDIUM_AMM_PROGRAM = new PublicKey("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8");
 
+type RaydiumAmmLayout = {
+  dataSize: number;
+  offsets: {
+    tokenMintA: number;
+    tokenMintB: number;
+    ammOpenOrders: number;
+    poolCoinTokenAccount: number;
+    poolPcTokenAccount: number;
+    serumProgramId: number;
+    serumMarket: number;
+  };
+};
+
+let raydiumAmmLayoutCache:
+  | {
+      timestamp: number;
+      layout: RaydiumAmmLayout;
+    }
+  | null = null;
+
+const RAYDIUM_LAYOUT_CACHE_TTL_MS = 10 * 60 * 1000;
+
+function findAllOccurrences(haystack: Buffer, needle: Buffer): number[] {
+  const offsets: number[] = [];
+  const n = needle.length;
+  for (let i = 0; i <= haystack.length - n; i++) {
+    if (haystack.subarray(i, i + n).equals(needle)) offsets.push(i);
+  }
+  return offsets;
+}
+
+function pickBestOffset(candidates: number[], opts: { label: string }): number | null {
+  if (candidates.length === 0) return null;
+  const aligned = candidates.filter((o) => o % 8 === 0);
+  const chosen = (aligned.length > 0 ? aligned : candidates).slice().sort((a, b) => a - b)[0];
+  if (candidates.length > 1) {
+    logger.debug("RaydiumResolver", "Multiple candidate offsets; picking best", {
+      label: opts.label,
+      chosen,
+      candidates: candidates.slice(0, 8),
+      candidatesCount: candidates.length,
+    });
+  }
+  return chosen;
+}
+
+function readPubkeyAt(data: Buffer, offset: number): PublicKey {
+  return new PublicKey(data.subarray(offset, offset + 32));
+}
+
+function pickBestMintOffsets(mintAOffsets: number[], mintBOffsets: number[]): { a: number; b: number } | null {
+  if (mintAOffsets.length === 0 || mintBOffsets.length === 0) return null;
+
+  const aAligned = mintAOffsets.filter((o) => o % 8 === 0);
+  const bAligned = mintBOffsets.filter((o) => o % 8 === 0);
+  const as = aAligned.length > 0 ? aAligned : mintAOffsets;
+  const bs = bAligned.length > 0 ? bAligned : mintBOffsets;
+
+  let best: { a: number; b: number; score: number } | null = null;
+  for (const a of as) {
+    for (const b of bs) {
+      if (a === b) continue;
+      const dist = Math.abs(a - b);
+      const penalty = dist > 256 ? 1_000_000 : 0;
+      const score = dist + penalty;
+      if (!best || score < best.score) best = { a, b, score };
+    }
+  }
+  return best ? { a: best.a, b: best.b } : null;
+}
+
+function getRaydiumAmmAuthorityFromStaticConfig(): PublicKey | null {
+  const knownPool = getAllRaydiumPools()[0];
+  if (!knownPool) return null;
+  return knownPool.ammAuthority;
+}
+
+function isRpcProgramAccountsIndexDisabled(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    msg.includes("excluded from account secondary indexes") ||
+    msg.includes("this RPC method unavailable") ||
+    msg.includes("get accounts owned by program")
+  );
+}
+
+async function getRaydiumAmmLayout(connection: Connection): Promise<RaydiumAmmLayout | null> {
+  const now = Date.now();
+  if (raydiumAmmLayoutCache && now - raydiumAmmLayoutCache.timestamp < RAYDIUM_LAYOUT_CACHE_TTL_MS) {
+    return raydiumAmmLayoutCache.layout;
+  }
+
+  const knownPool = getAllRaydiumPools()[0];
+  if (!knownPool) {
+    logger.warn("RaydiumResolver", "No static Raydium pools available to deduce AMM layout");
+    return null;
+  }
+
+  const info = await connection.getAccountInfo(knownPool.ammAddress);
+  if (!info?.data) {
+    logger.warn("RaydiumResolver", "Known Raydium AMM account missing; cannot deduce layout", {
+      ammAddress: knownPool.ammAddress.toBase58(),
+    });
+    return null;
+  }
+
+  const data = info.data;
+  const dataSize = data.length;
+
+  const mintAOffsets = findAllOccurrences(data, knownPool.tokenMintA.toBuffer());
+  const mintBOffsets = findAllOccurrences(data, knownPool.tokenMintB.toBuffer());
+  const mintOffsets = pickBestMintOffsets(mintAOffsets, mintBOffsets);
+  if (!mintOffsets) {
+    logger.warn("RaydiumResolver", "Failed to deduce Raydium mint offsets", {
+      ammAddress: knownPool.ammAddress.toBase58(),
+      mintAOffsetsCount: mintAOffsets.length,
+      mintBOffsetsCount: mintBOffsets.length,
+    });
+    return null;
+  }
+
+  const offsets = {
+    tokenMintA: mintOffsets.a,
+    tokenMintB: mintOffsets.b,
+    ammOpenOrders: pickBestOffset(findAllOccurrences(data, knownPool.ammOpenOrders.toBuffer()), {
+      label: "ammOpenOrders",
+    }),
+    poolCoinTokenAccount: pickBestOffset(
+      findAllOccurrences(data, knownPool.poolCoinTokenAccount.toBuffer()),
+      { label: "poolCoinTokenAccount" }
+    ),
+    poolPcTokenAccount: pickBestOffset(
+      findAllOccurrences(data, knownPool.poolPcTokenAccount.toBuffer()),
+      { label: "poolPcTokenAccount" }
+    ),
+    serumProgramId: pickBestOffset(findAllOccurrences(data, knownPool.serumProgramId.toBuffer()), {
+      label: "serumProgramId",
+    }),
+    serumMarket: pickBestOffset(findAllOccurrences(data, knownPool.serumMarket.toBuffer()), {
+      label: "serumMarket",
+    }),
+  } as const;
+
+  for (const [k, v] of Object.entries(offsets)) {
+    if (v === null) {
+      logger.warn("RaydiumResolver", "Failed to deduce Raydium AMM layout offset", {
+        field: k,
+        ammAddress: knownPool.ammAddress.toBase58(),
+        dataSize,
+      });
+      return null;
+    }
+  }
+
+  const layout: RaydiumAmmLayout = {
+    dataSize,
+    offsets: offsets as any,
+  };
+
+  // Safety: validate offsets against known pool
+  const roundtrip = {
+    tokenMintA: readPubkeyAt(data, layout.offsets.tokenMintA),
+    tokenMintB: readPubkeyAt(data, layout.offsets.tokenMintB),
+    ammOpenOrders: readPubkeyAt(data, layout.offsets.ammOpenOrders),
+    poolCoinTokenAccount: readPubkeyAt(data, layout.offsets.poolCoinTokenAccount),
+    poolPcTokenAccount: readPubkeyAt(data, layout.offsets.poolPcTokenAccount),
+    serumProgramId: readPubkeyAt(data, layout.offsets.serumProgramId),
+    serumMarket: readPubkeyAt(data, layout.offsets.serumMarket),
+  };
+
+  const ok =
+    roundtrip.tokenMintA.equals(knownPool.tokenMintA) &&
+    roundtrip.tokenMintB.equals(knownPool.tokenMintB) &&
+    roundtrip.ammOpenOrders.equals(knownPool.ammOpenOrders) &&
+    roundtrip.poolCoinTokenAccount.equals(knownPool.poolCoinTokenAccount) &&
+    roundtrip.poolPcTokenAccount.equals(knownPool.poolPcTokenAccount) &&
+    roundtrip.serumProgramId.equals(knownPool.serumProgramId) &&
+    roundtrip.serumMarket.equals(knownPool.serumMarket);
+
+  if (!ok) {
+    logger.error("RaydiumResolver", "Raydium AMM layout deduction failed roundtrip validation", {
+      ammAddress: knownPool.ammAddress.toBase58(),
+      dataSize,
+      offsets: layout.offsets,
+      expected: {
+        tokenMintA: knownPool.tokenMintA.toBase58(),
+        tokenMintB: knownPool.tokenMintB.toBase58(),
+        ammOpenOrders: knownPool.ammOpenOrders.toBase58(),
+        poolCoinTokenAccount: knownPool.poolCoinTokenAccount.toBase58(),
+        poolPcTokenAccount: knownPool.poolPcTokenAccount.toBase58(),
+        serumProgramId: knownPool.serumProgramId.toBase58(),
+        serumMarket: knownPool.serumMarket.toBase58(),
+      },
+      got: {
+        tokenMintA: roundtrip.tokenMintA.toBase58(),
+        tokenMintB: roundtrip.tokenMintB.toBase58(),
+        ammOpenOrders: roundtrip.ammOpenOrders.toBase58(),
+        poolCoinTokenAccount: roundtrip.poolCoinTokenAccount.toBase58(),
+        poolPcTokenAccount: roundtrip.poolPcTokenAccount.toBase58(),
+        serumProgramId: roundtrip.serumProgramId.toBase58(),
+        serumMarket: roundtrip.serumMarket.toBase58(),
+      },
+    });
+    return null;
+  }
+
+  raydiumAmmLayoutCache = { timestamp: now, layout };
+  return layout;
+}
+
+function decodeRaydiumPoolFromAmmState(
+  ammAddress: PublicKey,
+  data: Buffer,
+  layout: RaydiumAmmLayout,
+  ammAuthority: PublicKey
+): RaydiumPoolConfig {
+  const tokenMintA = readPubkeyAt(data, layout.offsets.tokenMintA);
+  const tokenMintB = readPubkeyAt(data, layout.offsets.tokenMintB);
+  const ammOpenOrders = readPubkeyAt(data, layout.offsets.ammOpenOrders);
+  const poolCoinTokenAccount = readPubkeyAt(data, layout.offsets.poolCoinTokenAccount);
+  const poolPcTokenAccount = readPubkeyAt(data, layout.offsets.poolPcTokenAccount);
+  const serumProgramId = readPubkeyAt(data, layout.offsets.serumProgramId);
+  const serumMarket = readPubkeyAt(data, layout.offsets.serumMarket);
+
+  return {
+    symbol: `${tokenMintA.toBase58().slice(0, 6)}/${tokenMintB.toBase58().slice(0, 6)}`,
+    ammAddress,
+    ammAuthority,
+    ammOpenOrders,
+    // Champs requis par l'interface mais non utilisés par notre CPI Raydium actuel.
+    ammTargetOrders: PublicKey.default,
+    poolCoinTokenAccount,
+    poolPcTokenAccount,
+    poolWithdrawQueue: PublicKey.default,
+    poolTempLpTokenAccount: PublicKey.default,
+    serumProgramId,
+    serumMarket,
+    tokenMintA,
+    tokenMintB,
+    feeBps: 0,
+    minLiquidityUsd: 0,
+  };
+}
+
+async function findRaydiumPoolOnChain(
+  connection: Connection,
+  inputMint: PublicKey,
+  outputMint: PublicKey
+): Promise<RaydiumPoolConfig | null> {
+  const layout = await getRaydiumAmmLayout(connection);
+  if (!layout) return null;
+
+  const ammAuthority = getRaydiumAmmAuthorityFromStaticConfig();
+  if (!ammAuthority) {
+    logger.warn("RaydiumResolver", "Missing Raydium AMM authority (no static pools?)");
+    return null;
+  }
+
+  try {
+    const query = async (a: PublicKey, b: PublicKey) =>
+      connection.getProgramAccounts(RAYDIUM_AMM_PROGRAM, {
+        filters: [
+          { dataSize: layout.dataSize },
+          { memcmp: { offset: layout.offsets.tokenMintA, bytes: a.toBase58() } },
+          { memcmp: { offset: layout.offsets.tokenMintB, bytes: b.toBase58() } },
+        ],
+      });
+
+    let candidates = await query(inputMint, outputMint);
+    if (candidates.length === 0) {
+      candidates = await query(outputMint, inputMint);
+    }
+
+    if (candidates.length === 0) return null;
+
+    candidates.sort((x, y) => x.pubkey.toBase58().localeCompare(y.pubkey.toBase58()));
+    const chosen = candidates[0];
+    const decoded = decodeRaydiumPoolFromAmmState(chosen.pubkey, chosen.account.data, layout, ammAuthority);
+
+    const mA = decoded.tokenMintA;
+    const mB = decoded.tokenMintB;
+    const matches =
+      (mA.equals(inputMint) && mB.equals(outputMint)) || (mA.equals(outputMint) && mB.equals(inputMint));
+    if (!matches) {
+      logger.warn("RaydiumResolver", "Raydium on-chain candidate did not match requested mints", {
+        requested: {
+          inputMint: inputMint.toBase58(),
+          outputMint: outputMint.toBase58(),
+        },
+        decoded: {
+          tokenMintA: mA.toBase58(),
+          tokenMintB: mB.toBase58(),
+        },
+        ammAddress: chosen.pubkey.toBase58(),
+      });
+      return null;
+    }
+
+    if (candidates.length > 1) {
+      logger.warn("RaydiumResolver", "Multiple Raydium AMM pools found for pair; picking first", {
+        inputMint: inputMint.toBase58(),
+        outputMint: outputMint.toBase58(),
+        picked: chosen.pubkey.toBase58(),
+        count: candidates.length,
+      });
+    }
+
+    return decoded;
+  } catch (error) {
+    if (isRpcProgramAccountsIndexDisabled(error)) {
+      logger.warn("RaydiumResolver", "RPC does not support getProgramAccounts for Raydium AMM; on-chain discovery disabled", {
+        inputMint: inputMint.toBase58(),
+        outputMint: outputMint.toBase58(),
+        rpcHint: "Use an indexed RPC (e.g. Helius/Triton/QuickNode) if you want dynamic Raydium pool discovery",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+
+    logger.error("RaydiumResolver", "Raydium on-chain discovery failed", {
+      inputMint: inputMint.toBase58(),
+      outputMint: outputMint.toBase58(),
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
 /**
  * Trouve le pool Raydium AMM pour une paire
  */
 async function findRaydiumPool(
+  connection: Connection,
   inputMint: PublicKey,
   outputMint: PublicKey
 ): Promise<RaydiumPoolConfig | null> {
@@ -1004,6 +1955,17 @@ async function findRaydiumPool(
     if (staticPool) {
       raydiumPoolCache.set(cacheKey, { timestamp: now, pool: staticPool });
       return staticPool;
+    }
+
+    const onChainPool = await findRaydiumPoolOnChain(connection, inputMint, outputMint);
+    if (onChainPool) {
+      logger.info("RaydiumResolver", "Resolved Raydium AMM pool via on-chain discovery", {
+        inputMint: inputMintStr,
+        outputMint: outputMintStr,
+        ammAddress: onChainPool.ammAddress.toBase58(),
+      });
+      raydiumPoolCache.set(cacheKey, { timestamp: now, pool: onChainPool });
+      return onChainPool;
     }
 
     logger.warn("RaydiumResolver", "No Raydium pool config found", {
@@ -1036,7 +1998,7 @@ export async function getRaydiumAccounts(
     const safeInputMint = toPublicKey(inputMint);
     const safeOutputMint = toPublicKey(outputMint);
     const safeUser = toPublicKey(userPublicKey);
-    const poolConfig = await findRaydiumPool(safeInputMint, safeOutputMint);
+    const poolConfig = await findRaydiumPool(connection, safeInputMint, safeOutputMint);
 
     if (!poolConfig) {
       logger.warn("RaydiumResolver", "No Raydium pool found for pair", {

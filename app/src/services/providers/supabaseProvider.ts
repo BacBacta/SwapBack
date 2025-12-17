@@ -67,7 +67,8 @@ export class SupabasePlanStoreProvider implements PlanStoreProvider {
 
     try {
       // Dynamic import to avoid build errors when module not installed
-      const supabaseModule = await (Function('return import("@supabase/supabase-js")')() as Promise<typeof import("@supabase/supabase-js")>);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const supabaseModule: any = await (Function('return import("@supabase/supabase-js")')());
       this.client = supabaseModule.createClient(url, key) as unknown as SupabaseClient;
       return this.client;
     } catch (e) {

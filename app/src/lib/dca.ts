@@ -786,8 +786,6 @@ export async function executeDcaSwapTransaction(
     logger.error('DCA', 'DCA swap execution failed', error);
     throw error;
   }
-  
-  return signature;
 }
 
 /**
