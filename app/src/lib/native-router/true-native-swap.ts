@@ -123,6 +123,8 @@ export interface TrueNativeSwapResult {
   transaction: VersionedTransaction;
   route: TrueNativeRoute;
   planAccount: PublicKey;
+  blockhash: string;
+  lastValidBlockHeight: number;
 }
 
 // ============================================================================
@@ -1216,6 +1218,8 @@ export class TrueNativeSwap {
       transaction,
       route,
       planAccount: planPda,
+      blockhash,
+      lastValidBlockHeight,
     };
   }
 }

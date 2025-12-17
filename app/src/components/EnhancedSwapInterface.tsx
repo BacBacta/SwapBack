@@ -39,6 +39,8 @@ import { RoutingStrategySelector } from "@/components/RoutingStrategySelector";
 import { RouterReliabilityCard } from "@/components/RouterReliabilityCard";
 import { RouteIntentsList } from "@/components/RouteIntentsList";
 import type { RoutingStrategy } from "@/lib/routing/hybridRouting";
+import { hasOracleForPair } from "@/config/oracles";
+import { TrueNativeSwap } from "@/lib/native-router/true-native-swap";
 import { debounce } from "lodash";
 import { ClientOnlyConnectionStatus } from "./ClientOnlyConnectionStatus";
 import { buildNativeRouteInsights, formatTokenAmount as formatNativeTokenAmount, lamportsToTokens } from "@/lib/routing/nativeRouteInsights";
@@ -243,11 +245,13 @@ function decodeBase64ToUint8Array(data: string): Uint8Array {
 }
 
 export function EnhancedSwapInterface() {
-  const { connected, publicKey } = useWallet();
+  const { connected, publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
   const { swapWithRouter, swapWithRouterVersioned, executeJupiterSwap } = useSwapRouter();
   const haptic = useHaptic();
   const walletAddress = publicKey?.toBase58() ?? null;
+
+  const trueNativeSwap = useMemo(() => new TrueNativeSwap(connection), [connection]);
 
   // Store
   const {
@@ -897,42 +901,40 @@ export function EnhancedSwapInterface() {
       return;
     }
     
-    const activeRoutePlan = getActiveRoutePlan();
-
     if (selectedRouter !== "swapback") {
       setSwapError("L'exécution on-chain est disponible uniquement via le router SwapBack.");
       return;
     }
-    if (!swap.inputToken || !swap.outputToken || !routes.selectedRoute) {
-      setSwapError("Route invalide. Relancez une recherche avant de swapper.");
+    if (!swap.inputToken || !swap.outputToken) {
+      setSwapError("Sélectionnez deux tokens avant d'exécuter un swap.");
       return;
     }
-    if (!activeRoutePlan || activeRoutePlan.length === 0) {
-      setSwapError("Plan de route introuvable. Relancez une recherche avant de swapper.");
-      return;
-    }
-    if (!swapWithRouter) {
-      setSwapError("Client router non initialisé. Veuillez recharger la page.");
-      return;
-    }
-    
-    let useNativeExecution = shouldAttemptNativeExecution;
-    let nativeAccountsBuilderFactory: ((params: { derived: DerivedSwapAccounts }) => AccountMeta[]) | null = null;
 
-    if (useNativeExecution) {
-      try {
-        console.log(
-          `⚙️ [NativeExecution] Provider ${nativeProviderLabel ?? "SwapBack"} sélectionné (raison: ${nativeExecutionDecision.reason}).`
-        );
-        nativeAccountsBuilderFactory = await createRemainingAccountsBuilder();
-      } catch (builderError) {
-        console.warn(
-          "⚠️ [NativeExecution] Impossible de préparer les comptes natifs, bascule sur Jupiter CPI",
-          builderError
-        );
-        useNativeExecution = false;
-      }
+    // =====================================================================
+    // SwapBack doit exécuter le VRAI swap natif (CPI direct vers les DEX)
+    // - Pas de dépendance à Jupiter pour exécuter le swap
+    // - Gating oracle AVANT signature
+    // =====================================================================
+
+    if (!publicKey) {
+      setSwapError("Veuillez connecter votre wallet pour exécuter le swap.");
+      return;
     }
+
+    if (!signTransaction) {
+      setSwapError("Votre wallet ne supporte pas la signature de transactions.");
+      return;
+    }
+
+    if (!hasOracleForPair(swap.inputToken.mint, swap.outputToken.mint)) {
+      setSwapError("Cette paire n'est pas supportée par le swap natif (oracle manquant).");
+      return;
+    }
+
+    const useNativeExecution = true;
+    console.log(
+      `⚙️ [NativeExecution] Provider ${nativeProviderLabel ?? "SwapBack"} sélectionné (raison: ${nativeExecutionDecision.reason}).`
+    );
     
     // Check if mock mode - can't execute real swaps
     if (routes.isMock) {
@@ -940,26 +942,7 @@ export function EnhancedSwapInterface() {
       return;
     }
     
-    // Check if Jupiter CPI is available for execution
-    if (!routes.jupiterCpi || !routes.jupiterCpi.swapInstruction) {
-      // Si pas de jupiterCpi, relancer automatiquement la recherche avec le wallet connecté
-      if (publicKey) {
-        console.log("🔄 Re-fetching routes with wallet for swap instructions...");
-        setSwapError(null);
-        const success = await instrumentedFetchRoutes("swap-fallback");
-        // Récupérer les nouvelles routes après le fetch
-        const updatedRoutes = useSwapStore.getState().routes;
-        if (!success || !updatedRoutes.jupiterCpi || !updatedRoutes.jupiterCpi.swapInstruction) {
-          setSwapError("Impossible d'obtenir les instructions de swap. Veuillez réessayer.");
-          return;
-        }
-        // Continuer avec les nouvelles données
-        toast.info("Route mise à jour avec les instructions de swap");
-      } else {
-        setSwapError("Veuillez connecter votre wallet pour exécuter le swap.");
-        return;
-      }
-    }
+    // Note: le swap natif SwapBack n'a pas besoin de routes.jupiterCpi.
 
     const amountInLamports = toLamports(
       swap.inputAmount,
@@ -989,42 +972,7 @@ export function EnhancedSwapInterface() {
       minOutLamports = new BN(1);
     }
 
-    let staticRemainingAccounts: AccountMeta[] | null = null;
-    let jupiterRoutePayload: JupiterRouteParams | null = null;
-
-    // Flag to track if we can use Router CPI (with rebates) or need Jupiter direct
-    let canUseRouterCpi = true;
-
-    try {
-      staticRemainingAccounts = routes.jupiterCpi!.accounts.map((meta) => ({
-        pubkey: new PublicKey(meta.pubkey),
-        isWritable: meta.isWritable,
-        isSigner: meta.isSigner,
-      }));
-
-      if (!staticRemainingAccounts.length) {
-        throw new Error("Liste de comptes Jupiter vide.");
-      }
-
-      // Use instructionData (raw instruction bytes) for Router CPI, NOT the full transaction
-      const instructionBytes = routes.jupiterCpi!.instructionData 
-        ? new Uint8Array(routes.jupiterCpi!.instructionData)
-        : null;
-
-      if (!instructionBytes || instructionBytes.length === 0) {
-        console.warn("⚠️ No instructionData found, will use Jupiter direct fallback");
-        canUseRouterCpi = false;
-      } else {
-        jupiterRoutePayload = {
-          expectedInputAmount: new BN(routes.jupiterCpi!.expectedInputAmount),
-          swapInstruction: instructionBytes,
-        };
-        console.log(`✅ Jupiter instruction prepared: ${instructionBytes.length} bytes (vs full transaction)`);
-      }
-    } catch (error) {
-      console.warn("⚠️ Failed to prepare Router CPI:", error);
-      canUseRouterCpi = false;
-    }
+    // Le mode SwapBack (true native) n'utilise ni routes.jupiterCpi ni Router CPI.
 
     setSwapError(null);
     setSwapSignature(null);
@@ -1052,112 +1000,93 @@ export function EnhancedSwapInterface() {
       setLoadingProgress(40);
       setLoadingStep('signing');
 
-      const buildNativeRemainingAccounts = nativeAccountsBuilderFactory
-        ? async ({ derived }: { derived: DerivedSwapAccounts; request: SwapRequest }) =>
-            nativeAccountsBuilderFactory({ derived })
-        : null;
+      if (useNativeExecution) {
+        console.log('🛠️ Executing TRUE native swap (direct DEX CPI)');
 
-      if (useNativeExecution && nativeAccountsBuilderFactory && buildNativeRemainingAccounts) {
-        try {
-          console.log('🛠️ Attempting native on-chain execution via router');
-          signature = await swapWithRouterVersioned({
-            tokenIn: new PublicKey(swap.inputToken.mint),
-            tokenOut: new PublicKey(swap.outputToken.mint),
-            amountIn: amountInLamports,
-            minOut: minOutLamports,
-            slippageBps,
-            buildRemainingAccounts: buildNativeRemainingAccounts ?? undefined,
-            jupiterRoute: null,
-          });
-          swapMethod = 'native';
-        } catch (nativeError) {
-          console.warn('⚠️ Native execution failed, enabling Jupiter CPI fallback', nativeError);
-          signature = null;
+        if (!swap.inputToken || !swap.outputToken) {
+          throw new Error('Tokens manquants pour le swap natif.');
         }
+        if (!publicKey) {
+          throw new Error('Wallet non connecté.');
+        }
+        if (!signTransaction) {
+          throw new Error('Wallet ne supporte pas signTransaction.');
+        }
+        if (!hasOracleForPair(swap.inputToken.mint, swap.outputToken.mint)) {
+          throw new Error("Paire non supportée par le swap natif (oracle manquant).");
+        }
+
+        let amountInNumber: number;
+        try {
+          amountInNumber = amountInLamports.toNumber();
+        } catch {
+          throw new Error('Montant trop grand pour être exécuté en sécurité (overflow).');
+        }
+
+        const route = await trueNativeSwap.getBestNativeRoute({
+          inputMint: new PublicKey(swap.inputToken.mint),
+          outputMint: new PublicKey(swap.outputToken.mint),
+          amountIn: amountInNumber,
+          minAmountOut: 0,
+          slippageBps,
+          userPublicKey: publicKey,
+        });
+
+        if (!route) {
+          throw new Error(
+            "Aucune venue native disponible pour cette paire (Orca/Raydium/Meteora)."
+          );
+        }
+
+        const minOutNumber = Math.floor(
+          route.outputAmount * (BPS_SCALE - slippageBps) / BPS_SCALE
+        );
+
+        const built = await trueNativeSwap.buildNativeSwapTransaction({
+          inputMint: new PublicKey(swap.inputToken.mint),
+          outputMint: new PublicKey(swap.outputToken.mint),
+          amountIn: amountInNumber,
+          minAmountOut: minOutNumber,
+          slippageBps,
+          userPublicKey: publicKey,
+        });
+
+        if (!built) {
+          throw new Error('Impossible de construire la transaction native.');
+        }
+
+        // Simulation avant signature/envoi (requirement: simulateTransaction first)
+        const sim = await connection.simulateTransaction(built.transaction, {
+          sigVerify: false,
+          replaceRecentBlockhash: false,
+        });
+
+        if (sim.value.err) {
+          const logs = sim.value.logs?.slice(-30) ?? [];
+          throw new Error(
+            `Simulation du swap natif échouée: ${JSON.stringify(sim.value.err)}\n` +
+              (logs.length ? `Logs (tail):\n${logs.join('\n')}` : '')
+          );
+        }
+
+        const signedTx = await signTransaction(built.transaction);
+
+        signature = await connection.sendTransaction(signedTx, {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+        });
+
+        swapMethod = 'native';
       }
 
+      if (!signature && useNativeExecution) {
+        throw new Error('Swap natif échoué: signature manquante.');
+      }
+
+      // IMPORTANT: aucun fallback Jupiter ici tant que le routeur natif n'est pas
+      // explicitement confirmé fonctionnel par l'utilisateur.
       if (!signature) {
-        // If we can't use Router CPI (no instructionData), go directly to Jupiter
-        if (!canUseRouterCpi || !jupiterRoutePayload) {
-          console.log('📦 Router CPI not available, using Jupiter direct...');
-          if (routes.jupiterCpi?.swapInstruction) {
-            signature = await executeJupiterSwap(
-              routes.jupiterCpi.swapInstruction,
-              {
-                lastValidBlockHeight: routes.jupiterCpi.lastValidBlockHeight,
-                skipPreflight: false,
-              }
-            );
-            swapMethod = 'jupiter-direct';
-            toast.info('Swap exécuté via Jupiter direct (rebates différées)');
-          } else {
-            throw new Error('No Jupiter swap instruction available');
-          }
-        } else {
-          // Strategy: Try versioned (ALT) first → Legacy → Jupiter direct
-          try {
-            // 1. First try with Versioned Transaction + ALT (optimal)
-            console.log('🚀 Trying swap with Versioned Transaction + ALT...');
-            signature = await swapWithRouterVersioned({
-              tokenIn: new PublicKey(swap.inputToken.mint),
-              tokenOut: new PublicKey(swap.outputToken.mint),
-              amountIn: amountInLamports,
-              minOut: minOutLamports,
-              slippageBps,
-              remainingAccounts: staticRemainingAccounts ?? undefined,
-              jupiterRoute: {
-                ...jupiterRoutePayload,
-                addressTableLookups: routes.jupiterCpi?.addressTableLookups,
-              },
-            });
-            swapMethod = 'versioned';
-          } catch (versionedError) {
-            const errorMsg = versionedError instanceof Error ? versionedError.message : '';
-            console.warn('⚠️ Versioned swap failed:', errorMsg);
-            
-            // 2. If ALT not available or still too large, try legacy
-            if (errorMsg.includes('ALT') || errorMsg.includes('not set')) {
-              console.log('📦 ALT not available, trying legacy transaction...');
-              try {
-                signature = await swapWithRouter({
-                  tokenIn: new PublicKey(swap.inputToken.mint),
-                  tokenOut: new PublicKey(swap.outputToken.mint),
-                  amountIn: amountInLamports,
-                  minOut: minOutLamports,
-                  slippageBps,
-                  remainingAccounts: staticRemainingAccounts ?? undefined,
-                  jupiterRoute: jupiterRoutePayload,
-                });
-                swapMethod = 'legacy';
-              } catch (legacyError) {
-                const legacyMsg = legacyError instanceof Error ? legacyError.message : '';
-                if (legacyMsg.includes('Transaction too large') || legacyMsg.includes('1232')) {
-                  // Fall through to Jupiter direct
-                  throw legacyError;
-                }
-                throw legacyError;
-              }
-            } else if (errorMsg.includes('Transaction too large') || errorMsg.includes('1232')) {
-              // 3. Last resort: Jupiter direct (no router rebates)
-              console.log('📦 Transaction still too large, using Jupiter direct...');
-              if (routes.jupiterCpi?.swapInstruction) {
-                signature = await executeJupiterSwap(
-                  routes.jupiterCpi.swapInstruction,
-                  {
-                    lastValidBlockHeight: routes.jupiterCpi.lastValidBlockHeight,
-                    skipPreflight: false,
-                  }
-                );
-                swapMethod = 'jupiter-direct';
-                toast.info('Swap exécuté via Jupiter direct (rebates différées)');
-              } else {
-                throw new Error('No Jupiter swap instruction available');
-              }
-            } else {
-              throw versionedError;
-            }
-          }
-        }
+        throw new Error('Swap natif échoué: aucune signature produite.');
       }
 
       setLoadingProgress(70);

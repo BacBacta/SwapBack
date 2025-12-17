@@ -496,6 +496,13 @@ export function useNativeSwap() {
         const safeInputMint = toPublicKey(params.inputMint);
         const safeOutputMint = toPublicKey(params.outputMint);
 
+        // Gating oracle AVANT toute signature
+        if (!hasOracleForPair(safeInputMint.toBase58(), safeOutputMint.toBase58())) {
+          throw new Error(
+            "Cette paire n'est pas supportée par le swap natif (oracle manquant)."
+          );
+        }
+
         logger.info("useNativeSwap", "🔥 Executing TRUE native swap (direct DEX CPI)", {
           inputMint: safeInputMint.toBase58().slice(0, 8),
           outputMint: safeOutputMint.toBase58().slice(0, 8),
@@ -544,39 +551,143 @@ export function useNativeSwap() {
           priceImpactBps: route.priceImpactBps,
         });
 
+        const build = async () =>
+          trueNativeSwap.buildNativeSwapTransaction({
+            inputMint: safeInputMint,
+            outputMint: safeOutputMint,
+            amountIn: params.amount,
+            minAmountOut,
+            slippageBps,
+            userPublicKey: publicKey,
+          });
+
         // Construire la transaction
-        const result = await trueNativeSwap.buildNativeSwapTransaction({
-          inputMint: safeInputMint,
-          outputMint: safeOutputMint,
-          amountIn: params.amount,
-          minAmountOut,
-          slippageBps,
-          userPublicKey: publicKey,
-        });
+        let result = await build();
 
         if (!result) {
           throw new Error("Impossible de construire la transaction native");
+        }
+
+        // Simulation AVANT signature (SIMULATE FIRST)
+        const sim = await connection.simulateTransaction(result.transaction, {
+          sigVerify: false,
+          // Simuler EXACTEMENT ce qui sera signé/envoyé.
+          replaceRecentBlockhash: false,
+        });
+
+        if (sim.value.err) {
+          const logsTail = sim.value.logs?.slice(-30) ?? [];
+          throw new Error(
+            `Simulation du swap natif échouée: ${JSON.stringify(sim.value.err)}` +
+              (logsTail.length ? `\nLogs (tail):\n${logsTail.join("\n")}` : "")
+          );
         }
 
         // Signer
         params.onProgress?.('signing');
         const signedTx = await signTransaction(result.transaction);
 
-        // Envoyer
-        params.onProgress?.('sending');
-        const signature = await connection.sendTransaction(signedTx, {
-          skipPreflight: false,
-          preflightCommitment: 'confirmed',
-        });
+        const sendAndConfirm = async (ctx: {
+          signed: VersionedTransaction;
+          blockhash: string;
+          lastValidBlockHeight: number;
+        }): Promise<string> => {
+          // Envoyer
+          params.onProgress?.('sending');
+          const signature = await connection.sendTransaction(ctx.signed, {
+            skipPreflight: false,
+            preflightCommitment: 'confirmed',
+          });
 
-        logger.info("useNativeSwap", "True native tx sent", { signature });
+          logger.info("useNativeSwap", "True native tx sent", {
+            signature,
+            blockhash: ctx.blockhash,
+            lastValidBlockHeight: ctx.lastValidBlockHeight,
+          });
 
-        // Confirmer
-        params.onProgress?.('confirming');
-        const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+          // Confirmer (avec contexte blockhash pour éviter les faux négatifs)
+          params.onProgress?.('confirming');
+          const confirmation = await connection.confirmTransaction(
+            {
+              signature,
+              blockhash: ctx.blockhash,
+              lastValidBlockHeight: ctx.lastValidBlockHeight,
+            },
+            'confirmed'
+          );
 
-        if (confirmation.value.err) {
-          throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+          if (confirmation.value.err) {
+            // Essayer de récupérer des logs on-chain pour diagnostic
+            let logsTail: string[] = [];
+            try {
+              const tx = await connection.getTransaction(signature, {
+                commitment: 'confirmed',
+                maxSupportedTransactionVersion: 0,
+              });
+              logsTail = tx?.meta?.logMessages?.slice(-40) ?? [];
+            } catch {
+              logsTail = [];
+            }
+
+            throw new Error(
+              `Transaction failed: ${JSON.stringify(confirmation.value.err)}` +
+                (logsTail.length ? `\nLogs (tail):\n${logsTail.join("\n")}` : "")
+            );
+          }
+
+          return signature;
+        };
+
+        let signature: string;
+        try {
+          signature = await sendAndConfirm({
+            signed: signedTx,
+            blockhash: result.blockhash,
+            lastValidBlockHeight: result.lastValidBlockHeight,
+          });
+        } catch (sendErr) {
+          const msg = sendErr instanceof Error ? sendErr.message : String(sendErr);
+          const normalizedSend = msg.toLowerCase();
+
+          // Cas fréquent: l'utilisateur a mis trop de temps → blockhash expiré
+          if (
+            normalizedSend.includes('blockhash not found') ||
+            normalizedSend.includes('blockhashnotfound') ||
+            normalizedSend.includes('transactionexpiredblockheightexceeded') ||
+            normalizedSend.includes('expired')
+          ) {
+            logger.warn("useNativeSwap", "Blockhash expired after signature; rebuilding once", {
+              error: msg,
+            });
+
+            // Rebuild + re-simulate + re-sign (1x)
+            result = await build();
+            if (!result) {
+              throw new Error("Impossible de reconstruire la transaction native");
+            }
+
+            const sim2 = await connection.simulateTransaction(result.transaction, {
+              sigVerify: false,
+              replaceRecentBlockhash: false,
+            });
+            if (sim2.value.err) {
+              const logsTail2 = sim2.value.logs?.slice(-30) ?? [];
+              throw new Error(
+                `Simulation du swap natif échouée (retry): ${JSON.stringify(sim2.value.err)}` +
+                  (logsTail2.length ? `\nLogs (tail):\n${logsTail2.join("\n")}` : "")
+              );
+            }
+
+            params.onProgress?.('signing');
+            const signedTx2 = await signTransaction(result.transaction);
+            signature = await sendAndConfirm({
+              signed: signedTx2,
+              blockhash: result.blockhash,
+              lastValidBlockHeight: result.lastValidBlockHeight,
+            });
+          } else {
+            throw sendErr;
+          }
         }
 
         // Succès !
