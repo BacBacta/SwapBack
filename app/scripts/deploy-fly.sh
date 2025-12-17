@@ -49,6 +49,12 @@ fi
 
 # Déployer
 echo "🏗️  Build et déploiement..."
+GIT_SHA=$(git rev-parse HEAD 2>/dev/null || echo "")
+if [ -n "$GIT_SHA" ]; then
+  echo "🏷️  Enregistrement GIT_SHA=$GIT_SHA"
+  fly secrets set -a "$APP_NAME" GIT_SHA="$GIT_SHA" >/dev/null
+fi
+
 fly deploy -a "$APP_NAME" --remote-only
 
 # Vérifier le déploiement
