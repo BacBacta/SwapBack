@@ -31,7 +31,10 @@ function getWebSocketConstructor() {
   }
   // Node.js - try to load 'ws' package
   try {
-    return require('ws');
+    const wsPkg = require('ws');
+    // `ws` peut être CJS (classe) ou ESM transpillé (objet avec `.default`)
+    // et expose parfois explicitement `.WebSocket`.
+    return wsPkg?.WebSocket || wsPkg?.default || wsPkg;
   } catch (e) {
     return null;
   }

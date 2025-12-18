@@ -17,7 +17,8 @@ try {
   if (!WebSocketImpl) {
     // `ws` is available in the server runtime; ignore if not installed for build-only usage.
     // eslint-disable-next-line global-require
-    WebSocketImpl = require('ws');
+    const wsPkg = require('ws');
+    WebSocketImpl = wsPkg?.WebSocket || wsPkg?.default || wsPkg;
   }
 } catch (err) {
   WebSocketImpl = null;
