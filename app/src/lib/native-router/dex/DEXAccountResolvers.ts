@@ -1365,20 +1365,11 @@ export async function getMeteoraAccounts(
           return null;
         }
 
-        // Meteora DLMM SDK: swapForY => input = quote token.
-        // Le quote token est *celui qui est SOL ou USDC* (contrainte SDK).
-        const quoteMint = tokenXMint.equals(WSOL_MINT) || tokenXMint.equals(USDC_MINT) ? tokenXMint : tokenYMint;
-        const isSupportedQuote = quoteMint.equals(WSOL_MINT) || quoteMint.equals(USDC_MINT);
-        if (!isSupportedQuote) {
-          logger.warn("MeteoraResolver", "DLMM pair has unsupported quote token", {
-            lbPair: lbPair.toBase58(),
-            tokenXMint: tokenXMint.toBase58(),
-            tokenYMint: tokenYMint.toBase58(),
-          });
-          return null;
-        }
-
-        swapForY = safeInputMint.equals(quoteMint);
+        // IMPORTANT: swapForY is derived from the INPUT mint direction, NOT quote token semantics.
+        // The Router on-chain computes x_to_y by matching user_token_x/y with user_token_account_a/b.
+        // - If input=X: we're swapping X->Y, so x_to_y=TRUE (destination is Y).
+        // - If input=Y: we're swapping Y->X, so x_to_y=FALSE (destination is X).
+        swapForY = inputIsX; // TRUE if we're swapping from tokenX to tokenY
       }
 
       // Certaines paires nécessitent plus que 5 bin arrays pour couvrir la range.
@@ -1462,8 +1453,8 @@ export async function getMeteoraAccounts(
           return null;
         }
 
-        // swapForY => input est le quote token (tokenY)
-        swapForY = inputIsY;
+        // IMPORTANT: swapForY is derived from the INPUT mint direction, NOT quote token semantics.
+        swapForY = inputIsX; // TRUE if we're swapping from tokenX to tokenY
       }
 
       logger.warn("MeteoraResolver", "DLMM SDK unavailable; using fallback bin_array scan", {
