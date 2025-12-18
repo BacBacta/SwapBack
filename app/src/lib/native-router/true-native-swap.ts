@@ -74,6 +74,13 @@ const COMPUTE_UNITS = 400_000;
 // failures (custom program error 0xF) dues à un minOut irréaliste.
 const DISABLED_BEST_ROUTE_VENUES = new Set<SupportedVenue>(["PHOENIX"]);
 
+// Venues pour lesquelles on a une implémentation de quote dans ce module.
+const QUOTED_VENUES = new Set<SupportedVenue>([
+  "ORCA_WHIRLPOOL",
+  "METEORA_DLMM",
+  "RAYDIUM_AMM",
+]);
+
 // ============================================================================
 // HELPERS - Using centralized publicKeyUtils
 // ============================================================================
@@ -202,7 +209,12 @@ export class TrueNativeSwap {
     // Pour chaque venue disponible, obtenir une quote
     for (const [venue, accounts] of allAccounts) {
       if (DISABLED_BEST_ROUTE_VENUES.has(venue)) {
-        logger.warn("TrueNativeSwap", `Skipping disabled venue in best-route: ${venue}`);
+        logger.debug("TrueNativeSwap", `Skipping disabled venue in best-route: ${venue}`);
+        continue;
+      }
+
+      if (!QUOTED_VENUES.has(venue)) {
+        logger.debug("TrueNativeSwap", `Skipping venue without quote implementation: ${venue}`);
         continue;
       }
       try {
@@ -241,10 +253,23 @@ export class TrueNativeSwap {
             latencyMs,
           });
         } else {
-          logger.warn("TrueNativeSwap", `Quote returned null for ${venue}`, {
-            poolAddress: accounts.meta?.poolAddress || "none",
-            latencyMs,
-          });
+          if (venue === "ORCA_WHIRLPOOL") {
+            logger.debug("TrueNativeSwap", `Quote returned null for ${venue}`, {
+              poolAddress: accounts.meta?.poolAddress || "none",
+              latencyMs,
+            });
+          } else {
+            const payload = {
+              poolAddress: accounts.meta?.poolAddress || "none",
+              latencyMs,
+            };
+
+            if (venue === "LIFINITY") {
+              logger.debug("TrueNativeSwap", `Quote returned null for ${venue}`, payload);
+            } else {
+              logger.warn("TrueNativeSwap", `Quote returned null for ${venue}`, payload);
+            }
+          }
         }
       } catch (error) {
         logger.warn("TrueNativeSwap", `Failed to get quote from ${venue}`, { error });
@@ -350,10 +375,15 @@ export class TrueNativeSwap {
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => "");
-        logger.warn("TrueNativeSwap", "Orca API error", {
+        const payload = {
           status: response.status,
           error: errorText.slice(0, 200),
-        });
+        };
+        if (response.status === 502) {
+          logger.debug("TrueNativeSwap", "Orca API error", payload);
+        } else {
+          logger.warn("TrueNativeSwap", "Orca API error", payload);
+        }
         return null;
       }
 

@@ -149,9 +149,12 @@ WebSocketFactory.CLOSED = 3;
 
 // Match original module's export structure
 exports.default = WebSocketFactory;
+// rpc-websockets expects a named export `w3cwebsocket`
+exports.w3cwebsocket = WebSocketFactory;
 exports.WebSocketBrowserImpl = WebSocketBrowserImpl;
 
 // CommonJS default export pattern - use WebSocketFactory as the main export
 module.exports = WebSocketFactory;
 module.exports.default = WebSocketFactory;
+module.exports.w3cwebsocket = WebSocketFactory;
 module.exports.WebSocketBrowserImpl = WebSocketBrowserImpl;

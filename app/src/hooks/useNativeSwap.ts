@@ -744,7 +744,7 @@ export function useNativeSwap() {
               normalized.includes('block height exceeded') ||
               normalized.includes('expired')
             ) {
-              logger.warn("useNativeSwap", "confirmTransaction expired; polling signature status", {
+              logger.info("useNativeSwap", "confirmTransaction expired; polling signature status", {
                 signature,
                 error: msg,
               });

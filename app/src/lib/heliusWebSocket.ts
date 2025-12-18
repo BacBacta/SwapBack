@@ -17,6 +17,8 @@ interface WebSocketManager {
 
 const wsManagers = new Map<string, WebSocketManager>();
 
+const ENABLE_SOLANA_WS = process.env.NEXT_PUBLIC_ENABLE_SOLANA_WS === 'true';
+
 /**
  * Subscribe to real-time account updates via WebSocket
  * 
@@ -30,6 +32,12 @@ export function subscribeToAccount(
   callback: WebSocketCallback,
   connection: Connection
 ): () => void {
+  if (!ENABLE_SOLANA_WS) {
+    return () => {
+      // noop
+    };
+  }
+
   const key = accountPubkey.toBase58();
   
   let manager = wsManagers.get(key);
@@ -86,6 +94,12 @@ export function subscribeToLogs(
   callback: (signature: string, logs: string[]) => void,
   connection: Connection
 ): () => void {
+  if (!ENABLE_SOLANA_WS) {
+    return () => {
+      // noop
+    };
+  }
+
   const subscriptionId = connection.onLogs(
     programId,
     (logs) => {
@@ -112,6 +126,12 @@ export function subscribeToProgramAccounts(
   callback: (pubkey: PublicKey, accountInfo: unknown) => void,
   connection: Connection
 ): () => void {
+  if (!ENABLE_SOLANA_WS) {
+    return () => {
+      // noop
+    };
+  }
+
   const subscriptionId = connection.onProgramAccountChange(
     programId,
     (keyedAccountInfo) => {
