@@ -1453,7 +1453,7 @@ export class SwapExecutor {
     }
 
     // Set recent blockhash using latest RPC method
-    const { blockhash } = await this.connection.getLatestBlockhash(
+    const { blockhash } = await (this.connection as any).getLatestBlockhash(
       "confirmed"
     );
     transaction.recentBlockhash = blockhash;

@@ -330,7 +330,8 @@ export class TrueNativeSwap {
       );
 
       if (!response.ok) {
-        return this.estimateQuoteFromPool(accounts, amountIn);
+        // Pas de fallback estimatif pour Meteora DLMM : trop imprécis sans balances du pool
+        return null;
       }
 
       const data = await response.json();
@@ -339,7 +340,8 @@ export class TrueNativeSwap {
         priceImpactBps: (data.priceImpact || 0) * 10000,
       };
     } catch {
-      return this.estimateQuoteFromPool(accounts, amountIn);
+      // Pas de fallback estimatif pour Meteora DLMM : trop imprécis sans balances du pool
+      return null;
     }
   }
 
@@ -353,6 +355,21 @@ export class TrueNativeSwap {
     accounts: DEXAccounts,
     slippageBps?: number
   ): Promise<{ outputAmount: number; priceImpactBps: number; minOutAmount?: number } | null> {
+    const poolId = accounts.meta.poolAddress;
+    
+    // IMPORTANT: Si pas de poolId, on ne peut pas garantir que la quote API
+    // correspond au pool que le CPI utilisera. Retourner null pour éviter
+    // les décalages quote/exécution qui causent des erreurs de slippage.
+    if (!poolId) {
+      logger.warn("TrueNativeSwap", "Raydium quote skipped - no poolId available", {
+        inputMint: inputMint.toBase58(),
+        outputMint: outputMint.toBase58(),
+        amountIn,
+        hint: "Quote API might route to a different pool than CPI",
+      });
+      return null;
+    }
+    
     try {
       const response = await fetch(
         `/api/dex/raydium/quote?` +
@@ -360,7 +377,7 @@ export class TrueNativeSwap {
             inputMint: inputMint.toBase58(),
             outputMint: outputMint.toBase58(),
             amount: amountIn.toString(),
-            poolId: accounts.meta.poolAddress || "",
+            poolId,
             ...(typeof slippageBps === "number" && Number.isFinite(slippageBps)
               ? { slippageBps: Math.floor(slippageBps).toString() }
               : {}),
@@ -369,10 +386,21 @@ export class TrueNativeSwap {
       );
 
       if (!response.ok) {
-        return this.estimateQuoteFromPool(accounts, amountIn);
+        // Pas de fallback estimatif pour Raydium : trop imprécis sans balances du pool
+        return null;
       }
 
       const data = await response.json();
+      
+      // Vérifier que le poolId retourné correspond à celui demandé
+      if (data.poolId && data.poolId !== poolId) {
+        logger.warn("TrueNativeSwap", "Raydium API returned quote for different pool", {
+          requestedPoolId: poolId,
+          returnedPoolId: data.poolId,
+          hint: "Using returned quote but CPI might target different pool",
+        });
+      }
+      
       return {
         outputAmount: data.outputAmount,
         priceImpactBps: (data.priceImpact || 0) * 10000,
@@ -382,7 +410,8 @@ export class TrueNativeSwap {
             : undefined,
       };
     } catch {
-      return this.estimateQuoteFromPool(accounts, amountIn);
+      // Pas de fallback estimatif pour Raydium : trop imprécis sans balances du pool
+      return null;
     }
   }
 
@@ -406,22 +435,6 @@ export class TrueNativeSwap {
     // on désactive Phoenix au niveau quote pour éviter de sélectionner cette venue.
     logger.warn("TrueNativeSwap", "Phoenix quote disabled (orderbook quote not implemented)");
     return null;
-  }
-
-  /**
-   * Estimation de quote basée sur la formule AMM x*y=k
-   */
-  private estimateQuoteFromPool(
-    accounts: DEXAccounts,
-    amountIn: number
-  ): { outputAmount: number; priceImpactBps: number } | null {
-    const feeRate = accounts.meta.feeRate || 0.003;
-    // Estimation conservative: assume 0.3% fee + 0.1% slippage
-    const outputAmount = Math.floor(amountIn * (1 - feeRate - 0.001));
-    return {
-      outputAmount,
-      priceImpactBps: Math.round((feeRate + 0.001) * 10000),
-    };
   }
 
   // ==========================================================================
@@ -1212,6 +1225,25 @@ export class TrueNativeSwap {
           minAmountOut = candidate;
         }
       }
+    }
+
+    // Validation de sanité: détecter les minAmountOut suspectement proches de amountIn
+    // Pour les swaps non-stablecoin, un minAmountOut >= amountIn est un signe d'erreur
+    // car il y a toujours des frais dans un AMM swap.
+    const minOutRatio = minAmountOut / amountIn;
+    if (minOutRatio > 0.95) {
+      // minAmountOut est > 95% de amountIn - potentiellement dangereux
+      // Cela ne devrait arriver que pour des swaps stablecoin-to-stablecoin
+      // Pour éviter les erreurs "exceeds desired slippage limit", on log un warning
+      logger.warn("TrueNativeSwap", "minAmountOut is suspiciously close to amountIn", {
+        amountIn,
+        minAmountOut,
+        minOutRatio,
+        venue: route.venue,
+        outputAmount: route.outputAmount,
+        slippageBps,
+        hint: "This might cause 'exceeds desired slippage limit' errors if the quote was inaccurate",
+      });
     }
 
     logger.info("TrueNativeSwap", "Derived minAmountOut", {
