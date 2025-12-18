@@ -187,6 +187,18 @@ export class TrueNativeSwap {
       safeUser
     );
 
+    logger.info("TrueNativeSwap", "DEX accounts resolved", {
+      venuesWithAccounts: Array.from(allAccounts.keys()),
+      count: allAccounts.size,
+    });
+
+    if (allAccounts.size === 0) {
+      logger.warn("TrueNativeSwap", "No DEX pools found for this pair", {
+        inputMint: safeInputMint.toBase58(),
+        outputMint: safeOutputMint.toBase58(),
+      });
+    }
+
     // Pour chaque venue disponible, obtenir une quote
     for (const [venue, accounts] of allAccounts) {
       if (DISABLED_BEST_ROUTE_VENUES.has(venue)) {
@@ -226,6 +238,11 @@ export class TrueNativeSwap {
           logger.debug("TrueNativeSwap", `Quote from ${venue}`, {
             outputAmount: quote.outputAmount,
             priceImpactBps: quote.priceImpactBps,
+            latencyMs,
+          });
+        } else {
+          logger.warn("TrueNativeSwap", `Quote returned null for ${venue}`, {
+            poolAddress: accounts.meta?.poolAddress || "none",
             latencyMs,
           });
         }
