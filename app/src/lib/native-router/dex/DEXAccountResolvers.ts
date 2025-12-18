@@ -1179,10 +1179,42 @@ export async function getMeteoraAccounts(
       const dlmm = await DLMM.create(connection, lbPair);
       reserveX = dlmm.tokenX.reserve;
       reserveY = dlmm.tokenY.reserve;
-      tokenXMint = dlmm.tokenX.publicKey;
-      tokenYMint = dlmm.tokenY.publicKey;
-      tokenXProgram = dlmm.tokenX.owner;
-      tokenYProgram = dlmm.tokenY.owner;
+      // IMPORTANT: le SDK DLMM expose le mint via `tokenX.mint.address`.
+      // Utiliser `tokenX.publicKey` ici a déjà produit des mints invalides (ex: token account)
+      // => Token Program TransferChecked: "Account not associated with this Mint" (custom: 0x3).
+      tokenXMint =
+        dlmm?.tokenX?.mint?.address ??
+        dlmm?.tokenX?.mint?.publicKey ??
+        dlmm?.tokenX?.publicKey;
+      tokenYMint =
+        dlmm?.tokenY?.mint?.address ??
+        dlmm?.tokenY?.mint?.publicKey ??
+        dlmm?.tokenY?.publicKey;
+
+      if (!tokenXMint || !tokenYMint) {
+        logger.warn("MeteoraResolver", "DLMM SDK missing token mints", {
+          lbPair: lbPair.toBase58(),
+          tokenXMint: tokenXMint?.toBase58?.() ?? null,
+          tokenYMint: tokenYMint?.toBase58?.() ?? null,
+        });
+        return null;
+      }
+
+      // Déduire le token program via le owner du compte mint (Tokenkeg ou Token-2022)
+      const [tokenXMintInfo, tokenYMintInfo] = await Promise.all([
+        connection.getAccountInfo(tokenXMint),
+        connection.getAccountInfo(tokenYMint),
+      ]);
+      if (!tokenXMintInfo || !tokenYMintInfo) {
+        logger.warn("MeteoraResolver", "DLMM SDK returned mint that is missing on-chain", {
+          lbPair: lbPair.toBase58(),
+          tokenXMint: tokenXMint.toBase58(),
+          tokenYMint: tokenYMint.toBase58(),
+        });
+        return null;
+      }
+      tokenXProgram = tokenXMintInfo.owner;
+      tokenYProgram = tokenYMintInfo.owner;
 
       swapForY = safeInputMint.equals(tokenXMint);
       if (!swapForY && !safeInputMint.equals(tokenYMint)) {

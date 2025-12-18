@@ -1426,6 +1426,7 @@ export class TrueNativeSwap {
       if (!inputAtaInfo) {
         instructions.push(
           createAssociatedTokenAccountInstruction(
+          createCloseAccountInstruction,
             userPublicKey,
             userTokenAccountA,
             userPublicKey,
@@ -1483,6 +1484,19 @@ export class TrueNativeSwap {
     instructions.push(
       await this.buildNativeSwapInstruction(userPublicKey, route, effectiveParams)
     );
+    
+    // Output side: si l'utilisateur a demandé du SOL natif, on swap vers WSOL
+    // (So111...) puis on close le compte WSOL pour unwrap et renvoyer les lamports.
+    // NOTE: on utilise l'ATA WSOL (créé ci-dessus si absent). Il sera recréé au besoin.
+    if (outputMint.equals(SOL_MINT)) {
+      instructions.push(
+        createCloseAccountInstruction(
+          userTokenAccountB, // WSOL token account
+          userPublicKey, // destination (receives SOL)
+          userPublicKey // owner
+        )
+      );
+    }
 
     // 4. Construire la transaction versionnée
     const { blockhash, lastValidBlockHeight } =
