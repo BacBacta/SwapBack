@@ -55,6 +55,23 @@ async function main() {
     userPublicKey: USER,
   });
 
+  // Debug: print the DEX account slice and the swap instruction keys
+  console.log('\n--- DEX account slice (first 30) ---');
+  dexAccounts.accounts.slice(0, 30).forEach((a, i) => console.log(` [${i}] ${a.toBase58()}`));
+
+  console.log('\n--- swapIx keys ---');
+  ix.keys.forEach((k, i) => console.log(` [${i}] ${k.pubkey.toBase58()} writable=${k.isWritable} signer=${k.isSigner}`));
+
+  // Map expected indices for Meteora
+  console.log('\n--- Expected Meteora indices ---');
+  console.log(' lb_pair [0] =', dexAccounts.accounts[0].toBase58());
+  console.log(' reserve_x [2] =', dexAccounts.accounts[2].toBase58());
+  console.log(' reserve_y [3] =', dexAccounts.accounts[3].toBase58());
+  console.log(' user_token_x [4] =', dexAccounts.accounts[4].toBase58());
+  console.log(' user_token_y [5] =', dexAccounts.accounts[5].toBase58());
+  console.log(' token_x_mint [6] =', dexAccounts.accounts[6].toBase58());
+  console.log(' token_y_mint [7] =', dexAccounts.accounts[7].toBase58());
+
   const { blockhash } = await connection.getLatestBlockhash();
   const { TransactionMessage } = await import("@solana/web3.js");
   const msg = new VersionedTransaction(
@@ -66,7 +83,7 @@ async function main() {
   );
 
   console.log("Simulating...");
-  const sim = await connection.simulateTransaction(msg);
+  const sim = await connection.simulateTransaction(msg, { replaceRecentBlockhash: true, sigVerify: false });
 
   console.log("Simulation Error:", JSON.stringify(sim.value.err));
   console.log("Logs:");

@@ -76,6 +76,24 @@ pub fn swap(
             return err!(ErrorCode::DexExecutionFailed);
         };
 
+    // --- DEBUG LOGGING: dump relevant account pubkeys + mints (best-effort) ---
+    fn account_mint_str(account: &AccountInfo) -> Option<String> {
+        if account.data_is_empty() { return None; }
+        match SplAccount::unpack(&account.try_borrow_data().ok()?) {
+            Ok(a) => Some(a.mint.to_string()),
+            Err(_) => None,
+        }
+    }
+
+    msg!("Meteora DLMM: debug lb_pair={}, reserve_x={}, reserve_y={}",
+         account_slice[LB_PAIR_INDEX].key(), account_slice[RESERVE_X_INDEX].key(), account_slice[RESERVE_Y_INDEX].key());
+    msg!("Meteora DLMM: debug user_token_x={}, user_token_y={}", user_token_x.key(), user_token_y.key());
+    if let Some(m) = account_mint_str(user_token_x) { msg!("Meteora DLMM: user_token_x.mint={}", m); }
+    if let Some(m) = account_mint_str(user_token_y) { msg!("Meteora DLMM: user_token_y.mint={}", m); }
+    if let Some(m) = account_mint_str(&account_slice[RESERVE_X_INDEX]) { msg!("Meteora DLMM: reserve_x.mint={}", m); }
+    if let Some(m) = account_mint_str(&account_slice[RESERVE_Y_INDEX]) { msg!("Meteora DLMM: reserve_y.mint={}", m); }
+    msg!("Meteora DLMM: token_x_mint={}, token_y_mint={}", account_slice[TOKEN_X_MINT_INDEX].key(), account_slice[TOKEN_Y_MINT_INDEX].key());
+
     // Read pre-swap balance
     let pre_amount = read_token_amount(destination_account)?;
 

@@ -22,6 +22,45 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Credentials": "true",
 };
 
+// Retry config for transient Cloudflare/CDN errors (code 1016, 502, 503, 504)
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 500;
+
+/**
+ * Safe JSON parse: returns null if body is not valid JSON
+ */
+async function safeJsonParse(response: Response): Promise<{ json: unknown; text: string } | null> {
+  const text = await response.text();
+  try {
+    const json = JSON.parse(text);
+    return { json, text };
+  } catch {
+    return { json: null, text };
+  }
+}
+
+/**
+ * Check if error is retryable (Cloudflare CDN errors, rate limits, etc.)
+ */
+function isRetryableError(status: number, body: string): boolean {
+  // Cloudflare error codes in HTML body
+  if (body.includes("error code: 1016") || body.includes("error code: 1015")) {
+    return true;
+  }
+  // HTTP 502/503/504 are typically transient
+  if (status === 502 || status === 503 || status === 504 || status === 429) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Sleep helper
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,
@@ -70,47 +109,88 @@ export async function GET(request: NextRequest) {
         slippage: slippagePct,
       });
 
-    const response = await fetch(url, {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(7000),
-      // Cache faible: l'état pool peut changer vite
-      next: { revalidate: 2 },
-    });
+    let lastError: { status: number; body: string } | null = null;
 
-    if (!response.ok) {
-      const body = await response.text().catch(() => "");
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (attempt > 0) {
+        console.log(`[Orca Quote API] Retry ${attempt}/${MAX_RETRIES} after transient error`);
+        await sleep(RETRY_DELAY_MS * attempt);
+      }
+
+      const response = await fetch(url, {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(7000),
+        // Cache faible: l'état pool peut changer vite
+        next: { revalidate: 2 },
+      });
+
+      // Parse response safely (may be HTML error page from Cloudflare)
+      const parsed = await safeJsonParse(response);
+      const body = parsed?.text ?? "";
+      const data = parsed?.json as Record<string, unknown> | null;
+
+      if (!response.ok) {
+        console.warn(`[Orca Quote API] Upstream error ${response.status}:`, body.slice(0, 200));
+        
+        // Check if retryable
+        if (isRetryableError(response.status, body) && attempt < MAX_RETRIES) {
+          lastError = { status: response.status, body: body.slice(0, 500) };
+          continue; // retry
+        }
+
+        return NextResponse.json(
+          { error: "Orca upstream error", status: response.status, body: body.slice(0, 500) },
+          { status: 502, headers: CORS_HEADERS }
+        );
+      }
+
+      // Check if we got valid JSON
+      if (!data || typeof data !== "object") {
+        console.warn(`[Orca Quote API] Invalid JSON response:`, body.slice(0, 200));
+        
+        if (isRetryableError(200, body) && attempt < MAX_RETRIES) {
+          lastError = { status: 200, body: body.slice(0, 500) };
+          continue; // retry
+        }
+
+        return NextResponse.json(
+          { error: "Orca returned invalid JSON", body: body.slice(0, 500) },
+          { status: 502, headers: CORS_HEADERS }
+        );
+      }
+
+      const outAmount = Number(data.outAmount ?? 0);
+      const priceImpactPercent = Number(data.priceImpactPercent ?? 0);
+      const priceImpactBps = Number.isFinite(priceImpactPercent)
+        ? Math.round(priceImpactPercent * 100)
+        : 0;
+
+      if (!Number.isFinite(outAmount) || outAmount <= 0) {
+        return NextResponse.json(
+          { error: "Invalid Orca quote response", data },
+          { status: 502, headers: CORS_HEADERS }
+        );
+      }
+
       return NextResponse.json(
-        { error: "Orca upstream error", status: response.status, body },
-        { status: 502, headers: CORS_HEADERS }
+        {
+          inputMint,
+          outputMint,
+          inputAmount: amountIn,
+          outputAmount: outAmount,
+          priceImpact: Number.isFinite(priceImpactPercent) ? priceImpactPercent / 100 : 0,
+          priceImpactBps,
+          slippageBps,
+          source: "orca-api",
+        },
+        { headers: CORS_HEADERS }
       );
     }
 
-    const data = await response.json();
-    const outAmount = Number(data.outAmount ?? 0);
-    const priceImpactPercent = Number(data.priceImpactPercent ?? 0);
-    const priceImpactBps = Number.isFinite(priceImpactPercent)
-      ? Math.round(priceImpactPercent * 100)
-      : 0;
-
-    if (!Number.isFinite(outAmount) || outAmount <= 0) {
-      return NextResponse.json(
-        { error: "Invalid Orca quote response", data },
-        { status: 502, headers: CORS_HEADERS }
-      );
-    }
-
+    // All retries exhausted
     return NextResponse.json(
-      {
-        inputMint,
-        outputMint,
-        inputAmount: amountIn,
-        outputAmount: outAmount,
-        priceImpact: Number.isFinite(priceImpactPercent) ? priceImpactPercent / 100 : 0,
-        priceImpactBps,
-        slippageBps,
-        source: "orca-api",
-      },
-      { headers: CORS_HEADERS }
+      { error: "Orca API unavailable after retries", lastError },
+      { status: 503, headers: CORS_HEADERS }
     );
   } catch (error) {
     console.error('[Orca Quote API] Error:', error);
