@@ -1880,6 +1880,17 @@ async function findRaydiumPoolOnChain(
   inputMint: PublicKey,
   outputMint: PublicKey
 ): Promise<RaydiumPoolConfig | null> {
+  const readSplTokenAccountAmount = (data: Buffer | null | undefined): bigint | null => {
+    // SPL Token Account layout: amount is u64 LE at offset 64
+    // https://spl.solana.com/token (Token account layout)
+    if (!data || data.length < 72) return null;
+    try {
+      return data.readBigUInt64LE(64);
+    } catch {
+      return null;
+    }
+  };
+
   const layout = await getRaydiumAmmLayout(connection);
   if (!layout) return null;
 
@@ -1906,9 +1917,44 @@ async function findRaydiumPoolOnChain(
 
     if (candidates.length === 0) return null;
 
+    // IMPORTANT: Il peut exister plusieurs AMM Raydium pour la même paire.
+    // Choisir arbitrairement le premier peut sélectionner un pool quasi vide => CPI "insufficient funds".
+    // On score les candidats (capés) via les balances des vaults (coin/pc) et on prend le meilleur.
     candidates.sort((x, y) => x.pubkey.toBase58().localeCompare(y.pubkey.toBase58()));
-    const chosen = candidates[0];
-    const decoded = decodeRaydiumPoolFromAmmState(chosen.pubkey, chosen.account.data, layout, ammAuthority);
+
+    const MAX_CANDIDATES_TO_SCORE = 8;
+    const scoredCandidates = candidates.slice(0, MAX_CANDIDATES_TO_SCORE).map((c) => {
+      const decoded = decodeRaydiumPoolFromAmmState(c.pubkey, c.account.data, layout, ammAuthority);
+      return { candidate: c, decoded };
+    });
+
+    const vaultKeys: PublicKey[] = [];
+    for (const item of scoredCandidates) {
+      vaultKeys.push(item.decoded.poolCoinTokenAccount, item.decoded.poolPcTokenAccount);
+    }
+
+    const vaultInfos = await connection.getMultipleAccountsInfo(vaultKeys, "confirmed");
+    const vaultAmountByKey = new Map<string, bigint>();
+    for (let i = 0; i < vaultKeys.length; i++) {
+      const amount = readSplTokenAccountAmount(vaultInfos[i]?.data);
+      if (amount !== null) vaultAmountByKey.set(vaultKeys[i].toBase58(), amount);
+    }
+
+    let best = scoredCandidates[0];
+    let bestScore: bigint = -1n;
+
+    for (const item of scoredCandidates) {
+      const coin = vaultAmountByKey.get(item.decoded.poolCoinTokenAccount.toBase58()) ?? 0n;
+      const pc = vaultAmountByKey.get(item.decoded.poolPcTokenAccount.toBase58()) ?? 0n;
+      const score = coin * pc;
+      if (score > bestScore) {
+        bestScore = score;
+        best = item;
+      }
+    }
+
+    const chosen = best.candidate;
+    const decoded = best.decoded;
 
     const mA = decoded.tokenMintA;
     const mB = decoded.tokenMintB;
@@ -1930,11 +1976,12 @@ async function findRaydiumPoolOnChain(
     }
 
     if (candidates.length > 1) {
-      logger.warn("RaydiumResolver", "Multiple Raydium AMM pools found for pair; picking first", {
+      logger.warn("RaydiumResolver", "Multiple Raydium AMM pools found for pair; picking best by vault liquidity", {
         inputMint: inputMint.toBase58(),
         outputMint: outputMint.toBase58(),
         picked: chosen.pubkey.toBase58(),
         count: candidates.length,
+        scored: Math.min(candidates.length, 8),
       });
     }
 

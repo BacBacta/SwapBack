@@ -935,10 +935,18 @@ export function useNativeSwap() {
             "Erreur d'instruction Dynamic Plan. " +
             "Veuillez réessayer ou contacter le support."
           );
-        } else if (normalized.includes("insufficient") || normalized.includes("0x1")) {
+        } else if (
+          normalized.includes("custom:40") ||
+          normalized.includes("0x28") ||
+          normalized.includes("insufficient funds") ||
+          (normalized.includes("insufficient") && !normalized.includes("oraclestale")) ||
+          normalized.includes("0x1")
+        ) {
           setError(
-            "Solde insuffisant pour effectuer ce swap. " +
-            "Vérifiez que vous avez assez de tokens."
+            "Simulation échouée: fonds insuffisants (Raydium/Router). " +
+              "Causes fréquentes: (1) solde USDC insuffisant sur votre compte associé (ATA) utilisé par le swap, " +
+              "surtout si vous utilisez MAX; (2) pas assez de SOL pour payer les frais réseau/créations de comptes. " +
+              "Essayez de réduire légèrement le montant et assurez-vous d'avoir un petit solde SOL pour les frais."
           );
         } else if (phoenixLike) {
           setError(
