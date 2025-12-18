@@ -692,6 +692,23 @@ export function useNativeSwap() {
           blockhash: string;
           lastValidBlockHeight: number;
         }): Promise<string> => {
+          const waitForSignature = async (signature: string, timeoutMs: number): Promise<"confirmed" | "finalized" | null> => {
+            const start = Date.now();
+            while (Date.now() - start < timeoutMs) {
+              try {
+                const st = await connection.getSignatureStatuses([signature]);
+                const v = st.value[0];
+                if (v?.confirmationStatus === "finalized") return "finalized";
+                if (v?.confirmationStatus === "confirmed") return "confirmed";
+                if (v?.err) return null;
+              } catch {
+                // ignore transient
+              }
+              await new Promise((r) => setTimeout(r, 1000));
+            }
+            return null;
+          };
+
           // Envoyer
           params.onProgress?.('sending');
           const signature = await connection.sendTransaction(ctx.signed, {
@@ -709,14 +726,35 @@ export function useNativeSwap() {
 
           // Confirmer (avec contexte blockhash pour éviter les faux négatifs)
           params.onProgress?.('confirming');
-          const confirmation = await connection.confirmTransaction(
-            {
-              signature,
-              blockhash: ctx.blockhash,
-              lastValidBlockHeight: ctx.lastValidBlockHeight,
-            },
-            'confirmed'
-          );
+          let confirmation;
+          try {
+            confirmation = await connection.confirmTransaction(
+              {
+                signature,
+                blockhash: ctx.blockhash,
+                lastValidBlockHeight: ctx.lastValidBlockHeight,
+              },
+              'confirmed'
+            );
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            const normalized = msg.toLowerCase();
+            if (
+              normalized.includes('transactionexpiredblockheightexceeded') ||
+              normalized.includes('block height exceeded') ||
+              normalized.includes('expired')
+            ) {
+              logger.warn("useNativeSwap", "confirmTransaction expired; polling signature status", {
+                signature,
+                error: msg,
+              });
+              const status = await waitForSignature(signature, 25_000);
+              if (status) {
+                return signature;
+              }
+            }
+            throw e;
+          }
 
           if (confirmation.value.err) {
             // Essayer de récupérer des logs on-chain pour diagnostic
@@ -775,6 +813,39 @@ export function useNativeSwap() {
             });
 
             // Rebuild + re-simulate + re-sign (1x)
+            result = await build();
+            if (!result) {
+              throw new Error("Impossible de reconstruire la transaction native");
+            }
+
+            const sim2 = await connection.simulateTransaction(result.transaction, {
+              sigVerify: false,
+              replaceRecentBlockhash: false,
+            });
+            if (sim2.value.err) {
+              const logsTail2 = sim2.value.logs?.slice(-30) ?? [];
+              throw new Error(
+                `Simulation du swap natif échouée (retry): ${JSON.stringify(sim2.value.err)}` +
+                  (logsTail2.length ? `\nLogs (tail):\n${logsTail2.join("\n")}` : "")
+              );
+            }
+
+            params.onProgress?.('signing');
+            const signedTx2 = await signTransaction(result.transaction);
+            signature = await sendAndConfirm({
+              signed: signedTx2,
+              blockhash: result.blockhash,
+              lastValidBlockHeight: result.lastValidBlockHeight,
+            });
+          } else if (
+            normalizedSend.includes('block height exceeded') ||
+            normalizedSend.includes('transactionexpiredblockheightexceeded')
+          ) {
+            // Si l'expiration survient pendant confirm, on tente 1 rebuild+resign supplémentaire.
+            logger.warn("useNativeSwap", "Tx expired during confirmation; rebuilding once", {
+              error: msg,
+            });
+
             result = await build();
             if (!result) {
               throw new Error("Impossible de reconstruire la transaction native");

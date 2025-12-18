@@ -1006,7 +1006,7 @@ async function findDLMMPair(
       try {
         const response = await fetch(
           `https://dlmm-api.meteora.ag/pair/all_by_groups?include_pool_token=true`,
-          { signal: AbortSignal.timeout(5000) }
+          { signal: AbortSignal.timeout(METEORA_DLMM_API_TIMEOUT_MS) }
         );
 
         if (!response.ok) {
