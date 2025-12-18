@@ -87,7 +87,20 @@ class CommonClient extends EventEmitter {
     let socketInstance;
     try {
       const factory = this.webSocketFactory || defaultFactory;
-      socketInstance = factory(this.url, this.options);
+      // Some callers pass a WebSocket *constructor* as the "factory".
+      // The original rpc-websockets client instantiates it with `new`.
+      // If we call it as a plain function, browsers throw:
+      //   "WebSocket constructor: 'new' is required"
+      try {
+        socketInstance = factory(this.url, this.options);
+      } catch (innerError) {
+        const message = innerError instanceof Error ? innerError.message : String(innerError);
+        if (typeof factory === 'function' && /'new' is required/i.test(message)) {
+          socketInstance = new factory(this.url, this.options?.protocols);
+        } else {
+          throw innerError;
+        }
+      }
     } catch (error) {
       queueMicrotask(() => this.emit('error', error));
       return;

@@ -395,10 +395,12 @@ export class TrueNativeSwap {
   ): Promise<{ outputAmount: number; priceImpactBps: number } | null> {
     try {
       const response = await fetch(
-        `https://dlmm-api.meteora.ag/pair/${accounts.meta.poolAddress}/quote?` +
+        `/api/dex/meteora/quote?` +
           new URLSearchParams({
-            swapMode: inputMint.toBase58() < outputMint.toBase58() ? "ExactIn" : "ExactOut",
+            inputMint: inputMint.toBase58(),
+            outputMint: outputMint.toBase58(),
             amount: amountIn.toString(),
+            // swapMode=ExactIn côté proxy; on laisse ici l’API gérer la direction.
           }),
         { signal: AbortSignal.timeout(8000) }
       );
@@ -414,7 +416,7 @@ export class TrueNativeSwap {
       }
 
       const data = await response.json();
-      const outputAmount = parseInt(data.outAmount || "0");
+      const outputAmount = Number(data.outputAmount ?? data.outAmount ?? 0);
       
       if (!Number.isFinite(outputAmount) || outputAmount <= 0) {
         logger.warn("TrueNativeSwap", "Meteora quote invalid output", {
@@ -426,7 +428,10 @@ export class TrueNativeSwap {
       
       return {
         outputAmount,
-        priceImpactBps: (data.priceImpact || 0) * 10000,
+        priceImpactBps:
+          typeof data.priceImpactBps === "number" && Number.isFinite(data.priceImpactBps)
+            ? data.priceImpactBps
+            : (Number(data.priceImpact || 0) || 0) * 10000,
       };
     } catch (err) {
       logger.warn("TrueNativeSwap", "Meteora quote exception", {
