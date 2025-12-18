@@ -13,6 +13,7 @@
 import {
   Connection,
   PublicKey,
+  Keypair,
   Transaction,
   TransactionInstruction,
   VersionedTransaction,
@@ -72,7 +73,10 @@ const COMPUTE_UNITS = 400_000;
 // Phoenix (CLOB) requiert une quote orderbook (phoenix-sdk). Tant que ce n'est
 // pas implémenté côté client, on l'exclut du best-route pour éviter les IOC
 // failures (custom program error 0xF) dues à un minOut irréaliste.
-const DISABLED_BEST_ROUTE_VENUES = new Set<SupportedVenue>(["PHOENIX"]);
+// Best-route venues disabled until their quote->CPI coupling is proven reliable.
+// - PHOENIX: quote orderbook not implemented (IOC failures).
+// - RAYDIUM_AMM: REST quote can route through different pools than CPI (can trigger slippage failure 0x1e).
+const DISABLED_BEST_ROUTE_VENUES = new Set<SupportedVenue>(["PHOENIX", "RAYDIUM_AMM"]);
 
 // Venues pour lesquelles on a une implémentation de quote dans ce module.
 const QUOTED_VENUES = new Set<SupportedVenue>([
@@ -150,6 +154,31 @@ export class TrueNativeSwap {
     this.connection = connection;
   }
 
+  private async sleep(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private async getAccountInfoWithRetry(pubkey: PublicKey): Promise<Awaited<ReturnType<Connection["getAccountInfo"]>>> {
+    // web3.js a déjà un retry interne, mais sur certains RPC publics ça reste insuffisant.
+    // On ajoute une couche de backoff supplémentaire pour éviter les échecs non déterministes en simulate.
+    const delaysMs = [500, 1000, 2000, 4000, 8000, 12000];
+    let lastErr: unknown;
+    for (let i = 0; i < delaysMs.length; i++) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        return await this.connection.getAccountInfo(pubkey);
+      } catch (e) {
+        lastErr = e;
+        const msg = e instanceof Error ? e.message : String(e);
+        const is429 = msg.includes("429") || msg.toLowerCase().includes("rate limit");
+        if (!is429) throw e;
+        // eslint-disable-next-line no-await-in-loop
+        await this.sleep(delaysMs[i]);
+      }
+    }
+    throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+  }
+
   private async getMintDecimals(mint: PublicKey): Promise<number> {
     const key = mint.toBase58();
     const cached = this.mintDecimalsCache.get(key);
@@ -172,7 +201,8 @@ export class TrueNativeSwap {
     outputMint: PublicKey,
     amountIn: number,
     userPublicKey: PublicKey,
-    slippageBps?: number
+    slippageBps?: number,
+    venuesOverride?: SupportedVenue[]
   ): Promise<NativeVenueQuote[]> {
     const safeInputMint = toPublicKey(inputMint);
     const safeOutputMint = toPublicKey(outputMint);
@@ -186,12 +216,15 @@ export class TrueNativeSwap {
       amountIn,
     });
 
-    // Obtenir les comptes pour toutes les venues en parallèle
+    const venuesToResolve = venuesOverride?.length ? venuesOverride : Array.from(QUOTED_VENUES);
+
+    // Résoudre uniquement les comptes des venues pertinentes.
     const allAccounts = await getAllDEXAccounts(
       this.connection,
       safeInputMint,
       safeOutputMint,
-      safeUser
+      safeUser,
+      venuesToResolve
     );
 
     logger.info("TrueNativeSwap", "DEX accounts resolved", {
@@ -279,10 +312,13 @@ export class TrueNativeSwap {
     // Trier par meilleur output
     quotes.sort((a, b) => b.outputAmount - a.outputAmount);
 
-    // Si aucune quote n'a été obtenue et que Raydium n'est pas dans les comptes résolus,
-    // essayer de récupérer une quote Raydium via l'API (qui fait son propre routing)
-    if (quotes.length === 0 && !allAccounts.has("RAYDIUM_AMM")) {
-      logger.info("TrueNativeSwap", "Trying Raydium API fallback (no resolved accounts)");
+    // IMPORTANT:
+    // Raydium REST quote peut router via d'autres pools que ceux utilisés en CPI,
+    // et sans comptes DEX résolus on ne peut pas exécuter la route de manière fiable.
+    // On laisse un flag explicite pour debug uniquement.
+    const enableRaydiumApiFallback = process.env.SWAPBACK_ENABLE_RAYDIUM_API_FALLBACK === "true";
+    if (enableRaydiumApiFallback && quotes.length === 0 && !allAccounts.has("RAYDIUM_AMM")) {
+      logger.info("TrueNativeSwap", "Trying Raydium API fallback (debug flag enabled)");
       try {
         const startTime = Date.now();
         const emptyAccounts: DEXAccounts = {
@@ -299,7 +335,7 @@ export class TrueNativeSwap {
           slippageBps
         );
         const latencyMs = Date.now() - startTime;
-        
+
         if (raydiumQuote) {
           quotes.push({
             venue: "RAYDIUM_AMM",
@@ -339,7 +375,7 @@ export class TrueNativeSwap {
   ): Promise<{ outputAmount: number; priceImpactBps: number; minOutAmount?: number } | null> {
     switch (venue) {
       case "ORCA_WHIRLPOOL":
-        return this.getOrcaQuote(inputMint, outputMint, amountIn, accounts);
+        return this.getOrcaQuote(inputMint, outputMint, amountIn, accounts, slippageBps);
       case "METEORA_DLMM":
         return this.getMeteoraQuote(inputMint, outputMint, amountIn, accounts, slippageBps);
       case "RAYDIUM_AMM":
@@ -358,20 +394,84 @@ export class TrueNativeSwap {
     inputMint: PublicKey,
     outputMint: PublicKey,
     amountIn: number,
-    accounts: DEXAccounts
+    accounts: DEXAccounts,
+    slippageBps?: number
   ): Promise<{ outputAmount: number; priceImpactBps: number } | null> {
     try {
-      // Utiliser l'API Orca pour obtenir une quote
-      const response = await fetch(
+      const bpsRaw = typeof slippageBps === "number" && Number.isFinite(slippageBps) ? slippageBps : 50;
+      const bps = Math.min(10_000, Math.max(0, Math.floor(bpsRaw)));
+
+      const isNode = typeof window === "undefined";
+
+      // En Node/tsx (scripts): utiliser l'Orca Whirlpools SDK (quote on-chain)
+      // pour éviter les incidents REST (Cloudflare, payloads non-JSON, 1016, etc.).
+      if (isNode) {
+        const poolAddress = accounts.meta.poolAddress;
+        if (!poolAddress) return null;
+
+        const [{ AnchorProvider }, { Percentage }, whirlpools] = await Promise.all([
+          import("@coral-xyz/anchor"),
+          import("@orca-so/common-sdk"),
+          import("@orca-so/whirlpools-sdk"),
+        ]);
+
+        const {
+          WhirlpoolContext,
+          buildWhirlpoolClient,
+          swapQuoteByInputToken,
+          UseFallbackTickArray,
+        } = whirlpools as any;
+
+        const payer = Keypair.generate();
+        // Wallet readonly: suffisant pour lire/quote via SDK.
+        const wallet: any = {
+          publicKey: payer.publicKey,
+          payer,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          signTransaction: async (tx: any) => tx,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          signAllTransactions: async (txs: any[]) => txs,
+        };
+
+        const provider = new AnchorProvider(this.connection, wallet, AnchorProvider.defaultOptions());
+        const context = WhirlpoolContext.withProvider(provider);
+        const client = buildWhirlpoolClient(context);
+
+        const pool = await client.getPool(new PublicKey(poolAddress));
+        await pool.refreshData();
+
+        const slippage = Percentage.fromFraction(bps, 10_000);
+        const quote = await swapQuoteByInputToken(
+          pool,
+          inputMint,
+          new BN(amountIn.toString()),
+          slippage,
+          DEX_PROGRAM_IDS.ORCA_WHIRLPOOL,
+          context.fetcher,
+          undefined,
+          UseFallbackTickArray.Situational
+        );
+
+        const outputAmount = Number(quote?.estimatedAmountOut?.toString?.() ?? 0);
+        if (!Number.isFinite(outputAmount) || outputAmount <= 0) {
+          return null;
+        }
+
+        return { outputAmount, priceImpactBps: 0 };
+      }
+
+      // En navigateur: passer par /api/dex/* (évite CORS).
+      const url =
         `/api/dex/orca/quote?` +
-          new URLSearchParams({
-            inputMint: inputMint.toBase58(),
-            outputMint: outputMint.toBase58(),
-            amount: amountIn.toString(),
-            pool: accounts.meta.poolAddress || "",
-          }),
-        { signal: AbortSignal.timeout(8000) }
-      );
+        new URLSearchParams({
+          inputMint: inputMint.toBase58(),
+          outputMint: outputMint.toBase58(),
+          amount: amountIn.toString(),
+          pool: accounts.meta.poolAddress || "",
+          slippageBps: bps.toString(),
+        });
+
+      const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => "");
@@ -388,10 +488,13 @@ export class TrueNativeSwap {
       }
 
       const data = await response.json();
-      const outputAmount = Number(data.outputAmount ?? 0);
+      const outputAmount = Number(data.outputAmount ?? data.outAmount ?? 0);
+      // /api/dex/orca/quote renvoie priceImpactBps; l'upstream renvoie priceImpactPercent.
       const priceImpactBps = Number(
         data.priceImpactBps ??
-          (typeof data.priceImpact === "number" ? data.priceImpact * 10000 : 0)
+          (typeof data.priceImpactPercent === "number"
+            ? Math.round(data.priceImpactPercent * 100)
+            : (typeof data.priceImpact === "number" ? data.priceImpact * 10000 : 0))
       );
 
       if (!Number.isFinite(outputAmount) || outputAmount <= 0) {
@@ -425,6 +528,74 @@ export class TrueNativeSwap {
     slippageBps?: number
   ): Promise<{ outputAmount: number; priceImpactBps: number } | null> {
     try {
+      const bpsRaw = typeof slippageBps === "number" && Number.isFinite(slippageBps) ? slippageBps : 50;
+      const bps = Math.min(10_000, Math.max(0, Math.floor(bpsRaw)));
+
+      const isNode = typeof window === "undefined";
+      if (isNode) {
+        const pairAddress = accounts.meta.poolAddress;
+        if (!pairAddress) return null;
+
+        // Note: en Node ESM, l'import ESM de @meteora-ag/dlmm peut échouer
+        // (résolution Anchor "Directory import ... not supported").
+        // En scripts/serveur, on préfère charger la build CJS via createRequire().
+        let dlmmMod: any;
+        try {
+          const nodeModule: any = await import(/* webpackIgnore: true */ "node:module");
+          const createRequire = nodeModule?.createRequire;
+          if (typeof createRequire === "function") {
+            const req = createRequire(import.meta.url);
+            dlmmMod = req("@meteora-ag/dlmm");
+          } else {
+            dlmmMod = await import("@meteora-ag/dlmm");
+          }
+        } catch (e) {
+          try {
+            dlmmMod = await import("@meteora-ag/dlmm");
+          } catch (e2) {
+            logger.warn("TrueNativeSwap", "Meteora DLMM module load failed", {
+              error: e2 instanceof Error ? e2.message : String(e2),
+            });
+            return null;
+          }
+        }
+
+        const DLMM: any = (dlmmMod as any)?.DLMM ?? (dlmmMod as any)?.default ?? dlmmMod;
+
+        const dlmm = await DLMM.create(this.connection, new PublicKey(pairAddress));
+        const tokenXMint: PublicKey =
+          dlmm?.tokenX?.mint?.address ?? dlmm?.tokenX?.mint?.publicKey ?? dlmm?.tokenX?.publicKey;
+        const tokenYMint: PublicKey =
+          dlmm?.tokenY?.mint?.address ?? dlmm?.tokenY?.mint?.publicKey ?? dlmm?.tokenY?.publicKey;
+        if (!tokenXMint || !tokenYMint) return null;
+
+        const quoteMint =
+          tokenXMint.equals(SOL_MINT) || tokenXMint.equals(USDC_MINT) ? tokenXMint : tokenYMint;
+        const isSupportedQuote = quoteMint.equals(SOL_MINT) || quoteMint.equals(USDC_MINT);
+        if (!isSupportedQuote) return null;
+
+        const swapForY = inputMint.equals(quoteMint);
+        let binArrayAccounts: Array<{ publicKey: PublicKey }> = [];
+        for (const depth of [5, 20, 60]) {
+          // eslint-disable-next-line no-await-in-loop
+          binArrayAccounts = await dlmm.getBinArrayForSwap(swapForY, depth);
+          if (binArrayAccounts.length > 0) break;
+        }
+        if (binArrayAccounts.length === 0) return null;
+
+        const quote = await dlmm.swapQuote(
+          new BN(amountIn.toString()),
+          swapForY,
+          new BN(bps.toString()),
+          binArrayAccounts
+        );
+
+        const outAmountStr = quote?.outAmount?.toString?.() ?? "0";
+        const outAmount = Number(outAmountStr);
+        if (!Number.isFinite(outAmount) || outAmount <= 0) return null;
+        return { outputAmount: outAmount, priceImpactBps: 0 };
+      }
+
       const response = await fetch(
         `/api/dex/meteora/quote?` +
           new URLSearchParams({
@@ -432,9 +603,7 @@ export class TrueNativeSwap {
             outputMint: outputMint.toBase58(),
             amount: amountIn.toString(),
             pairAddress: accounts.meta.poolAddress || "",
-            ...(typeof slippageBps === "number" && Number.isFinite(slippageBps)
-              ? { slippageBps: Math.floor(slippageBps).toString() }
-              : {}),
+            slippageBps: bps.toString(),
           }),
         { signal: AbortSignal.timeout(8000) }
       );
@@ -498,6 +667,7 @@ export class TrueNativeSwap {
     }
     
     try {
+      const isNode = typeof window === "undefined";
       const params: Record<string, string> = {
         inputMint: inputMint.toBase58(),
         outputMint: outputMint.toBase58(),
@@ -512,10 +682,20 @@ export class TrueNativeSwap {
         params.slippageBps = Math.floor(slippageBps).toString();
       }
       
-      const response = await fetch(
-        `/api/dex/raydium/quote?` + new URLSearchParams(params),
-        { signal: AbortSignal.timeout(10000) }
-      );
+      const query = new URLSearchParams(params);
+      const url = isNode
+        ? `https://transaction-v1.raydium.io/compute/swap-base-in?` +
+          new URLSearchParams({
+            inputMint: params.inputMint,
+            outputMint: params.outputMint,
+            amount: params.amount,
+            slippageBps: params.slippageBps ?? "50",
+            txVersion: "V0",
+            ...(params.poolId ? { poolId: params.poolId } : {}),
+          })
+        : `/api/dex/raydium/quote?` + query;
+
+      const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => "");
@@ -528,17 +708,12 @@ export class TrueNativeSwap {
       }
 
       const data = await response.json();
-      
-      // Vérifier que le poolId retourné correspond à celui demandé
-      if (data.poolId && data.poolId !== poolId) {
-        logger.warn("TrueNativeSwap", "Raydium API returned quote for different pool", {
-          requestedPoolId: poolId,
-          returnedPoolId: data.poolId,
-          hint: "Using returned quote but CPI might target different pool",
-        });
-      }
-      
-      const outputAmount = Number(data.outputAmount ?? 0);
+
+      // Normaliser format: /api/dex/raydium/quote renvoie directement outputAmount;
+      // l'upstream renvoie { success, data: { outputAmount, otherAmountThreshold, priceImpactPct, ... } }
+      const normalizedOutput = data?.data?.outputAmount ?? data?.outputAmount ?? 0;
+      const normalizedMinOut = data?.data?.otherAmountThreshold ?? data?.minOutAmount;
+      const outputAmount = Number(normalizedOutput);
       if (!Number.isFinite(outputAmount) || outputAmount <= 0) {
         logger.warn("TrueNativeSwap", "Raydium quote invalid output", {
           outputAmount,
@@ -546,13 +721,28 @@ export class TrueNativeSwap {
         });
         return null;
       }
-      
+
+      // Vérifier que le poolId retourné correspond à celui demandé (si on passe par la route interne)
+      if (!isNode && data.poolId && data.poolId !== poolId) {
+        logger.warn("TrueNativeSwap", "Raydium API returned quote for different pool", {
+          requestedPoolId: poolId,
+          returnedPoolId: data.poolId,
+          hint: "Using returned quote but CPI might target different pool",
+        });
+      }
+
+      const priceImpactPctRaw = data?.data?.priceImpactPct ?? data?.priceImpactPct ?? data?.priceImpact;
+      const priceImpactPct = typeof priceImpactPctRaw === "string" ? Number(priceImpactPctRaw) : Number(priceImpactPctRaw ?? 0);
+
       return {
         outputAmount,
-        priceImpactBps: (data.priceImpact || 0) * 10000,
+        // priceImpactPct upstream est un % (ex: 0.15 = 0.15%) ; on convertit en bps.
+        priceImpactBps: Number.isFinite(priceImpactPct) ? Math.round(priceImpactPct * 100) : 0,
         minOutAmount:
-          typeof data.minOutAmount === "number" && Number.isFinite(data.minOutAmount)
-            ? data.minOutAmount
+          typeof normalizedMinOut === "number" && Number.isFinite(normalizedMinOut)
+            ? normalizedMinOut
+            : typeof normalizedMinOut === "string" && Number.isFinite(Number(normalizedMinOut))
+              ? Number(normalizedMinOut)
             : undefined,
       };
     } catch (err) {
@@ -601,12 +791,17 @@ export class TrueNativeSwap {
     const userPk = toPublicKey(params.userPublicKey);
     const amountIn = params.amountIn;
 
+    const venuesForBestRoute = Array.from(QUOTED_VENUES).filter(
+      (v) => !DISABLED_BEST_ROUTE_VENUES.has(v)
+    );
+
     const quotes = await this.getNativeQuotes(
       inputMintPk,
       outputMintPk,
       amountIn,
       userPk,
-      params.slippageBps
+      params.slippageBps,
+      venuesForBestRoute
     );
 
     if (quotes.length === 0) {
@@ -770,8 +965,8 @@ export class TrueNativeSwap {
     // - inférer une mauvaise direction (ctx.user_token_account_a/b mismatch)
     // - provoquer TransferChecked: "Account not associated with this Mint" (0x3)
     const [inputMintInfo, outputMintInfo] = await Promise.all([
-      this.connection.getAccountInfo(safeInput),
-      this.connection.getAccountInfo(safeOutput),
+      this.getAccountInfoWithRetry(safeInput),
+      this.getAccountInfoWithRetry(safeOutput),
     ]);
     if (!inputMintInfo) {
       throw new Error(`Mint introuvable (input): ${safeInput.toBase58()}`);
@@ -1444,7 +1639,7 @@ export class TrueNativeSwap {
         userPublicKey
       );
 
-      const inputAtaInfo = await this.connection.getAccountInfo(userTokenAccountA);
+      const inputAtaInfo = await this.getAccountInfoWithRetry(userTokenAccountA);
       if (!inputAtaInfo) {
         instructions.push(
           createAssociatedTokenAccountInstruction(
@@ -1479,7 +1674,7 @@ export class TrueNativeSwap {
       }
     }
 
-    const outputMintInfo = await this.connection.getAccountInfo(outputMint);
+    const outputMintInfo = await this.getAccountInfoWithRetry(outputMint);
     if (!outputMintInfo) {
       throw new Error(`Mint introuvable (output): ${outputMint.toBase58()}`);
     }
@@ -1491,7 +1686,7 @@ export class TrueNativeSwap {
       false,
       outputTokenProgram
     );
-    const accountInfo = await this.connection.getAccountInfo(userTokenAccountB);
+    const accountInfo = await this.getAccountInfoWithRetry(userTokenAccountB);
     if (!accountInfo) {
       instructions.push(
         createAssociatedTokenAccountInstruction(
