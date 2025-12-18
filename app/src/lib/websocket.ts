@@ -25,7 +25,7 @@ export type EventListener = (event: SwapEvent) => void;
 export class SwapWebSocketService {
   private readonly connection: Connection;
   private readonly listeners: Set<EventListener> = new Set();
-  private readonly activeSignatures: Map<string, number> = new Map(); // signature -> subscriptionId
+  private readonly activeSignatures: Map<string, ReturnType<typeof setInterval>> = new Map(); // signature -> polling timer
   private readonly priceIntervals: Map<string, ReturnType<typeof setInterval>> =
     new Map();
 
@@ -71,65 +71,63 @@ export class SwapWebSocketService {
     // Emit pending event
     this.emit({ type: "swap.pending", signature });
 
-    // Subscribe to signature status
-    const subscriptionId = this.connection.onSignature(
-      signature,
-      (result, context) => {
-        if (result.err) {
-          // Transaction failed
+    // IMPORTANT: On utilise du polling HTTP (RPC) au lieu de `onSignature`.
+    // Cela évite les problèmes ws/rpc-websockets côté navigateur ("new required" / "not a constructor").
+    let hasEmittedConfirmed = false;
+
+    const timer = setInterval(async () => {
+      try {
+        const status = await this.connection.getSignatureStatus(signature);
+        const value = status?.value;
+
+        if (!value) {
+          return;
+        }
+
+        if (value.err) {
           this.emit({
             type: "swap.error",
             signature,
-            error: JSON.stringify(result.err),
+            error: JSON.stringify(value.err),
           });
-        } else {
-          // Transaction confirmed
-          const confirmations = context.slot;
+          this.unsubscribeFromTransaction(signature);
+          return;
+        }
+
+        const confirmationStatus = value.confirmationStatus;
+        const slot = value.slot ?? 0;
+
+        if (!hasEmittedConfirmed && (confirmationStatus === "confirmed" || confirmationStatus === "finalized")) {
+          hasEmittedConfirmed = true;
           this.emit({
             type: "swap.confirmed",
             signature,
-            confirmations,
+            confirmations: slot,
           });
-
-          // Check if finalized
-          this.checkFinalization(signature);
         }
 
-        // Cleanup
-        this.activeSignatures.delete(signature);
-      },
-      "confirmed"
-    );
-
-    this.activeSignatures.set(signature, subscriptionId);
-  }
-
-  /**
-   * Check if transaction is finalized
-   */
-  private async checkFinalization(signature: string): Promise<void> {
-    try {
-      const status = await this.connection.getSignatureStatus(signature);
-      if (status?.value?.confirmationStatus === "finalized") {
-        this.emit({ type: "swap.finalized", signature });
-      } else {
-        // Poll again in 5 seconds
-        setTimeout(() => this.checkFinalization(signature), 5000);
+        if (confirmationStatus === "finalized") {
+          this.emit({ type: "swap.finalized", signature });
+          this.unsubscribeFromTransaction(signature);
+        }
+      } catch (error) {
+        // ne pas spammer l'UI; on garde le polling
+        console.error("Error polling signature status:", error);
       }
-    } catch (error) {
-      console.error("Error checking finalization:", error);
-    }
+    }, 1000);
+
+    this.activeSignatures.set(signature, timer);
   }
 
   /**
    * Unsubscribe from transaction
    */
   public unsubscribeFromTransaction(signature: string): void {
-    const subscriptionId = this.activeSignatures.get(signature);
-    if (subscriptionId !== undefined) {
-      this.connection.removeSignatureListener(subscriptionId);
-      this.activeSignatures.delete(signature);
+    const timer = this.activeSignatures.get(signature);
+    if (timer) {
+      clearInterval(timer);
     }
+    this.activeSignatures.delete(signature);
   }
 
   /**
@@ -188,8 +186,8 @@ export class SwapWebSocketService {
    */
   public cleanup(): void {
     // Unsubscribe from all transactions
-    this.activeSignatures.forEach((subscriptionId) => {
-      this.connection.removeSignatureListener(subscriptionId);
+    this.activeSignatures.forEach((timer) => {
+      clearInterval(timer);
     });
     this.activeSignatures.clear();
 

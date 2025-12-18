@@ -524,6 +524,48 @@ export function useNativeSwap() {
         const safeInputMint = toPublicKey(params.inputMint);
         const safeOutputMint = toPublicKey(params.outputMint);
 
+        // Pré-check fonds (évite les erreurs DEX "insufficient funds" / 0x28)
+        try {
+          const SOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
+
+          if (safeInputMint.equals(SOL_MINT)) {
+            const lamports = await connection.getBalance(publicKey, "confirmed");
+            if (lamports < params.amount) {
+              throw new Error(
+                `Solde SOL insuffisant. Solde=${lamports} lamports, requis=${params.amount} lamports.`
+              );
+            }
+          } else {
+            const tokenAccounts = await connection.getTokenAccountsByOwner(
+              publicKey,
+              { mint: safeInputMint },
+              "confirmed"
+            );
+            const tokenAccount = tokenAccounts.value[0]?.pubkey;
+            if (!tokenAccount) {
+              throw new Error(
+                "Compte token source introuvable (ATA manquant). Créez un compte token ou recevez ce token avant de swap."
+              );
+            }
+
+            const bal = await connection.getTokenAccountBalance(tokenAccount, "confirmed");
+            const amountStr = bal?.value?.amount ?? "0";
+            const have = BigInt(amountStr);
+            const need = BigInt(Math.max(0, Math.floor(params.amount)));
+
+            if (have < need) {
+              throw new Error(
+                `Solde insuffisant pour le token source. Solde=${amountStr} (base units), requis=${need.toString()} (base units).`
+              );
+            }
+          }
+        } catch (fundErr) {
+          const message = fundErr instanceof Error ? fundErr.message : String(fundErr);
+          // Remonter une erreur UI claire, sans continuer vers simulate/sign.
+          setError(message);
+          return null;
+        }
+
         // Gating oracle AVANT toute signature
         if (!hasOracleForPair(safeInputMint.toBase58(), safeOutputMint.toBase58())) {
           throw new Error(

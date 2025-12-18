@@ -1,12 +1,16 @@
 /**
  * API Route: /api/dex/meteora/quote
  *
- * Proxy serveur vers l'endpoint officiel Meteora DLMM (côté serveur = pas de CORS).
+ * Quote Meteora DLMM via SDK on-chain (évite la dépendance aux endpoints REST qui
+ * peuvent changer et renvoyer "invalid pair address").
  *
  * Référence (doc A→Z): https://docs.meteora.ag/developer-guide/guides/dlmm/typescript-sdk/getting-started
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { Connection, PublicKey } from "@solana/web3.js";
+import BN from "bn.js";
+import DLMM from "@meteora-ag/dlmm";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -30,10 +34,15 @@ export async function GET(request: NextRequest) {
   const inputMint = searchParams.get("inputMint");
   const outputMint = searchParams.get("outputMint");
   const amount = searchParams.get("amount");
+  const pairAddress = searchParams.get("pairAddress");
+  const slippageBpsParam = searchParams.get("slippageBps");
 
-  if (!inputMint || !outputMint || !amount) {
+  if (!inputMint || !outputMint || !amount || !pairAddress) {
     return NextResponse.json(
-      { error: "Missing required parameters: inputMint, outputMint, amount" },
+      {
+        error:
+          "Missing required parameters: inputMint, outputMint, amount, pairAddress",
+      },
       { status: 400, headers: CORS_HEADERS }
     );
   }
@@ -46,40 +55,63 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const slippageBpsRaw = slippageBpsParam ? Number(slippageBpsParam) : undefined;
+  const slippageBps =
+    typeof slippageBpsRaw === "number" && Number.isFinite(slippageBpsRaw)
+      ? Math.min(10_000, Math.max(0, Math.floor(slippageBpsRaw)))
+      : 50;
+
   try {
-    // Meteora DLMM quote endpoint.
-    // swapMode=ExactIn (on quote des swaps exact-in côté UI).
-    const url =
-      `https://dlmm-api.meteora.ag/pair/quote?` +
-      new URLSearchParams({
-        inputMint,
-        outputMint,
-        amount: amountIn.toString(),
-        swapMode: "ExactIn",
-      });
+    const rpcUrl =
+      process.env.SOLANA_RPC_URL ||
+      process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
+      "https://api.mainnet-beta.solana.com";
 
-    const response = await fetch(url, {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(7000),
-      next: { revalidate: 2 },
-    });
+    const connection = new Connection(rpcUrl, "confirmed");
+    const dlmm = await DLMM.create(connection, new PublicKey(pairAddress));
 
-    if (!response.ok) {
-      const body = await response.text().catch(() => "");
+    const tokenX = dlmm.tokenX?.mint?.address?.toBase58?.();
+    const tokenY = dlmm.tokenY?.mint?.address?.toBase58?.();
+
+    if (!tokenX || !tokenY) {
       return NextResponse.json(
-        { error: "Meteora upstream error", status: response.status, body },
+        { error: "Invalid DLMM pair: missing token mints" },
         { status: 502, headers: CORS_HEADERS }
       );
     }
 
-    const data = await response.json();
+    let swapForY: boolean;
+    if (tokenX === inputMint && tokenY === outputMint) {
+      swapForY = true;
+    } else if (tokenY === inputMint && tokenX === outputMint) {
+      swapForY = false;
+    } else {
+      return NextResponse.json(
+        {
+          error: "Pair does not match input/output mints",
+          pairAddress,
+          tokenX,
+          tokenY,
+          inputMint,
+          outputMint,
+        },
+        { status: 400, headers: CORS_HEADERS }
+      );
+    }
 
-    const outAmount = Number(data.outAmount ?? 0);
-    const priceImpact = Number(data.priceImpact ?? 0);
+    const binArrays = await dlmm.getBinArrayForSwap(swapForY);
+    const quote = await dlmm.swapQuote(
+      new BN(amountIn.toString()),
+      swapForY,
+      new BN(slippageBps),
+      binArrays
+    );
 
+    const outAmountStr = quote?.outAmount?.toString?.() ?? "0";
+    const outAmount = Number(outAmountStr);
     if (!Number.isFinite(outAmount) || outAmount <= 0) {
       return NextResponse.json(
-        { error: "Invalid Meteora quote response", data },
+        { error: "Invalid Meteora SDK quote output", outAmount: outAmountStr },
         { status: 502, headers: CORS_HEADERS }
       );
     }
@@ -90,8 +122,11 @@ export async function GET(request: NextRequest) {
         outputMint,
         inputAmount: amountIn,
         outputAmount: outAmount,
-        priceImpactBps: Number.isFinite(priceImpact) ? Math.round(priceImpact * 10_000) : 0,
-        source: "meteora-api",
+        priceImpactBps: 0,
+        slippageBps,
+        pairAddress,
+        swapForY,
+        source: "meteora-sdk",
       },
       { headers: CORS_HEADERS }
     );

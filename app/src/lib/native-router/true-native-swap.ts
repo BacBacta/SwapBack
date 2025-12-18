@@ -316,7 +316,7 @@ export class TrueNativeSwap {
       case "ORCA_WHIRLPOOL":
         return this.getOrcaQuote(inputMint, outputMint, amountIn, accounts);
       case "METEORA_DLMM":
-        return this.getMeteoraQuote(inputMint, outputMint, amountIn, accounts);
+        return this.getMeteoraQuote(inputMint, outputMint, amountIn, accounts, slippageBps);
       case "RAYDIUM_AMM":
         return this.getRaydiumQuote(inputMint, outputMint, amountIn, accounts, slippageBps);
       case "PHOENIX":
@@ -391,7 +391,8 @@ export class TrueNativeSwap {
     inputMint: PublicKey,
     outputMint: PublicKey,
     amountIn: number,
-    accounts: DEXAccounts
+    accounts: DEXAccounts,
+    slippageBps?: number
   ): Promise<{ outputAmount: number; priceImpactBps: number } | null> {
     try {
       const response = await fetch(
@@ -400,7 +401,10 @@ export class TrueNativeSwap {
             inputMint: inputMint.toBase58(),
             outputMint: outputMint.toBase58(),
             amount: amountIn.toString(),
-            // swapMode=ExactIn côté proxy; on laisse ici l’API gérer la direction.
+            pairAddress: accounts.meta.poolAddress || "",
+            ...(typeof slippageBps === "number" && Number.isFinite(slippageBps)
+              ? { slippageBps: Math.floor(slippageBps).toString() }
+              : {}),
           }),
         { signal: AbortSignal.timeout(8000) }
       );
@@ -1341,22 +1345,14 @@ export class TrueNativeSwap {
       }
     }
 
-    // Validation de sanité: détecter les minAmountOut suspectement proches de amountIn
-    // Pour les swaps non-stablecoin, un minAmountOut >= amountIn est un signe d'erreur
-    // car il y a toujours des frais dans un AMM swap.
-    const minOutRatio = minAmountOut / amountIn;
-    if (minOutRatio > 0.95) {
-      // minAmountOut est > 95% de amountIn - potentiellement dangereux
-      // Cela ne devrait arriver que pour des swaps stablecoin-to-stablecoin
-      // Pour éviter les erreurs "exceeds desired slippage limit", on log un warning
-      logger.warn("TrueNativeSwap", "minAmountOut is suspiciously close to amountIn", {
-        amountIn,
+    // Sanity: si minOut est supérieur au out estimé, la simulation échouera.
+    if (minAmountOut > route.outputAmount) {
+      logger.warn("TrueNativeSwap", "minAmountOut exceeds quoted outputAmount", {
         minAmountOut,
-        minOutRatio,
-        venue: route.venue,
         outputAmount: route.outputAmount,
+        venue: route.venue,
         slippageBps,
-        hint: "This might cause 'exceeds desired slippage limit' errors if the quote was inaccurate",
+        hint: "MinOut should generally be <= quoted outAmount (after slippage)",
       });
     }
 
