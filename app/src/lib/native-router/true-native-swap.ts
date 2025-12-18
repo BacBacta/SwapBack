@@ -66,7 +66,7 @@ export const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyT
 
 // Configuration
 const MAX_STALENESS_SECS = 120; // 2 minutes
-const PRIORITY_FEE_MICRO_LAMPORTS = 100_000;
+const PRIORITY_FEE_MICRO_LAMPORTS = 500_000;
 const COMPUTE_UNITS = 400_000;
 
 // Phoenix (CLOB) requiert une quote orderbook (phoenix-sdk). Tant que ce n'est

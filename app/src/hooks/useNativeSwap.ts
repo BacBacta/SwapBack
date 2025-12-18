@@ -626,8 +626,10 @@ export function useNativeSwap() {
           // Envoyer
           params.onProgress?.('sending');
           const signature = await connection.sendTransaction(ctx.signed, {
-            skipPreflight: false,
+            // Skip preflight car on a déjà simulé nous-mêmes
+            skipPreflight: true,
             preflightCommitment: 'confirmed',
+            maxRetries: 3,
           });
 
           logger.info("useNativeSwap", "True native tx sent", {
