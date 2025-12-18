@@ -208,6 +208,13 @@ export function useNativeSwap() {
         });
 
         if (!route || route.allQuotes.length === 0) {
+          logger.error("useNativeSwap", "No native venues available", {
+            inputMint: inputMintStr,
+            outputMint: outputMintStr,
+            amount: params.amount,
+            routeReturned: route ? "yes (but empty quotes)" : "null",
+            allQuotesLength: route?.allQuotes?.length ?? 0,
+          });
           throw new Error("Aucune venue native disponible pour cette paire");
         }
 

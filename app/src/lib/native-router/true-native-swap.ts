@@ -301,11 +301,15 @@ export class TrueNativeSwap {
             amount: amountIn.toString(),
             pool: accounts.meta.poolAddress || "",
           }),
-        { signal: AbortSignal.timeout(5000) }
+        { signal: AbortSignal.timeout(8000) }
       );
 
       if (!response.ok) {
-        // Pas de fallback estimatif pour Orca Whirlpool (CLMM) : trop imprécis
+        const errorText = await response.text().catch(() => "");
+        logger.warn("TrueNativeSwap", "Orca API error", {
+          status: response.status,
+          error: errorText.slice(0, 200),
+        });
         return null;
       }
 
@@ -316,13 +320,22 @@ export class TrueNativeSwap {
           (typeof data.priceImpact === "number" ? data.priceImpact * 10000 : 0)
       );
 
-      if (!Number.isFinite(outputAmount) || outputAmount <= 0) return null;
+      if (!Number.isFinite(outputAmount) || outputAmount <= 0) {
+        logger.warn("TrueNativeSwap", "Orca quote invalid output", {
+          outputAmount,
+          data: JSON.stringify(data).slice(0, 200),
+        });
+        return null;
+      }
 
       return {
         outputAmount,
         priceImpactBps: Number.isFinite(priceImpactBps) ? priceImpactBps : 0,
       };
-    } catch {
+    } catch (err) {
+      logger.warn("TrueNativeSwap", "Orca quote exception", {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return null;
     }
   }
@@ -343,21 +356,38 @@ export class TrueNativeSwap {
             swapMode: inputMint.toBase58() < outputMint.toBase58() ? "ExactIn" : "ExactOut",
             amount: amountIn.toString(),
           }),
-        { signal: AbortSignal.timeout(5000) }
+        { signal: AbortSignal.timeout(8000) }
       );
 
       if (!response.ok) {
-        // Pas de fallback estimatif pour Meteora DLMM : trop imprécis sans balances du pool
+        const errorText = await response.text().catch(() => "");
+        logger.warn("TrueNativeSwap", "Meteora API error", {
+          status: response.status,
+          poolAddress: accounts.meta.poolAddress,
+          error: errorText.slice(0, 200),
+        });
         return null;
       }
 
       const data = await response.json();
+      const outputAmount = parseInt(data.outAmount || "0");
+      
+      if (!Number.isFinite(outputAmount) || outputAmount <= 0) {
+        logger.warn("TrueNativeSwap", "Meteora quote invalid output", {
+          outputAmount,
+          data: JSON.stringify(data).slice(0, 200),
+        });
+        return null;
+      }
+      
       return {
-        outputAmount: parseInt(data.outAmount || "0"),
+        outputAmount,
         priceImpactBps: (data.priceImpact || 0) * 10000,
       };
-    } catch {
-      // Pas de fallback estimatif pour Meteora DLMM : trop imprécis sans balances du pool
+    } catch (err) {
+      logger.warn("TrueNativeSwap", "Meteora quote exception", {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return null;
     }
   }
@@ -374,36 +404,43 @@ export class TrueNativeSwap {
   ): Promise<{ outputAmount: number; priceImpactBps: number; minOutAmount?: number } | null> {
     const poolId = accounts.meta.poolAddress;
     
-    // IMPORTANT: Si pas de poolId, on ne peut pas garantir que la quote API
-    // correspond au pool que le CPI utilisera. Retourner null pour éviter
-    // les décalages quote/exécution qui causent des erreurs de slippage.
+    // Note: Si poolId est absent, on laisse l'API Raydium router automatiquement.
+    // C'est moins sûr (risque de décalage quote/CPI) mais permet d'obtenir des quotes.
     if (!poolId) {
-      logger.warn("TrueNativeSwap", "Raydium quote skipped - no poolId available", {
+      logger.debug("TrueNativeSwap", "Raydium quote without specific poolId", {
         inputMint: inputMint.toBase58(),
         outputMint: outputMint.toBase58(),
         amountIn,
-        hint: "Quote API might route to a different pool than CPI",
       });
-      return null;
     }
     
     try {
+      const params: Record<string, string> = {
+        inputMint: inputMint.toBase58(),
+        outputMint: outputMint.toBase58(),
+        amount: amountIn.toString(),
+      };
+      
+      if (poolId) {
+        params.poolId = poolId;
+      }
+      
+      if (typeof slippageBps === "number" && Number.isFinite(slippageBps)) {
+        params.slippageBps = Math.floor(slippageBps).toString();
+      }
+      
       const response = await fetch(
-        `/api/dex/raydium/quote?` +
-          new URLSearchParams({
-            inputMint: inputMint.toBase58(),
-            outputMint: outputMint.toBase58(),
-            amount: amountIn.toString(),
-            poolId,
-            ...(typeof slippageBps === "number" && Number.isFinite(slippageBps)
-              ? { slippageBps: Math.floor(slippageBps).toString() }
-              : {}),
-          }),
-        { signal: AbortSignal.timeout(5000) }
+        `/api/dex/raydium/quote?` + new URLSearchParams(params),
+        { signal: AbortSignal.timeout(10000) }
       );
 
       if (!response.ok) {
-        // Pas de fallback estimatif pour Raydium : trop imprécis sans balances du pool
+        const errorText = await response.text().catch(() => "");
+        logger.warn("TrueNativeSwap", "Raydium API error", {
+          status: response.status,
+          poolId,
+          error: errorText.slice(0, 200),
+        });
         return null;
       }
 
@@ -418,16 +455,27 @@ export class TrueNativeSwap {
         });
       }
       
+      const outputAmount = Number(data.outputAmount ?? 0);
+      if (!Number.isFinite(outputAmount) || outputAmount <= 0) {
+        logger.warn("TrueNativeSwap", "Raydium quote invalid output", {
+          outputAmount,
+          data: JSON.stringify(data).slice(0, 200),
+        });
+        return null;
+      }
+      
       return {
-        outputAmount: data.outputAmount,
+        outputAmount,
         priceImpactBps: (data.priceImpact || 0) * 10000,
         minOutAmount:
           typeof data.minOutAmount === "number" && Number.isFinite(data.minOutAmount)
             ? data.minOutAmount
             : undefined,
       };
-    } catch {
-      // Pas de fallback estimatif pour Raydium : trop imprécis sans balances du pool
+    } catch (err) {
+      logger.warn("TrueNativeSwap", "Raydium quote exception", {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return null;
     }
   }
