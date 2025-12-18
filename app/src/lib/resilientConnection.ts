@@ -1,6 +1,12 @@
 import { Connection, ConnectionConfig } from '@solana/web3.js';
 
-const BROWSER_RPC_ENDPOINT = '/api/solana-rpc';
+function getBrowserRpcEndpoint(): string {
+  if (typeof window === 'undefined') {
+    // SSR ou server-side: pas d'URL absolue possible, retourner un placeholder
+    return 'https://api.mainnet-beta.solana.com';
+  }
+  return `${window.location.origin}/api/solana-rpc`;
+}
 
 // Upstreams ordered by reliability (server-side only). Le navigateur doit passer par BROWSER_RPC_ENDPOINT.
 const SERVER_RPC_ENDPOINTS = [
@@ -44,7 +50,7 @@ function createConnection(endpoint: string): Connection {
 function getRpcEndpoints(): string[] {
   // Client: same-origin proxy pour éviter CORS/429 des RPC tiers.
   if (typeof window !== 'undefined') {
-    return [BROWSER_RPC_ENDPOINT];
+    return [getBrowserRpcEndpoint()];
   }
 
   // Server: possibilité d'override via env.
@@ -126,7 +132,7 @@ export function wasRecentlyRateLimited(): boolean {
  * Get current RPC endpoint
  */
 export function getCurrentEndpoint(): string {
-  return getRpcEndpoints()[currentEndpointIndex] || BROWSER_RPC_ENDPOINT;
+  return getRpcEndpoints()[currentEndpointIndex] || getBrowserRpcEndpoint();
 }
 
 function sleep(ms: number): Promise<void> {

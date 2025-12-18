@@ -19,7 +19,14 @@ import "@solana/wallet-adapter-react-ui/styles.css";
 
 // IMPORTANT: le navigateur ne doit pas appeler directement un RPC tiers (CORS/429).
 // On force un endpoint same-origin qui proxy vers des upstreams côté serveur.
-const BROWSER_RPC_ENDPOINT = "/api/solana-rpc";
+function getBrowserRpcEndpoint(): string {
+  if (typeof window === 'undefined') {
+    // SSR: retourner un placeholder (sera remplacé côté client)
+    return 'https://api.mainnet-beta.solana.com';
+  }
+  // Client: construire l'URL absolue
+  return `${window.location.origin}/api/solana-rpc`;
+}
 
 export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [rpcIndex, setRpcIndex] = useState(0);
@@ -48,12 +55,12 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
   
   // Build list of RPC endpoints
   const rpcEndpoints = useMemo(() => {
-    // Le WalletProvider est un composant client: endpoint relatif OK.
-    return [BROWSER_RPC_ENDPOINT];
+    // Le WalletProvider est un composant client: dériver l'URL absolue.
+    return [getBrowserRpcEndpoint()];
   }, [network]);
   
   const endpoint = useMemo(() => {
-    return rpcEndpoints[rpcIndex] || rpcEndpoints[0] || BROWSER_RPC_ENDPOINT;
+    return rpcEndpoints[rpcIndex] || rpcEndpoints[0] || getBrowserRpcEndpoint();
   }, [rpcEndpoints, rpcIndex]);
   
   // Test RPC connection and fallback if needed (only once per endpoint)
