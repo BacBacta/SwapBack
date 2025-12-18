@@ -6,7 +6,8 @@
 // Minimal shim mapping directly to the ws implementation for server builds
 let WebSocketImpl;
 try {
-  WebSocketImpl = require('ws');
+  const wsPkg = require('ws');
+  WebSocketImpl = wsPkg?.WebSocket || wsPkg?.default || wsPkg;
 } catch {
   WebSocketImpl = class MockWebSocket {
     constructor() {

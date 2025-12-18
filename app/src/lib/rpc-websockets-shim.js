@@ -64,6 +64,13 @@ function defaultFactory(address, options) {
   return new WebSocketImpl(address, options?.protocols);
 }
 
+// rpc-websockets exports a helper `WebSocket(url, options)` used by @solana/web3.js.
+// Important: this is NOT the native WebSocket constructor; it must be callable
+// as a plain function and accept an `options` object.
+function createRpcWebSocket(address, options) {
+  return defaultFactory(address, options);
+}
+
 class CommonClient extends EventEmitter {
   constructor(arg1, arg2, arg3) {
     super();
@@ -144,5 +151,5 @@ class CommonClient extends EventEmitter {
 module.exports = CommonClient;
 module.exports.Client = CommonClient;
 module.exports.CommonClient = CommonClient;
-module.exports.WebSocket = WebSocketImpl;
+module.exports.WebSocket = createRpcWebSocket;
 module.exports.default = CommonClient;
