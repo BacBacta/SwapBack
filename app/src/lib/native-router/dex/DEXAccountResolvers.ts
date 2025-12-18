@@ -2104,7 +2104,7 @@ export async function getRaydiumAccounts(
     // En attendant une correction on-chain, on évite de sélectionner Raydium
     // pour ce sens afin de laisser Meteora/Orca prendre le relais.
     if (poolConfig.tokenMintA.equals(safeOutputMint) && poolConfig.tokenMintB.equals(safeInputMint)) {
-      logger.warn("RaydiumResolver", "Raydium AMM quote→base temporarily disabled", {
+      logger.debug("RaydiumResolver", "Raydium AMM quote→base temporarily disabled", {
         inputMint: safeInputMint.toBase58(),
         outputMint: safeOutputMint.toBase58(),
         ammAddress: poolConfig.ammAddress.toBase58(),
