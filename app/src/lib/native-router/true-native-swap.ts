@@ -1426,7 +1426,6 @@ export class TrueNativeSwap {
       if (!inputAtaInfo) {
         instructions.push(
           createAssociatedTokenAccountInstruction(
-          createCloseAccountInstruction,
             userPublicKey,
             userTokenAccountA,
             userPublicKey,
@@ -1489,13 +1488,43 @@ export class TrueNativeSwap {
     // (So111...) puis on close le compte WSOL pour unwrap et renvoyer les lamports.
     // NOTE: on utilise l'ATA WSOL (créé ci-dessus si absent). Il sera recréé au besoin.
     if (outputMint.equals(SOL_MINT)) {
-      instructions.push(
-        createCloseAccountInstruction(
-          userTokenAccountB, // WSOL token account
-          userPublicKey, // destination (receives SOL)
-          userPublicKey // owner
-        )
-      );
+      // Certaines versions/bundles de @solana/spl-token n'exportent pas toujours
+      // `createCloseAccountInstruction` de manière stable (CJS/ESM). On fait donc
+      // un import dynamique + fallback sur une instruction CloseAccount manuelle.
+      let closeIx: TransactionInstruction | null = null;
+
+      try {
+        const spl: any = await import("@solana/spl-token");
+        const createClose =
+          spl?.createCloseAccountInstruction ??
+          spl?.default?.createCloseAccountInstruction;
+
+        if (typeof createClose === "function") {
+          closeIx = createClose(
+            userTokenAccountB, // account
+            userPublicKey, // destination
+            userPublicKey // owner
+          );
+        }
+      } catch {
+        // ignore
+      }
+
+      if (!closeIx) {
+        // SPL Token CloseAccount instruction (Tokenkeg): tag = 9
+        // Accounts: [account (w), destination (w), owner (signer)]
+        closeIx = new TransactionInstruction({
+          programId: TOKEN_PROGRAM_ID,
+          keys: [
+            { pubkey: userTokenAccountB, isSigner: false, isWritable: true },
+            { pubkey: userPublicKey, isSigner: false, isWritable: true },
+            { pubkey: userPublicKey, isSigner: true, isWritable: false },
+          ],
+          data: Buffer.from([9]),
+        });
+      }
+
+      instructions.push(closeIx);
     }
 
     // 4. Construire la transaction versionnée
