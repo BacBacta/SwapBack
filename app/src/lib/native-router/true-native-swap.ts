@@ -1063,6 +1063,68 @@ export class TrueNativeSwap {
       outputMint
     );
 
+    // Défense en profondeur: vérifier la cohérence on-chain des ATAs et des reserves
+    try {
+      const { AccountLayout } = await import("@solana/spl-token");
+
+      // Vérifier les ATAs utilisateurs (mint match)
+      const [userAInfo, userBInfo] = await Promise.all([
+        this.connection.getAccountInfo(accounts.userTokenAccountA),
+        this.connection.getAccountInfo(accounts.userTokenAccountB),
+      ]);
+
+      if (userAInfo?.data) {
+        try {
+          const decoded = AccountLayout.decode(userAInfo.data);
+          const ataMint = new PublicKey(decoded.mint);
+          if (!ataMint.equals(inputMint)) {
+            throw new Error(`User ATA A mint mismatch: expected ${inputMint.toBase58()} got ${ataMint.toBase58()}`);
+          }
+        } catch (e) {
+          throw new Error(`Failed ATA A sanity check: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+
+      if (userBInfo?.data) {
+        try {
+          const decoded = AccountLayout.decode(userBInfo.data);
+          const ataMint = new PublicKey(decoded.mint);
+          if (!ataMint.equals(outputMint)) {
+            throw new Error(`User ATA B mint mismatch: expected ${outputMint.toBase58()} got ${ataMint.toBase58()}`);
+          }
+        } catch (e) {
+          throw new Error(`Failed ATA B sanity check: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+
+      // Vérifier les reserves fournies par le DEX (seulement pour Meteora)
+      if (route.venue === "METEORA_DLMM") {
+        const vaults = [route.dexAccounts.vaultTokenAccountA, route.dexAccounts.vaultTokenAccountB].filter(Boolean) as PublicKey[];
+        if (vaults.length === 2) {
+          const [rxInfo, ryInfo] = await this.connection.getMultipleAccountsInfo(vaults);
+          if (rxInfo?.data && ryInfo?.data) {
+            const rx = AccountLayout.decode(rxInfo.data);
+            const ry = AccountLayout.decode(ryInfo.data);
+            const rxMint = new PublicKey(rx.mint);
+            const ryMint = new PublicKey(ry.mint);
+
+            const tokenXFromDex = route.dexAccounts.accounts[6];
+            const tokenYFromDex = route.dexAccounts.accounts[7];
+            if (!rxMint.equals(tokenXFromDex) && !rxMint.equals(tokenYFromDex)) {
+              throw new Error(`Reserve X mint ${rxMint.toBase58()} does not match tokenX/tokenY from DEX`);
+            }
+            if (!ryMint.equals(tokenXFromDex) && !ryMint.equals(tokenYFromDex)) {
+              throw new Error(`Reserve Y mint ${ryMint.toBase58()} does not match tokenX/tokenY from DEX`);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Faire échouer la construction de la transaction avec un message lisible
+      logger.error("TrueNativeSwap", "Pre-swap sanity check failed", { error: e instanceof Error ? e.message : String(e) });
+      throw new Error(`Pre-swap sanity check failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
     const normalizedDexAccounts = route.dexAccounts.accounts.map((pubkey, index) => {
       try {
         return toPublicKey(pubkey);
