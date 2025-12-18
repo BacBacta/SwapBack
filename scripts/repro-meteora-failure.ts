@@ -6,8 +6,14 @@ import { getDEXAccounts } from "../app/src/lib/native-router/dex/DEXAccountResol
 const RPC = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
 const connection = new Connection(RPC, "confirmed");
 
-// User from logs (likely has USDC/SOL accounts)
-const USER = new PublicKey("GqrXQUFtFxBh8xPB8Z2eS8hfF4MXVFWot1BiWDHXxYfM");
+// User from logs (likely has USDC/SOL accounts) or override via --user or USER_PUBKEY env var
+const args = process.argv.slice(2).reduce((acc: any, raw) => {
+  if (!raw.startsWith("--")) return acc;
+  const [k, v] = raw.slice(2).split("=", 2);
+  acc[k] = v ?? "true";
+  return acc;
+}, {} as Record<string, string>);
+const USER = new PublicKey(args.user ?? process.env.USER_PUBKEY ?? "GqrXQUFtFxBh8xPB8Z2eS8hfF4MXVFWot1BiWDHXxYfM");
 
 async function main() {
   console.log("Reproducing USDC -> SOL via Meteora...");
