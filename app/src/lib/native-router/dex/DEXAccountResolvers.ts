@@ -2171,8 +2171,15 @@ export async function getAllDEXAccounts(
   
   for (let i = 0; i < results.length; i++) {
     const result = results[i];
+    const venue = venues[i];
     if (result.status === 'fulfilled' && result.value) {
-      accountsMap.set(venues[i], result.value);
+      accountsMap.set(venue, result.value);
+    } else if (result.status === 'rejected') {
+      logger.warn("DEXAccountResolvers", `Failed to resolve ${venue}`, {
+        error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+      });
+    } else {
+      logger.debug("DEXAccountResolvers", `No accounts for ${venue} (null result)`);
     }
   }
   
