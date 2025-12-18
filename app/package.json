@@ -27,14 +27,14 @@
     "worker:hybrid": "tsx src/scripts/runHybridWorker.ts"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "0.30.1",
+    "@coral-xyz/anchor": "0.32.1",
     "@ellipsis-labs/phoenix-sdk": "^2.0.3",
     "@emotion/is-prop-valid": "^1.4.0",
     "@heroicons/react": "^2.2.0",
     "@lifinity/sdk": "^0.2.25",
     "@metaplex-foundation/mpl-bubblegum": "^5.0.2",
     "@meteora-ag/dlmm": "^1.8.0",
-    "@orca-so/whirlpools-sdk": "^0.16.0",
+    "@orca-so/whirlpools-sdk": "^0.17.4",
     "@project-serum/serum": "^0.13.65",
     "@pythnetwork/hermes-client": "^2.0.0",
     "@pythnetwork/pyth-solana-receiver": "^0.12.0",
@@ -73,7 +73,7 @@
     "zustand": "^5.0.8"
   },
   "overrides": {
-    "@coral-xyz/anchor": "0.30.1",
+    "@coral-xyz/anchor": "0.32.1",
     "rpc-websockets": "7.11.2"
   },
   "devDependencies": {
