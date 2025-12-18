@@ -765,13 +765,35 @@ export class TrueNativeSwap {
     const safeInput = toPublicKey(inputMint);
     const safeOutput = toPublicKey(outputMint);
 
+    // IMPORTANT: l'ATA dépend du token program (Tokenkeg vs Token-2022).
+    // Si on dérive avec le mauvais programId, le router on-chain peut:
+    // - inférer une mauvaise direction (ctx.user_token_account_a/b mismatch)
+    // - provoquer TransferChecked: "Account not associated with this Mint" (0x3)
+    const [inputMintInfo, outputMintInfo] = await Promise.all([
+      this.connection.getAccountInfo(safeInput),
+      this.connection.getAccountInfo(safeOutput),
+    ]);
+    if (!inputMintInfo) {
+      throw new Error(`Mint introuvable (input): ${safeInput.toBase58()}`);
+    }
+    if (!outputMintInfo) {
+      throw new Error(`Mint introuvable (output): ${safeOutput.toBase58()}`);
+    }
+
+    const inputTokenProgram = inputMintInfo.owner;
+    const outputTokenProgram = outputMintInfo.owner;
+
     const userTokenAccountA = await getAssociatedTokenAddress(
       safeInput,
-      safeUser
+      safeUser,
+      false,
+      inputTokenProgram
     );
     const userTokenAccountB = await getAssociatedTokenAddress(
       safeOutput,
-      safeUser
+      safeUser,
+      false,
+      outputTokenProgram
     );
 
     // Note: vault_token_account_a/b sont les vaults du DEX pool, pas des PDAs du router
@@ -1457,9 +1479,17 @@ export class TrueNativeSwap {
       }
     }
 
+    const outputMintInfo = await this.connection.getAccountInfo(outputMint);
+    if (!outputMintInfo) {
+      throw new Error(`Mint introuvable (output): ${outputMint.toBase58()}`);
+    }
+    const outputTokenProgram = outputMintInfo.owner;
+
     const userTokenAccountB = await getAssociatedTokenAddress(
       outputMint,
-      userPublicKey
+      userPublicKey,
+      false,
+      outputTokenProgram
     );
     const accountInfo = await this.connection.getAccountInfo(userTokenAccountB);
     if (!accountInfo) {
@@ -1468,7 +1498,8 @@ export class TrueNativeSwap {
           userPublicKey,
           userTokenAccountB,
           userPublicKey,
-          outputMint
+          outputMint,
+          outputTokenProgram
         )
       );
     }
