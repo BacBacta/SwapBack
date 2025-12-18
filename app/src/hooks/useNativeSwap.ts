@@ -20,6 +20,7 @@ import { useState, useCallback, useMemo } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, SendTransactionError, VersionedTransaction } from "@solana/web3.js";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { 
   getNativeRouter, 
   type NativeRouteQuote, 
@@ -536,26 +537,43 @@ export function useNativeSwap() {
               );
             }
           } else {
-            const tokenAccounts = await connection.getTokenAccountsByOwner(
-              publicKey,
-              { mint: safeInputMint },
-              "confirmed"
-            );
-            const tokenAccount = tokenAccounts.value[0]?.pubkey;
-            if (!tokenAccount) {
+            const inputAta = await getAssociatedTokenAddress(safeInputMint, publicKey);
+
+            let bal;
+            try {
+              bal = await connection.getTokenAccountBalance(inputAta, "confirmed");
+            } catch {
+              bal = null;
+            }
+
+            if (!bal?.value?.amount) {
+              logger.warn("useNativeSwap", "Missing input ATA for native swap", {
+                inputMint: safeInputMint.toBase58(),
+                inputAta: inputAta.toBase58(),
+                amountIn: params.amount,
+              });
               throw new Error(
-                "Compte token source introuvable (ATA manquant). Créez un compte token ou recevez ce token avant de swap."
+                "Solde insuffisant ou compte token source manquant. " +
+                  "Le swap natif utilise votre compte associé (ATA) pour le token source. " +
+                  `ATA attendu: ${inputAta.toBase58()}`
               );
             }
 
-            const bal = await connection.getTokenAccountBalance(tokenAccount, "confirmed");
-            const amountStr = bal?.value?.amount ?? "0";
-            const have = BigInt(amountStr);
+            const have = BigInt(bal.value.amount);
             const need = BigInt(Math.max(0, Math.floor(params.amount)));
 
             if (have < need) {
+              logger.warn("useNativeSwap", "Insufficient input token balance (ATA)", {
+                inputMint: safeInputMint.toBase58(),
+                inputAta: inputAta.toBase58(),
+                have: bal.value.amount,
+                haveUi: bal.value.uiAmountString,
+                need: need.toString(),
+              });
               throw new Error(
-                `Solde insuffisant pour le token source. Solde=${amountStr} (base units), requis=${need.toString()} (base units).`
+                `Solde insuffisant pour le token source. ` +
+                  `Solde ATA=${bal.value.uiAmountString ?? bal.value.amount}, ` +
+                  `requis=${need.toString()} (base units).`
               );
             }
           }
