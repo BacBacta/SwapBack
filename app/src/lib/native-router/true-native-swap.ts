@@ -798,8 +798,11 @@ export class TrueNativeSwap {
     }
 
     // Phoenix (CLOB) n'est pas exécutable sans quote orderbook fiable.
-    // Empêche toute construction d'instruction menant à un IOC 0xF.
-    if (DISABLED_BEST_ROUTE_VENUES.has(route.venue)) {
+    // Défense en profondeur: gate aussi sur le programId (même si la route est mal étiquetée).
+    if (
+      DISABLED_BEST_ROUTE_VENUES.has(route.venue) ||
+      route.venueProgramId?.equals?.(DEX_PROGRAM_IDS.PHOENIX)
+    ) {
       throw new Error(
         `Venue native temporairement désactivée: ${route.venue}. ` +
           `Phoenix requiert une quote orderbook pour éviter les IOC failures (0xF).`
@@ -1308,7 +1311,10 @@ export class TrueNativeSwap {
       return null;
     }
 
-    if (DISABLED_BEST_ROUTE_VENUES.has(route.venue)) {
+    if (
+      DISABLED_BEST_ROUTE_VENUES.has(route.venue) ||
+      route.venueProgramId?.equals?.(DEX_PROGRAM_IDS.PHOENIX)
+    ) {
       throw new Error(
         `Venue native temporairement désactivée: ${route.venue}. ` +
           `Phoenix requiert une quote orderbook pour éviter les IOC failures (0xF).`

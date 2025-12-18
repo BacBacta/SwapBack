@@ -37,6 +37,7 @@ import {
   TrueNativeSwap,
   type TrueNativeRoute,
   type TrueNativeSwapResult,
+  DEX_PROGRAM_IDS,
 } from "@/lib/native-router/true-native-swap";
 import { toPublicKey } from "@/lib/native-router/utils/publicKeyUtils";
 import { 
@@ -619,24 +620,32 @@ export function useNativeSwap() {
           );
         }
 
-        // Sécurité: Phoenix (CLOB) nécessite une quote orderbook. Tant que ce n'est
-        // pas implémenté, on refuse d'exécuter Phoenix pour éviter les IOC failures 0xF.
-        if (route.venue === 'PHOENIX') {
+        // Sécurité: Phoenix (CLOB) nécessite une quote orderbook.
+        // Défense en profondeur: certains chemins peuvent produire une route mal étiquetée;
+        // on gate aussi sur le programId.
+        if (
+          route.venue === 'PHOENIX' ||
+          route.venueProgramId?.equals?.(DEX_PROGRAM_IDS.PHOENIX)
+        ) {
           throw new Error(
             "Phoenix est temporairement désactivé pour le swap natif (quote orderbook non implémentée). " +
             "Veuillez réessayer: une autre venue (Meteora/Orca/Raydium) sera utilisée si disponible."
           );
         }
 
-        setTrueNativeRoute(route);
+        // Garder une référence locale pour logs/erreurs (l'état React peut être stale en catch).
+        const selectedRoute = route;
+
+        setTrueNativeRoute(selectedRoute);
 
         const minAmountOut = Math.floor(route.outputAmount * (10000 - slippageBps) / 10000);
 
         logger.info("useNativeSwap", "True native route found", {
-          venue: route.venue,
-          outputAmount: route.outputAmount,
+          venue: selectedRoute.venue,
+          venueProgramId: selectedRoute.venueProgramId?.toBase58?.() ?? null,
+          outputAmount: selectedRoute.outputAmount,
           minAmountOut,
-          priceImpactBps: route.priceImpactBps,
+          priceImpactBps: selectedRoute.priceImpactBps,
         });
 
         const build = async () =>
@@ -649,7 +658,7 @@ export function useNativeSwap() {
             minAmountOut: 0,
             slippageBps,
             userPublicKey: publicKey,
-            routeOverride: route,
+            routeOverride: selectedRoute,
           });
 
         // Construire la transaction
@@ -801,13 +810,13 @@ export function useNativeSwap() {
         const swapResult: NativeSwapResult = {
           signature,
           inputAmount: params.amount,
-          outputAmount: route.outputAmount,
+          outputAmount: selectedRoute.outputAmount,
           inputMint: safeInputMint.toBase58(),
           outputMint: safeOutputMint.toBase58(),
-          venues: [route.venue],
-          rebateAmount: calculateBoostedRebate(route.outputAmount * 0.001, userBoostBps).boostedRebate,
+          venues: [selectedRoute.venue],
+          rebateAmount: calculateBoostedRebate(selectedRoute.outputAmount * 0.001, userBoostBps).boostedRebate,
           boostApplied: userBoostBps,
-          npiGenerated: route.outputAmount * 0.001,
+          npiGenerated: selectedRoute.outputAmount * 0.001,
           success: true,
         };
 
@@ -815,14 +824,21 @@ export function useNativeSwap() {
 
         logger.info("useNativeSwap", "🔥 TRUE native swap completed!", {
           signature,
-          venue: route.venue,
-          outputAmount: route.outputAmount,
+          venue: selectedRoute.venue,
+          outputAmount: selectedRoute.outputAmount,
         });
 
         return swapResult;
       } catch (err) {
         const message = err instanceof Error ? err.message : "Erreur lors du swap natif";
         const normalized = message.toLowerCase();
+
+        const phoenixLike =
+          normalized.includes("phoenix") ||
+          normalized.includes("ioc") ||
+          normalized.includes("0xf") ||
+          normalized.includes("min_quote_lots_to_fill") ||
+          normalized.includes("phoenixinstruction::swap");
 
         // Log detailed error for debugging
         logger.error("useNativeSwap", "True native swap error", {
@@ -866,6 +882,11 @@ export function useNativeSwap() {
           setError(
             "Solde insuffisant pour effectuer ce swap. " +
             "Vérifiez que vous avez assez de tokens."
+          );
+        } else if (phoenixLike) {
+          setError(
+            "Phoenix est temporairement désactivé pour le swap natif (IOC/0xF). " +
+              "Veuillez réessayer: une autre venue (Meteora/Orca/Raydium) sera utilisée si disponible."
           );
         } else {
           setError(message);
