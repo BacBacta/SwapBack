@@ -79,21 +79,19 @@ export async function GET(request: NextRequest) {
   console.log(`[venue-quotes] Fetching quotes for ${inputMint} -> ${outputMint}, amount: ${amountNum}`);
 
   const quotes: VenueQuoteResult[] = [];
-  let jupiterBenchmark: VenueQuoteResult | null = null;
+  const jupiterBenchmark: VenueQuoteResult | null = null;
 
   // Fetch all quotes in parallel
-  const [raydiumResult, orcaResult, meteoraResult, jupiterResult] = await Promise.allSettled([
+  const [raydiumResult, orcaResult, meteoraResult] = await Promise.allSettled([
     fetchRaydiumQuote(inputMint, outputMint, amountNum),
     fetchOrcaQuote(inputMint, outputMint, amountNum),
     fetchMeteoraQuote(inputMint, outputMint, amountNum),
-    fetchJupiterQuote(inputMint, outputMint, amountNum),
   ]);
 
   console.log('[venue-quotes] Fetch results:', {
     raydium: raydiumResult.status === 'fulfilled' ? raydiumResult.value : 'rejected',
     orca: orcaResult.status === 'fulfilled' ? orcaResult.value : 'rejected',
     meteora: meteoraResult.status === 'fulfilled' ? meteoraResult.value : 'rejected',
-    jupiter: jupiterResult.status === 'fulfilled' ? jupiterResult.value : 'rejected',
   });
 
   // Process all results - les fonctions retournent toujours un objet maintenant
@@ -109,53 +107,15 @@ export async function GET(request: NextRequest) {
     quotes.push(meteoraResult.value);
   }
 
-  // Process Jupiter (benchmark)
-  if (jupiterResult.status === 'fulfilled' && jupiterResult.value.outputAmount > 0) {
-    jupiterBenchmark = jupiterResult.value;
-  }
+  console.log('[venue-quotes] Valid quotes:', quotes.length);
 
-  console.log('[venue-quotes] Valid quotes:', quotes.length, 'Jupiter benchmark:', !!jupiterBenchmark);
-
-  // Find best venue among native venues (exclure Jupiter du tri)
-  const nativeQuotes = quotes.filter(q => q.venue !== 'JUPITER');
-  let bestQuote = nativeQuotes.reduce((best, current) => 
+  // Find best venue among native venues
+  let bestQuote = quotes.reduce((best, current) => 
     current.outputAmount > (best?.outputAmount || 0) ? current : best
   , null as VenueQuoteResult | null);
 
-  // FALLBACK 1: Si aucune venue native n'a de quote valide, utiliser Jupiter
-  if (!bestQuote && jupiterBenchmark && jupiterBenchmark.outputAmount > 0) {
-    console.log('[venue-quotes] No native venues, using Jupiter as fallback');
-    bestQuote = {
-      ...jupiterBenchmark,
-      venue: 'JUPITER_FALLBACK',
-    };
-    quotes.push(bestQuote);
-  }
-
-  // FALLBACK 2: Si toujours rien, générer des quotes synthétiques basées sur les prix
-  if (!bestQuote || quotes.length === 0) {
-    console.log('[venue-quotes] No quotes at all, generating synthetic quotes from prices...');
-    
-    const syntheticQuotes = await generateSyntheticQuotes(inputMint, outputMint, amountNum);
-    
-    if (syntheticQuotes.length > 0) {
-      quotes.push(...syntheticQuotes);
-      bestQuote = syntheticQuotes.reduce((best, current) => 
-        current.outputAmount > (best?.outputAmount || 0) ? current : best
-      , null as VenueQuoteResult | null);
-      
-      // Utiliser la meilleure quote synthétique comme benchmark Jupiter si pas de benchmark
-      if (!jupiterBenchmark && bestQuote) {
-        jupiterBenchmark = {
-          ...bestQuote,
-          venue: 'JUPITER',
-          source: 'synthetic',
-        };
-      }
-      
-      console.log('[venue-quotes] Generated', syntheticQuotes.length, 'synthetic quotes, best:', bestQuote?.venue);
-    }
-  }
+  // IMPORTANT: Pas de fallback vers Jupiter ici. Si aucune venue native ne quote,
+  // le client doit afficher une erreur explicite (pas de routing implicite).
 
   console.log('[venue-quotes] Final result:', {
     quotesCount: quotes.length,

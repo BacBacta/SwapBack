@@ -425,6 +425,6 @@ export async function GET() {
     ],
     routerProgram: "APHj6L2b2bA2q62jwYZp38dqbTxQUqwatqdUum1trPnN",
     fallbackEnabled: true,
-    fallbackSource: "/api/price (Jupiter/Birdeye/DexScreener)",
+    fallbackSource: "/api/price",
   }, { headers: CORS_HEADERS });
 }

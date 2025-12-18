@@ -692,21 +692,43 @@ export function useNativeSwap() {
           blockhash: string;
           lastValidBlockHeight: number;
         }): Promise<string> => {
-          const waitForSignature = async (signature: string, timeoutMs: number): Promise<"confirmed" | "finalized" | null> => {
+          const waitForSignature = async (signature: string, timeoutMs: number): Promise<"confirmed" | "finalized" | "unknown"> => {
             const start = Date.now();
+
             while (Date.now() - start < timeoutMs) {
+              // Stop tôt si le blockhash est clairement expiré.
               try {
-                const st = await connection.getSignatureStatuses([signature]);
-                const v = st.value[0];
-                if (v?.confirmationStatus === "finalized") return "finalized";
-                if (v?.confirmationStatus === "confirmed") return "confirmed";
-                if (v?.err) return null;
+                const currentBlockHeight = await connection.getBlockHeight('confirmed');
+                if (currentBlockHeight > ctx.lastValidBlockHeight) {
+                  return 'unknown';
+                }
               } catch {
                 // ignore transient
               }
+
+              try {
+                const st = await connection.getSignatureStatuses([signature], {
+                  searchTransactionHistory: true,
+                });
+                const v = st.value[0];
+
+                if (v?.err) {
+                  throw new Error(`Transaction failed: ${JSON.stringify(v.err)}`);
+                }
+
+                if (v?.confirmationStatus === 'finalized') return 'finalized';
+                if (v?.confirmationStatus === 'confirmed') return 'confirmed';
+              } catch (e) {
+                // propagate hard failure
+                if (e instanceof Error && e.message.startsWith('Transaction failed:')) {
+                  throw e;
+                }
+              }
+
               await new Promise((r) => setTimeout(r, 1000));
             }
-            return null;
+
+            return 'unknown';
           };
 
           // Envoyer
@@ -724,56 +746,20 @@ export function useNativeSwap() {
             lastValidBlockHeight: ctx.lastValidBlockHeight,
           });
 
-          // Confirmer (avec contexte blockhash pour éviter les faux négatifs)
+          // Confirmer SANS websocket: polling HTTP uniquement.
           params.onProgress?.('confirming');
-          let confirmation;
-          try {
-            confirmation = await connection.confirmTransaction(
-              {
-                signature,
-                blockhash: ctx.blockhash,
-                lastValidBlockHeight: ctx.lastValidBlockHeight,
-              },
-              'confirmed'
-            );
-          } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e);
-            const normalized = msg.toLowerCase();
-            if (
-              normalized.includes('transactionexpiredblockheightexceeded') ||
-              normalized.includes('block height exceeded') ||
-              normalized.includes('expired')
-            ) {
-              logger.info("useNativeSwap", "confirmTransaction expired; polling signature status", {
-                signature,
-                error: msg,
-              });
-              const status = await waitForSignature(signature, 25_000);
-              if (status) {
-                return signature;
-              }
-            }
-            throw e;
+          const status = await waitForSignature(signature, 35_000);
+          if (status === 'confirmed' || status === 'finalized') {
+            return signature;
           }
 
-          if (confirmation.value.err) {
-            // Essayer de récupérer des logs on-chain pour diagnostic
-            let logsTail: string[] = [];
-            try {
-              const tx = await connection.getTransaction(signature, {
-                commitment: 'confirmed',
-                maxSupportedTransactionVersion: 0,
-              });
-              logsTail = tx?.meta?.logMessages?.slice(-40) ?? [];
-            } catch {
-              logsTail = [];
-            }
-
-            throw new Error(
-              `Transaction failed: ${JSON.stringify(confirmation.value.err)}` +
-                (logsTail.length ? `\nLogs (tail):\n${logsTail.join("\n")}` : "")
-            );
-          }
+          // Statut inconnu: ne pas bloquer l'UI (souvent c'est juste un délai RPC).
+          // La UI/TransactionTracker peut continuer à poller et l'utilisateur peut vérifier l'explorer.
+          logger.warn("useNativeSwap", "Transaction sent but not confirmed within timeout (status unknown)", {
+            signature,
+            blockhash: ctx.blockhash,
+            lastValidBlockHeight: ctx.lastValidBlockHeight,
+          });
 
           return signature;
         };
