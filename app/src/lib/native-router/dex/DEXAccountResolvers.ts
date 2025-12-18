@@ -2098,6 +2098,21 @@ export async function getRaydiumAccounts(
       return null;
     }
 
+    // NOTE: Le CPI Raydium AMM côté programme on-chain supporte de manière fiable
+    // le sens "base-in" (ex: SOL→USDC) mais le sens inverse "quote→base" a
+    // montré des échecs persistants (0x28 insufficient funds) en mainnet.
+    // En attendant une correction on-chain, on évite de sélectionner Raydium
+    // pour ce sens afin de laisser Meteora/Orca prendre le relais.
+    if (poolConfig.tokenMintA.equals(safeOutputMint) && poolConfig.tokenMintB.equals(safeInputMint)) {
+      logger.warn("RaydiumResolver", "Raydium AMM quote→base temporarily disabled", {
+        inputMint: safeInputMint.toBase58(),
+        outputMint: safeOutputMint.toBase58(),
+        ammAddress: poolConfig.ammAddress.toBase58(),
+        hint: "Use Orca/Meteora for quote→base until on-chain Raydium CPI is fixed",
+      });
+      return null;
+    }
+
     const userSourceAccount = await getAssociatedTokenAddress(safeInputMint, safeUser);
     const userDestinationAccount = await getAssociatedTokenAddress(safeOutputMint, safeUser);
 

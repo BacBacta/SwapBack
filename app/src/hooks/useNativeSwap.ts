@@ -903,7 +903,8 @@ export function useNativeSwap() {
           stack: err instanceof Error ? err.stack : null,
           inputMint: params.inputMint?.toString?.() ?? "unknown",
           outputMint: params.outputMint?.toString?.() ?? "unknown",
-          venue: trueNativeRoute?.venue,
+          // trueNativeRoute peut être stale dans un catch; garder un fallback sur la quote courante si possible.
+          venue: trueNativeRoute?.venue ?? (currentQuote as any)?.venue ?? undefined,
         });
 
         // Check for specific error types and provide helpful messages
