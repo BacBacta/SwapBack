@@ -481,14 +481,26 @@ async function main() {
     // NOTE: En mode native direct DEX (useDynamicPlan=false), le SwapPlan est optionnel.
     // Éviter de créer un plan dans le simulateur pour limiter la taille de tx (pas d'écriture on-chain).
 
-      const swapIx = await swapper.buildNativeSwapInstruction(user.publicKey, forcedRoute as any, {
-        inputMint: swapCase.inputMint,
-        outputMint: swapCase.outputMint,
-        amountIn: swapCase.amountInLamports,
-        minAmountOut: minOut,
-        slippageBps,
-        userPublicKey: user.publicKey,
-      });
+      let swapIx: TransactionInstruction;
+      try {
+        swapIx = await swapper.buildNativeSwapInstruction(user.publicKey, forcedRoute as any, {
+          inputMint: swapCase.inputMint,
+          outputMint: swapCase.outputMint,
+          amountIn: swapCase.amountInLamports,
+          minAmountOut: minOut,
+          slippageBps,
+          userPublicKey: user.publicKey,
+        });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        if (/Venue native temporairement d[ée]sactiv[ée]e/i.test(message)) {
+          console.log(`[simulate-native-swap] SKIP venue=${venue} case=${swapCase.name}: ${message}`);
+          summary.push({ venue, caseName: swapCase.name, status: "SKIP", error: message });
+          continue;
+        }
+        throw e;
+      }
+
       instructions.push(swapIx);
 
   // Debug (Lifinity): vérifier si `configAccount` est bien writable dans l'instruction outer (SwapToc).
