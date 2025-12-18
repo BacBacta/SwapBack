@@ -254,6 +254,50 @@ export class TrueNativeSwap {
     // Trier par meilleur output
     quotes.sort((a, b) => b.outputAmount - a.outputAmount);
 
+    // Si aucune quote n'a été obtenue et que Raydium n'est pas dans les comptes résolus,
+    // essayer de récupérer une quote Raydium via l'API (qui fait son propre routing)
+    if (quotes.length === 0 && !allAccounts.has("RAYDIUM_AMM")) {
+      logger.info("TrueNativeSwap", "Trying Raydium API fallback (no resolved accounts)");
+      try {
+        const startTime = Date.now();
+        const emptyAccounts: DEXAccounts = {
+          accounts: [],
+          vaultTokenAccountA: safeInputMint,
+          vaultTokenAccountB: safeOutputMint,
+          meta: { venue: "RAYDIUM_AMM", poolAddress: "", feeRate: 0.0025 },
+        };
+        const raydiumQuote = await this.getRaydiumQuote(
+          safeInputMint,
+          safeOutputMint,
+          amountIn,
+          emptyAccounts,
+          slippageBps
+        );
+        const latencyMs = Date.now() - startTime;
+        
+        if (raydiumQuote) {
+          quotes.push({
+            venue: "RAYDIUM_AMM",
+            venueProgramId: DEX_PROGRAM_IDS.RAYDIUM_AMM,
+            inputAmount: amountIn,
+            outputAmount: raydiumQuote.outputAmount,
+            priceImpactBps: raydiumQuote.priceImpactBps,
+            minOutAmount: raydiumQuote.minOutAmount,
+            accounts: emptyAccounts,
+            latencyMs,
+          });
+          logger.info("TrueNativeSwap", "Raydium API fallback succeeded", {
+            outputAmount: raydiumQuote.outputAmount,
+            latencyMs,
+          });
+        }
+      } catch (err) {
+        logger.warn("TrueNativeSwap", "Raydium API fallback failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     return quotes;
   }
 
