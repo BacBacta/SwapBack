@@ -267,8 +267,21 @@ export class TransactionSimulator {
       
       // 2. Vérifier le compte token d'entrée
       const { getAssociatedTokenAddress } = await import("@solana/spl-token");
-      const inputAta = await getAssociatedTokenAddress(inputMint, userPublicKey);
-      const inputAccountInfo = await this.connection.getAccountInfo(inputAta);
+
+      const resolveAta = async (mint: PublicKey): Promise<{ ata: PublicKey; tokenProgram: PublicKey } | null> => {
+        const mintInfo = await this.connection.getAccountInfo(mint);
+        if (!mintInfo) {
+          issues.push(`Mint introuvable on-chain (${mint.toBase58().slice(0, 8)}...)`);
+          return null;
+        }
+        const tokenProgram = mintInfo.owner;
+        const ata = await getAssociatedTokenAddress(mint, userPublicKey, false, tokenProgram);
+        return { ata, tokenProgram };
+      };
+
+      const inputAtaResolved = await resolveAta(inputMint);
+      const inputAta = inputAtaResolved?.ata;
+      const inputAccountInfo = inputAta ? await this.connection.getAccountInfo(inputAta) : null;
       
       if (!inputAccountInfo) {
         issues.push(`Compte token d'entrée non initialisé (${inputMint.toBase58().slice(0, 8)}...)`);
@@ -284,8 +297,9 @@ export class TransactionSimulator {
       }
       
       // 3. Vérifier si le compte de sortie existe
-      const outputAta = await getAssociatedTokenAddress(outputMint, userPublicKey);
-      const outputAccountInfo = await this.connection.getAccountInfo(outputAta);
+      const outputAtaResolved = await resolveAta(outputMint);
+      const outputAta = outputAtaResolved?.ata;
+      const outputAccountInfo = outputAta ? await this.connection.getAccountInfo(outputAta) : null;
       
       if (!outputAccountInfo) {
         warnings.push(`Le compte de sortie sera créé automatiquement (coût: ~0.002 SOL)`);
