@@ -9,6 +9,17 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { AnchorProvider } from "@coral-xyz/anchor";
+import BN from "bn.js";
+import { Percentage } from "@orca-so/common-sdk";
+import {
+  UseFallbackTickArray,
+  WhirlpoolContext,
+  buildWhirlpoolClient,
+  swapQuoteByInputToken,
+} from "@orca-so/whirlpools-sdk";
+import { Connection, Keypair, PublicKey } from "@solana/web3.js";
+import { ORCA_WHIRLPOOL_PROGRAM_ID } from "@/sdk/config/orca-pools";
 
 // Route handler: toujours dynamique (aucune exécution au build)
 export const dynamic = "force-dynamic";
@@ -93,6 +104,81 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+class ReadonlyWallet {
+  publicKey: PublicKey;
+  payer: Keypair;
+
+  constructor(keypair: Keypair = Keypair.generate()) {
+    this.publicKey = keypair.publicKey;
+    this.payer = keypair;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async signTransaction(tx: any): Promise<any> {
+    return tx;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async signAllTransactions(txs: any[]): Promise<any[]> {
+    return txs;
+  }
+}
+
+async function quoteWithOrcaWhirlpoolSdk(params: {
+  rpcUrl: string;
+  pool: string;
+  inputMint: string;
+  outputMint: string;
+  amountIn: number;
+  slippageBps: number;
+}): Promise<{ outAmount: number }> {
+  const connection = new Connection(params.rpcUrl, "confirmed");
+  const provider = new AnchorProvider(
+    connection,
+    new ReadonlyWallet() as any,
+    AnchorProvider.defaultOptions()
+  );
+  const ctx = WhirlpoolContext.withProvider(provider, ORCA_WHIRLPOOL_PROGRAM_ID);
+  const client = buildWhirlpoolClient(ctx);
+
+  const poolPk = new PublicKey(params.pool);
+  const pool = await client.getPool(poolPk);
+  await pool.refreshData();
+
+  const tokenA = pool.getTokenAInfo();
+  const tokenB = pool.getTokenBInfo();
+  const inputPk = new PublicKey(params.inputMint);
+  const outputPk = new PublicKey(params.outputMint);
+
+  const aToB = tokenA.mint.equals(inputPk) && tokenB.mint.equals(outputPk);
+  const bToA = tokenB.mint.equals(inputPk) && tokenA.mint.equals(outputPk);
+
+  if (!aToB && !bToA) {
+    throw new Error(
+      `Pool does not match input/output mints (tokenA=${tokenA.mint.toBase58()}, tokenB=${tokenB.mint.toBase58()})`
+    );
+  }
+
+  const slippage = Percentage.fromFraction(params.slippageBps, 10_000);
+  const quote = await swapQuoteByInputToken(
+    pool,
+    inputPk,
+    new BN(params.amountIn),
+    slippage,
+    ORCA_WHIRLPOOL_PROGRAM_ID,
+    ctx.fetcher,
+    undefined,
+    UseFallbackTickArray.Situational
+  );
+
+  const outAmount = Number(quote.estimatedAmountOut.toString());
+  if (!Number.isFinite(outAmount) || outAmount <= 0) {
+    throw new Error(`Invalid outAmount from SDK: ${quote.estimatedAmountOut.toString()}`);
+  }
+
+  return { outAmount };
+}
+
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 204,
@@ -105,6 +191,7 @@ export async function GET(request: NextRequest) {
   const inputMint = searchParams.get('inputMint');
   const outputMint = searchParams.get('outputMint');
   const amount = searchParams.get('amount');
+  const pool = searchParams.get("pool");
   const slippageBpsParam = searchParams.get("slippageBps");
   const corsHeaders = getCorsHeaders(request.headers.get("origin"));
 
@@ -129,6 +216,11 @@ export async function GET(request: NextRequest) {
         { status: 400, headers: corsHeaders }
       );
     }
+
+    const rpcUrl =
+      process.env.SOLANA_RPC_URL ||
+      process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
+      "https://api.mainnet-beta.solana.com";
 
     // Orca Quote API (déjà utilisée ailleurs dans le repo)
     // Note: le paramètre `slippage` est en % (0.5 = 0.5%)
@@ -180,15 +272,8 @@ export async function GET(request: NextRequest) {
           continue; // retry
         }
 
-        return NextResponse.json(
-          {
-            error: "Orca upstream error",
-            status: response.status,
-            contentType,
-            body: body.slice(0, 500),
-          },
-          { status: 502, headers: corsHeaders }
-        );
+        lastError = { status: response.status, body: body.slice(0, 500) };
+        break;
       }
 
       // Check if we got valid JSON
@@ -234,7 +319,44 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // All retries exhausted
+    // Fallback: Orca Whirlpool SDK on-chain (requires `pool`)
+    if (pool) {
+      try {
+        const sdkQuote = await quoteWithOrcaWhirlpoolSdk({
+          rpcUrl,
+          pool,
+          inputMint,
+          outputMint,
+          amountIn,
+          slippageBps,
+        });
+
+        return NextResponse.json(
+          {
+            inputMint,
+            outputMint,
+            inputAmount: amountIn,
+            outputAmount: sdkQuote.outAmount,
+            priceImpact: 0,
+            priceImpactBps: 0,
+            slippageBps,
+            source: "orca-whirlpool-sdk",
+          },
+          { headers: corsHeaders }
+        );
+      } catch (sdkError) {
+        return NextResponse.json(
+          {
+            error: "Orca quote unavailable (upstream + SDK fallback failed)",
+            lastError,
+            sdkError: String(sdkError),
+          },
+          { status: 503, headers: corsHeaders }
+        );
+      }
+    }
+
+    // All retries exhausted (no fallback possible)
     return NextResponse.json(
       { error: "Orca API unavailable after retries", lastError },
       { status: 503, headers: corsHeaders }
