@@ -90,6 +90,54 @@ async function simulateTransactionWith429Retry(
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
+function dumpInnerTokenTransfers(sim: Awaited<ReturnType<Connection["simulateTransaction"]>>, tx: VersionedTransaction): void {
+  const value: any = (sim as any)?.value;
+  const inner = value?.innerInstructions as
+    | Array<{ index: number; instructions: Array<{ programIdIndex: number; accounts: number[]; data: string }> }>
+    | undefined;
+
+  if (!inner || inner.length === 0) return;
+
+  const msg = tx.message;
+  const keyForIndex = (i: number): string => {
+    try {
+      // @solana/web3.js: message.getAccountKeys() is available on v0 messages.
+      const keys = (msg as any).getAccountKeys?.();
+      const pubkey = keys?.get?.(i) ?? keys?.staticAccountKeys?.[i] ?? (msg as any).staticAccountKeys?.[i];
+      return pubkey?.toBase58?.() ?? String(pubkey ?? i);
+    } catch {
+      return String(i);
+    }
+  };
+
+  const tokenProgramIds = new Set([
+    TOKEN_PROGRAM_ID.toBase58(),
+    // Token-2022
+    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+  ]);
+
+  const tokenInners: Array<{ parentIx: number; programId: string; accounts: string[]; data: string }> = [];
+  for (const group of inner) {
+    for (const ix of group.instructions ?? []) {
+      const programId = keyForIndex(ix.programIdIndex);
+      if (!tokenProgramIds.has(programId)) continue;
+      tokenInners.push({
+        parentIx: group.index,
+        programId,
+        accounts: (ix.accounts ?? []).map((a) => keyForIndex(a)),
+        data: ix.data,
+      });
+    }
+  }
+
+  if (tokenInners.length === 0) return;
+
+  console.log("--- inner SPL token instructions (debug) ---");
+  for (const ix of tokenInners.slice(0, 12)) {
+    console.log(JSON.stringify(ix, null, 2));
+  }
+}
+
 function tryAutoCreateDefaultKeypair(defaultPath: string): boolean {
   try {
     const dir = path.dirname(defaultPath);
@@ -450,6 +498,10 @@ async function main() {
         }
 
         if (sim.value.err) {
+          dumpInnerTokenTransfers(sim, tx);
+        }
+
+        if (sim.value.err) {
           summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "FAIL", error: JSON.stringify(sim.value.err) });
           process.exitCode = 1;
         } else {
@@ -709,6 +761,10 @@ async function main() {
           console.log(line);
         }
       }
+    }
+
+    if (sim.value.err) {
+      dumpInnerTokenTransfers(sim, tx);
     }
 
       if (sim.value.err) {

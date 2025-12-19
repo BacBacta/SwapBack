@@ -1463,8 +1463,11 @@ export async function getMeteoraAccounts(
 
       // Scanner un petit voisinage autour de 0 (safe) pour trouver des bin arrays initialisés.
       // Ce fallback est moins fiable que le SDK mais évite de passer des PDAs non initialisées.
-      const desiredBinArrays = 5;
-      const scanRadius = 500;
+      // IMPORTANT: il faut souvent fournir un nombre significatif de bin arrays (remaining accounts)
+      // sinon le programme DLMM peut échouer avec AccountNotEnoughKeys (3005).
+      const desiredBinArrays = 60;
+      const minBinArraysRequired = 20;
+      const scanRadius = 2500;
       const binArraysFound: PublicKey[] = [];
       const indices: number[] = [];
       for (let i = 0; i < scanRadius && indices.length < 2000; i++) {
@@ -1504,6 +1507,15 @@ export async function getMeteoraAccounts(
         });
         return null;
       }
+
+      if (binArraysFound.length < minBinArraysRequired) {
+        console.warn("[MeteoraResolver] Too few initialized bin_array accounts found (fallback)", {
+          lbPair: lbPair.toBase58(),
+          found: binArraysFound.length,
+          required: minBinArraysRequired,
+        });
+        return null;
+      }
       binArrays = binArraysFound;
     }
 
@@ -1531,6 +1543,12 @@ export async function getMeteoraAccounts(
     const { getAssociatedTokenAddress } = await import("@solana/spl-token");
     const userTokenX = await getAssociatedTokenAddress(tokenXMint, safeUser, false, tokenXProgram);
     const userTokenY = await getAssociatedTokenAddress(tokenYMint, safeUser, false, tokenYProgram);
+
+    // Meteora DLMM (IDL SDK): les comptes attendus sont `user_token_in` / `user_token_out`.
+    // Direction = déduite par l’ordre des comptes, pas par une paire X/Y fixe.
+    const inputIsX = safeInputMint.equals(tokenXMint);
+    const userTokenIn = inputIsX ? userTokenX : userTokenY;
+    const userTokenOut = inputIsX ? userTokenY : userTokenX;
     
     // Bin array bitmap extension (doit exister si fourni)
     const [binArrayBitmapExtension] = PublicKey.findProgramAddressSync(
@@ -1552,20 +1570,24 @@ export async function getMeteoraAccounts(
       METEORA_DLMM_PROGRAM
     );
     
+    // `host_fee_in` est optionnel côté Meteora, mais si fourni il doit être cohérent avec le token d'entrée.
+    const hostFeeIn = userTokenIn;
+
     return {
       accounts: [
         lbPair,                        // 0. lb_pair
         binArrayBitmapExtension,       // 1. bin_array_bitmap_extension
         reserveX,                      // 2. reserve_x (vault)
         reserveY,                      // 3. reserve_y (vault)
-        userTokenX,                    // 4. user_token_x
-        userTokenY,                    // 5. user_token_y
+        userTokenIn,                   // 4. user_token_in
+        userTokenOut,                  // 5. user_token_out
         tokenXMint,                    // 6. token_x_mint
         tokenYMint,                    // 7. token_y_mint
         oracle,                        // 8. oracle
-        // NOTE: certains chemins Meteora semblent utiliser host_fee_in avec tokenX.
-        // Pour éviter un TransferChecked 0x3 en sens Y->X, on stabilise sur userTokenX.
-        userTokenX,                    // 9. host_fee_in (optional) - use a real SPL token account
+        // NOTE: host_fee_in (si utilisé) doit être un compte SPL du token d'entre.
+        // - X->Y: fee en X  userTokenX
+        // - Y->X: fee en Y  userTokenY
+        hostFeeIn,                     // 9. host_fee_in (optional) - use a real SPL token account
         safeUser,                      // 10. user (signer)
         tokenXProgram,                 // 11. token_x_program
         tokenYProgram,                 // 12. token_y_program
