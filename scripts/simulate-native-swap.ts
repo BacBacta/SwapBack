@@ -59,6 +59,37 @@ type SwapCase = {
   amountInLamports: number;
 };
 
+async function sleep(ms: number): Promise<void> {
+  await new Promise((r) => setTimeout(r, ms));
+}
+
+async function simulateTransactionWith429Retry(
+  connection: Connection,
+  tx: VersionedTransaction,
+  options: Parameters<Connection["simulateTransaction"]>[1],
+  label: string
+): Promise<Awaited<ReturnType<Connection["simulateTransaction"]>>> {
+  const delaysMs = [500, 1000, 2000, 4000, 8000, 12000];
+  let lastErr: unknown;
+
+  for (let i = 0; i < delaysMs.length; i++) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      return await connection.simulateTransaction(tx, options as any);
+    } catch (e) {
+      lastErr = e;
+      const msg = e instanceof Error ? e.message : String(e);
+      const is429 = msg.includes("429") || msg.toLowerCase().includes("rate limit");
+      if (!is429) throw e;
+      console.log(`[simulate-native-swap] 429 rate-limited during simulate (${label}). Retrying in ${delaysMs[i]}ms...`);
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(delaysMs[i]);
+    }
+  }
+
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
 function tryAutoCreateDefaultKeypair(defaultPath: string): boolean {
   try {
     const dir = path.dirname(defaultPath);
@@ -400,10 +431,10 @@ async function main() {
           continue;
         }
 
-        const sim = await connection.simulateTransaction(tx, {
+        const sim = await simulateTransactionWith429Retry(connection, tx, {
           sigVerify: false,
           replaceRecentBlockhash: true,
-        });
+        }, "bestRoute");
 
         console.log("Simulation err:", sim.value.err);
         console.log("Units:", sim.value.unitsConsumed);
