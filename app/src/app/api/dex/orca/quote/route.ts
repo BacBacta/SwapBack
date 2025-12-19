@@ -138,7 +138,9 @@ async function quoteWithOrcaWhirlpoolSdk(params: {
     new ReadonlyWallet() as any,
     AnchorProvider.defaultOptions()
   );
-  const ctx = WhirlpoolContext.withProvider(provider, ORCA_WHIRLPOOL_PROGRAM_ID);
+  // NOTE: `withProvider(provider, fetcher?)` — le 2e argument est un *fetcher*, pas le programId.
+  // Passer un PublicKey ici casse `ctx.fetcher` (=> getPool is not a function).
+  const ctx = WhirlpoolContext.withProvider(provider);
   const client = buildWhirlpoolClient(ctx);
 
   const poolPk = new PublicKey(params.pool);
