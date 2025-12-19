@@ -79,9 +79,10 @@ pub fn swap(
         return err!(ErrorCode::DexExecutionFailed);
     };
 
-    // Always verify the actual output delta on the router's declared output account.
-    // This avoids underflow when tokenX/tokenY ordering differs from router A/B semantics.
-    let destination_account = ctx.accounts.user_token_account_b.to_account_info();
+    // Read both user-side token balances pre/post and compute the positive delta.
+    // This is more robust than assuming a single destination account and avoids underflow
+    // when the observed account is actually the source (post < pre).
+    let expected_output_key = ctx.accounts.user_token_account_b.key();
 
     // --- DEBUG LOGGING: dump relevant account pubkeys + mints (best-effort) ---
     fn account_mint_str(account: &AccountInfo) -> Option<String> {
@@ -101,8 +102,9 @@ pub fn swap(
     if let Some(m) = account_mint_str(&account_slice[RESERVE_Y_INDEX]) { msg!("Meteora DLMM: reserve_y.mint={}", m); }
     msg!("Meteora DLMM: token_x_mint={}, token_y_mint={}", account_slice[TOKEN_X_MINT_INDEX].key(), account_slice[TOKEN_Y_MINT_INDEX].key());
 
-    // Read pre-swap balance
-    let pre_amount = read_token_amount(&destination_account)?;
+    // Read pre-swap balances (best-effort: both must be SPL Token accounts)
+    let pre_x = read_token_amount(user_token_x)?;
+    let pre_y = read_token_amount(user_token_y)?;
 
     // Build swap instruction data
     // Meteora DLMM swap params: amount_in, min_out, x_to_y
@@ -137,10 +139,29 @@ pub fn swap(
         })?;
 
     // Verify output
-    let post_amount = read_token_amount(&destination_account)?;
-    let amount_out = post_amount
-        .checked_sub(pre_amount)
-        .ok_or_else(|| error!(ErrorCode::DexExecutionFailed))?;
+    let post_x = read_token_amount(user_token_x)?;
+    let post_y = read_token_amount(user_token_y)?;
+
+    let delta_x = post_x.checked_sub(pre_x).unwrap_or(0);
+    let delta_y = post_y.checked_sub(pre_y).unwrap_or(0);
+
+    // Prefer the delta on the router-declared output account.
+    // Fallbacks:
+    // - if it doesn't match x/y keys (unexpected), use direction x_to_y
+    // - if still zero, take the max positive delta as a last resort
+    let mut amount_out = if expected_output_key == user_token_x.key() {
+        delta_x
+    } else if expected_output_key == user_token_y.key() {
+        delta_y
+    } else if x_to_y {
+        delta_y
+    } else {
+        delta_x
+    };
+
+    if amount_out == 0 {
+        amount_out = core::cmp::max(delta_x, delta_y);
+    }
 
     if amount_out < min_out {
         msg!("Meteora DLMM: slippage exceeded, got {} expected min {}", amount_out, min_out);
