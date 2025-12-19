@@ -197,21 +197,23 @@ function defaultMatrixCasesForVenue(venue: SupportedVenue, amountInLamports: num
 async function ensureAta(
   connection: Connection,
   payer: PublicKey,
+  owner: PublicKey,
   mint: PublicKey
 ): Promise<{ ata: PublicKey; ix?: ReturnType<typeof createAssociatedTokenAccountInstruction> }> {
-  const ata = await getAssociatedTokenAddress(mint, payer);
+  const ata = await getAssociatedTokenAddress(mint, owner);
   const info = await connection.getAccountInfo(ata);
   if (info) return { ata };
 
   return {
     ata,
-    ix: createAssociatedTokenAccountInstruction(payer, ata, payer, mint),
+    ix: createAssociatedTokenAccountInstruction(payer, ata, owner, mint),
   };
 }
 
 async function ensureWsolFunding(
   connection: Connection,
   payer: PublicKey,
+  owner: PublicKey,
   amountLamports: number
 ): Promise<{
   ata: PublicKey;
@@ -222,7 +224,7 @@ async function ensureWsolFunding(
   >;
 }> {
   const ixs: Array<any> = [];
-  const { ata, ix } = await ensureAta(connection, payer, SOL_MINT);
+  const { ata, ix } = await ensureAta(connection, payer, owner, SOL_MINT);
   if (ix) ixs.push(ix);
 
   let current = 0;
@@ -278,24 +280,26 @@ async function main() {
   const singleOutputMint = new PublicKey(args.outputMint ?? USDC_MINT.toBase58());
 
   const connection = new Connection(rpcUrl, "confirmed");
-  const user = loadKeypair(keypairPath);
+  const feePayer = loadKeypair(keypairPath);
+  const userPublicKey = args.user ? new PublicKey(args.user) : feePayer.publicKey;
 
-  const payerInfo = await connection.getAccountInfo(user.publicKey);
+  const payerInfo = await connection.getAccountInfo(feePayer.publicKey);
   if (!payerInfo) {
     console.error("\n[simulate-native-swap] Fee payer account does not exist on-chain (likely 0 SOL / never funded).\n" +
       `Fund this address with a small amount of SOL, then re-run:\n` +
-      `  ${user.publicKey.toBase58()}\n` +
+      `  ${feePayer.publicKey.toBase58()}\n` +
       `Tip: you can set SOLANA_KEYPAIR to an already-funded wallet keypair.\n`
     );
     process.exitCode = 1;
     return;
   }
 
-  const payerLamports = await connection.getBalance(user.publicKey);
+  const payerLamports = await connection.getBalance(feePayer.publicKey);
   console.log("Payer balance (lamports):", payerLamports);
 
   console.log("RPC:", rpcUrl);
-  console.log("User:", user.publicKey.toBase58());
+  console.log("Fee payer:", feePayer.publicKey.toBase58());
+  console.log("User:", userPublicKey.toBase58());
   console.log("Venues:", venues.join(","));
   console.log("Mode:", bestRouteMode ? "bestRoute" : matrixMode ? "matrix" : "single");
   if (!matrixMode) {
@@ -342,7 +346,7 @@ async function main() {
           amountIn: swapCase.amountInLamports,
           minAmountOut: 0,
           slippageBps,
-          userPublicKey: user.publicKey,
+          userPublicKey,
         });
 
         if (!route) {
@@ -419,7 +423,7 @@ async function main() {
 
       let dex: Awaited<ReturnType<typeof getDEXAccounts>>;
       try {
-        dex = await getDEXAccounts(connection, venue, swapCase.inputMint, swapCase.outputMint, user.publicKey);
+        dex = await getDEXAccounts(connection, venue, swapCase.inputMint, swapCase.outputMint, userPublicKey);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.log(`DEX resolver threw for venue=${venue} case=${swapCase.name}: ${msg}`);
@@ -467,15 +471,15 @@ async function main() {
 
       // Input prep
       if (swapCase.inputMint.equals(SOL_MINT)) {
-        const wsol = await ensureWsolFunding(connection, user.publicKey, swapCase.amountInLamports);
+        const wsol = await ensureWsolFunding(connection, feePayer.publicKey, userPublicKey, swapCase.amountInLamports);
         instructions.push(...wsol.ixs);
       } else {
-        const inAta = await ensureAta(connection, user.publicKey, swapCase.inputMint);
+        const inAta = await ensureAta(connection, feePayer.publicKey, userPublicKey, swapCase.inputMint);
         if (inAta.ix) instructions.push(inAta.ix);
       }
 
       // Output ATA
-      const outAta = await ensureAta(connection, user.publicKey, swapCase.outputMint);
+      const outAta = await ensureAta(connection, feePayer.publicKey, userPublicKey, swapCase.outputMint);
       if (outAta.ix) instructions.push(outAta.ix);
 
     // NOTE: En mode native direct DEX (useDynamicPlan=false), le SwapPlan est optionnel.
@@ -483,13 +487,13 @@ async function main() {
 
       let swapIx: TransactionInstruction;
       try {
-        swapIx = await swapper.buildNativeSwapInstruction(user.publicKey, forcedRoute as any, {
+        swapIx = await swapper.buildNativeSwapInstruction(userPublicKey, forcedRoute as any, {
           inputMint: swapCase.inputMint,
           outputMint: swapCase.outputMint,
           amountIn: swapCase.amountInLamports,
           minAmountOut: minOut,
           slippageBps,
-          userPublicKey: user.publicKey,
+          userPublicKey,
         });
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
@@ -519,7 +523,7 @@ async function main() {
 
     const { blockhash } = await connection.getLatestBlockhash();
     const msg = new TransactionMessage({
-      payerKey: user.publicKey,
+      payerKey: feePayer.publicKey,
       recentBlockhash: blockhash,
       instructions,
     }).compileToV0Message();
@@ -536,7 +540,9 @@ async function main() {
 
     const tx = new VersionedTransaction(msg);
     try {
-      tx.sign([user]);
+      // `sigVerify=false` dans simulateTransaction, on a seulement besoin d'une signature valide
+      // pour le fee payer; les autres signers peuvent rester en placeholder.
+      tx.sign([feePayer]);
     } catch (e) {
       console.error("Failed to sign/serialize transaction (likely too large):", e);
       process.exitCode = 1;
@@ -546,10 +552,68 @@ async function main() {
     const sim = await connection.simulateTransaction(tx, {
       sigVerify: false,
       replaceRecentBlockhash: true,
+      ...(venue === "METEORA_DLMM"
+        ? {
+            accounts: {
+              encoding: "base64" as const,
+              addresses: [
+                dex.accounts[2].toBase58(), // reserveX
+                dex.accounts[3].toBase58(), // reserveY
+                dex.accounts[4].toBase58(), // userTokenX
+                dex.accounts[5].toBase58(), // userTokenY
+              ],
+            },
+          }
+        : {}),
     });
 
     console.log("Simulation err:", sim.value.err);
     console.log("Units:", sim.value.unitsConsumed);
+
+    if (venue === "METEORA_DLMM" && (sim.value as any).accounts) {
+      try {
+        const { AccountLayout } = await import("@solana/spl-token");
+        const labels = ["reserveX", "reserveY", "userTokenX", "userTokenY"];
+        // `simulateTransaction` renvoie les comptes dans le même ordre que `accounts.addresses`.
+        const returned = (sim.value as any).accounts as Array<
+          | null
+          | {
+              data: [string, string];
+              owner: string;
+              lamports: number;
+              executable: boolean;
+              rentEpoch: number;
+            }
+        >;
+
+        console.log("--- post-sim accounts (Meteora) ---");
+        for (let i = 0; i < Math.min(labels.length, returned.length); i++) {
+          const acc = returned[i];
+          const label = labels[i];
+          const pk = [dex.accounts[2], dex.accounts[3], dex.accounts[4], dex.accounts[5]][i];
+          if (!acc) {
+            console.log(`${label}: ${pk.toBase58()} => null`);
+            continue;
+          }
+          const [b64] = acc.data;
+          const buf = Buffer.from(b64, "base64");
+          let mint = "?";
+          let amount = "?";
+          try {
+            const decoded = AccountLayout.decode(buf);
+            mint = new PublicKey(decoded.mint).toBase58();
+            amount = decoded.amount.toString();
+          } catch {
+            // not a token account
+          }
+          console.log(
+            `${label}: ${pk.toBase58()} owner=${acc.owner} len=${buf.length} mint=${mint} amount=${amount}`
+          );
+        }
+      } catch (e) {
+        console.log("[debug] Failed to decode post-sim accounts:", e);
+      }
+    }
     if (sim.value.logs) {
       const head = 400;
       console.log(`--- logs (first ${head}) ---`);

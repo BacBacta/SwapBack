@@ -1563,7 +1563,9 @@ export async function getMeteoraAccounts(
         tokenXMint,                    // 6. token_x_mint
         tokenYMint,                    // 7. token_y_mint
         oracle,                        // 8. oracle
-        safeInputMint.equals(tokenXMint) ? userTokenX : userTokenY, // 9. host_fee_in (optional) - use a real SPL token account
+        // NOTE: certains chemins Meteora semblent utiliser host_fee_in avec tokenX.
+        // Pour éviter un TransferChecked 0x3 en sens Y->X, on stabilise sur userTokenX.
+        userTokenX,                    // 9. host_fee_in (optional) - use a real SPL token account
         safeUser,                      // 10. user (signer)
         tokenXProgram,                 // 11. token_x_program
         tokenYProgram,                 // 12. token_y_program

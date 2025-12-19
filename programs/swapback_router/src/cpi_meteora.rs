@@ -66,15 +66,22 @@ pub fn swap(
     let user_token_a_key = ctx.accounts.user_token_account_a.key();
     let user_token_b_key = ctx.accounts.user_token_account_b.key();
 
-    let (x_to_y, _source_account, destination_account) = 
-        if user_token_x.key() == user_token_a_key && user_token_y.key() == user_token_b_key {
-            (true, user_token_x, user_token_y)
-        } else if user_token_x.key() == user_token_b_key && user_token_y.key() == user_token_a_key {
-            (false, user_token_y, user_token_x)
-        } else {
-            msg!("Meteora DLMM: token account mismatch");
-            return err!(ErrorCode::DexExecutionFailed);
-        };
+    // Router invariant (used across venues):
+    // - user_token_account_a = input token account
+    // - user_token_account_b = output token account
+    // Meteora needs x_to_y based on whether the router's *input* is token X or token Y.
+    let x_to_y = if user_token_x.key() == user_token_a_key && user_token_y.key() == user_token_b_key {
+        true
+    } else if user_token_x.key() == user_token_b_key && user_token_y.key() == user_token_a_key {
+        false
+    } else {
+        msg!("Meteora DLMM: token account mismatch");
+        return err!(ErrorCode::DexExecutionFailed);
+    };
+
+    // Always verify the actual output delta on the router's declared output account.
+    // This avoids underflow when tokenX/tokenY ordering differs from router A/B semantics.
+    let destination_account = ctx.accounts.user_token_account_b.to_account_info();
 
     // --- DEBUG LOGGING: dump relevant account pubkeys + mints (best-effort) ---
     fn account_mint_str(account: &AccountInfo) -> Option<String> {
@@ -95,7 +102,7 @@ pub fn swap(
     msg!("Meteora DLMM: token_x_mint={}, token_y_mint={}", account_slice[TOKEN_X_MINT_INDEX].key(), account_slice[TOKEN_Y_MINT_INDEX].key());
 
     // Read pre-swap balance
-    let pre_amount = read_token_amount(destination_account)?;
+    let pre_amount = read_token_amount(&destination_account)?;
 
     // Build swap instruction data
     // Meteora DLMM swap params: amount_in, min_out, x_to_y
@@ -130,7 +137,7 @@ pub fn swap(
         })?;
 
     // Verify output
-    let post_amount = read_token_amount(destination_account)?;
+    let post_amount = read_token_amount(&destination_account)?;
     let amount_out = post_amount
         .checked_sub(pre_amount)
         .ok_or_else(|| error!(ErrorCode::DexExecutionFailed))?;
