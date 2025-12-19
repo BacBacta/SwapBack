@@ -668,12 +668,68 @@ export function useNativeSwap() {
           throw new Error("Impossible de construire la transaction native");
         }
 
+        const isMeteoraSlippage6003 = (err: unknown): boolean => {
+          const s = (() => {
+            try {
+              return JSON.stringify(err);
+            } catch {
+              return String(err);
+            }
+          })();
+          return /"Custom"\s*:\s*6003/.test(s) || /0x1773/.test(s);
+        };
+
         // Simulation AVANT signature (SIMULATE FIRST)
-        const sim = await connection.simulateTransaction(result.transaction, {
+        let sim = await connection.simulateTransaction(result.transaction, {
           sigVerify: false,
           // Simuler EXACTEMENT ce qui sera signé/envoyé.
           replaceRecentBlockhash: false,
         });
+
+        // Fallback strictement NATIVE: si Meteora échoue en slippage (6003), retenter Orca.
+        if (sim.value.err && selectedRoute.venue === 'METEORA_DLMM' && isMeteoraSlippage6003(sim.value.err)) {
+          const orcaQuote = selectedRoute.allQuotes?.find((q) => q.venue === 'ORCA_WHIRLPOOL');
+          if (orcaQuote) {
+            const fallbackRoute: TrueNativeRoute = {
+              ...selectedRoute,
+              venue: orcaQuote.venue,
+              venueProgramId: orcaQuote.venueProgramId,
+              outputAmount: orcaQuote.outputAmount,
+              priceImpactBps: orcaQuote.priceImpactBps,
+              dexAccounts: orcaQuote.accounts,
+            };
+
+            logger.warn('useNativeSwap', 'Meteora simulation failed with slippage; retrying with Orca', {
+              originalVenue: selectedRoute.venue,
+              fallbackVenue: fallbackRoute.venue,
+              meteoraOut: selectedRoute.outputAmount,
+              orcaOut: fallbackRoute.outputAmount,
+            });
+
+            const rebuilt = await trueNativeSwap.buildNativeSwapTransaction({
+              inputMint: safeInputMint,
+              outputMint: safeOutputMint,
+              amountIn: params.amount,
+              minAmountOut: 0,
+              slippageBps,
+              userPublicKey: publicKey,
+              routeOverride: fallbackRoute,
+            });
+
+            if (rebuilt) {
+              const fallbackSim = await connection.simulateTransaction(rebuilt.transaction, {
+                sigVerify: false,
+                replaceRecentBlockhash: false,
+              });
+
+              if (!fallbackSim.value.err) {
+                setTrueNativeRoute(rebuilt.route);
+                result = rebuilt;
+                sim = fallbackSim;
+              }
+            }
+          }
+        }
 
         if (sim.value.err) {
           const logsTail = sim.value.logs?.slice(-30) ?? [];

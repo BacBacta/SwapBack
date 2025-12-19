@@ -281,7 +281,11 @@ async function main() {
 
   const connection = new Connection(rpcUrl, "confirmed");
   const feePayer = loadKeypair(keypairPath);
-  const userPublicKey = args.user ? new PublicKey(args.user) : feePayer.publicKey;
+  // NOTE: pour simuler fidèlement une tx swap, on doit pouvoir signer en tant que `user`.
+  // Ce script n'a accès qu'à la keypair du fee payer; on force donc `user=feePayer`.
+  // Si vous voulez simuler un autre user, exécutez le script avec sa keypair.
+  const user = feePayer;
+  const userPublicKey = feePayer.publicKey;
 
   const payerInfo = await connection.getAccountInfo(feePayer.publicKey);
   if (!payerInfo) {
@@ -371,9 +375,11 @@ async function main() {
           inputMint: swapCase.inputMint,
           outputMint: swapCase.outputMint,
           amountIn: swapCase.amountInLamports,
-          minAmountOut: minAmountOutUi,
+          // Comme l'app: minOut est dérivé côté builder à partir de routeOverride + slippage.
+          minAmountOut: 0,
           slippageBps,
           userPublicKey: user.publicKey,
+          routeOverride: route,
         });
 
         if (!built) {
@@ -533,6 +539,17 @@ async function main() {
           continue;
         }
         throw e;
+      }
+
+      // Debug: vérifier quels comptes le router reçoit comme `user_token_account_a/b`.
+      // Si ceux-ci sont inversés, Meteora peut swapper dans le mauvais sens et échouer en slippage.
+      try {
+        const userA = swapIx.keys[4]?.pubkey;
+        const userB = swapIx.keys[5]?.pubkey;
+        console.log(`[debug] SwapToc user_token_account_a=${userA?.toBase58?.() ?? "?"}`);
+        console.log(`[debug] SwapToc user_token_account_b=${userB?.toBase58?.() ?? "?"}`);
+      } catch {
+        // ignore
       }
 
       instructions.push(swapIx);

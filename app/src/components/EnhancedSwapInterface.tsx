@@ -1042,7 +1042,7 @@ export function EnhancedSwapInterface() {
           route.outputAmount * (BPS_SCALE - slippageBps) / BPS_SCALE
         );
 
-        const built = await trueNativeSwap.buildNativeSwapTransaction({
+        let built = await trueNativeSwap.buildNativeSwapTransaction({
           inputMint: new PublicKey(swap.inputToken.mint),
           outputMint: new PublicKey(swap.outputToken.mint),
           amountIn: amountInNumber,
@@ -1056,11 +1056,65 @@ export function EnhancedSwapInterface() {
           throw new Error('Impossible de construire la transaction native.');
         }
 
+        const isMeteoraSlippage6003 = (err: unknown): boolean => {
+          const s = (() => {
+            try {
+              return JSON.stringify(err);
+            } catch {
+              return String(err);
+            }
+          })();
+          return /"Custom"\s*:\s*6003/.test(s) || /0x1773/.test(s);
+        };
+
         // Simulation avant signature/envoi (requirement: simulateTransaction first)
-        const sim = await connection.simulateTransaction(built.transaction, {
+        let sim = await connection.simulateTransaction(built.transaction, {
           sigVerify: false,
           replaceRecentBlockhash: false,
         });
+
+        // Fallback strictement NATIVE: Meteora peut échouer avec 6003, retenter Orca si quote dispo.
+        if (sim.value.err && route.venue === 'METEORA_DLMM' && isMeteoraSlippage6003(sim.value.err)) {
+          const orcaQuote = route.allQuotes?.find((q) => q.venue === 'ORCA_WHIRLPOOL');
+          if (orcaQuote) {
+            const fallbackRoute = {
+              ...route,
+              venue: orcaQuote.venue,
+              venueProgramId: orcaQuote.venueProgramId,
+              outputAmount: orcaQuote.outputAmount,
+              priceImpactBps: orcaQuote.priceImpactBps,
+              dexAccounts: orcaQuote.accounts,
+            };
+
+            console.warn('Meteora simulation failed with slippage; retrying with Orca', {
+              meteoraOut: route.outputAmount,
+              orcaOut: fallbackRoute.outputAmount,
+            });
+
+            const rebuilt = await trueNativeSwap.buildNativeSwapTransaction({
+              inputMint: new PublicKey(swap.inputToken.mint),
+              outputMint: new PublicKey(swap.outputToken.mint),
+              amountIn: amountInNumber,
+              minAmountOut: 0,
+              slippageBps,
+              userPublicKey: publicKey,
+              routeOverride: fallbackRoute,
+            });
+
+            if (rebuilt) {
+              const fallbackSim = await connection.simulateTransaction(rebuilt.transaction, {
+                sigVerify: false,
+                replaceRecentBlockhash: false,
+              });
+
+              if (!fallbackSim.value.err) {
+                // Remplacer la tx qui sera signée/envoyée
+                built = rebuilt;
+                sim = fallbackSim;
+              }
+            }
+          }
+        }
 
         if (sim.value.err) {
           const logs = sim.value.logs?.slice(-30) ?? [];
