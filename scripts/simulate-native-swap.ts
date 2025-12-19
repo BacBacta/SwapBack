@@ -476,6 +476,36 @@ async function main() {
       } else {
         const inAta = await ensureAta(connection, feePayer.publicKey, userPublicKey, swapCase.inputMint);
         if (inAta.ix) instructions.push(inAta.ix);
+
+        // Precheck: évite d'interpréter un manque de funds comme un bug router/DEX.
+        try {
+          const bal = await connection.getTokenAccountBalance(inAta.ata);
+          const current = BigInt(bal.value.amount);
+          const needed = BigInt(swapCase.amountInLamports);
+
+          const requiredUi = (
+            swapCase.amountInLamports / Math.pow(10, bal.value.decimals)
+          ).toLocaleString("en-US", { maximumFractionDigits: bal.value.decimals });
+
+          console.log(
+            `[precheck] input ATA=${inAta.ata.toBase58()} balance=${bal.value.uiAmountString} required=${requiredUi}`
+          );
+
+          if (current < needed) {
+            const msg =
+              `Insufficient input funds in ATA ${inAta.ata.toBase58()} ` +
+              `(have ${bal.value.uiAmountString}, need ${requiredUi}).`;
+            console.log(`[simulate-native-swap] FAIL venue=${venue} case=${swapCase.name}: ${msg}`);
+            summary.push({ venue, caseName: swapCase.name, status: "FAIL", error: msg });
+            process.exitCode = 1;
+            continue;
+          }
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.log(
+            `[simulate-native-swap] WARN: could not fetch input token balance for ATA=${inAta.ata.toBase58()}: ${msg}`
+          );
+        }
       }
 
       // Output ATA
