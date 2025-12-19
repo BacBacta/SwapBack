@@ -15,12 +15,35 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 // Headers CORS (pattern repo)
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": process.env.ALLOWED_ORIGIN || "*",
-  "Access-Control-Allow-Methods": "GET,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Requested-With",
-  "Access-Control-Allow-Credentials": "true",
-};
+// Note: en prod, éviter `*` + credentials. Si ALLOWED_ORIGIN n'est pas défini,
+// on répond en mode "public" (pas de credentials) pour rester conforme.
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowed = (process.env.ALLOWED_ORIGIN ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const allowOrigin =
+    origin && allowed.length > 0 && allowed.includes(origin)
+      ? origin
+      : allowed.length > 0
+        ? allowed[0]
+        : "*";
+
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Methods": "GET,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Requested-With",
+    "Access-Control-Max-Age": "86400",
+  };
+
+  if (allowOrigin !== "*") {
+    headers["Access-Control-Allow-Credentials"] = "true";
+    headers["Vary"] = "Origin";
+  }
+
+  return headers;
+}
 
 // Retry config for transient Cloudflare/CDN errors (code 1016, 502, 503, 504)
 const MAX_RETRIES = 2;
@@ -37,6 +60,15 @@ async function safeJsonParse(response: Response): Promise<{ json: unknown; text:
   } catch {
     return { json: null, text };
   }
+}
+
+function isOrcaDiagnosticPayload(data: Record<string, unknown> | null): boolean {
+  if (!data) return false;
+  // Payload observé quand l'upstream renvoie du `text/plain` avec un JSON “diagnostic”
+  // ex: { headers: {...}, lasterror: "SyntaxError... error code: 1016" }
+  if (typeof data.lasterror === "string") return true;
+  if (data.headers && typeof data.headers === "object" && data.outAmount == null) return true;
+  return false;
 }
 
 /**
@@ -61,10 +93,10 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 204,
-    headers: CORS_HEADERS,
+    headers: getCorsHeaders(request.headers.get("origin")),
   });
 }
 
@@ -74,11 +106,12 @@ export async function GET(request: NextRequest) {
   const outputMint = searchParams.get('outputMint');
   const amount = searchParams.get('amount');
   const slippageBpsParam = searchParams.get("slippageBps");
+  const corsHeaders = getCorsHeaders(request.headers.get("origin"));
 
   if (!inputMint || !outputMint || !amount) {
     return NextResponse.json(
       { error: 'Missing required parameters: inputMint, outputMint, amount' },
-      { status: 400, headers: CORS_HEADERS }
+      { status: 400, headers: corsHeaders }
     );
   }
 
@@ -93,7 +126,7 @@ export async function GET(request: NextRequest) {
     if (!Number.isFinite(amountIn) || amountIn <= 0) {
       return NextResponse.json(
         { error: "Invalid amount" },
-        { status: 400, headers: CORS_HEADERS }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -124,12 +157,21 @@ export async function GET(request: NextRequest) {
         next: { revalidate: 2 },
       });
 
+      const contentType = response.headers.get("content-type") ?? "";
+
       // Parse response safely (may be HTML error page from Cloudflare)
       const parsed = await safeJsonParse(response);
       const body = parsed?.text ?? "";
       const data = parsed?.json as Record<string, unknown> | null;
 
-      if (!response.ok) {
+      // Même avec status=200, Orca peut répondre en `text/plain` avec un JSON “diagnostic”
+      // ou une page HTML Cloudflare.
+      const treatAsError =
+        !response.ok ||
+        !contentType.toLowerCase().includes("application/json") ||
+        isOrcaDiagnosticPayload(data);
+
+      if (treatAsError) {
         console.warn(`[Orca Quote API] Upstream error ${response.status}:`, body.slice(0, 200));
         
         // Check if retryable
@@ -139,8 +181,13 @@ export async function GET(request: NextRequest) {
         }
 
         return NextResponse.json(
-          { error: "Orca upstream error", status: response.status, body: body.slice(0, 500) },
-          { status: 502, headers: CORS_HEADERS }
+          {
+            error: "Orca upstream error",
+            status: response.status,
+            contentType,
+            body: body.slice(0, 500),
+          },
+          { status: 502, headers: corsHeaders }
         );
       }
 
@@ -155,7 +202,7 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json(
           { error: "Orca returned invalid JSON", body: body.slice(0, 500) },
-          { status: 502, headers: CORS_HEADERS }
+          { status: 502, headers: corsHeaders }
         );
       }
 
@@ -168,7 +215,7 @@ export async function GET(request: NextRequest) {
       if (!Number.isFinite(outAmount) || outAmount <= 0) {
         return NextResponse.json(
           { error: "Invalid Orca quote response", data },
-          { status: 502, headers: CORS_HEADERS }
+          { status: 502, headers: corsHeaders }
         );
       }
 
@@ -183,20 +230,20 @@ export async function GET(request: NextRequest) {
           slippageBps,
           source: "orca-api",
         },
-        { headers: CORS_HEADERS }
+        { headers: corsHeaders }
       );
     }
 
     // All retries exhausted
     return NextResponse.json(
       { error: "Orca API unavailable after retries", lastError },
-      { status: 503, headers: CORS_HEADERS }
+      { status: 503, headers: corsHeaders }
     );
   } catch (error) {
     console.error('[Orca Quote API] Error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch Orca quote', details: String(error) },
-      { status: 502, headers: CORS_HEADERS }
+      { status: 502, headers: corsHeaders }
     );
   }
 }
