@@ -1365,19 +1365,30 @@ export async function getMeteoraAccounts(
           return null;
         }
 
-        // IMPORTANT: swapForY is derived from the INPUT mint direction, NOT quote token semantics.
-        // The Router on-chain computes x_to_y by matching user_token_x/y with user_token_account_a/b.
-        // - If input=X: we're swapping X->Y, so x_to_y=TRUE (destination is Y).
-        // - If input=Y: we're swapping Y->X, so x_to_y=FALSE (destination is X).
-        swapForY = inputIsX; // TRUE if we're swapping from tokenX to tokenY
+        // Meteora DLMM SDK: `swapForY` correspond à la direction X->Y (output = tokenY).
+        // IMPORTANT: aligner avec `TrueNativeSwap.getMeteoraQuote`.
+        const hasSupportedQuote =
+          tokenXMint.equals(WSOL_MINT) ||
+          tokenXMint.equals(USDC_MINT) ||
+          tokenYMint.equals(WSOL_MINT) ||
+          tokenYMint.equals(USDC_MINT);
+        if (!hasSupportedQuote) {
+          return null;
+        }
+        swapForY = inputIsX;
       }
 
       // Certaines paires nécessitent plus que 5 bin arrays pour couvrir la range.
       // On tente plusieurs profondeurs avant d'abandonner.
       let binArrayAccounts: Array<{ publicKey: PublicKey }> = [];
       for (const depth of [5, 20, 60]) {
-        binArrayAccounts = await dlmm.getBinArrayForSwap(swapForY, depth);
-        if (binArrayAccounts.length > 0) break;
+        const candidate = await dlmm.getBinArrayForSwap(swapForY, depth);
+        if (candidate.length > 0) {
+          // Préférer la profondeur la plus grande disponible: certaines paires
+          // renvoient un set non-vide en depth=5 mais sans bins liquidés,
+          // ce qui mène à 6037 (CannotFindNonZeroLiquidityBinArrayId).
+          binArrayAccounts = candidate;
+        }
       }
 
       binArrays = binArrayAccounts.map((a) => a.publicKey);
@@ -1388,6 +1399,22 @@ export async function getMeteoraAccounts(
           attemptedDepths: [5, 20, 60],
         });
         return null;
+      }
+
+      // IMPORTANT: limiter le nombre de bin arrays passés en remaining accounts.
+      // En multi-hop (2 legs) la tx peut dépasser la taille max v0 si on inclut trop de bin arrays.
+      // Pour de petits amounts (cas des simulations), un prefix suffit généralement.
+      // IMPORTANT: limiter agressivement pour éviter des tx v0 trop grosses en pratique.
+      // Les bin arrays sont les principaux contributeurs (comptes dynamiques) à la taille.
+      const MAX_BIN_ARRAYS_FOR_TX = 8;
+      if (binArrays.length > MAX_BIN_ARRAYS_FOR_TX) {
+        console.warn("[MeteoraResolver] Truncating bin arrays for tx size", {
+          lbPair: lbPair.toBase58(),
+          swapForY,
+          before: binArrays.length,
+          after: MAX_BIN_ARRAYS_FOR_TX,
+        });
+        binArrays = binArrays.slice(0, MAX_BIN_ARRAYS_FOR_TX);
       }
     } catch (sdkError) {
       // On tente de récupérer les données de paire via API (réserves/mints/bin_step)
@@ -1519,15 +1546,7 @@ export async function getMeteoraAccounts(
       binArrays = binArraysFound;
     }
 
-    // Sanity: direction du swap
-    if (!swapForY && !safeInputMint.equals(tokenYMint)) {
-      console.warn("[MeteoraResolver] Input mint does not match DLMM token X/Y", {
-        inputMint: safeInputMint.toBase58(),
-        tokenXMint: tokenXMint.toBase58(),
-        tokenYMint: tokenYMint.toBase58(),
-      });
-      return null;
-    }
+    // Sanity: input doit être X ou Y (déjà validé dans le bloc direction ci-dessus)
 
     // binStep depuis l'API si disponible, sinon best-effort: 0.
     // (Le feeRate est purement metadata UI; le swap n'en dépend pas.)

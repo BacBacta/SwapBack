@@ -19,7 +19,16 @@
  * @date December 10, 2025
  */
 
-import { hasOracleForPair, listSupportedOraclePairs } from "@/config/oracles";
+import { hasOracleForPair, listSupportedOraclePairs, TOKEN_MINTS } from "@/config/oracles";
+
+function hasOracleSupportViaUsdc(inputMint: string, outputMint: string): boolean {
+  // Si l'un des deux est déjà USDC, le "via USDC" n'ajoute rien.
+  if (inputMint === TOKEN_MINTS.USDC || outputMint === TOKEN_MINTS.USDC) {
+    return false;
+  }
+
+  return hasOracleForPair(inputMint, TOKEN_MINTS.USDC) && hasOracleForPair(TOKEN_MINTS.USDC, outputMint);
+}
 
 // ============================================================================
 // TYPES
@@ -118,10 +127,14 @@ export function decideSwapRoute(params: SwapRouteParams): SwapRouteDecision {
     };
   }
   
-  // 2. Vérifier si la paire est supportée (a un oracle configuré)
+  // 2. Vérifier si le swap est supporté (oracles configurés)
+  // V1.1: autoriser si la paire n'a pas d'oracle direct mais est exécutable via 2 legs (A→USDC→B).
   const pairKey = `${inputMint.slice(0, 8)}.../${outputMint.slice(0, 8)}...`;
-  
-  if (!hasOracleForPair(inputMint, outputMint)) {
+
+  const directOracleOk = hasOracleForPair(inputMint, outputMint);
+  const viaUsdcOk = hasOracleSupportViaUsdc(inputMint, outputMint);
+
+  if (!directOracleOk && !viaUsdcOk) {
     return {
       route: "jupiter",
       reason: "PAIR_UNSUPPORTED",
@@ -138,10 +151,13 @@ export function decideSwapRoute(params: SwapRouteParams): SwapRouteDecision {
   return {
     route: "native",
     reason: "NATIVE_ELIGIBLE",
-    message: `Swap natif disponible pour ${pairKey}.`,
+    message: viaUsdcOk && !directOracleOk
+      ? `Swap natif disponible pour ${pairKey} (multi-hop via USDC).`
+      : `Swap natif disponible pour ${pairKey}.`,
     details: {
       inputMint,
       outputMint,
+      oracleSupport: viaUsdcOk && !directOracleOk ? "USDC_MULTIHOP" : "DIRECT_PAIR",
     },
   };
 }
