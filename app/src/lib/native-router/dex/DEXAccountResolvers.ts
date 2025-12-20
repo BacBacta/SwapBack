@@ -852,6 +852,48 @@ const METEORA_DLMM_PROGRAM = new PublicKey("LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9Y
 
 const METEORA_DLMM_API_TIMEOUT_MS = 15_000;
 
+// L'endpoint `pair/all_by_groups` renvoie un gros payload.
+// Sans cache, chaque recherche de quote (nouvelle paire) retélécharge et re-scan le JSON.
+// On garde un index en mémoire pour accélérer les requêtes suivantes.
+const METEORA_API_INDEX_CACHE_TTL_MS_DEFAULT = 2 * 60_000;
+let meteoraApiPairsIndexCache: { timestamp: number; index: Map<string, string> } | null = null;
+
+function getMeteoraApiIndexCacheTtlMs(): number {
+  const ttl =
+    getEnvNumber("NEXT_PUBLIC_SWAPBACK_METEORA_API_INDEX_CACHE_TTL_MS") ??
+    getEnvNumber("SWAPBACK_METEORA_API_INDEX_CACHE_TTL_MS") ??
+    METEORA_API_INDEX_CACHE_TTL_MS_DEFAULT;
+  return Math.max(0, Math.floor(ttl));
+}
+
+function buildMeteoraApiPairsIndex(payload: any): Map<string, string> {
+  const index = new Map<string, string>();
+  for (const group of payload?.groups || []) {
+    for (const pair of group?.pairs || []) {
+      const mintX = typeof pair?.mint_x === "string" ? pair.mint_x : null;
+      const mintY = typeof pair?.mint_y === "string" ? pair.mint_y : null;
+      const address = typeof pair?.address === "string" ? pair.address : null;
+      if (!mintX || !mintY || !address) continue;
+      index.set(getPairCacheKey(mintX, mintY), address);
+    }
+  }
+  return index;
+}
+
+function getMeteoraPairFromApiIndex(tokenX: PublicKey, tokenY: PublicKey): PublicKey | null | undefined {
+  const ttl = getMeteoraApiIndexCacheTtlMs();
+  if (!meteoraApiPairsIndexCache || ttl <= 0) return undefined;
+  const now = Date.now();
+  if (now - meteoraApiPairsIndexCache.timestamp > ttl) {
+    meteoraApiPairsIndexCache = null;
+    return undefined;
+  }
+
+  const key = getPairCacheKey(tokenX.toBase58(), tokenY.toBase58());
+  const address = meteoraApiPairsIndexCache.index.get(key);
+  return address ? new PublicKey(address) : null;
+}
+
 const WSOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
 const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 const USDT_MINT = new PublicKey("Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB");
@@ -932,6 +974,9 @@ function findSubarrayOffsets(haystack: Buffer, needle: Buffer): number[] {
 }
 
 async function findDLMMPairViaApi(tokenX: PublicKey, tokenY: PublicKey): Promise<PublicKey | null> {
+  const cached = getMeteoraPairFromApiIndex(tokenX, tokenY);
+  if (cached !== undefined) return cached;
+
   const tokenXStr = tokenX.toBase58();
   const tokenYStr = tokenY.toBase58();
   for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
@@ -948,6 +993,10 @@ async function findDLMMPairViaApi(tokenX: PublicKey, tokenY: PublicKey): Promise
 
       // eslint-disable-next-line no-await-in-loop
       const pairs = await response.json();
+
+      // Build + cache l'index complet (warm path pour les requêtes suivantes)
+      meteoraApiPairsIndexCache = { timestamp: Date.now(), index: buildMeteoraApiPairsIndex(pairs) };
+
       for (const group of pairs.groups || []) {
         for (const pair of group.pairs || []) {
           if (
@@ -1242,6 +1291,20 @@ async function findDLMMPair(
       return cached.pair;
     }
 
+    // Warm path: si l'index API en mémoire est frais, lookup immédiat.
+    const fromIndex = getMeteoraPairFromApiIndex(tokenX, tokenY);
+    if (fromIndex !== undefined) {
+      if (fromIndex) {
+        meteoraPairCache.set(cacheKey, { timestamp: now, pair: fromIndex });
+        return fromIndex;
+      }
+      // Index frais mais paire absente.
+      if (!allowMeteoraDeepFallbacks()) {
+        meteoraPairCache.set(cacheKey, { timestamp: now, pair: null });
+        return null;
+      }
+    }
+
     let lastError: string | undefined;
     let apiSaysNoPair = false;
     for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
@@ -1264,17 +1327,14 @@ async function findDLMMPair(
 
         const pairs = await response.json();
 
-        for (const group of pairs.groups || []) {
-          for (const pair of group.pairs || []) {
-            if (
-              (pair.mint_x === tokenXStr && pair.mint_y === tokenYStr) ||
-              (pair.mint_x === tokenYStr && pair.mint_y === tokenXStr)
-            ) {
-              const resolved = new PublicKey(pair.address);
-              meteoraPairCache.set(cacheKey, { timestamp: now, pair: resolved });
-              return resolved;
-            }
-          }
+        // Cache l'index complet pour accélérer les prochaines requêtes.
+        meteoraApiPairsIndexCache = { timestamp: Date.now(), index: buildMeteoraApiPairsIndex(pairs) };
+
+        const address = meteoraApiPairsIndexCache.index.get(cacheKey);
+        if (address) {
+          const resolved = new PublicKey(address);
+          meteoraPairCache.set(cacheKey, { timestamp: now, pair: resolved });
+          return resolved;
         }
 
         {
