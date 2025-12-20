@@ -8,31 +8,52 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 
 // Headers CORS pour les réponses
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'GET,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Requested-With',
-  'Access-Control-Allow-Credentials': 'true',
-};
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowed = (process.env.ALLOWED_ORIGIN ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const allowOrigin =
+    origin && allowed.length > 0 && allowed.includes(origin)
+      ? origin
+      : allowed.length > 0
+        ? allowed[0]
+        : '*';
+
+  const headers: Record<string, string> = {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Methods': 'GET,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Requested-With',
+  };
+
+  if (allowOrigin !== '*') {
+    headers['Access-Control-Allow-Credentials'] = 'true';
+    headers['Vary'] = 'Origin';
+  }
+
+  return headers;
+}
 
 /**
  * Handler OPTIONS pour les preflight requests
  */
-export async function OPTIONS() {
+export async function OPTIONS(request?: NextRequest) {
   return new NextResponse(null, {
     status: 204,
-    headers: CORS_HEADERS,
+    headers: getCorsHeaders(request?.headers?.get('origin') ?? null),
   });
 }
 
 export async function GET(request: NextRequest) {
+  const corsHeaders = getCorsHeaders(request.headers.get('origin'));
   const { searchParams } = new URL(request.url);
   const mint = searchParams.get('mint');
 
   if (!mint) {
     return NextResponse.json(
       { error: 'Missing mint parameter' }, 
-      { status: 400, headers: CORS_HEADERS }
+      { status: 400, headers: corsHeaders }
     );
   }
 
@@ -53,7 +74,7 @@ export async function GET(request: NextRequest) {
         if (price > 0) {
           return NextResponse.json(
             { price, source: 'jupiter', mint },
-            { headers: CORS_HEADERS }
+            { headers: corsHeaders }
           );
         }
       }
@@ -78,7 +99,7 @@ export async function GET(request: NextRequest) {
         if (birdeyeData.data && birdeyeData.data.value) {
           return NextResponse.json(
             { price: birdeyeData.data.value, source: 'birdeye', mint },
-            { headers: CORS_HEADERS }
+            { headers: corsHeaders }
           );
         }
       }
@@ -101,7 +122,7 @@ export async function GET(request: NextRequest) {
         if (pairWithPrice && pairWithPrice.priceUsd) {
           return NextResponse.json(
             { price: parseFloat(pairWithPrice.priceUsd), source: 'dexscreener', mint },
-            { headers: CORS_HEADERS }
+            { headers: corsHeaders }
           );
         }
       }
@@ -110,14 +131,14 @@ export async function GET(request: NextRequest) {
     // Aucun prix trouvé
     return NextResponse.json(
       { price: 0, source: 'none', mint, error: 'Price not found' },
-      { headers: CORS_HEADERS }
+      { headers: corsHeaders }
     );
 
   } catch (error) {
     console.error('Price API error:', error);
     return NextResponse.json(
       { price: 0, source: 'error', mint, error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500, headers: CORS_HEADERS }
+      { status: 500, headers: corsHeaders }
     );
   }
 }

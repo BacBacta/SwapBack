@@ -16,13 +16,32 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
-// Headers CORS
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Requested-With',
-  'Access-Control-Allow-Credentials': 'true',
-};
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowed = (process.env.ALLOWED_ORIGIN ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const allowOrigin =
+    origin && allowed.length > 0 && allowed.includes(origin)
+      ? origin
+      : allowed.length > 0
+        ? allowed[0]
+        : '*';
+
+  const headers: Record<string, string> = {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Requested-With',
+  };
+
+  if (allowOrigin !== '*') {
+    headers['Access-Control-Allow-Credentials'] = 'true';
+    headers['Vary'] = 'Origin';
+  }
+
+  return headers;
+}
 
 // DEX APIs
 const DEX_APIS = {
@@ -65,10 +84,10 @@ interface NativeQuoteResponse {
 /**
  * Handler OPTIONS pour les preflight requests
  */
-export async function OPTIONS() {
+export async function OPTIONS(request?: NextRequest) {
   return new NextResponse(null, {
     status: 204,
-    headers: CORS_HEADERS,
+    headers: getCorsHeaders(request?.headers?.get('origin') ?? null),
   });
 }
 
@@ -313,6 +332,7 @@ async function fetchMeteoraQuote(
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   const failedVenues: string[] = [];
+  const corsHeaders = getCorsHeaders(request.headers.get('origin'));
 
   try {
     const body = await request.json();
@@ -322,7 +342,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: false,
         error: "Missing required parameters: inputMint, outputMint, amount",
-      }, { status: 400, headers: CORS_HEADERS });
+      }, { status: 400, headers: corsHeaders });
     }
 
     console.log(`[native-quote] Fetching quotes for ${inputMint.slice(0, 8)}... -> ${outputMint.slice(0, 8)}..., amount: ${amount}, slippage: ${slippageBps}bps`);
@@ -391,7 +411,7 @@ export async function POST(request: NextRequest) {
       response.error = "No venue quotes available for this pair";
     }
 
-    return NextResponse.json(response, { headers: CORS_HEADERS });
+    return NextResponse.json(response, { headers: corsHeaders });
 
   } catch (error) {
     console.error("[native-quote] API error:", error);
@@ -402,7 +422,7 @@ export async function POST(request: NextRequest) {
       totalLatencyMs: Date.now() - startTime,
       error: error instanceof Error ? error.message : "Internal server error",
       failedVenues,
-    }, { status: 500, headers: CORS_HEADERS });
+    }, { status: 500, headers: corsHeaders });
   }
 }
 
@@ -411,7 +431,8 @@ export async function POST(request: NextRequest) {
  * 
  * Returns list of supported venues
  */
-export async function GET() {
+export async function GET(request?: NextRequest) {
+  const corsHeaders = getCorsHeaders(request?.headers?.get('origin') ?? null);
   return NextResponse.json({
     venues: [
       { name: "Raydium", type: "AMM", programId: "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8", apiAvailable: true },
@@ -426,5 +447,5 @@ export async function GET() {
     routerProgram: "APHj6L2b2bA2q62jwYZp38dqbTxQUqwatqdUum1trPnN",
     fallbackEnabled: true,
     fallbackSource: "/api/price",
-  }, { headers: CORS_HEADERS });
+  }, { headers: corsHeaders });
 }

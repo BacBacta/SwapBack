@@ -29,17 +29,29 @@ const nextConfig = {
   // 🔓 Configuration CORS pour les routes API
   // Permet aux clients (dApp, extension, mobile) d'accéder aux APIs
   async headers() {
-    const allowedOrigin = process.env.ALLOWED_ORIGIN || '*';
+    const allowedOriginEnv = process.env.ALLOWED_ORIGIN || '*';
+    const allowedOrigin = allowedOriginEnv && allowedOriginEnv.trim() ? allowedOriginEnv.trim() : '*';
+    const allowCredentials = allowedOrigin !== '*';
+
+    const headers = [
+      { key: 'Access-Control-Allow-Origin', value: allowedOrigin },
+      { key: 'Access-Control-Allow-Methods', value: 'GET,POST,OPTIONS' },
+      { key: 'Access-Control-Allow-Headers', value: 'Content-Type,Authorization,X-Requested-With' },
+      { key: 'Access-Control-Max-Age', value: '86400' },
+    ];
+
+    // Ne jamais envoyer "credentials: true" avec "origin: *" (CORS invalide)
+    if (allowCredentials) {
+      headers.push(
+        { key: 'Access-Control-Allow-Credentials', value: 'true' },
+        { key: 'Vary', value: 'Origin' },
+      );
+    }
+
     return [
       {
         source: '/api/:path*',
-        headers: [
-          { key: 'Access-Control-Allow-Origin', value: allowedOrigin },
-          { key: 'Access-Control-Allow-Methods', value: 'GET,POST,OPTIONS' },
-          { key: 'Access-Control-Allow-Headers', value: 'Content-Type,Authorization,X-Requested-With' },
-          { key: 'Access-Control-Allow-Credentials', value: 'true' },
-          { key: 'Access-Control-Max-Age', value: '86400' },
-        ],
+        headers,
       },
     ];
   },

@@ -30,12 +30,32 @@ interface QuoteResponse {
 }
 
 // Helper pour les headers CORS
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'GET,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Requested-With',
-  'Access-Control-Allow-Credentials': 'true',
-};
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowed = (process.env.ALLOWED_ORIGIN ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const allowOrigin =
+    origin && allowed.length > 0 && allowed.includes(origin)
+      ? origin
+      : allowed.length > 0
+        ? allowed[0]
+        : '*';
+
+  const headers: Record<string, string> = {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Methods': 'GET,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Requested-With',
+  };
+
+  if (allowOrigin !== '*') {
+    headers['Access-Control-Allow-Credentials'] = 'true';
+    headers['Vary'] = 'Origin';
+  }
+
+  return headers;
+}
 
 // Proxy interne (plus fiable que corsfix.com)
 const getInternalProxyUrl = () => {
@@ -48,14 +68,15 @@ const getInternalProxyUrl = () => {
 /**
  * Handler OPTIONS pour les preflight requests CORS
  */
-export async function OPTIONS() {
+export async function OPTIONS(request?: NextRequest) {
   return new NextResponse(null, {
     status: 204,
-    headers: CORS_HEADERS,
+    headers: getCorsHeaders(request?.headers?.get('origin') ?? null),
   });
 }
 
 export async function GET(request: NextRequest) {
+  const corsHeaders = getCorsHeaders(request.headers.get('origin'));
   const { searchParams } = new URL(request.url);
   const inputMint = searchParams.get('inputMint');
   const outputMint = searchParams.get('outputMint');
@@ -64,7 +85,7 @@ export async function GET(request: NextRequest) {
   if (!inputMint || !outputMint || !amount) {
     return NextResponse.json(
       { error: 'Missing required parameters: inputMint, outputMint, amount' },
-      { status: 400 }
+      { status: 400, headers: corsHeaders }
     );
   }
 
@@ -72,7 +93,7 @@ export async function GET(request: NextRequest) {
   if (isNaN(amountNum) || amountNum <= 0) {
     return NextResponse.json(
       { error: 'Invalid amount' },
-      { status: 400 }
+      { status: 400, headers: corsHeaders }
     );
   }
 
