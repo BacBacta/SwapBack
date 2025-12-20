@@ -1591,11 +1591,23 @@ export async function getMeteoraAccounts(
   userPublicKey: PublicKey | string
 ): Promise<DEXAccounts | null> {
   try {
+    const startedAt = Date.now();
+    const deadlineAt = startedAt + Math.max(0, getResolveTimeoutMsForVenue("METEORA_DLMM") - 50);
+    const pastDeadline = (): boolean => Date.now() > deadlineAt;
+
     const safeInputMint = toPublicKey(inputMint);
     const safeOutputMint = toPublicKey(outputMint);
     const safeUser = toPublicKey(userPublicKey);
 
-    const lbPair = await findDLMMPair(connection, safeInputMint, safeOutputMint);
+    // Hot path: SOL/USDC est une paire critique et l'API Meteora peut être lente.
+    // On bypass la résolution via API et on utilise le lb_pair mainnet connu.
+    const isWsolUsdc =
+      (safeInputMint.equals(WSOL_MINT) && safeOutputMint.equals(USDC_MINT)) ||
+      (safeInputMint.equals(USDC_MINT) && safeOutputMint.equals(WSOL_MINT));
+
+    const lbPair = isWsolUsdc
+      ? METEORA_KNOWN_SOL_USDC_LBPAIR
+      : await findDLMMPair(connection, safeInputMint, safeOutputMint);
     if (!lbPair) {
       const inputStr = safeInputMint.toBase58();
       const outputStr = safeOutputMint.toBase58();
@@ -1608,6 +1620,8 @@ export async function getMeteoraAccounts(
       }
       return null;
     }
+
+    if (pastDeadline()) return null;
 
     // Fast-fail: certains lb_pairs n'ont pas (ou plus) de bitmap extension.
     // Le check était auparavant effectué en fin de resolver, après des étapes coûteuses (SDK + bin arrays).
@@ -1648,6 +1662,8 @@ export async function getMeteoraAccounts(
       return null;
     }
 
+    if (pastDeadline()) return null;
+
     // Préférer le SDK DLMM pour:
     // - obtenir les vraies reserves/mints/token programs depuis on-chain,
     // - obtenir les bin arrays exacts (dynamiques) via getBinArrayForSwap.
@@ -1670,6 +1686,8 @@ export async function getMeteoraAccounts(
       if (!DLMM?.create) {
         throw new Error("Meteora DLMM SDK DLMM.create not available");
       }
+
+      if (pastDeadline()) return null;
 
       const dlmm = await DLMM.create(connection, lbPair);
       reserveX = dlmm.tokenX.reserve;
@@ -1711,6 +1729,8 @@ export async function getMeteoraAccounts(
       tokenXProgram = tokenXMintInfo.owner;
       tokenYProgram = tokenYMintInfo.owner;
 
+      if (pastDeadline()) return null;
+
       {
         const inputIsX = safeInputMint.equals(tokenXMint);
         const inputIsY = safeInputMint.equals(tokenYMint);
@@ -1739,9 +1759,15 @@ export async function getMeteoraAccounts(
       // Certaines paires nécessitent plus que 5 bin arrays pour couvrir la range.
       // On tente plusieurs profondeurs avant d'abandonner.
       let binArrayAccounts: Array<{ publicKey: PublicKey }> = [];
-      for (const depth of [5, 20, 60]) {
+      const depthsToTry = isWsolUsdc ? [5] : [5, 20, 60];
+      for (const depth of depthsToTry) {
+        if (pastDeadline()) return null;
         const candidate = await dlmm.getBinArrayForSwap(swapForY, depth);
         if (candidate.length > 0) {
+          if (isWsolUsdc) {
+            binArrayAccounts = candidate;
+            break;
+          }
           // Préférer la profondeur la plus grande disponible: certaines paires
           // renvoient un set non-vide en depth=5 mais sans bins liquidés,
           // ce qui mène à 6037 (CannotFindNonZeroLiquidityBinArrayId).
