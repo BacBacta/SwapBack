@@ -39,10 +39,57 @@ CNFT_PROGRAM_ID: 26kzow1KF3AbrbFA7M3WxXVCtcMRgzMXkAKtVYDDt6Ru
   Oracles           Best venue          ALTs/CU           No errors
 ```
 
+### Split-Route Architecture (v2.0 - Dec 20, 2025)
+
+SwapBack implémente maintenant le **split-route** inspiré de Jupiter Metis:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Quote Matrix Builder                       │
+│   Venue A: [10%, 20%, 30%, 50%, 100%] quotes                │
+│   Venue B: [10%, 20%, 30%, 50%, 100%] quotes                │
+│   Venue C: [10%, 20%, 30%, 50%, 100%] quotes                │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Greedy Split Optimizer                          │
+│   Sélectionne la répartition maximisant l'output total      │
+│   Ex: 60% Orca + 40% Meteora → meilleur que 100% Orca       │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Multi-Instruction TX Builder                    │
+│   Construit N instructions swap_toc dans une seule TX       │
+│   Utilise ALTs pour compresser les comptes                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Fichiers clés:**
+- `app/src/config/routing.ts` - Configuration centralisée des venues et du split-route
+- `app/src/lib/native-router/split-route.ts` - Algorithme de split-route
+- `app/src/lib/native-router/true-native-swap.ts` - Exécution des swaps
+
+**Configuration:**
+```typescript
+// app/src/config/routing.ts
+splitRoute: {
+  enabled: true,
+  maxSplits: 3,           // Maximum 3 venues par swap
+  minSplitPercent: 10,    // Minimum 10% par split
+  minAmountUsdForSplit: 100, // Split seulement > $100
+}
+```
+
 ### Référence d'implémentation
 
 > **A) Router natif A→Z (référence d'implémentation)**
 > - https://github.com/okxlabs/DEX-Router-Solana-V1
+
+> **Jupiter Routing (reference industrielle)**
+> - https://dev.jup.ag/docs/routing
+> - https://dev.jup.ag/blog/metis-v7
 
 ---
 
@@ -162,6 +209,41 @@ if (confidenceBps > MAX_CONFIDENCE_BPS) throw new Error("OracleConfidenceTooWide
 ---
 
 ## 6. Intégrations DEX
+
+### 6.0 Configuration des Venues (v2.0)
+
+Depuis v2.0, les venues sont configurées dans `app/src/config/routing.ts`:
+
+| Venue | Statut | Frais (bps) | Quote API | Notes |
+|-------|--------|-------------|-----------|-------|
+| ORCA_WHIRLPOOL | ✅ Actif | 30 | Oui | Venue principale |
+| METEORA_DLMM | ✅ Actif | 20 | Oui | Excellent pour CL |
+| RAYDIUM_AMM | ✅ Actif | 25 | Oui | Grande liquidité |
+| PHOENIX | ✅ Actif | 10 | SDK | CLOB orderbook |
+| LIFINITY | ✅ Actif | 30 | Oui | Oracle-based AMM |
+| SABER | ✅ Actif | 4 | Oui | Stableswap |
+| RAYDIUM_CLMM | ⚠️ Désactivé | 25 | Oui | Implémentation en cours |
+| SANCTUM | ⚠️ Désactivé | 10 | Non | LST only |
+
+### Slippage Dynamique (v2.0)
+
+Le slippage est maintenant calculé dynamiquement:
+
+```typescript
+// app/src/config/routing.ts
+dynamicSlippage: {
+  enabled: true,
+  baseSlippageBps: 30,      // 0.3% base
+  maxSlippageBps: 300,      // 3% max
+  sizeThresholdBps: 50,     // Impact si > 0.5% du pool
+  volatilityFactor: 1.5,
+}
+
+// Formule:
+// slippage = base + sizeImpact + volatilityImpact
+// sizeImpact = max(0, (amountIn/poolTvl * 10000) - sizeThreshold)
+// volatilityImpact = volatilityBps * factor / divisor
+```
 
 ### 6.1 Orca Whirlpools
 

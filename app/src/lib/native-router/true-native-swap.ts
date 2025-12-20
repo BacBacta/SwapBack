@@ -41,6 +41,14 @@ import {
   getAllDEXAccounts,
 } from "./dex/DEXAccountResolvers";
 import { toPublicKey, toBase58Safe } from "./utils/publicKeyUtils";
+import {
+  getRoutingConfig,
+  getEnabledVenues,
+  isVenueEnabled,
+  calculateDynamicSlippage,
+  type VenueConfig,
+} from "@/config/routing";
+import { benchmarkAgainstJupiter } from "./split-route";
 
 // ============================================================================
 // CONSTANTS
@@ -65,31 +73,82 @@ export const DEX_PROGRAM_IDS = {
 export const SOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
 export const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 
-// Configuration
-const MAX_STALENESS_SECS = 120; // 2 minutes
+// Configuration - Now loaded from centralized config
+// @see app/src/config/routing.ts
 const PRIORITY_FEE_MICRO_LAMPORTS = 500_000;
 const COMPUTE_UNITS = 400_000;
 
-// Phoenix (CLOB) requiert une quote orderbook (phoenix-sdk). Tant que ce n'est
-// pas implémenté côté client, on l'exclut du best-route pour éviter les IOC
-// failures (custom program error 0xF) dues à un minOut irréaliste.
-// Best-route venues disabled until their quote->CPI coupling is proven reliable.
-// - PHOENIX: quote orderbook not implemented (IOC failures).
-// - RAYDIUM_AMM: REST quote can route through different pools than CPI (can trigger slippage failure 0x1e).
-const DISABLED_BEST_ROUTE_VENUES = new Set<SupportedVenue>(["PHOENIX", "RAYDIUM_AMM"]);
+/**
+ * Retourne les venues désactivées pour le routing.
+ * Utilise la configuration centralisée au lieu de constantes hardcodées.
+ * 
+ * CHANGEMENT v2.0 (Dec 20, 2025):
+ * - PHOENIX et RAYDIUM_AMM sont maintenant ACTIVÉS via routing.ts
+ * - La désactivation est gérée dynamiquement via isVenueEnabled()
+ */
+function getDisabledVenues(): Set<SupportedVenue> {
+  const config = getRoutingConfig();
+  const disabled = new Set<SupportedVenue>();
+  
+  for (const venue of config.venues) {
+    if (!venue.enabled) {
+      disabled.add(venue.id);
+    }
+  }
+  
+  return disabled;
+}
 
-// Venues pour lesquelles on a une implémentation de quote dans ce module.
-const QUOTED_VENUES = new Set<SupportedVenue>([
-  "ORCA_WHIRLPOOL",
-  "METEORA_DLMM",
-  "RAYDIUM_AMM",
-  "LIFINITY",
-  "SABER",
-]);
+/**
+ * Retourne les venues avec implémentation de quote.
+ * Utilise la configuration centralisée.
+ */
+function getQuotableVenueIds(): Set<SupportedVenue> {
+  const config = getRoutingConfig();
+  const quotable = new Set<SupportedVenue>();
+  
+  for (const venue of config.venues) {
+    if (venue.enabled && venue.hasQuoteAPI) {
+      quotable.add(venue.id);
+    }
+  }
+  
+  // Toujours inclure ces venues si elles sont activées (quote via SDK)
+  if (isVenueEnabled("PHOENIX")) quotable.add("PHOENIX");
+  
+  return quotable;
+}
 
-// Optim perf: on tente d'abord les venues les plus fiables/rapides (DoD V1.1).
-// Les autres venues ne sont interrogées que si ORCA+METEORA ne renvoient aucune quote.
-const PRIMARY_QUOTE_VENUES: SupportedVenue[] = ["ORCA_WHIRLPOOL", "METEORA_DLMM"];
+/**
+ * Retourne les venues prioritaires pour les quotes.
+ * Triées par quotePriority de la configuration.
+ */
+function getPrimaryQuoteVenues(): SupportedVenue[] {
+  const enabledVenues = getEnabledVenues();
+  return enabledVenues
+    .filter(v => v.hasQuoteAPI)
+    .sort((a, b) => a.quotePriority - b.quotePriority)
+    .slice(0, 3) // Top 3 venues
+    .map(v => v.id);
+}
+
+// Legacy compatibility - dynamically computed getters
+// Ces getters sont appelés à chaque utilisation pour obtenir la config à jour
+const DISABLED_BEST_ROUTE_VENUES = {
+  has: (venue: SupportedVenue) => getDisabledVenues().has(venue),
+};
+
+const QUOTED_VENUES = {
+  has: (venue: SupportedVenue) => getQuotableVenueIds().has(venue),
+  [Symbol.iterator]: () => getQuotableVenueIds()[Symbol.iterator](),
+};
+
+const PRIMARY_QUOTE_VENUES = {
+  includes: (venue: SupportedVenue) => getPrimaryQuoteVenues().includes(venue),
+};
+
+// MAX_STALENESS_SECS from config
+const MAX_STALENESS_SECS = getRoutingConfig().maxOracleStalenessSecs;
 
 // ============================================================================
 // HELPERS - Using centralized publicKeyUtils
@@ -317,7 +376,7 @@ export class TrueNativeSwap {
       amountIn,
     });
 
-    const venuesToResolve = venuesOverride?.length ? venuesOverride : Array.from(QUOTED_VENUES);
+    const venuesToResolve = venuesOverride?.length ? venuesOverride : Array.from(getQuotableVenueIds());
 
     // Browser fast-path: avoid heavy RPC account resolution for quotes.
     // On /app/swap we only need a live quote; dex accounts can be resolved lazily at execution time.
@@ -1110,14 +1169,15 @@ export class TrueNativeSwap {
     const outputMintStr = outputMintPk.toBase58();
     const directOracleOk = hasOracleForPair(inputMintStr, outputMintStr);
 
-    const venuesForBestRoute = Array.from(QUOTED_VENUES).filter(
+    const venuesForBestRoute = Array.from(getQuotableVenueIds()).filter(
       (v) => !DISABLED_BEST_ROUTE_VENUES.has(v)
     );
 
     let quotes: NativeVenueQuote[] = [];
     if (directOracleOk) {
-      const primaryVenues = venuesForBestRoute.filter((v) => PRIMARY_QUOTE_VENUES.includes(v));
-      const secondaryVenues = venuesForBestRoute.filter((v) => !PRIMARY_QUOTE_VENUES.includes(v));
+      const primaryVenuesList = getPrimaryQuoteVenues();
+      const primaryVenues = venuesForBestRoute.filter((v) => primaryVenuesList.includes(v));
+      const secondaryVenues = venuesForBestRoute.filter((v) => !primaryVenuesList.includes(v));
 
       const primaryQuotes = primaryVenues.length
         ? await this.getNativeQuotes(inputMintPk, outputMintPk, amountIn, userPk, params.slippageBps, primaryVenues)
@@ -1507,15 +1567,12 @@ export class TrueNativeSwap {
       );
     }
 
-    // Phoenix (CLOB) n'est pas exécutable sans quote orderbook fiable.
-    // Défense en profondeur: gate aussi sur le programId (même si la route est mal étiquetée).
-    if (
-      DISABLED_BEST_ROUTE_VENUES.has(route.venue) ||
-      route.venueProgramId?.equals?.(DEX_PROGRAM_IDS.PHOENIX)
-    ) {
+    // Vérifier que la venue est activée dans la configuration
+    // Les venues désactivées dans routing.ts ne peuvent pas être exécutées
+    if (DISABLED_BEST_ROUTE_VENUES.has(route.venue)) {
       throw new Error(
         `Venue native temporairement désactivée: ${route.venue}. ` +
-          `Phoenix requiert une quote orderbook pour éviter les IOC failures (0xF).`
+          `Vérifiez la configuration dans routing.ts.`
       );
     }
 
@@ -1532,7 +1589,7 @@ export class TrueNativeSwap {
     // Si la quote a été obtenue via fast-path (browser), les dexAccounts peuvent être vides.
     // On résout alors les comptes DEX au moment de la construction du swap.
     if (!route.dexAccounts?.accounts?.length) {
-      const resolved = await getDEXAccounts(this.connection, inputMint, outputMint, safeUser, route.venue);
+      const resolved = await getDEXAccounts(this.connection, route.venue, inputMint, outputMint, safeUser);
       if (!resolved) {
         throw new Error(`Impossible de résoudre les comptes DEX pour ${route.venue} (${inputMint.toBase58()} -> ${outputMint.toBase58()})`);
       }
@@ -2377,13 +2434,11 @@ export class TrueNativeSwap {
       };
     }
 
-    if (
-      DISABLED_BEST_ROUTE_VENUES.has(route.venue) ||
-      route.venueProgramId?.equals?.(DEX_PROGRAM_IDS.PHOENIX)
-    ) {
+    // Vérifier que la venue est activée dans la configuration
+    if (DISABLED_BEST_ROUTE_VENUES.has(route.venue)) {
       throw new Error(
         `Venue native temporairement désactivée: ${route.venue}. ` +
-          `Phoenix requiert une quote orderbook pour éviter les IOC failures (0xF).`
+          `Vérifiez la configuration dans routing.ts.`
       );
     }
 
