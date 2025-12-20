@@ -1622,8 +1622,14 @@ export class TrueNativeSwap {
     const vaultTokenAccountA = userTokenAccountA;
     const vaultTokenAccountB = userTokenAccountB;
 
-    // user_rebate est optionnel : placeholder par défaut pour limiter la taille.
-    const userRebateKey = ROUTER_PROGRAM_ID;
+    // user_rebate est optionnel on-chain. Si on passe un placeholder, le programme skip le crédit.
+    // On le passe seulement s'il existe on-chain (sinon Anchor le traite comme None).
+    const userRebatePdaExists = await this.connection
+      .getAccountInfo(accounts.userRebate, "confirmed")
+      .then((info) => !!info)
+      .catch(() => false);
+
+    const userRebateKey = userRebatePdaExists ? accounts.userRebate : ROUTER_PROGRAM_ID;
 
     // Construire les metas des remaining accounts DEX avec les bons flags.
     // IMPORTANT:
@@ -1804,7 +1810,7 @@ export class TrueNativeSwap {
       // 14. user_rebate_account (optional)
       { pubkey: ROUTER_PROGRAM_ID, isSigner: false, isWritable: false },
       // 15. user_rebate (optional, PDA) - use placeholder if not initialized
-      { pubkey: userRebateKey, isSigner: false, isWritable: false },
+      { pubkey: userRebateKey, isSigner: false, isWritable: userRebatePdaExists },
       // 16. rebate_vault (writable, PDA)
       { pubkey: accounts.rebateVault, isSigner: false, isWritable: true },
       // 17. oracle_cache (optional, PDA)

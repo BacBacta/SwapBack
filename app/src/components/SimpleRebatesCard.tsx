@@ -58,6 +58,7 @@ export function SimpleRebatesCard() {
   const [showHistory, setShowHistory] = useState(false);
   const [rebateData, setRebateData] = useState<RebateData | null>(null);
   const [claimHistory, setClaimHistory] = useState<ClaimEvent[]>([]);
+  const [rebateAccountMissing, setRebateAccountMissing] = useState(false);
 
   const fetchSeq = useRef(0);
 
@@ -102,6 +103,8 @@ export function SimpleRebatesCard() {
       if (seq !== fetchSeq.current) {
         return;
       }
+
+      setRebateAccountMissing(!accountInfo);
 
       if (accountInfo && accountInfo.data.length >= 81) {
         console.log('[SimpleRebatesCard] Account found, parsing data...');
@@ -339,6 +342,16 @@ export function SimpleRebatesCard() {
             </h2>
             <p className="text-gray-400">À réclamer</p>
           </div>
+
+          {rebateAccountMissing && (
+            <div className="mb-4 rounded-xl bg-white/5 p-4 text-sm text-gray-300">
+              <div className="font-medium text-white mb-1">Compte rebates non détecté</div>
+              <div className="text-gray-400">
+                Le programme ne peut créditer des rebates que si votre compte on-chain <span className="text-gray-300">user_rebate</span> existe.
+                Si vos swaps ont été exécutés sans ce compte, les rebates ne peuvent pas apparaître ici.
+              </div>
+            </div>
+          )}
 
           {/* Bouton Claim */}
           <button
