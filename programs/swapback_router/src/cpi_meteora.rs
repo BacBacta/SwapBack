@@ -66,18 +66,45 @@ pub fn swap(
     let user_token_a_key = ctx.accounts.user_token_account_a.key();
     let user_token_b_key = ctx.accounts.user_token_account_b.key();
 
-    let (x_to_y, _source_account, destination_account) = 
-        if user_token_x.key() == user_token_a_key && user_token_y.key() == user_token_b_key {
-            (true, user_token_x, user_token_y)
-        } else if user_token_x.key() == user_token_b_key && user_token_y.key() == user_token_a_key {
-            (false, user_token_y, user_token_x)
-        } else {
-            msg!("Meteora DLMM: token account mismatch");
-            return err!(ErrorCode::DexExecutionFailed);
-        };
+    // Router invariant (used across venues):
+    // - user_token_account_a = input token account
+    // - user_token_account_b = output token account
+    // Meteora needs x_to_y based on whether the router's *input* is token X or token Y.
+    let x_to_y = if user_token_x.key() == user_token_a_key && user_token_y.key() == user_token_b_key {
+        true
+    } else if user_token_x.key() == user_token_b_key && user_token_y.key() == user_token_a_key {
+        false
+    } else {
+        msg!("Meteora DLMM: token account mismatch");
+        return err!(ErrorCode::DexExecutionFailed);
+    };
 
-    // Read pre-swap balance
-    let pre_amount = read_token_amount(destination_account)?;
+    // Read both user-side token balances pre/post and compute the positive delta.
+    // This is more robust than assuming a single destination account and avoids underflow
+    // when the observed account is actually the source (post < pre).
+    let expected_output_key = ctx.accounts.user_token_account_b.key();
+
+    // --- DEBUG LOGGING: dump relevant account pubkeys + mints (best-effort) ---
+    fn account_mint_str(account: &AccountInfo) -> Option<String> {
+        if account.data_is_empty() { return None; }
+        match SplAccount::unpack(&account.try_borrow_data().ok()?) {
+            Ok(a) => Some(a.mint.to_string()),
+            Err(_) => None,
+        }
+    }
+
+    msg!("Meteora DLMM: debug lb_pair={}, reserve_x={}, reserve_y={}",
+         account_slice[LB_PAIR_INDEX].key(), account_slice[RESERVE_X_INDEX].key(), account_slice[RESERVE_Y_INDEX].key());
+    msg!("Meteora DLMM: debug user_token_x={}, user_token_y={}", user_token_x.key(), user_token_y.key());
+    if let Some(m) = account_mint_str(user_token_x) { msg!("Meteora DLMM: user_token_x.mint={}", m); }
+    if let Some(m) = account_mint_str(user_token_y) { msg!("Meteora DLMM: user_token_y.mint={}", m); }
+    if let Some(m) = account_mint_str(&account_slice[RESERVE_X_INDEX]) { msg!("Meteora DLMM: reserve_x.mint={}", m); }
+    if let Some(m) = account_mint_str(&account_slice[RESERVE_Y_INDEX]) { msg!("Meteora DLMM: reserve_y.mint={}", m); }
+    msg!("Meteora DLMM: token_x_mint={}, token_y_mint={}", account_slice[TOKEN_X_MINT_INDEX].key(), account_slice[TOKEN_Y_MINT_INDEX].key());
+
+    // Read pre-swap balances (best-effort: both must be SPL Token accounts)
+    let pre_x = read_token_amount(user_token_x)?;
+    let pre_y = read_token_amount(user_token_y)?;
 
     // Build swap instruction data
     // Meteora DLMM swap params: amount_in, min_out, x_to_y
@@ -112,10 +139,29 @@ pub fn swap(
         })?;
 
     // Verify output
-    let post_amount = read_token_amount(destination_account)?;
-    let amount_out = post_amount
-        .checked_sub(pre_amount)
-        .ok_or_else(|| error!(ErrorCode::DexExecutionFailed))?;
+    let post_x = read_token_amount(user_token_x)?;
+    let post_y = read_token_amount(user_token_y)?;
+
+    let delta_x = post_x.checked_sub(pre_x).unwrap_or(0);
+    let delta_y = post_y.checked_sub(pre_y).unwrap_or(0);
+
+    // Prefer the delta on the router-declared output account.
+    // Fallbacks:
+    // - if it doesn't match x/y keys (unexpected), use direction x_to_y
+    // - if still zero, take the max positive delta as a last resort
+    let mut amount_out = if expected_output_key == user_token_x.key() {
+        delta_x
+    } else if expected_output_key == user_token_y.key() {
+        delta_y
+    } else if x_to_y {
+        delta_y
+    } else {
+        delta_x
+    };
+
+    if amount_out == 0 {
+        amount_out = core::cmp::max(delta_x, delta_y);
+    }
 
     if amount_out < min_out {
         msg!("Meteora DLMM: slippage exceeded, got {} expected min {}", amount_out, min_out);

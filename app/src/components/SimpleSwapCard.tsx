@@ -47,12 +47,15 @@ interface TokenInfo {
 interface QuoteResult {
   outputAmount: string;
   outputAmountFormatted: number;
+  /** Optionnel: minOut (en unités token) recommandé par la venue sélectionnée */
+  minOutAmountFormatted?: number;
   priceImpact: number;
   cashbackAmount: number;
   npiAmount: number;
   route: string[];
   venues: string[];
   isNativeRoute: boolean;
+  bestVenue?: string;
   dynamicSlippageBps?: number;
   slippageBreakdown?: {
     slippageBps: number;
@@ -152,10 +155,23 @@ export function SimpleSwapCard() {
   
   // Ref pour rafraîchissement prix USD
   const priceRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Ref pour rafraîchissement quote swap
+  const quoteRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const quoteFetchSeqRef = useRef(0);
+  const quoteInFlightRef = useRef(false);
+  const quoteRef = useRef<QuoteResult | null>(null);
 
   // Paramètres (cachés par défaut)
   const [slippage, setSlippage] = useState(slippageConfig.BASE_SLIPPAGE_BPS / 100); // Utiliser config dynamique
   const [mevProtection, setMevProtection] = useState(useMevProtection);
+
+  // Parsing robuste des montants utilisateur (ex: locale FR "0,01" => 0.01)
+  const parseUserAmount = useCallback((raw: string): number => {
+    if (!raw) return 0;
+    const normalized = raw.trim().replace(/\s+/g, "").replace(/,/g, ".");
+    const n = Number.parseFloat(normalized);
+    return Number.isFinite(n) ? n : 0;
+  }, []);
 
   // Token data
   const inputTokenData = useTokenData(inputToken.mint);
@@ -197,7 +213,7 @@ export function SimpleSwapCard() {
     }
     
     // Rafraîchir les prix toutes les 10 secondes pendant qu'on a un montant
-    if (inputAmount && parseFloat(inputAmount) > 0) {
+    if (inputAmount && parseUserAmount(inputAmount) > 0) {
       priceRefreshIntervalRef.current = setInterval(() => {
         // Les hooks useTokenData vont automatiquement rafraîchir
         // On force un re-render léger en mettant à jour un timestamp
@@ -213,11 +229,17 @@ export function SimpleSwapCard() {
     };
   }, [inputAmount, inputTokenData, outputTokenData]);
 
+  // Garder une ref à jour de la dernière quote (évite de relancer l'effet de fetch)
+  useEffect(() => {
+    quoteRef.current = quote;
+  }, [quote]);
+
   // Calculer le montant en unités de base
   const amountInBaseUnits = useMemo(() => {
-    const amount = parseFloat(inputAmount);
+    const amount = parseUserAmount(inputAmount);
     if (!amount || !Number.isFinite(amount)) return 0;
-    return Math.floor(amount * Math.pow(10, inputToken.decimals));
+    const lamports = Math.floor(amount * Math.pow(10, inputToken.decimals));
+    return Number.isFinite(lamports) && lamports > 0 ? lamports : 0;
   }, [inputAmount, inputToken.decimals]);
 
   // Fetch quote via le ROUTER NATIF (pas Jupiter!)
@@ -227,9 +249,22 @@ export function SimpleSwapCard() {
       return;
     }
 
+    // Clear previous interval
+    if (quoteRefreshIntervalRef.current) {
+      clearInterval(quoteRefreshIntervalRef.current);
+      quoteRefreshIntervalRef.current = null;
+    }
+
+    const seq = ++quoteFetchSeqRef.current;
     const controller = new AbortController();
     const fetchNativeQuote = async () => {
-      setLoading(true);
+      if (controller.signal.aborted) return;
+      if (quoteInFlightRef.current) return;
+
+      quoteInFlightRef.current = true;
+      const shouldShowLoading = !quoteRef.current;
+      if (shouldShowLoading) setLoading(true);
+
       try {
         // Utiliser le router NATIF SwapBack
         const nativeResult = await getSwapQuote(
@@ -242,20 +277,29 @@ export function SimpleSwapCard() {
           0 // userBoostBps - peut être récupéré depuis le statut de lock
         );
 
-        if (nativeResult && !controller.signal.aborted) {
+        if (nativeResult && !controller.signal.aborted && seq === quoteFetchSeqRef.current) {
           const formatted = nativeResult.outputAmount / Math.pow(10, outputToken.decimals);
+          const minOutFormatted =
+            nativeResult.bestVenue === "RAYDIUM_AMM" &&
+            typeof nativeResult.selectedMinOutAmount === "number" &&
+            Number.isFinite(nativeResult.selectedMinOutAmount) &&
+            nativeResult.selectedMinOutAmount > 0
+              ? nativeResult.selectedMinOutAmount / Math.pow(10, outputToken.decimals)
+              : undefined;
           const cashbackFormatted = nativeResult.boostedRebate / Math.pow(10, outputToken.decimals);
           const npiFormatted = nativeResult.estimatedNpi / Math.pow(10, outputToken.decimals);
 
           setQuote({
             outputAmount: nativeResult.outputAmount.toString(),
             outputAmountFormatted: formatted,
+            minOutAmountFormatted: minOutFormatted,
             priceImpact: nativeResult.priceImpactBps / 100,
             cashbackAmount: cashbackFormatted,
             npiAmount: npiFormatted,
             route: nativeResult.venues.map(v => v.venue),
             venues: nativeResult.venues.map(v => v.venue),
             isNativeRoute: true,
+            bestVenue: nativeResult.bestVenue,
             dynamicSlippageBps: nativeResult.dynamicSlippageBps,
             slippageBreakdown: nativeResult.slippageResult,
           } as QuoteResult);
@@ -271,15 +315,29 @@ export function SimpleSwapCard() {
           // Ne pas afficher d'erreur si la quote échoue silencieusement
         }
       } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
+        quoteInFlightRef.current = false;
+        if (!controller.signal.aborted && seq === quoteFetchSeqRef.current) {
+          // Éviter le flicker: on n'affiche le loader que lors du premier fetch
+          if (!quoteRef.current) {
+            setLoading(false);
+          }
         }
       }
     };
 
     const timeout = setTimeout(fetchNativeQuote, 300);
+
+    // Auto-refresh quote: garde les prix dynamiques même sans interaction utilisateur
+    quoteRefreshIntervalRef.current = setInterval(() => {
+      void fetchNativeQuote();
+    }, 10_000);
+
     return () => {
       clearTimeout(timeout);
+      if (quoteRefreshIntervalRef.current) {
+        clearInterval(quoteRefreshIntervalRef.current);
+        quoteRefreshIntervalRef.current = null;
+      }
       controller.abort();
     };
   }, [amountInBaseUnits, inputToken.mint, outputToken.mint, outputToken.decimals, slippage, publicKey, getSwapQuote]);
@@ -505,8 +563,11 @@ export function SimpleSwapCard() {
                   inputMode="decimal"
                   value={inputAmount}
                   onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9.]/g, "");
-                    if (value.split(".").length <= 2) {
+                    // Accepte "." ou "," comme séparateur décimal.
+                    const value = e.target.value.replace(/[^0-9.,\s]/g, "");
+                    const dotCount = (value.match(/\./g) || []).length;
+                    const commaCount = (value.match(/,/g) || []).length;
+                    if (dotCount + commaCount <= 1) {
                       setInputAmount(value);
                     }
                   }}
@@ -525,10 +586,10 @@ export function SimpleSwapCard() {
                 </button>
               </div>
               {/* Valeur USD en temps réel avec SingleTokenFiat */}
-              {inputAmount && parseFloat(inputAmount) > 0 && (
+              {inputAmount && parseUserAmount(inputAmount) > 0 && (
                 <SingleTokenFiat
                   tokenSymbol={inputToken.symbol}
-                  amount={parseFloat(inputAmount)}
+                  amount={parseUserAmount(inputAmount)}
                   compact
                   className="mt-1"
                 />
@@ -623,12 +684,32 @@ export function SimpleSwapCard() {
                     </span>
                   )}
                 </div>
+
+                {/* V1.1: Indicateur multi-hop (2 legs) */}
+                {trueNativeRoute?.multiHop && (
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                      <Clock className="w-3.5 h-3.5 text-gray-500" />
+                      <span>Multi-hop via USDC</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] bg-white/5 border border-white/10 text-gray-300 px-2 py-0.5 rounded-full font-medium">
+                        {trueNativeRoute.multiHop.firstLeg.route.venue}
+                      </span>
+                      <span className="text-[10px] text-gray-600">→</span>
+                      <span className="text-[10px] bg-white/5 border border-white/10 text-gray-300 px-2 py-0.5 rounded-full font-medium">
+                        {trueNativeRoute.multiHop.secondLeg.route.venue}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Visualisation des routes améliorée en mode avancé */}
                 {swapMode === 'advanced' && quote.venues && quote.venues.length > 0 ? (
                   <RouteVisualization
                     inputToken={{
                       symbol: inputToken.symbol,
-                      amount: parseFloat(inputAmount) || 0,
+                      amount: parseUserAmount(inputAmount) || 0,
                       logoURI: inputToken.logoURI,
                     }}
                     outputToken={{
@@ -717,6 +798,17 @@ export function SimpleSwapCard() {
                       {quote.priceImpact.toFixed(2)}%
                     </span>
                   </div>
+
+                  {quote.bestVenue === "RAYDIUM_AMM" &&
+                    typeof quote.minOutAmountFormatted === "number" &&
+                    Number.isFinite(quote.minOutAmountFormatted) && (
+                      <div className="flex justify-between">
+                        <span>Min reçu (Raydium):</span>
+                        <span className="text-gray-300">
+                          {formatAmount(quote.minOutAmountFormatted)} {outputToken.symbol}
+                        </span>
+                      </div>
+                    )}
                 </div>
               </motion.div>
             )}
@@ -740,7 +832,7 @@ export function SimpleSwapCard() {
                 </span>
               ) : !connected ? (
                 "Connecter le wallet"
-              ) : !inputAmount || parseFloat(inputAmount) === 0 ? (
+              ) : !inputAmount || parseUserAmount(inputAmount) === 0 ? (
                 "Entrez un montant"
               ) : !quote ? (
                 "Calcul du prix..."

@@ -156,12 +156,8 @@ export function hasOracleForPair(inputMint: string, outputMint: string): boolean
  * Vérifie si les swaps natifs sont disponibles (feature flag)
  * 
  * IMPORTANT: Cette fonction vérifie uniquement le feature flag.
- * La décision complète de routing doit utiliser `decideSwapRoute()`
- * qui vérifie aussi la paire supportée et la disponibilité de jupiterCpi.
- * 
- * Note technique:
- * Le programme on-chain `swapback_router` exige un `jupiter_route` valide.
- * Le native-router doit obtenir ces données via /api/swap/quote avant le swap.
+ * La décision complète de routing doit vérifier que la paire est supportée
+ * (oracles + venue DEX disponibles) avant signature.
  * 
  * @see lib/swap-routing/decideSwapRoute.ts
  */
@@ -188,7 +184,7 @@ export function isNativeSwapAvailable(): boolean {
  */
 export const NATIVE_SWAP_UNAVAILABLE_MESSAGE = 
   "Le swap natif n'est pas disponible pour cette transaction. " +
-  "Votre transaction est routée via Jupiter.";
+  "Veuillez vérifier que la paire est supportée et réessayer.";
 
 /**
  * Retro-compatibilité (retourne l'oracle primaire uniquement)

@@ -21,5 +21,6 @@
 
 ## Definition of Done
 - simulateTransaction OK (pas 0x1772) sur paires supportées
+- revalidation DoD V1.1 (sans Raydium CLMM): voir docs/agent/DOD_V1_1_NATIVE_SWAP_NO_RAYDIUM_CLMM.md
 - paires non supportées: blocage avant signature + fallback Jupiter
 - scripts + tests green

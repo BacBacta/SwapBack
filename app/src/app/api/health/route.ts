@@ -16,6 +16,7 @@ interface HealthStatus {
   status: 'healthy' | 'degraded' | 'unhealthy';
   timestamp: string;
   version: string;
+  gitSha?: string;
   uptime: number;
   checks: HealthCheck[];
 }
@@ -118,6 +119,11 @@ export async function GET() {
     status: allPassing ? 'healthy' : anyFailing ? 'degraded' : 'unhealthy',
     timestamp: new Date().toISOString(),
     version: process.env.npm_package_version || '1.0.0',
+    gitSha:
+      process.env.GIT_SHA ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ||
+      undefined,
     uptime: Math.floor((Date.now() - startTime) / 1000),
     checks,
   };

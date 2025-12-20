@@ -102,7 +102,7 @@ describe("decideSwapRoute - PAIR_UNSUPPORTED", () => {
 // ============================================================================
 
 describe("decideSwapRoute - JUPITER_CPI_UNAVAILABLE", () => {
-  it("should return jupiter when jupiterCpi is not available", () => {
+  it("should still return native even when hasJupiterCpi is false (legacy param)", () => {
     const params: SwapRouteParams = {
       inputMint: SOL_MINT,
       outputMint: USDC_MINT,
@@ -112,9 +112,9 @@ describe("decideSwapRoute - JUPITER_CPI_UNAVAILABLE", () => {
 
     const result = decideSwapRoute(params);
 
-    expect(result.route).toBe("jupiter");
-    expect(result.reason).toBe("JUPITER_CPI_UNAVAILABLE");
-    expect(result.message).toContain("Jupiter CPI");
+    expect(result.route).toBe("native");
+    expect(result.reason).toBe("NATIVE_ELIGIBLE");
+    expect(result.message).toContain("Swap natif");
   });
 });
 
@@ -161,7 +161,6 @@ describe("getUIMessageForReason", () => {
   it("should return appropriate message for FLAG_DISABLED", () => {
     const message = getUIMessageForReason("FLAG_DISABLED");
     expect(message).toContain("désactivé");
-    expect(message).toContain("Jupiter");
   });
 
   it("should return appropriate message for PAIR_UNSUPPORTED", () => {
@@ -177,7 +176,7 @@ describe("getUIMessageForReason", () => {
 
   it("should return fallback message for unknown reason", () => {
     const message = getUIMessageForReason("FALLBACK_JUPITER");
-    expect(message).toContain("Jupiter");
+    expect(message).toContain("Swap natif");
   });
 });
 

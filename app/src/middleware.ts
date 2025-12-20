@@ -61,18 +61,28 @@ export function middleware(request: NextRequest) {
     }
     // Sinon on garde '*' pour le dev
   }
+
+  // CORS: ne jamais combiner "Origin: *" avec "Credentials: true".
+  // Si on reflète une origine explicite, on active credentials + Vary.
+  const allowCredentials = allowOrigin !== '*';
   
   // Pour les preflight requests (OPTIONS), retourner immédiatement
   if (request.method === 'OPTIONS') {
+    const preflightHeaders: Record<string, string> = {
+      'Access-Control-Allow-Origin': allowOrigin,
+      'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Requested-With,Accept',
+      'Access-Control-Max-Age': '86400', // Cache preflight pour 24h
+    };
+
+    if (allowCredentials) {
+      preflightHeaders['Access-Control-Allow-Credentials'] = 'true';
+      preflightHeaders['Vary'] = 'Origin';
+    }
+
     return new NextResponse(null, {
       status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': allowOrigin,
-        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Requested-With,Accept',
-        'Access-Control-Allow-Credentials': 'true',
-        'Access-Control-Max-Age': '86400', // Cache preflight pour 24h
-      },
+      headers: preflightHeaders,
     });
   }
   
@@ -83,7 +93,12 @@ export function middleware(request: NextRequest) {
   response.headers.set('Access-Control-Allow-Origin', allowOrigin);
   response.headers.set('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
   response.headers.set('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept');
-  response.headers.set('Access-Control-Allow-Credentials', 'true');
+  if (allowCredentials) {
+    response.headers.set('Access-Control-Allow-Credentials', 'true');
+    response.headers.set('Vary', 'Origin');
+  } else {
+    response.headers.delete('Access-Control-Allow-Credentials');
+  }
   
   // Headers de sécurité supplémentaires
   response.headers.set('X-Content-Type-Options', 'nosniff');

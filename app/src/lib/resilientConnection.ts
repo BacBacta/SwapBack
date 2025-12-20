@@ -1,7 +1,15 @@
 import { Connection, ConnectionConfig } from '@solana/web3.js';
 
-// RPC endpoints ordered by reliability (avoid Helius - rate limited)
-const RPC_ENDPOINTS = [
+function getBrowserRpcEndpoint(): string {
+  if (typeof window === 'undefined') {
+    // SSR ou server-side: pas d'URL absolue possible, retourner un placeholder
+    return 'https://api.mainnet-beta.solana.com';
+  }
+  return `${window.location.origin}/api/solana-rpc`;
+}
+
+// Upstreams ordered by reliability (server-side only). Le navigateur doit passer par BROWSER_RPC_ENDPOINT.
+const SERVER_RPC_ENDPOINTS = [
   'https://api.mainnet-beta.solana.com',
   'https://rpc.ankr.com/solana',
   'https://solana.publicnode.com',
@@ -22,7 +30,7 @@ let lastRequestTime = 0;
  */
 export function getResilientConnection(): Connection {
   if (!cachedConnection) {
-    cachedConnection = createConnection(RPC_ENDPOINTS[currentEndpointIndex]);
+    cachedConnection = createConnection(getRpcEndpoints()[currentEndpointIndex]);
   }
   return cachedConnection;
 }
@@ -39,12 +47,30 @@ function createConnection(endpoint: string): Connection {
   return new Connection(endpoint, config);
 }
 
+function getRpcEndpoints(): string[] {
+  // Client: same-origin proxy pour éviter CORS/429 des RPC tiers.
+  if (typeof window !== 'undefined') {
+    return [getBrowserRpcEndpoint()];
+  }
+
+  // Server: possibilité d'override via env.
+  const envRpc = process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
+  const endpoints = [envRpc, ...SERVER_RPC_ENDPOINTS].filter(
+    (u): u is string => typeof u === 'string' && u.trim().length > 0
+  );
+
+  // Filtrer les URLs non HTTP(S)
+  const normalized = endpoints.map((u) => u.trim()).filter((u) => /^https?:\/\//i.test(u));
+  return [...new Set(normalized)];
+}
+
 /**
  * Switch to next RPC endpoint (called on 429 errors)
  */
 export function switchToNextEndpoint(): string {
-  currentEndpointIndex = (currentEndpointIndex + 1) % RPC_ENDPOINTS.length;
-  const newEndpoint = RPC_ENDPOINTS[currentEndpointIndex];
+  const endpoints = getRpcEndpoints();
+  currentEndpointIndex = (currentEndpointIndex + 1) % endpoints.length;
+  const newEndpoint = endpoints[currentEndpointIndex];
   cachedConnection = createConnection(newEndpoint);
   console.log(`[RPC] Switched to: ${newEndpoint}`);
   return newEndpoint;
@@ -106,7 +132,7 @@ export function wasRecentlyRateLimited(): boolean {
  * Get current RPC endpoint
  */
 export function getCurrentEndpoint(): string {
-  return RPC_ENDPOINTS[currentEndpointIndex];
+  return getRpcEndpoints()[currentEndpointIndex] || getBrowserRpcEndpoint();
 }
 
 function sleep(ms: number): Promise<void> {

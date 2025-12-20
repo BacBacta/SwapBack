@@ -2,7 +2,7 @@
  * 🔄 Hook pour Swaps Natifs SwapBack
  *
  * Ce hook utilise EXCLUSIVEMENT les venues natives (Raydium, Orca, Meteora, Phoenix)
- * via le programme router on-chain SwapBack au lieu de passer par Jupiter.
+ * via le programme router on-chain SwapBack.
  * 
  * Avantages:
  * - Génère du NPI (Native Price Improvement)
@@ -19,7 +19,8 @@
 import { useState, useCallback, useMemo } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey, VersionedTransaction } from "@solana/web3.js";
+import { PublicKey, SendTransactionError, VersionedTransaction } from "@solana/web3.js";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { 
   getNativeRouter, 
   type NativeRouteQuote, 
@@ -36,6 +37,7 @@ import {
   TrueNativeSwap,
   type TrueNativeRoute,
   type TrueNativeSwapResult,
+  DEX_PROGRAM_IDS,
 } from "@/lib/native-router/true-native-swap";
 import { toPublicKey } from "@/lib/native-router/utils/publicKeyUtils";
 import { 
@@ -96,6 +98,9 @@ export interface NativeSwapQuote {
   // Méta
   timestamp: number;
   expiresAt: number;
+
+  /** Optionnel: minOut recommandé par le DEX pour la venue sélectionnée (ex Raydium otherAmountThreshold) */
+  selectedMinOutAmount?: number;
 }
 
 export interface SwapHistoryEntry {
@@ -133,7 +138,7 @@ export function useNativeSwap() {
     return isNativeSwapAvailable();
   }, []);
 
-  // Router natif (ancien, utilise Jupiter CPI)
+  // Router natif (legacy)
   const nativeRouter = useMemo(() => {
     return getNativeRouter(connection);
   }, [connection]);
@@ -169,12 +174,10 @@ export function useNativeSwap() {
         // ============================================================
         // Décision de routing centralisée via decideSwapRoute
         // ============================================================
-        // Note: hasJupiterCpi est true ici car on vérifie avant d'obtenir
-        // la quote. Le vrai check jupiterCpi se fait au moment du swap.
         const routeDecision = decideSwapRoute({
           inputMint: inputMintStr,
           outputMint: outputMintStr,
-          hasJupiterCpi: true, // Présumé disponible pour la quote
+          hasJupiterCpi: true,
         });
         
         // Log structuré de la décision
@@ -183,11 +186,6 @@ export function useNativeSwap() {
         // Si route != native, retourner null avec message approprié
         if (routeDecision.route !== "native") {
           const uiMessage = getUIMessageForReason(routeDecision.reason);
-          logger.info("useNativeSwap", "Routing to Jupiter", {
-            reason: routeDecision.reason,
-            inputMint: inputMintStr.slice(0, 8),
-            outputMint: outputMintStr.slice(0, 8),
-          });
           setError(uiMessage);
           return null;
         }
@@ -199,17 +197,30 @@ export function useNativeSwap() {
           boostBps: userBoostBps,
         });
 
-        // Récupérer la route native (utiliser les mints normalisés)
-        const route = await nativeRouter.buildNativeRoute(
-          safeInputMint,
-          safeOutputMint,
-          params.amount,
-          params.slippageBps ?? 50
-        );
+        const slippageBps = params.slippageBps ?? SLIPPAGE_CONFIG.BASE_SLIPPAGE_BPS;
 
-        if (!route || route.venues.length === 0) {
+        // Récupérer la meilleure route native via TrueNativeSwap (cohérent avec executeTrueNativeSwap)
+        const route = await trueNativeSwap.getBestNativeRoute({
+          inputMint: safeInputMint,
+          outputMint: safeOutputMint,
+          amountIn: params.amount,
+          minAmountOut: 0,
+          slippageBps,
+          userPublicKey: publicKey,
+        });
+
+        if (!route || route.allQuotes.length === 0) {
+          logger.error("useNativeSwap", "No native venues available", {
+            inputMint: inputMintStr,
+            outputMint: outputMintStr,
+            amount: params.amount,
+            routeReturned: route ? "yes (but empty quotes)" : "null",
+            allQuotesLength: route?.allQuotes?.length ?? 0,
+          });
           throw new Error("Aucune venue native disponible pour cette paire");
         }
+
+        setTrueNativeRoute(route);
 
         // Calculer le slippage dynamique si non fourni
         let dynamicSlippageBps = params.slippageBps ?? SLIPPAGE_CONFIG.BASE_SLIPPAGE_BPS;
@@ -235,24 +246,40 @@ export function useNativeSwap() {
           });
         }
 
+        // Estimations (alignées avec executeTrueNativeSwap)
+        const estimatedNpi = Math.floor(route.outputAmount * 0.001);
+        const estimatedRebate = Math.floor(estimatedNpi * 0.7);
+
         // Calculer les rebates avec boost
-        const baseRebate = route.estimatedRebate;
-        const rebateCalc = calculateBoostedRebate(baseRebate, userBoostBps);
+        const baseRebate = estimatedRebate;
+        const rebateCalc = calculateBoostedRebate(estimatedRebate, userBoostBps);
+
+        const venues: VenueQuote[] = route.allQuotes.map((q) => ({
+          venue: q.venue,
+          venueProgramId: q.venueProgramId,
+          inputAmount: q.inputAmount,
+          outputAmount: q.outputAmount,
+          priceImpactBps: q.priceImpactBps,
+          accounts: q.accounts.accounts,
+          instructionData: q.accounts.data,
+          estimatedNpiBps: 0,
+          latencyMs: q.latencyMs,
+        }));
 
         const quote: NativeSwapQuote = {
           // Montants
-          inputAmount: route.totalInputAmount,
-          outputAmount: route.totalOutputAmount,
-          netOutputAmount: route.netOutputAmount,
+          inputAmount: route.inputAmount,
+          outputAmount: route.outputAmount,
+          netOutputAmount: route.outputAmount,
           
           // Route
-          venues: route.venues,
-          bestVenue: route.bestVenue, // Utiliser directement bestVenue de la route
+          venues,
+          bestVenue: route.venue,
           
           // Économie
-          priceImpactBps: route.totalPriceImpactBps,
-          estimatedRebate: route.estimatedRebate,
-          estimatedNpi: route.estimatedNpi,
+          priceImpactBps: route.priceImpactBps,
+          estimatedRebate,
+          estimatedNpi,
           platformFeeBps: route.platformFeeBps,
           
           // Slippage dynamique
@@ -269,6 +296,11 @@ export function useNativeSwap() {
           // Méta
           timestamp: Date.now(),
           expiresAt: Date.now() + 30000, // 30 secondes de validité
+
+          selectedMinOutAmount:
+            route.venue === "RAYDIUM_AMM"
+              ? (route.allQuotes.find((q) => q.venue === route.venue)?.minOutAmount ?? undefined)
+              : undefined,
         };
 
         setCurrentQuote(quote);
@@ -291,7 +323,7 @@ export function useNativeSwap() {
         setQuoteLoading(false);
       }
     },
-    [publicKey, nativeRouter, calculateBoostedRebate]
+    [publicKey, trueNativeSwap, calculateBoostedRebate]
   );
 
   /**
@@ -432,12 +464,15 @@ export function useNativeSwap() {
         ) {
           setError(
             "Transaction trop volumineuse pour le router natif. " +
-            "Réduisez le montant ou utilisez Jupiter direct."
+            "Réduisez le montant puis réessayez."
           );
         } else if (
           normalized.includes("0x177e") ||
           normalized.includes("slippage") ||
-          normalized.includes("slippage exceeded")
+          normalized.includes("slippage exceeded") ||
+          normalized.includes("custom:30") ||
+          normalized.includes("0x1e") ||
+          normalized.includes("exceeds desired slippage")
         ) {
           setError(
             "Le prix a bougé pendant la simulation (slippage dépassé). " +
@@ -445,8 +480,8 @@ export function useNativeSwap() {
           );
         } else if (normalized.includes("native_slippage_gate")) {
           setError(
-            "Le router natif ne peut pas respecter ce slippage avec Jupiter. " +
-            "Relancez une quote fraîche ou passez via Jupiter directement."
+            "Le swap natif ne peut pas respecter ce slippage. " +
+            "Relancez une quote fraîche ou augmentez légèrement le slippage."
           );
         } else {
           setError(message);
@@ -460,7 +495,7 @@ export function useNativeSwap() {
   );
 
   /**
-   * 🔥 Exécuter un swap via le VRAI routage natif (sans Jupiter)
+  * 🔥 Exécuter un swap via le VRAI routage natif (direct DEX CPI)
    * Appelle directement les DEX (Orca, Raydium, Meteora) via le mode Dynamic Plan
    */
   const executeTrueNativeSwap = useCallback(
@@ -473,6 +508,16 @@ export function useNativeSwap() {
         return null;
       }
 
+      // Garde-fou: éviter d'envoyer un swap à 0 lamport (souvent dû à un parsing/arrondi UI)
+      // qui provoque InvalidAmount (6014) côté programme on-chain.
+      if (!Number.isFinite(params.amount) || params.amount <= 0) {
+        setError(
+          "Montant invalide ou trop petit (arrondi à 0). " +
+            "Augmentez le montant et vérifiez le séparateur décimal (utilisez \".\" ou \" ,\")."
+        );
+        return null;
+      }
+
       setLoading(true);
       setError(null);
 
@@ -481,7 +526,73 @@ export function useNativeSwap() {
         const safeInputMint = toPublicKey(params.inputMint);
         const safeOutputMint = toPublicKey(params.outputMint);
 
-        logger.info("useNativeSwap", "🔥 Executing TRUE native swap (no Jupiter)", {
+        // Pré-check fonds (évite les erreurs DEX "insufficient funds" / 0x28)
+        try {
+          const SOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
+
+          if (safeInputMint.equals(SOL_MINT)) {
+            const lamports = await connection.getBalance(publicKey, "confirmed");
+            if (lamports < params.amount) {
+              throw new Error(
+                `Solde SOL insuffisant. Solde=${lamports} lamports, requis=${params.amount} lamports.`
+              );
+            }
+          } else {
+            const inputAta = await getAssociatedTokenAddress(safeInputMint, publicKey);
+
+            let bal;
+            try {
+              bal = await connection.getTokenAccountBalance(inputAta, "confirmed");
+            } catch {
+              bal = null;
+            }
+
+            if (!bal?.value?.amount) {
+              logger.warn("useNativeSwap", "Missing input ATA for native swap", {
+                inputMint: safeInputMint.toBase58(),
+                inputAta: inputAta.toBase58(),
+                amountIn: params.amount,
+              });
+              throw new Error(
+                "Solde insuffisant ou compte token source manquant. " +
+                  "Le swap natif utilise votre compte associé (ATA) pour le token source. " +
+                  `ATA attendu: ${inputAta.toBase58()}`
+              );
+            }
+
+            const have = BigInt(bal.value.amount);
+            const need = BigInt(Math.max(0, Math.floor(params.amount)));
+
+            if (have < need) {
+              logger.warn("useNativeSwap", "Insufficient input token balance (ATA)", {
+                inputMint: safeInputMint.toBase58(),
+                inputAta: inputAta.toBase58(),
+                have: bal.value.amount,
+                haveUi: bal.value.uiAmountString,
+                need: need.toString(),
+              });
+              throw new Error(
+                `Solde insuffisant pour le token source. ` +
+                  `Solde ATA=${bal.value.uiAmountString ?? bal.value.amount}, ` +
+                  `requis=${need.toString()} (base units).`
+              );
+            }
+          }
+        } catch (fundErr) {
+          const message = fundErr instanceof Error ? fundErr.message : String(fundErr);
+          // Remonter une erreur UI claire, sans continuer vers simulate/sign.
+          setError(message);
+          return null;
+        }
+
+        // Gating oracle AVANT toute signature
+        if (!hasOracleForPair(safeInputMint.toBase58(), safeOutputMint.toBase58())) {
+          throw new Error(
+            "Cette paire n'est pas supportée par le swap natif (oracle manquant)."
+          );
+        }
+
+        logger.info("useNativeSwap", "🔥 Executing TRUE native swap (direct DEX CPI)", {
           inputMint: safeInputMint.toBase58().slice(0, 8),
           outputMint: safeOutputMint.toBase58().slice(0, 8),
           amount: params.amount,
@@ -505,54 +616,393 @@ export function useNativeSwap() {
         if (!route) {
           throw new Error(
             "Aucune venue native disponible. Cette paire n'est pas supportée " +
-            "par les DEX natifs (Orca, Raydium, Meteora). Utilisez Jupiter."
+            "par les DEX natifs (Orca, Raydium, Meteora)."
           );
         }
 
-        setTrueNativeRoute(route);
+        // Sécurité: Phoenix (CLOB) nécessite une quote orderbook.
+        // Défense en profondeur: certains chemins peuvent produire une route mal étiquetée;
+        // on gate aussi sur le programId.
+        if (
+          route.venue === 'PHOENIX' ||
+          route.venueProgramId?.equals?.(DEX_PROGRAM_IDS.PHOENIX)
+        ) {
+          throw new Error(
+            "Phoenix est temporairement désactivé pour le swap natif (quote orderbook non implémentée). " +
+            "Veuillez réessayer: une autre venue (Meteora/Orca/Raydium) sera utilisée si disponible."
+          );
+        }
+
+        // Garder une référence locale pour logs/erreurs (l'état React peut être stale en catch).
+        let selectedRoute = route;
+
+        setTrueNativeRoute(selectedRoute);
 
         const minAmountOut = Math.floor(route.outputAmount * (10000 - slippageBps) / 10000);
 
         logger.info("useNativeSwap", "True native route found", {
-          venue: route.venue,
-          outputAmount: route.outputAmount,
+          venue: selectedRoute.venue,
+          venueProgramId: selectedRoute.venueProgramId?.toBase58?.() ?? null,
+          outputAmount: selectedRoute.outputAmount,
           minAmountOut,
-          priceImpactBps: route.priceImpactBps,
+          priceImpactBps: selectedRoute.priceImpactBps,
         });
 
+        const isProgramFrozenError = (err: unknown): boolean => {
+          const s = (() => {
+            try {
+              return err instanceof Error ? `${err.name}: ${err.message}` : JSON.stringify(err);
+            } catch {
+              return String(err);
+            }
+          })();
+          return /ProgramIsFrozen/i.test(s) || /program\s+is\s+frozen/i.test(s);
+        };
+
+        const pickBestNonLifinityFallback = (base: TrueNativeRoute): TrueNativeRoute | null => {
+          const quotes = (base.allQuotes ?? []).filter((q) => q.venue !== 'LIFINITY' && q.outputAmount > 0);
+          if (quotes.length === 0) return null;
+          quotes.sort((a, b) => b.outputAmount - a.outputAmount);
+          const best = quotes[0];
+          if (!best) return null;
+          return {
+            ...base,
+            venue: best.venue,
+            venueProgramId: best.venueProgramId,
+            outputAmount: best.outputAmount,
+            priceImpactBps: best.priceImpactBps,
+            dexAccounts: best.accounts,
+          };
+        };
+
+        const build = async (routeOverride: TrueNativeRoute) =>
+          trueNativeSwap.buildNativeSwapTransaction({
+            inputMint: safeInputMint,
+            outputMint: safeOutputMint,
+            amountIn: params.amount,
+            // minAmountOut est dérivé côté builder depuis route.outputAmount + slippageBps
+            // pour éviter toute divergence en cas de re-quote.
+            minAmountOut: 0,
+            slippageBps,
+            userPublicKey: publicKey,
+            routeOverride,
+          });
+
         // Construire la transaction
-        const result = await trueNativeSwap.buildNativeSwapTransaction({
-          inputMint: safeInputMint,
-          outputMint: safeOutputMint,
-          amountIn: params.amount,
-          minAmountOut,
-          slippageBps,
-          userPublicKey: publicKey,
-        });
+        let result;
+        try {
+          result = await build(selectedRoute);
+        } catch (buildErr) {
+          if (selectedRoute.venue === 'LIFINITY' && isProgramFrozenError(buildErr)) {
+            trueNativeSwap.markVenueUnavailable('LIFINITY', 5 * 60_000);
+            const fallbackRoute = pickBestNonLifinityFallback(selectedRoute);
+            if (fallbackRoute) {
+              logger.warn('useNativeSwap', 'Lifinity is frozen; retrying with native fallback venue', {
+                originalVenue: selectedRoute.venue,
+                fallbackVenue: fallbackRoute.venue,
+              });
+              selectedRoute = fallbackRoute;
+              setTrueNativeRoute(selectedRoute);
+              result = await build(selectedRoute);
+            } else {
+              throw buildErr;
+            }
+          } else {
+            throw buildErr;
+          }
+        }
 
         if (!result) {
           throw new Error("Impossible de construire la transaction native");
+        }
+
+        const isMeteoraSlippage6003 = (err: unknown): boolean => {
+          const s = (() => {
+            try {
+              return JSON.stringify(err);
+            } catch {
+              return String(err);
+            }
+          })();
+          return /"Custom"\s*:\s*6003/.test(s) || /0x1773/.test(s);
+        };
+
+        // Simulation AVANT signature (SIMULATE FIRST)
+        let sim = await connection.simulateTransaction(result.transaction, {
+          sigVerify: false,
+          // Simuler EXACTEMENT ce qui sera signé/envoyé.
+          replaceRecentBlockhash: false,
+        });
+
+        // Fallback strictement NATIVE: Lifinity peut être "frozen" (upstream).
+        // Si la simulation échoue sur Lifinity et qu'on a une alternative non-Lifinity, retenter.
+        if (sim.value.err && selectedRoute.venue === 'LIFINITY') {
+          const frozenBySim = isProgramFrozenError({ err: sim.value.err, logs: sim.value.logs?.slice(-40) ?? [] });
+          if (frozenBySim) {
+            trueNativeSwap.markVenueUnavailable('LIFINITY', 5 * 60_000);
+            const fallbackRoute = pickBestNonLifinityFallback(selectedRoute);
+            if (fallbackRoute) {
+              logger.warn('useNativeSwap', 'Lifinity simulation indicates frozen program; retrying with native fallback venue', {
+                originalVenue: selectedRoute.venue,
+                fallbackVenue: fallbackRoute.venue,
+              });
+
+              const rebuilt = await trueNativeSwap.buildNativeSwapTransaction({
+                inputMint: safeInputMint,
+                outputMint: safeOutputMint,
+                amountIn: params.amount,
+                minAmountOut: 0,
+                slippageBps,
+                userPublicKey: publicKey,
+                routeOverride: fallbackRoute,
+              });
+
+              if (rebuilt) {
+                const fallbackSim = await connection.simulateTransaction(rebuilt.transaction, {
+                  sigVerify: false,
+                  replaceRecentBlockhash: false,
+                });
+
+                if (!fallbackSim.value.err) {
+                  selectedRoute = rebuilt.route;
+                  setTrueNativeRoute(selectedRoute);
+                  result = rebuilt;
+                  sim = fallbackSim;
+                }
+              }
+            }
+          }
+        }
+
+        // Fallback strictement NATIVE: si Meteora échoue en slippage (6003), retenter Orca.
+        if (sim.value.err && selectedRoute.venue === 'METEORA_DLMM' && isMeteoraSlippage6003(sim.value.err)) {
+          const orcaQuote = selectedRoute.allQuotes?.find((q) => q.venue === 'ORCA_WHIRLPOOL');
+          if (orcaQuote) {
+            const fallbackRoute: TrueNativeRoute = {
+              ...selectedRoute,
+              venue: orcaQuote.venue,
+              venueProgramId: orcaQuote.venueProgramId,
+              outputAmount: orcaQuote.outputAmount,
+              priceImpactBps: orcaQuote.priceImpactBps,
+              dexAccounts: orcaQuote.accounts,
+            };
+
+            logger.warn('useNativeSwap', 'Meteora simulation failed with slippage; retrying with Orca', {
+              originalVenue: selectedRoute.venue,
+              fallbackVenue: fallbackRoute.venue,
+              meteoraOut: selectedRoute.outputAmount,
+              orcaOut: fallbackRoute.outputAmount,
+            });
+
+            const rebuilt = await trueNativeSwap.buildNativeSwapTransaction({
+              inputMint: safeInputMint,
+              outputMint: safeOutputMint,
+              amountIn: params.amount,
+              minAmountOut: 0,
+              slippageBps,
+              userPublicKey: publicKey,
+              routeOverride: fallbackRoute,
+            });
+
+            if (rebuilt) {
+              const fallbackSim = await connection.simulateTransaction(rebuilt.transaction, {
+                sigVerify: false,
+                replaceRecentBlockhash: false,
+              });
+
+              if (!fallbackSim.value.err) {
+                setTrueNativeRoute(rebuilt.route);
+                result = rebuilt;
+                sim = fallbackSim;
+              }
+            }
+          }
+        }
+
+        if (sim.value.err) {
+          const logsTail = sim.value.logs?.slice(-30) ?? [];
+          throw new Error(
+            `Simulation du swap natif échouée: ${JSON.stringify(sim.value.err)}` +
+              (logsTail.length ? `\nLogs (tail):\n${logsTail.join("\n")}` : "")
+          );
         }
 
         // Signer
         params.onProgress?.('signing');
         const signedTx = await signTransaction(result.transaction);
 
-        // Envoyer
-        params.onProgress?.('sending');
-        const signature = await connection.sendTransaction(signedTx, {
-          skipPreflight: false,
-          preflightCommitment: 'confirmed',
-        });
+        const sendAndConfirm = async (ctx: {
+          signed: VersionedTransaction;
+          blockhash: string;
+          lastValidBlockHeight: number;
+        }): Promise<string> => {
+          const waitForSignature = async (signature: string, timeoutMs: number): Promise<"confirmed" | "finalized" | "unknown"> => {
+            const start = Date.now();
 
-        logger.info("useNativeSwap", "True native tx sent", { signature });
+            while (Date.now() - start < timeoutMs) {
+              // Stop tôt si le blockhash est clairement expiré.
+              try {
+                const currentBlockHeight = await connection.getBlockHeight('confirmed');
+                if (currentBlockHeight > ctx.lastValidBlockHeight) {
+                  return 'unknown';
+                }
+              } catch {
+                // ignore transient
+              }
 
-        // Confirmer
-        params.onProgress?.('confirming');
-        const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+              try {
+                const st = await connection.getSignatureStatuses([signature], {
+                  searchTransactionHistory: true,
+                });
+                const v = st.value[0];
 
-        if (confirmation.value.err) {
-          throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+                if (v?.err) {
+                  throw new Error(`Transaction failed: ${JSON.stringify(v.err)}`);
+                }
+
+                if (v?.confirmationStatus === 'finalized') return 'finalized';
+                if (v?.confirmationStatus === 'confirmed') return 'confirmed';
+              } catch (e) {
+                // propagate hard failure
+                if (e instanceof Error && e.message.startsWith('Transaction failed:')) {
+                  throw e;
+                }
+              }
+
+              await new Promise((r) => setTimeout(r, 1000));
+            }
+
+            return 'unknown';
+          };
+
+          // Envoyer
+          params.onProgress?.('sending');
+          const signature = await connection.sendTransaction(ctx.signed, {
+            // Skip preflight car on a déjà simulé nous-mêmes
+            skipPreflight: true,
+            preflightCommitment: 'confirmed',
+            maxRetries: 3,
+          });
+
+          logger.info("useNativeSwap", "True native tx sent", {
+            signature,
+            blockhash: ctx.blockhash,
+            lastValidBlockHeight: ctx.lastValidBlockHeight,
+          });
+
+          // Confirmer SANS websocket: polling HTTP uniquement.
+          params.onProgress?.('confirming');
+          const status = await waitForSignature(signature, 35_000);
+          if (status === 'confirmed' || status === 'finalized') {
+            return signature;
+          }
+
+          // Statut inconnu: ne pas bloquer l'UI (souvent c'est juste un délai RPC).
+          // La UI/TransactionTracker peut continuer à poller et l'utilisateur peut vérifier l'explorer.
+          logger.warn("useNativeSwap", "Transaction sent but not confirmed within timeout (status unknown)", {
+            signature,
+            blockhash: ctx.blockhash,
+            lastValidBlockHeight: ctx.lastValidBlockHeight,
+          });
+
+          return signature;
+        };
+
+        let signature: string;
+        try {
+          signature = await sendAndConfirm({
+            signed: signedTx,
+            blockhash: result.blockhash,
+            lastValidBlockHeight: result.lastValidBlockHeight,
+          });
+        } catch (sendErr) {
+          let msg = sendErr instanceof Error ? sendErr.message : String(sendErr);
+          // Si l'échec vient du préflight (simulation RPC) après signature,
+          // récupérer les logs complets pour isoler le programme/instruction fautif.
+          if (sendErr instanceof SendTransactionError) {
+            try {
+              const logs = await sendErr.getLogs(connection);
+              if (logs?.length) {
+                msg += `\nLogs (preflight):\n${logs.join("\n")}`;
+              }
+            } catch {
+              // ignore
+            }
+          }
+          const normalizedSend = msg.toLowerCase();
+
+          // Cas fréquent: l'utilisateur a mis trop de temps → blockhash expiré
+          if (
+            normalizedSend.includes('blockhash not found') ||
+            normalizedSend.includes('blockhashnotfound') ||
+            normalizedSend.includes('transactionexpiredblockheightexceeded') ||
+            normalizedSend.includes('expired')
+          ) {
+            logger.warn("useNativeSwap", "Blockhash expired after signature; rebuilding once", {
+              error: msg,
+            });
+
+            // Rebuild + re-simulate + re-sign (1x)
+            result = await build(selectedRoute);
+            if (!result) {
+              throw new Error("Impossible de reconstruire la transaction native");
+            }
+
+            const sim2 = await connection.simulateTransaction(result.transaction, {
+              sigVerify: false,
+              replaceRecentBlockhash: false,
+            });
+            if (sim2.value.err) {
+              const logsTail2 = sim2.value.logs?.slice(-30) ?? [];
+              throw new Error(
+                `Simulation du swap natif échouée (retry): ${JSON.stringify(sim2.value.err)}` +
+                  (logsTail2.length ? `\nLogs (tail):\n${logsTail2.join("\n")}` : "")
+              );
+            }
+
+            params.onProgress?.('signing');
+            const signedTx2 = await signTransaction(result.transaction);
+            signature = await sendAndConfirm({
+              signed: signedTx2,
+              blockhash: result.blockhash,
+              lastValidBlockHeight: result.lastValidBlockHeight,
+            });
+          } else if (
+            normalizedSend.includes('block height exceeded') ||
+            normalizedSend.includes('transactionexpiredblockheightexceeded')
+          ) {
+            // Si l'expiration survient pendant confirm, on tente 1 rebuild+resign supplémentaire.
+            logger.warn("useNativeSwap", "Tx expired during confirmation; rebuilding once", {
+              error: msg,
+            });
+
+            result = await build(selectedRoute);
+            if (!result) {
+              throw new Error("Impossible de reconstruire la transaction native");
+            }
+
+            const sim2 = await connection.simulateTransaction(result.transaction, {
+              sigVerify: false,
+              replaceRecentBlockhash: false,
+            });
+            if (sim2.value.err) {
+              const logsTail2 = sim2.value.logs?.slice(-30) ?? [];
+              throw new Error(
+                `Simulation du swap natif échouée (retry): ${JSON.stringify(sim2.value.err)}` +
+                  (logsTail2.length ? `\nLogs (tail):\n${logsTail2.join("\n")}` : "")
+              );
+            }
+
+            params.onProgress?.('signing');
+            const signedTx2 = await signTransaction(result.transaction);
+            signature = await sendAndConfirm({
+              signed: signedTx2,
+              blockhash: result.blockhash,
+              lastValidBlockHeight: result.lastValidBlockHeight,
+            });
+          } else {
+            throw sendErr;
+          }
         }
 
         // Succès !
@@ -561,13 +1011,13 @@ export function useNativeSwap() {
         const swapResult: NativeSwapResult = {
           signature,
           inputAmount: params.amount,
-          outputAmount: route.outputAmount,
+          outputAmount: selectedRoute.outputAmount,
           inputMint: safeInputMint.toBase58(),
           outputMint: safeOutputMint.toBase58(),
-          venues: [route.venue],
-          rebateAmount: calculateBoostedRebate(route.outputAmount * 0.001, userBoostBps).boostedRebate,
+          venues: [selectedRoute.venue],
+          rebateAmount: calculateBoostedRebate(selectedRoute.outputAmount * 0.001, userBoostBps).boostedRebate,
           boostApplied: userBoostBps,
-          npiGenerated: route.outputAmount * 0.001,
+          npiGenerated: selectedRoute.outputAmount * 0.001,
           success: true,
         };
 
@@ -575,8 +1025,8 @@ export function useNativeSwap() {
 
         logger.info("useNativeSwap", "🔥 TRUE native swap completed!", {
           signature,
-          venue: route.venue,
-          outputAmount: route.outputAmount,
+          venue: selectedRoute.venue,
+          outputAmount: selectedRoute.outputAmount,
         });
 
         return swapResult;
@@ -584,13 +1034,21 @@ export function useNativeSwap() {
         const message = err instanceof Error ? err.message : "Erreur lors du swap natif";
         const normalized = message.toLowerCase();
 
+        const phoenixLike =
+          normalized.includes("phoenix") ||
+          normalized.includes("ioc") ||
+          normalized.includes("0xf") ||
+          normalized.includes("min_quote_lots_to_fill") ||
+          normalized.includes("phoenixinstruction::swap");
+
         // Log detailed error for debugging
         logger.error("useNativeSwap", "True native swap error", {
           error: message,
           stack: err instanceof Error ? err.stack : null,
           inputMint: params.inputMint?.toString?.() ?? "unknown",
           outputMint: params.outputMint?.toString?.() ?? "unknown",
-          venue: trueNativeRoute?.venue,
+          // trueNativeRoute peut être stale dans un catch; garder un fallback sur la quote courante si possible.
+          venue: trueNativeRoute?.venue ?? (currentQuote as any)?.venue ?? undefined,
         });
 
         // Check for specific error types and provide helpful messages
@@ -604,8 +1062,17 @@ export function useNativeSwap() {
             "Oracle obsolète ou non disponible pour cette paire. " +
             "Cette paire n'est pas supportée par le routage natif."
           );
+        } else if (
+          normalized.includes("amountoutbelowminimum") ||
+          normalized.includes("0x1794") ||
+          normalized.includes("6036")
+        ) {
+          setError(
+            "Le minimum reçu (minOut) est trop élevé pour l'état actuel du pool Orca. " +
+            "Actualisez la quote et/ou augmentez légèrement le slippage."
+          );
         } else if (normalized.includes("0x65") || normalized.includes("instructionfallbacknotfound")) {
-          // Log warning but DO NOT fallback to Jupiter per user request
+          // Warning: pas de fallback automatique
           logger.warn("useNativeSwap", "Dynamic Plan instruction error", {
             venue: trueNativeRoute?.venue,
           });
@@ -613,10 +1080,23 @@ export function useNativeSwap() {
             "Erreur d'instruction Dynamic Plan. " +
             "Veuillez réessayer ou contacter le support."
           );
-        } else if (normalized.includes("insufficient") || normalized.includes("0x1")) {
+        } else if (
+          normalized.includes("custom:40") ||
+          normalized.includes("0x28") ||
+          normalized.includes("insufficient funds") ||
+          (normalized.includes("insufficient") && !normalized.includes("oraclestale")) ||
+          normalized.includes("0x1")
+        ) {
           setError(
-            "Solde insuffisant pour effectuer ce swap. " +
-            "Vérifiez que vous avez assez de tokens."
+            "Simulation échouée: fonds insuffisants (Raydium/Router). " +
+              "Causes fréquentes: (1) solde USDC insuffisant sur votre compte associé (ATA) utilisé par le swap, " +
+              "surtout si vous utilisez MAX; (2) pas assez de SOL pour payer les frais réseau/créations de comptes. " +
+              "Essayez de réduire légèrement le montant et assurez-vous d'avoir un petit solde SOL pour les frais."
+          );
+        } else if (phoenixLike) {
+          setError(
+            "Phoenix est temporairement désactivé pour le swap natif (IOC/0xF). " +
+              "Veuillez réessayer: une autre venue (Meteora/Orca/Raydium) sera utilisée si disponible."
           );
         } else {
           setError(message);
@@ -769,7 +1249,7 @@ export function useNativeSwap() {
       const decision = decideSwapRoute({
         inputMint: inputStr,
         outputMint: outputStr,
-        hasJupiterCpi: true, // Présumé pour le check UI
+        hasJupiterCpi: true,
       });
       
       return decision.route === "native";
@@ -802,7 +1282,7 @@ export function useNativeSwap() {
     validateOraclePrices,
     isPairSupported,
     
-    // 🔥 Vrai routage natif (sans Jupiter)
+    // 🔥 Vrai routage natif (direct DEX CPI)
     useTrueNativeRouting,
     setUseTrueNativeRouting,
     executeTrueNativeSwap,

@@ -22,6 +22,8 @@
  */
 
 import {
+  AddressLookupTableAccount,
+  AddressLookupTableProgram,
   ComputeBudgetProgram,
   Connection,
   Keypair,
@@ -50,6 +52,8 @@ import {
   type SupportedVenue,
 } from "../app/src/lib/native-router/dex/DEXAccountResolvers";
 
+import { invalidateALTCache } from "../app/src/lib/alt/swapbackALT";
+
 const USDT_MINT = new PublicKey("Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB");
 
 type SwapCase = {
@@ -58,6 +62,85 @@ type SwapCase = {
   outputMint: PublicKey;
   amountInLamports: number;
 };
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise((r) => setTimeout(r, ms));
+}
+
+async function simulateTransactionWith429Retry(
+  connection: Connection,
+  tx: VersionedTransaction,
+  options: Parameters<Connection["simulateTransaction"]>[1],
+  label: string
+): Promise<Awaited<ReturnType<Connection["simulateTransaction"]>>> {
+  const delaysMs = [500, 1000, 2000, 4000, 8000, 12000];
+  let lastErr: unknown;
+
+  for (let i = 0; i < delaysMs.length; i++) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      return await connection.simulateTransaction(tx, options as any);
+    } catch (e) {
+      lastErr = e;
+      const msg = e instanceof Error ? e.message : String(e);
+      const is429 = msg.includes("429") || msg.toLowerCase().includes("rate limit");
+      if (!is429) throw e;
+      console.log(`[simulate-native-swap] 429 rate-limited during simulate (${label}). Retrying in ${delaysMs[i]}ms...`);
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(delaysMs[i]);
+    }
+  }
+
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
+function dumpInnerTokenTransfers(sim: Awaited<ReturnType<Connection["simulateTransaction"]>>, tx: VersionedTransaction): void {
+  const value: any = (sim as any)?.value;
+  const inner = value?.innerInstructions as
+    | Array<{ index: number; instructions: Array<{ programIdIndex: number; accounts: number[]; data: string }> }>
+    | undefined;
+
+  if (!inner || inner.length === 0) return;
+
+  const msg = tx.message;
+  const keyForIndex = (i: number): string => {
+    try {
+      // @solana/web3.js: message.getAccountKeys() is available on v0 messages.
+      const keys = (msg as any).getAccountKeys?.();
+      const pubkey = keys?.get?.(i) ?? keys?.staticAccountKeys?.[i] ?? (msg as any).staticAccountKeys?.[i];
+      return pubkey?.toBase58?.() ?? String(pubkey ?? i);
+    } catch {
+      return String(i);
+    }
+  };
+
+  const tokenProgramIds = new Set([
+    TOKEN_PROGRAM_ID.toBase58(),
+    // Token-2022
+    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+  ]);
+
+  const tokenInners: Array<{ parentIx: number; programId: string; accounts: string[]; data: string }> = [];
+  for (const group of inner) {
+    for (const ix of group.instructions ?? []) {
+      const programId = keyForIndex(ix.programIdIndex);
+      if (!tokenProgramIds.has(programId)) continue;
+      tokenInners.push({
+        parentIx: group.index,
+        programId,
+        accounts: (ix.accounts ?? []).map((a) => keyForIndex(a)),
+        data: ix.data,
+      });
+    }
+  }
+
+  if (tokenInners.length === 0) return;
+
+  console.log("--- inner SPL token instructions (debug) ---");
+  for (const ix of tokenInners.slice(0, 12)) {
+    console.log(JSON.stringify(ix, null, 2));
+  }
+}
 
 function tryAutoCreateDefaultKeypair(defaultPath: string): boolean {
   try {
@@ -131,6 +214,28 @@ function parseArgs(argv: string[]): Record<string, string> {
   return out;
 }
 
+function resolveRpcUrl(rpcArg?: string): string {
+  const raw = (rpcArg ?? "").trim();
+  if (!raw) return "https://api.mainnet-beta.solana.com";
+
+  if (raw.toLowerCase() === "helius") {
+    const key =
+      process.env.NEXT_PUBLIC_HELIUS_API_KEY ||
+      process.env.HELIUS_API_KEY ||
+      "";
+    if (!key) {
+      throw new Error(
+        "RPC=helius demandé, mais aucune clé Helius trouvée. " +
+          "Définissez NEXT_PUBLIC_HELIUS_API_KEY ou HELIUS_API_KEY, " +
+          "ou passez une URL complète via SOLANA_RPC_URL/--rpc."
+      );
+    }
+    return `https://mainnet.helius-rpc.com/?api-key=${key}`;
+  }
+
+  return raw;
+}
+
 function parsePairsArg(pairsArg: string): SwapCase[] {
   // Format: MINT_IN:MINT_OUT[,MINT_IN:MINT_OUT]
   const rawPairs = pairsArg
@@ -175,21 +280,23 @@ function defaultMatrixCasesForVenue(venue: SupportedVenue, amountInLamports: num
 async function ensureAta(
   connection: Connection,
   payer: PublicKey,
+  owner: PublicKey,
   mint: PublicKey
 ): Promise<{ ata: PublicKey; ix?: ReturnType<typeof createAssociatedTokenAccountInstruction> }> {
-  const ata = await getAssociatedTokenAddress(mint, payer);
+  const ata = await getAssociatedTokenAddress(mint, owner);
   const info = await connection.getAccountInfo(ata);
   if (info) return { ata };
 
   return {
     ata,
-    ix: createAssociatedTokenAccountInstruction(payer, ata, payer, mint),
+    ix: createAssociatedTokenAccountInstruction(payer, ata, owner, mint),
   };
 }
 
 async function ensureWsolFunding(
   connection: Connection,
   payer: PublicKey,
+  owner: PublicKey,
   amountLamports: number
 ): Promise<{
   ata: PublicKey;
@@ -200,7 +307,7 @@ async function ensureWsolFunding(
   >;
 }> {
   const ixs: Array<any> = [];
-  const { ata, ix } = await ensureAta(connection, payer, SOL_MINT);
+  const { ata, ix } = await ensureAta(connection, payer, owner, SOL_MINT);
   if (ix) ixs.push(ix);
 
   let current = 0;
@@ -237,7 +344,20 @@ async function main() {
     .split(",")
     .map((v) => v.trim())
     .filter(Boolean) as SupportedVenue[];
-  const rpcUrl = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+
+  // Mode "supportedOnly": ne tester que les venues/paires explicitement validées (DoD) en natif.
+  // Objectif: obtenir un run stable (exit code 0) qui reflète le périmètre supporté.
+  const supportedOnlyMode = args.supportedOnly === "true" || args.supportedOnly === "1";
+
+  // Mode "bestRoute": reproduit le chemin UI (quote -> minOut -> build tx) au lieu de forcer une venue.
+  const bestRouteMode = args.bestRoute === "true";
+  // Mode "quoteOnly": ne construit pas la tx, ne simule pas. Sert à valider la sélection de route.
+  const quoteOnlyMode = args.quoteOnly === "true" || args.quoteOnly === "1";
+  // Mode "autoExtendAlt": si la tx dépasse la taille max v0, étend l'ALT SwapBack avec les comptes manquants,
+  // puis rebuild + retry. (⚠️ envoie des transactions MAINNET, payer=feePayer)
+  const autoExtendAltMode = args.autoExtendAlt === "true" || args.autoExtendAlt === "1";
+
+  const rpcUrl = resolveRpcUrl(args.rpc ?? process.env.SOLANA_RPC_URL);
   const keypairPath = resolveKeypairPath({ autoCreate: autoCreateKeypair });
 
   const matrixMode = args.matrix === "true";
@@ -252,34 +372,67 @@ async function main() {
   const singleOutputMint = new PublicKey(args.outputMint ?? USDC_MINT.toBase58());
 
   const connection = new Connection(rpcUrl, "confirmed");
-  const user = loadKeypair(keypairPath);
+  const feePayer = loadKeypair(keypairPath);
+  // NOTE: pour simuler fidèlement une tx swap, on doit pouvoir signer en tant que `user`.
+  // Ce script n'a accès qu'à la keypair du fee payer; on force donc `user=feePayer`.
+  // Si vous voulez simuler un autre user, exécutez le script avec sa keypair.
+  const user = feePayer;
+  const userPublicKey = feePayer.publicKey;
 
-  const payerInfo = await connection.getAccountInfo(user.publicKey);
+  const payerInfo = await connection.getAccountInfo(feePayer.publicKey);
   if (!payerInfo) {
     console.error("\n[simulate-native-swap] Fee payer account does not exist on-chain (likely 0 SOL / never funded).\n" +
       `Fund this address with a small amount of SOL, then re-run:\n` +
-      `  ${user.publicKey.toBase58()}\n` +
+      `  ${feePayer.publicKey.toBase58()}\n` +
       `Tip: you can set SOLANA_KEYPAIR to an already-funded wallet keypair.\n`
     );
     process.exitCode = 1;
     return;
   }
 
-  const payerLamports = await connection.getBalance(user.publicKey);
+  const payerLamports = await connection.getBalance(feePayer.publicKey);
   console.log("Payer balance (lamports):", payerLamports);
 
   console.log("RPC:", rpcUrl);
-  console.log("User:", user.publicKey.toBase58());
+  console.log("Fee payer:", feePayer.publicKey.toBase58());
+  console.log("User:", userPublicKey.toBase58());
   console.log("Venues:", venues.join(","));
-  console.log("Mode:", matrixMode ? "matrix" : "single");
-  if (!matrixMode) {
+  console.log("Mode:", bestRouteMode ? "bestRoute" : matrixMode ? "matrix" : "single");
+  if (supportedOnlyMode) {
+    console.log("SupportedOnly:", "true");
+  }
+  if (quoteOnlyMode) {
+    console.log("QuoteOnly:", "true");
+  }
+  if (autoExtendAltMode) {
+    console.log("AutoExtendALT:", "true");
+  }
+  if (pairsOverride) {
+    console.log("Pairs override (--pairs):", args.pairs);
+  } else if (!matrixMode) {
     console.log("InputMint:", singleInputMint.toBase58());
     console.log("OutputMint:", singleOutputMint.toBase58());
   }
 
+  // ALT (read-only): si présent, on l'utilise pour compresser les tx v0 (évite les "tx too large").
+  // Important: en dehors de `--autoExtendAlt`, cela ne fait AUCUNE écriture on-chain.
+  let altForV0: AddressLookupTableAccount | null = null;
+  const altAddressStr = process.env.NEXT_PUBLIC_SWAPBACK_ALT_ADDRESS;
+  if (altAddressStr) {
+    try {
+      const altAddress = new PublicKey(altAddressStr);
+      const altAcc = await connection.getAddressLookupTable(altAddress);
+      altForV0 = altAcc.value ?? null;
+      console.log("ALT:", altForV0 ? altAddress.toBase58() : "not found");
+    } catch {
+      console.warn("ALT: invalid NEXT_PUBLIC_SWAPBACK_ALT_ADDRESS; ignoring.");
+      altForV0 = null;
+    }
+  }
+
   const swapper = new TrueNativeSwap(connection);
 
-  const summary: Array<{ venue: string; caseName: string; status: "OK" | "FAIL" | "XFAIL"; error?: string }> = [];
+  const summary: Array<{ venue: string; caseName: string; status: "OK" | "FAIL" | "XFAIL" | "SKIP"; error?: string }> = [];
 
   const isProgramFrozen = (err: unknown, logs?: string[] | null): boolean => {
     const errStr = err ? JSON.stringify(err) : "";
@@ -292,12 +445,21 @@ async function main() {
     return logHit;
   };
 
-  for (const venue of venues) {
-    const cases: SwapCase[] = matrixMode
-      ? (pairsOverride
-          ? pairsOverride.map((c) => ({ ...c, amountInLamports }))
-          : defaultMatrixCasesForVenue(venue, amountInLamports))
-      : [{ name: "single", inputMint: singleInputMint, outputMint: singleOutputMint, amountInLamports }];
+  // En mode bestRoute, on ne force pas une venue: on simule une seule route "best" par case.
+  const SUPPORTED_ONLY_VENUES: SupportedVenue[] = ["ORCA_WHIRLPOOL", "METEORA_DLMM"];
+  const venuesToRun = bestRouteMode
+    ? (["BEST_ROUTE"] as any as SupportedVenue[])
+    : supportedOnlyMode
+      ? venues.filter((v) => SUPPORTED_ONLY_VENUES.includes(v))
+      : venues;
+
+  for (const venue of venuesToRun) {
+    // NOTE: `--pairs` doit être honoré même sans `--matrix=true` (notamment en bestRoute).
+    const cases: SwapCase[] = pairsOverride
+      ? pairsOverride.map((c) => ({ ...c, amountInLamports }))
+      : matrixMode
+        ? defaultMatrixCasesForVenue(venue, amountInLamports)
+        : [{ name: "single", inputMint: singleInputMint, outputMint: singleOutputMint, amountInLamports }];
 
     for (const swapCase of cases) {
       console.log("\n============================================================");
@@ -305,9 +467,286 @@ async function main() {
       console.log("InputMint:", swapCase.inputMint.toBase58());
       console.log("OutputMint:", swapCase.outputMint.toBase58());
 
+      if (bestRouteMode) {
+        // 1) Quote best venue
+        const route = await swapper.getBestNativeRoute({
+          inputMint: swapCase.inputMint,
+          outputMint: swapCase.outputMint,
+          amountIn: swapCase.amountInLamports,
+          minAmountOut: 0,
+          slippageBps,
+          userPublicKey,
+        });
+
+        if (!route) {
+          const msg = "No native route available (pair unsupported or all quotes failed)";
+          console.log(msg);
+          summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "FAIL", error: msg });
+          process.exitCode = 1;
+          continue;
+        }
+
+        const minAmountOutUi = Math.floor(route.outputAmount * (10000 - slippageBps) / 10000);
+        console.log("Best venue:", route.venue);
+        if ((route as any).multiHop) {
+          const mh = (route as any).multiHop as {
+            intermediateMint: PublicKey;
+            firstLeg: { route: { venue: string }; amountIn: number; minAmountOut: number };
+            secondLeg: { route: { venue: string }; amountIn: number; minAmountOut: number };
+          };
+          console.log("Best route:", "MULTI_HOP_VIA_USDC");
+          console.log("Multi-hop legs:", [mh.firstLeg.route.venue, mh.secondLeg.route.venue]);
+          console.log("Leg1 amountIn/minOut:", mh.firstLeg.amountIn, mh.firstLeg.minAmountOut);
+          console.log("Leg2 amountIn/minOut:", mh.secondLeg.amountIn, mh.secondLeg.minAmountOut);
+          console.log("IntermediateMint:", mh.intermediateMint.toBase58());
+        } else {
+          console.log("Best route:", "DIRECT");
+        }
+        console.log("Quote outputAmount:", route.outputAmount);
+        console.log("UI minAmountOut:", minAmountOutUi);
+        console.log(
+          "All quotes:",
+          route.allQuotes.map((q) => ({ venue: q.venue, out: q.outputAmount, pi: q.priceImpactBps }))
+        );
+
+        if (quoteOnlyMode) {
+          summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "OK" });
+          continue;
+        }
+
+        // 2) Build transaction exactly like the app
+        let built: Awaited<ReturnType<typeof swapper.buildNativeSwapTransaction>>;
+        try {
+          built = await swapper.buildNativeSwapTransaction({
+            inputMint: swapCase.inputMint,
+            outputMint: swapCase.outputMint,
+            amountIn: swapCase.amountInLamports,
+            // Comme l'app: minOut est dérivé côté builder à partir de routeOverride + slippage.
+            minAmountOut: 0,
+            slippageBps,
+            userPublicKey: user.publicKey,
+            routeOverride: route,
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          const isMissingInput = /No initialized token account found for input mint/i.test(msg);
+          if (isMissingInput) {
+            console.log(`[simulate-native-swap] SKIP venue=BEST_ROUTE case=${swapCase.name}: ${msg}`);
+            summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "SKIP", error: msg });
+            continue;
+          }
+          console.log(`[simulate-native-swap] FAIL venue=BEST_ROUTE case=${swapCase.name}: ${msg}`);
+          summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "FAIL", error: msg });
+          process.exitCode = 1;
+          continue;
+        }
+
+        if (!built) {
+          const msg = "Failed to build transaction";
+          console.log(msg);
+          summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "FAIL", error: msg });
+          process.exitCode = 1;
+          continue;
+        }
+
+        const tx = built.transaction;
+        const trySign = (): { ok: true } | { ok: false; error: unknown } => {
+          try {
+            tx.sign([user]);
+            return { ok: true };
+          } catch (e) {
+            return { ok: false, error: e };
+          }
+        };
+
+        const firstSign = trySign();
+        if (!firstSign.ok) {
+          const e = firstSign.error;
+          const msg = e instanceof Error ? e.message : String(e);
+          const isTooLarge = msg.toLowerCase().includes("encoding overruns") || msg.toLowerCase().includes("transaction too large");
+
+          if (!autoExtendAltMode || !isTooLarge) {
+            console.error("Failed to sign/serialize transaction (likely too large):", e);
+            summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "FAIL", error: "sign_failed" });
+            process.exitCode = 1;
+            continue;
+          }
+
+          const altAddressStr = process.env.NEXT_PUBLIC_SWAPBACK_ALT_ADDRESS;
+          if (!altAddressStr) {
+            console.error("AutoExtendALT requested but NEXT_PUBLIC_SWAPBACK_ALT_ADDRESS is not set.");
+            summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "FAIL", error: "alt_missing" });
+            process.exitCode = 1;
+            continue;
+          }
+
+          console.log("[autoExtendAlt] Tx too large. Attempting to extend SwapBack ALT and retry...");
+
+          const altAddress = new PublicKey(altAddressStr);
+          const altAcc = await connection.getAddressLookupTable(altAddress);
+          if (!altAcc.value) {
+            console.error("[autoExtendAlt] ALT not found on-chain:", altAddress.toBase58());
+            summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "FAIL", error: "alt_not_found" });
+            process.exitCode = 1;
+            continue;
+          }
+
+          const altState = altAcc.value.state;
+          const authority = altState.authority;
+          if (!authority || !authority.equals(feePayer.publicKey)) {
+            console.error("[autoExtendAlt] ALT authority mismatch. Expected:", feePayer.publicKey.toBase58(), "got:", authority?.toBase58() ?? null);
+            summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "FAIL", error: "alt_authority_mismatch" });
+            process.exitCode = 1;
+            continue;
+          }
+
+          const altSet = new Set(altState.addresses.map((a) => a.toBase58()));
+          const numSigners = (tx.message as any).header?.numRequiredSignatures ?? 1;
+          const staticKeys: PublicKey[] = (tx.message as any).staticAccountKeys ?? [];
+
+          const candidates = staticKeys.slice(numSigners);
+          const missing = candidates.filter((k) => !altSet.has(k.toBase58()));
+
+          if (missing.length === 0) {
+            console.warn("[autoExtendAlt] No missing non-signer static keys to add; cannot reduce tx size further via ALT.");
+            summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "FAIL", error: "alt_no_missing" });
+            process.exitCode = 1;
+            continue;
+          }
+
+          console.log("[autoExtendAlt] Missing addresses to add:", missing.length);
+
+          const MAX_ADDRESSES_PER_TX = 30;
+          for (let i = 0; i < missing.length; i += MAX_ADDRESSES_PER_TX) {
+            const chunk = missing.slice(i, i + MAX_ADDRESSES_PER_TX);
+            console.log(`[autoExtendAlt] Extending ALT (${i}/${missing.length}) with ${chunk.length} addresses...`);
+
+            const extendIx = AddressLookupTableProgram.extendLookupTable({
+              payer: feePayer.publicKey,
+              authority: feePayer.publicKey,
+              lookupTable: altAddress,
+              addresses: chunk,
+            });
+
+            const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+            const msg = new TransactionMessage({
+              payerKey: feePayer.publicKey,
+              recentBlockhash: blockhash,
+              instructions: [
+                ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
+                extendIx,
+              ],
+            }).compileToV0Message();
+
+            const vtx = new VersionedTransaction(msg);
+            vtx.sign([feePayer]);
+
+            const sig = await connection.sendTransaction(vtx, {
+              skipPreflight: false,
+              maxRetries: 3,
+            });
+            console.log("[autoExtendAlt] Sent:", sig);
+
+            await connection.confirmTransaction(
+              { signature: sig, blockhash, lastValidBlockHeight },
+              "confirmed"
+            );
+          }
+
+          // Invalider le cache ALT (sinon build réutilise l'ancienne version)
+          invalidateALTCache();
+
+          // Rebuild + retry
+          const rebuilt = await swapper.buildNativeSwapTransaction({
+            inputMint: swapCase.inputMint,
+            outputMint: swapCase.outputMint,
+            amountIn: swapCase.amountInLamports,
+            minAmountOut: 0,
+            slippageBps,
+            userPublicKey: user.publicKey,
+            routeOverride: route,
+          });
+
+          if (!rebuilt) {
+            const msg = "Failed to rebuild transaction after ALT extend";
+            console.log(msg);
+            summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "FAIL", error: msg });
+            process.exitCode = 1;
+            continue;
+          }
+
+          const tx2 = rebuilt.transaction;
+          try {
+            tx2.sign([user]);
+          } catch (e2) {
+            console.error("[autoExtendAlt] Still failed to sign/serialize after ALT extend:", e2);
+            summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "FAIL", error: "sign_failed_after_alt" });
+            process.exitCode = 1;
+            continue;
+          }
+
+          const sim2 = await simulateTransactionWith429Retry(connection, tx2, {
+            sigVerify: false,
+            replaceRecentBlockhash: true,
+          }, "bestRoute(afterAlt)");
+
+          console.log("Simulation err:", sim2.value.err);
+          console.log("Units:", sim2.value.unitsConsumed);
+          if (sim2.value.logs) {
+            const head = 400;
+            console.log(`--- logs (first ${head}) ---`);
+            for (const line of sim2.value.logs.slice(0, head)) {
+              console.log(line);
+            }
+            if (sim2.value.logs.length > head) {
+              console.log(`... (${sim2.value.logs.length - head} more)`);
+            }
+          }
+          if (sim2.value.err) {
+            dumpInnerTokenTransfers(sim2, tx2);
+            summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "FAIL", error: JSON.stringify(sim2.value.err) });
+            process.exitCode = 1;
+          } else {
+            summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "OK" });
+          }
+
+          continue;
+        }
+
+        const sim = await simulateTransactionWith429Retry(connection, tx, {
+          sigVerify: false,
+          replaceRecentBlockhash: true,
+        }, "bestRoute");
+
+        console.log("Simulation err:", sim.value.err);
+        console.log("Units:", sim.value.unitsConsumed);
+        if (sim.value.logs) {
+          const head = 400;
+          console.log(`--- logs (first ${head}) ---`);
+          for (const line of sim.value.logs.slice(0, head)) {
+            console.log(line);
+          }
+          if (sim.value.logs.length > head) {
+            console.log(`... (${sim.value.logs.length - head} more)`);
+          }
+        }
+
+        if (sim.value.err) {
+          dumpInnerTokenTransfers(sim, tx);
+        }
+
+        if (sim.value.err) {
+          summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "FAIL", error: JSON.stringify(sim.value.err) });
+          process.exitCode = 1;
+        } else {
+          summary.push({ venue: "BEST_ROUTE", caseName: swapCase.name, status: "OK" });
+        }
+        continue;
+      }
+
       let dex: Awaited<ReturnType<typeof getDEXAccounts>>;
       try {
-        dex = await getDEXAccounts(connection, venue, swapCase.inputMint, swapCase.outputMint, user.publicKey);
+        dex = await getDEXAccounts(connection, venue, swapCase.inputMint, swapCase.outputMint, userPublicKey);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.log(`DEX resolver threw for venue=${venue} case=${swapCase.name}: ${msg}`);
@@ -355,28 +794,81 @@ async function main() {
 
       // Input prep
       if (swapCase.inputMint.equals(SOL_MINT)) {
-        const wsol = await ensureWsolFunding(connection, user.publicKey, swapCase.amountInLamports);
+        const wsol = await ensureWsolFunding(connection, feePayer.publicKey, userPublicKey, swapCase.amountInLamports);
         instructions.push(...wsol.ixs);
       } else {
-        const inAta = await ensureAta(connection, user.publicKey, swapCase.inputMint);
+        const inAta = await ensureAta(connection, feePayer.publicKey, userPublicKey, swapCase.inputMint);
         if (inAta.ix) instructions.push(inAta.ix);
+
+        // Precheck: évite d'interpréter un manque de funds comme un bug router/DEX.
+        try {
+          const bal = await connection.getTokenAccountBalance(inAta.ata);
+          const current = BigInt(bal.value.amount);
+          const needed = BigInt(swapCase.amountInLamports);
+
+          const requiredUi = (
+            swapCase.amountInLamports / Math.pow(10, bal.value.decimals)
+          ).toLocaleString("en-US", { maximumFractionDigits: bal.value.decimals });
+
+          console.log(
+            `[precheck] input ATA=${inAta.ata.toBase58()} balance=${bal.value.uiAmountString} required=${requiredUi}`
+          );
+
+          if (current < needed) {
+            const msg =
+              `Insufficient input funds in ATA ${inAta.ata.toBase58()} ` +
+              `(have ${bal.value.uiAmountString}, need ${requiredUi}).`;
+            console.log(`[simulate-native-swap] FAIL venue=${venue} case=${swapCase.name}: ${msg}`);
+            summary.push({ venue, caseName: swapCase.name, status: "FAIL", error: msg });
+            process.exitCode = 1;
+            continue;
+          }
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.log(
+            `[simulate-native-swap] WARN: could not fetch input token balance for ATA=${inAta.ata.toBase58()}: ${msg}`
+          );
+        }
       }
 
       // Output ATA
-      const outAta = await ensureAta(connection, user.publicKey, swapCase.outputMint);
+      const outAta = await ensureAta(connection, feePayer.publicKey, userPublicKey, swapCase.outputMint);
       if (outAta.ix) instructions.push(outAta.ix);
 
     // NOTE: En mode native direct DEX (useDynamicPlan=false), le SwapPlan est optionnel.
     // Éviter de créer un plan dans le simulateur pour limiter la taille de tx (pas d'écriture on-chain).
 
-      const swapIx = await swapper.buildNativeSwapInstruction(user.publicKey, forcedRoute as any, {
-        inputMint: swapCase.inputMint,
-        outputMint: swapCase.outputMint,
-        amountIn: swapCase.amountInLamports,
-        minAmountOut: minOut,
-        slippageBps,
-        userPublicKey: user.publicKey,
-      });
+      let swapIx: TransactionInstruction;
+      try {
+        swapIx = await swapper.buildNativeSwapInstruction(userPublicKey, forcedRoute as any, {
+          inputMint: swapCase.inputMint,
+          outputMint: swapCase.outputMint,
+          amountIn: swapCase.amountInLamports,
+          minAmountOut: minOut,
+          slippageBps,
+          userPublicKey,
+        });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        if (/Venue native temporairement d[ée]sactiv[ée]e/i.test(message)) {
+          console.log(`[simulate-native-swap] SKIP venue=${venue} case=${swapCase.name}: ${message}`);
+          summary.push({ venue, caseName: swapCase.name, status: "SKIP", error: message });
+          continue;
+        }
+        throw e;
+      }
+
+      // Debug: vérifier quels comptes le router reçoit comme `user_token_account_a/b`.
+      // Si ceux-ci sont inversés, Meteora peut swapper dans le mauvais sens et échouer en slippage.
+      try {
+        const userA = swapIx.keys[4]?.pubkey;
+        const userB = swapIx.keys[5]?.pubkey;
+        console.log(`[debug] SwapToc user_token_account_a=${userA?.toBase58?.() ?? "?"}`);
+        console.log(`[debug] SwapToc user_token_account_b=${userB?.toBase58?.() ?? "?"}`);
+      } catch {
+        // ignore
+      }
+
       instructions.push(swapIx);
 
   // Debug (Lifinity): vérifier si `configAccount` est bien writable dans l'instruction outer (SwapToc).
@@ -395,10 +887,10 @@ async function main() {
 
     const { blockhash } = await connection.getLatestBlockhash();
     const msg = new TransactionMessage({
-      payerKey: user.publicKey,
+      payerKey: feePayer.publicKey,
       recentBlockhash: blockhash,
       instructions,
-    }).compileToV0Message();
+    }).compileToV0Message(altForV0 ? [altForV0] : []);
 
     console.log("Message staticAccountKeys:", msg.staticAccountKeys.length);
     console.log("Message addressTableLookups:", msg.addressTableLookups.length);
@@ -412,7 +904,9 @@ async function main() {
 
     const tx = new VersionedTransaction(msg);
     try {
-      tx.sign([user]);
+      // `sigVerify=false` dans simulateTransaction, on a seulement besoin d'une signature valide
+      // pour le fee payer; les autres signers peuvent rester en placeholder.
+      tx.sign([feePayer]);
     } catch (e) {
       console.error("Failed to sign/serialize transaction (likely too large):", e);
       process.exitCode = 1;
@@ -422,10 +916,68 @@ async function main() {
     const sim = await connection.simulateTransaction(tx, {
       sigVerify: false,
       replaceRecentBlockhash: true,
+      ...(venue === "METEORA_DLMM"
+        ? {
+            accounts: {
+              encoding: "base64" as const,
+              addresses: [
+                dex.accounts[2].toBase58(), // reserveX
+                dex.accounts[3].toBase58(), // reserveY
+                dex.accounts[4].toBase58(), // userTokenX
+                dex.accounts[5].toBase58(), // userTokenY
+              ],
+            },
+          }
+        : {}),
     });
 
     console.log("Simulation err:", sim.value.err);
     console.log("Units:", sim.value.unitsConsumed);
+
+    if (venue === "METEORA_DLMM" && (sim.value as any).accounts) {
+      try {
+        const { AccountLayout } = await import("@solana/spl-token");
+        const labels = ["reserveX", "reserveY", "userTokenX", "userTokenY"];
+        // `simulateTransaction` renvoie les comptes dans le même ordre que `accounts.addresses`.
+        const returned = (sim.value as any).accounts as Array<
+          | null
+          | {
+              data: [string, string];
+              owner: string;
+              lamports: number;
+              executable: boolean;
+              rentEpoch: number;
+            }
+        >;
+
+        console.log("--- post-sim accounts (Meteora) ---");
+        for (let i = 0; i < Math.min(labels.length, returned.length); i++) {
+          const acc = returned[i];
+          const label = labels[i];
+          const pk = [dex.accounts[2], dex.accounts[3], dex.accounts[4], dex.accounts[5]][i];
+          if (!acc) {
+            console.log(`${label}: ${pk.toBase58()} => null`);
+            continue;
+          }
+          const [b64] = acc.data;
+          const buf = Buffer.from(b64, "base64");
+          let mint = "?";
+          let amount = "?";
+          try {
+            const decoded = AccountLayout.decode(buf);
+            mint = new PublicKey(decoded.mint).toBase58();
+            amount = decoded.amount.toString();
+          } catch {
+            // not a token account
+          }
+          console.log(
+            `${label}: ${pk.toBase58()} owner=${acc.owner} len=${buf.length} mint=${mint} amount=${amount}`
+          );
+        }
+      } catch (e) {
+        console.log("[debug] Failed to decode post-sim accounts:", e);
+      }
+    }
     if (sim.value.logs) {
       const head = 400;
       console.log(`--- logs (first ${head}) ---`);
@@ -443,6 +995,10 @@ async function main() {
           console.log(line);
         }
       }
+    }
+
+    if (sim.value.err) {
+      dumpInnerTokenTransfers(sim, tx);
     }
 
       if (sim.value.err) {

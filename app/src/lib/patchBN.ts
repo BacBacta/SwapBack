@@ -15,6 +15,8 @@ const patchBNPrototype = (BNClass: BNish | typeof BNjs) => {
 
   const originalInitArray = BNPrototype._initArray;
 
+  let warnedEmptyBuffer = false;
+
   BNPrototype._initArray = function patchedInitArray(
     src: unknown,
     base?: number | 'hex',
@@ -39,11 +41,23 @@ const patchBNPrototype = (BNClass: BNish | typeof BNjs) => {
 
     if (length === 0) {
       const safeBuffer = typeof Buffer !== 'undefined' ? Buffer.from([0]) : new Uint8Array([0]);
-      console.warn('[BNGuard] Empty buffer received; injecting zero byte to prevent assertion', {
-        base,
-        endian,
-        stack: process.env.NODE_ENV !== 'production' ? new Error().stack : undefined,
-      });
+      if (!warnedEmptyBuffer) {
+        warnedEmptyBuffer = true;
+        // En prod, ce cas peut arriver (buffers vides) et le patch l'absorbe.
+        // Ne pas polluer la console avec un warn utilisateur.
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('[BNGuard] Empty buffer received; injecting zero byte to prevent assertion', {
+            base,
+            endian,
+            stack: new Error().stack,
+          });
+        } else {
+          console.debug('[BNGuard] Empty buffer received; injecting zero byte to prevent assertion', {
+            base,
+            endian,
+          });
+        }
+      }
       return originalInitArray.call(this, safeBuffer, base, endian);
     }
 

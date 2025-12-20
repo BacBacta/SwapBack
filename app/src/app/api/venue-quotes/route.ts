@@ -30,12 +30,32 @@ interface QuoteResponse {
 }
 
 // Helper pour les headers CORS
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'GET,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Requested-With',
-  'Access-Control-Allow-Credentials': 'true',
-};
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowed = (process.env.ALLOWED_ORIGIN ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const allowOrigin =
+    origin && allowed.length > 0 && allowed.includes(origin)
+      ? origin
+      : allowed.length > 0
+        ? allowed[0]
+        : '*';
+
+  const headers: Record<string, string> = {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Methods': 'GET,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Requested-With',
+  };
+
+  if (allowOrigin !== '*') {
+    headers['Access-Control-Allow-Credentials'] = 'true';
+    headers['Vary'] = 'Origin';
+  }
+
+  return headers;
+}
 
 // Proxy interne (plus fiable que corsfix.com)
 const getInternalProxyUrl = () => {
@@ -48,14 +68,15 @@ const getInternalProxyUrl = () => {
 /**
  * Handler OPTIONS pour les preflight requests CORS
  */
-export async function OPTIONS() {
+export async function OPTIONS(request?: NextRequest) {
   return new NextResponse(null, {
     status: 204,
-    headers: CORS_HEADERS,
+    headers: getCorsHeaders(request?.headers?.get('origin') ?? null),
   });
 }
 
 export async function GET(request: NextRequest) {
+  const corsHeaders = getCorsHeaders(request.headers.get('origin'));
   const { searchParams } = new URL(request.url);
   const inputMint = searchParams.get('inputMint');
   const outputMint = searchParams.get('outputMint');
@@ -64,7 +85,7 @@ export async function GET(request: NextRequest) {
   if (!inputMint || !outputMint || !amount) {
     return NextResponse.json(
       { error: 'Missing required parameters: inputMint, outputMint, amount' },
-      { status: 400 }
+      { status: 400, headers: corsHeaders }
     );
   }
 
@@ -72,30 +93,26 @@ export async function GET(request: NextRequest) {
   if (isNaN(amountNum) || amountNum <= 0) {
     return NextResponse.json(
       { error: 'Invalid amount' },
-      { status: 400 }
+      { status: 400, headers: corsHeaders }
     );
   }
 
   console.log(`[venue-quotes] Fetching quotes for ${inputMint} -> ${outputMint}, amount: ${amountNum}`);
 
   const quotes: VenueQuoteResult[] = [];
-  let jupiterBenchmark: VenueQuoteResult | null = null;
+  const jupiterBenchmark: VenueQuoteResult | null = null;
 
   // Fetch all quotes in parallel
-  const [raydiumResult, orcaResult, meteoraResult, phoenixResult, jupiterResult] = await Promise.allSettled([
+  const [raydiumResult, orcaResult, meteoraResult] = await Promise.allSettled([
     fetchRaydiumQuote(inputMint, outputMint, amountNum),
     fetchOrcaQuote(inputMint, outputMint, amountNum),
     fetchMeteoraQuote(inputMint, outputMint, amountNum),
-    fetchPhoenixQuote(inputMint, outputMint, amountNum),
-    fetchJupiterQuote(inputMint, outputMint, amountNum),
   ]);
 
   console.log('[venue-quotes] Fetch results:', {
     raydium: raydiumResult.status === 'fulfilled' ? raydiumResult.value : 'rejected',
     orca: orcaResult.status === 'fulfilled' ? orcaResult.value : 'rejected',
     meteora: meteoraResult.status === 'fulfilled' ? meteoraResult.value : 'rejected',
-    phoenix: phoenixResult.status === 'fulfilled' ? phoenixResult.value : 'rejected',
-    jupiter: jupiterResult.status === 'fulfilled' ? jupiterResult.value : 'rejected',
   });
 
   // Process all results - les fonctions retournent toujours un objet maintenant
@@ -111,57 +128,15 @@ export async function GET(request: NextRequest) {
     quotes.push(meteoraResult.value);
   }
 
-  if (phoenixResult.status === 'fulfilled' && phoenixResult.value.outputAmount > 0) {
-    quotes.push(phoenixResult.value);
-  }
+  console.log('[venue-quotes] Valid quotes:', quotes.length);
 
-  // Process Jupiter (benchmark)
-  if (jupiterResult.status === 'fulfilled' && jupiterResult.value.outputAmount > 0) {
-    jupiterBenchmark = jupiterResult.value;
-  }
-
-  console.log('[venue-quotes] Valid quotes:', quotes.length, 'Jupiter benchmark:', !!jupiterBenchmark);
-
-  // Find best venue among native venues (exclure Jupiter du tri)
-  const nativeQuotes = quotes.filter(q => q.venue !== 'JUPITER');
-  let bestQuote = nativeQuotes.reduce((best, current) => 
+  // Find best venue among native venues
+  let bestQuote = quotes.reduce((best, current) => 
     current.outputAmount > (best?.outputAmount || 0) ? current : best
   , null as VenueQuoteResult | null);
 
-  // FALLBACK 1: Si aucune venue native n'a de quote valide, utiliser Jupiter
-  if (!bestQuote && jupiterBenchmark && jupiterBenchmark.outputAmount > 0) {
-    console.log('[venue-quotes] No native venues, using Jupiter as fallback');
-    bestQuote = {
-      ...jupiterBenchmark,
-      venue: 'JUPITER_FALLBACK',
-    };
-    quotes.push(bestQuote);
-  }
-
-  // FALLBACK 2: Si toujours rien, générer des quotes synthétiques basées sur les prix
-  if (!bestQuote || quotes.length === 0) {
-    console.log('[venue-quotes] No quotes at all, generating synthetic quotes from prices...');
-    
-    const syntheticQuotes = await generateSyntheticQuotes(inputMint, outputMint, amountNum);
-    
-    if (syntheticQuotes.length > 0) {
-      quotes.push(...syntheticQuotes);
-      bestQuote = syntheticQuotes.reduce((best, current) => 
-        current.outputAmount > (best?.outputAmount || 0) ? current : best
-      , null as VenueQuoteResult | null);
-      
-      // Utiliser la meilleure quote synthétique comme benchmark Jupiter si pas de benchmark
-      if (!jupiterBenchmark && bestQuote) {
-        jupiterBenchmark = {
-          ...bestQuote,
-          venue: 'JUPITER',
-          source: 'synthetic',
-        };
-      }
-      
-      console.log('[venue-quotes] Generated', syntheticQuotes.length, 'synthetic quotes, best:', bestQuote?.venue);
-    }
-  }
+  // IMPORTANT: Pas de fallback vers Jupiter ici. Si aucune venue native ne quote,
+  // le client doit afficher une erreur explicite (pas de routing implicite).
 
   console.log('[venue-quotes] Final result:', {
     quotesCount: quotes.length,
@@ -219,7 +194,7 @@ async function generateSyntheticQuotes(
   const adjustedOutput = Math.floor(baseOutput * conservativeSpread);
   
   // Générer des quotes identiques pour chaque venue (pas de faux avantage)
-  const venues = ['RAYDIUM', 'ORCA', 'METEORA', 'PHOENIX'];
+  const venues = ['RAYDIUM', 'ORCA', 'METEORA'];
   
   const quotes: VenueQuoteResult[] = venues.map(venue => ({
     venue,

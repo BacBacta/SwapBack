@@ -1,28 +1,34 @@
 /**
  * SwapRoute Decision Function
- * 
+ *
  * Fonction pure et testable qui détermine si un swap doit être exécuté
- * via le router natif SwapBack ou via Jupiter direct.
- * 
- * IMPORTANT: Le programme on-chain `swapback_router` exige TOUJOURS
- * un `jupiter_route` valide dans les SwapArgs pour `swap_toc`.
- * Donc le swap "natif" signifie: swap via notre router qui utilise Jupiter CPI,
- * PAS un swap directement vers Raydium/Orca sans Jupiter.
- * 
+ * via le routage natif SwapBack (direct DEX CPI) ou non.
+ *
+ * IMPORTANT:
+ * - Le routage natif V1 sélectionne une venue off-chain puis exécute un swap
+ *   direct vers le DEX via CPI (sans dépendance obligatoire à un routeur tiers).
+ * - Les paires sans oracle configuré doivent être bloquées côté client.
+ *
  * Conditions pour route=native:
  * 1. Flag global activé (NEXT_PUBLIC_NATIVE_SWAP_ENABLED=true)
  * 2. Paire supportée (oracle configuré dans ORACLE_FEED_CONFIGS)
- * 3. jupiterCpi disponible (récupéré via /api/swap/quote)
- * 
- * Sinon: fallback vers Jupiter direct avec reason code explicite.
- * 
+ *
  * Référence: docs/ai/solana-native-router-a2z.md
- * 
+ *
  * @author SwapBack Team
  * @date December 10, 2025
  */
 
-import { hasOracleForPair, listSupportedOraclePairs } from "@/config/oracles";
+import { hasOracleForPair, listSupportedOraclePairs, TOKEN_MINTS } from "@/config/oracles";
+
+function hasOracleSupportViaUsdc(inputMint: string, outputMint: string): boolean {
+  // Si l'un des deux est déjà USDC, le "via USDC" n'ajoute rien.
+  if (inputMint === TOKEN_MINTS.USDC || outputMint === TOKEN_MINTS.USDC) {
+    return false;
+  }
+
+  return hasOracleForPair(inputMint, TOKEN_MINTS.USDC) && hasOracleForPair(TOKEN_MINTS.USDC, outputMint);
+}
 
 // ============================================================================
 // TYPES
@@ -35,9 +41,9 @@ export type SwapRouteReason =
   | "FLAG_DISABLED"           // Feature flag NEXT_PUBLIC_NATIVE_SWAP_ENABLED=false
   | "PAIR_UNSUPPORTED"        // Paire non dans ORACLE_FEED_CONFIGS
   | "ORACLE_CONFIG_MISSING"   // Oracle introuvable (legacy, équivalent PAIR_UNSUPPORTED)
-  | "JUPITER_CPI_UNAVAILABLE" // jupiterCpi non disponible (wallet non connecté, API error)
+  | "JUPITER_CPI_UNAVAILABLE" // Legacy reason (ne doit pas être utilisé pour le routage natif V1)
   | "NATIVE_ELIGIBLE"         // Toutes conditions remplies → route native
-  | "FALLBACK_JUPITER";       // Fallback par défaut
+  | "FALLBACK_JUPITER";       // Legacy reason (ne doit pas être utilisé pour le routage natif V1)
 
 /**
  * Résultat de la décision de routing
@@ -61,7 +67,7 @@ export interface SwapRouteParams {
   inputMint: string;
   /** Mint du token de sortie */
   outputMint: string;
-  /** jupiterCpi disponible depuis /api/swap/quote */
+  /** Legacy (non requis pour le routage natif V1) */
   hasJupiterCpi: boolean;
   /** Override du feature flag (pour tests) */
   featureFlagOverride?: boolean;
@@ -106,14 +112,14 @@ export function isNativeSwapFeatureEnabled(override?: boolean): boolean {
  * @returns SwapRouteDecision avec route, reason et message
  */
 export function decideSwapRoute(params: SwapRouteParams): SwapRouteDecision {
-  const { inputMint, outputMint, hasJupiterCpi, featureFlagOverride } = params;
+  const { inputMint, outputMint, featureFlagOverride } = params;
   
   // 1. Vérifier le feature flag global
   if (!isNativeSwapFeatureEnabled(featureFlagOverride)) {
     return {
       route: "jupiter",
       reason: "FLAG_DISABLED",
-      message: "Swap natif désactivé par configuration. Transaction via Jupiter.",
+      message: "Swap natif désactivé par configuration.",
       details: {
         featureFlag: "NEXT_PUBLIC_NATIVE_SWAP_ENABLED",
         value: "false",
@@ -121,14 +127,18 @@ export function decideSwapRoute(params: SwapRouteParams): SwapRouteDecision {
     };
   }
   
-  // 2. Vérifier si la paire est supportée (a un oracle configuré)
+  // 2. Vérifier si le swap est supporté (oracles configurés)
+  // V1.1: autoriser si la paire n'a pas d'oracle direct mais est exécutable via 2 legs (A→USDC→B).
   const pairKey = `${inputMint.slice(0, 8)}.../${outputMint.slice(0, 8)}...`;
-  
-  if (!hasOracleForPair(inputMint, outputMint)) {
+
+  const directOracleOk = hasOracleForPair(inputMint, outputMint);
+  const viaUsdcOk = hasOracleSupportViaUsdc(inputMint, outputMint);
+
+  if (!directOracleOk && !viaUsdcOk) {
     return {
       route: "jupiter",
       reason: "PAIR_UNSUPPORTED",
-      message: `Paire ${pairKey} non supportée par le router natif. Transaction via Jupiter.`,
+      message: `Paire ${pairKey} non supportée par le swap natif.`,
       details: {
         inputMint,
         outputMint,
@@ -137,28 +147,17 @@ export function decideSwapRoute(params: SwapRouteParams): SwapRouteDecision {
     };
   }
   
-  // 3. Vérifier si jupiterCpi est disponible (requis par le programme on-chain)
-  if (!hasJupiterCpi) {
-    return {
-      route: "jupiter",
-      reason: "JUPITER_CPI_UNAVAILABLE",
-      message: "Données Jupiter CPI non disponibles. Transaction via Jupiter direct.",
-      details: {
-        pairKey,
-        note: "Le programme on-chain exige jupiter_route. Récupérez jupiterCpi via /api/swap/quote.",
-      },
-    };
-  }
-  
   // 4. Toutes les conditions sont remplies → route native
   return {
     route: "native",
     reason: "NATIVE_ELIGIBLE",
-    message: `Swap natif disponible pour ${pairKey}.`,
+    message: viaUsdcOk && !directOracleOk
+      ? `Swap natif disponible pour ${pairKey} (multi-hop via USDC).`
+      : `Swap natif disponible pour ${pairKey}.`,
     details: {
       inputMint,
       outputMint,
-      hasJupiterCpi: true,
+      oracleSupport: viaUsdcOk && !directOracleOk ? "USDC_MULTIHOP" : "DIRECT_PAIR",
     },
   };
 }
@@ -185,17 +184,17 @@ export function formatRouteDecisionForLog(decision: SwapRouteDecision): Record<s
 export function getUIMessageForReason(reason: SwapRouteReason): string {
   switch (reason) {
     case "FLAG_DISABLED":
-      return "Le swap natif est temporairement désactivé. Votre transaction est routée via Jupiter.";
+      return "Le swap natif est temporairement désactivé.";
     case "PAIR_UNSUPPORTED":
-      return "Cette paire n'est pas supportée par le router natif. Transaction via Jupiter.";
+      return "Cette paire n'est pas supportée par le swap natif.";
     case "ORACLE_CONFIG_MISSING":
-      return "Configuration oracle manquante. Transaction via Jupiter.";
+      return "Configuration oracle manquante pour cette paire.";
     case "JUPITER_CPI_UNAVAILABLE":
-      return "Préparation du swap en cours. Transaction via Jupiter.";
+      return "Préparation du swap natif indisponible.";
     case "NATIVE_ELIGIBLE":
       return "Swap via le router SwapBack avec rebates activés.";
     case "FALLBACK_JUPITER":
     default:
-      return "Transaction routée via Jupiter.";
+      return "Swap natif indisponible.";
   }
 }

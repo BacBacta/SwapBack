@@ -15,7 +15,6 @@ import {
   Keypair,
   PublicKey,
   Transaction,
-  VersionedTransaction,
 } from "@solana/web3.js";
 import {
   getOrcaWhirlpool,
@@ -31,6 +30,11 @@ const DEFAULT_ORCA_SLIPPAGE_BPS = Number(
   process.env.NEXT_PUBLIC_ORCA_SLIPPAGE_BPS ?? 50
 );
 
+/**
+ * Readonly wallet stub for Orca SDK.
+ * Uses `any` for signTransaction/signAllTransactions to avoid
+ * type conflicts with @lifinity/sdk pulling an old @solana/web3.js.
+ */
 class ReadonlyWallet implements Wallet {
   publicKey: PublicKey;
   payer: Keypair;
@@ -40,11 +44,13 @@ class ReadonlyWallet implements Wallet {
     this.payer = keypair;
   }
 
-  async signTransaction<T extends Transaction | VersionedTransaction>(tx: T): Promise<T> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async signTransaction(tx: any): Promise<any> {
     return tx;
   }
 
-  async signAllTransactions<T extends Transaction | VersionedTransaction>(txs: T[]): Promise<T[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async signAllTransactions(txs: any[]): Promise<any[]> {
     return txs;
   }
 }

@@ -17,7 +17,8 @@ try {
   if (!WebSocketImpl) {
     // `ws` is available in the server runtime; ignore if not installed for build-only usage.
     // eslint-disable-next-line global-require
-    WebSocketImpl = require('ws');
+    const wsPkg = require('ws');
+    WebSocketImpl = wsPkg?.WebSocket || wsPkg?.default || wsPkg;
   }
 } catch (err) {
   WebSocketImpl = null;
@@ -63,6 +64,13 @@ function defaultFactory(address, options) {
   return new WebSocketImpl(address, options?.protocols);
 }
 
+// rpc-websockets exports a helper `WebSocket(url, options)` used by @solana/web3.js.
+// Important: this is NOT the native WebSocket constructor; it must be callable
+// as a plain function and accept an `options` object.
+function createRpcWebSocket(address, options) {
+  return defaultFactory(address, options);
+}
+
 class CommonClient extends EventEmitter {
   constructor(arg1, arg2, arg3) {
     super();
@@ -87,7 +95,20 @@ class CommonClient extends EventEmitter {
     let socketInstance;
     try {
       const factory = this.webSocketFactory || defaultFactory;
-      socketInstance = factory(this.url, this.options);
+      // Some callers pass a WebSocket *constructor* as the "factory".
+      // The original rpc-websockets client instantiates it with `new`.
+      // If we call it as a plain function, browsers throw:
+      //   "WebSocket constructor: 'new' is required"
+      try {
+        socketInstance = factory(this.url, this.options);
+      } catch (innerError) {
+        const message = innerError instanceof Error ? innerError.message : String(innerError);
+        if (typeof factory === 'function' && /'new' is required/i.test(message)) {
+          socketInstance = new factory(this.url, this.options?.protocols);
+        } else {
+          throw innerError;
+        }
+      }
     } catch (error) {
       queueMicrotask(() => this.emit('error', error));
       return;
@@ -130,5 +151,5 @@ class CommonClient extends EventEmitter {
 module.exports = CommonClient;
 module.exports.Client = CommonClient;
 module.exports.CommonClient = CommonClient;
-module.exports.WebSocket = WebSocketImpl;
+module.exports.WebSocket = createRpcWebSocket;
 module.exports.default = CommonClient;

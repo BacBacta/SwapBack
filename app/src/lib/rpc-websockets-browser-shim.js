@@ -31,7 +31,10 @@ function getWebSocketConstructor() {
   }
   // Node.js - try to load 'ws' package
   try {
-    return require('ws');
+    const wsPkg = require('ws');
+    // `ws` peut être CJS (classe) ou ESM transpillé (objet avec `.default`)
+    // et expose parfois explicitement `.WebSocket`.
+    return wsPkg?.WebSocket || wsPkg?.default || wsPkg;
   } catch (e) {
     return null;
   }
@@ -149,9 +152,12 @@ WebSocketFactory.CLOSED = 3;
 
 // Match original module's export structure
 exports.default = WebSocketFactory;
+// rpc-websockets expects a named export `w3cwebsocket`
+exports.w3cwebsocket = WebSocketFactory;
 exports.WebSocketBrowserImpl = WebSocketBrowserImpl;
 
 // CommonJS default export pattern - use WebSocketFactory as the main export
 module.exports = WebSocketFactory;
 module.exports.default = WebSocketFactory;
+module.exports.w3cwebsocket = WebSocketFactory;
 module.exports.WebSocketBrowserImpl = WebSocketBrowserImpl;

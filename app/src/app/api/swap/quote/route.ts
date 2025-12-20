@@ -621,6 +621,7 @@ export async function POST(request: NextRequest) {
       slippageBps = 50,
       routingStrategy = "smart",
       userPublicKey,
+      forceFresh,
     } = body as {
       inputMint?: string;
       outputMint?: string;
@@ -628,6 +629,7 @@ export async function POST(request: NextRequest) {
       slippageBps?: number;
       routingStrategy?: RoutingStrategy;
       userPublicKey?: string | null;
+      forceFresh?: boolean;
     };
 
     // Validate inputs
@@ -655,18 +657,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check cache first
+    const shouldBypassCache = forceFresh === true;
+
+    // Check cache first (sauf refresh forcé)
     const cacheKey = getCacheKey({ inputMint, outputMint, amount: parsedAmount, slippageBps });
-    const cachedResponse = getFromCache(cacheKey);
-    if (cachedResponse) {
-      console.log(`📦 Cache hit for ${inputMint.slice(0, 8)}...→${outputMint.slice(0, 8)}...`);
-      return NextResponse.json(cachedResponse, {
-        headers: {
-          ...CORS_HEADERS,
-          "X-Cache": "HIT",
-          "X-RateLimit-Remaining": String(rateLimit.remaining),
-        },
-      });
+    if (!shouldBypassCache) {
+      const cachedResponse = getFromCache(cacheKey);
+      if (cachedResponse) {
+        console.log(`📦 Cache hit for ${inputMint.slice(0, 8)}...→${outputMint.slice(0, 8)}...`);
+        return NextResponse.json(
+          cachedResponse,
+          withNoStore({
+            headers: {
+              "X-Cache": "HIT",
+              "X-RateLimit-Remaining": String(rateLimit.remaining),
+            },
+          })
+        );
+      }
     }
 
     analyticsId = userPublicKey ?? "swapback-server";
@@ -702,6 +710,7 @@ export async function POST(request: NextRequest) {
         outputDecimals,
         slippageBps,
         userPublicKey: userPublicKey ?? undefined,
+        bypassCache: shouldBypassCache,
       })
       .catch((aggError) => {
         console.warn("⚠️ Multi-source aggregator failed", aggError);
@@ -1017,17 +1026,20 @@ export async function POST(request: NextRequest) {
       multiSourceCandidates: multiSourceQuotes.length,
     });
 
-    // Cache the successful response
-    setCache(cacheKey, responsePayload);
+    // Cache the successful response (sauf refresh forcé)
+    if (!shouldBypassCache) {
+      setCache(cacheKey, responsePayload);
+    }
 
-    return NextResponse.json(responsePayload, {
-      headers: {
-        ...CORS_HEADERS,
-        "Cache-Control": "no-store",
-        "X-Cache": "MISS",
-        "X-RateLimit-Remaining": String(rateLimit.remaining),
-      },
-    });
+    return NextResponse.json(
+      responsePayload,
+      withNoStore({
+        headers: {
+          "X-Cache": "MISS",
+          "X-RateLimit-Remaining": String(rateLimit.remaining),
+        },
+      })
+    );
   } catch (error) {
     console.error("❌ Error in /api/swap/quote:", error);
 

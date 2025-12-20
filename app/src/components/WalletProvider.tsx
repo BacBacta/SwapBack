@@ -17,17 +17,16 @@ import { monitor } from "@/lib/protocolMonitor";
 // Import des styles du wallet adapter
 import "@solana/wallet-adapter-react-ui/styles.css";
 
-// Fallback RPC endpoints pour mainnet - ordered by reliability
-// NOTE: Avoid Helius public endpoints (rate limited)
-const MAINNET_FALLBACK_RPCS = [
-  // Primary: Solana official (most reliable, no rate limits for basic usage)
-  "https://api.mainnet-beta.solana.com",
-  // Fallbacks with CORS support
-  "https://rpc.ankr.com/solana", // Ankr - supports CORS, 30 req/sec
-  "https://solana.publicnode.com", // PublicNode - supports CORS
-  "https://solana-mainnet.rpc.extrnode.com", // ExtrNode - supports CORS
-  "https://solana-rpc.publicnode.com", // PublicNode alt
-];
+// IMPORTANT: le navigateur ne doit pas appeler directement un RPC tiers (CORS/429).
+// On force un endpoint same-origin qui proxy vers des upstreams côté serveur.
+function getBrowserRpcEndpoint(): string {
+  if (typeof window === 'undefined') {
+    // SSR: retourner un placeholder (sera remplacé côté client)
+    return 'https://api.mainnet-beta.solana.com';
+  }
+  // Client: construire l'URL absolue
+  return `${window.location.origin}/api/solana-rpc`;
+}
 
 export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [rpcIndex, setRpcIndex] = useState(0);
@@ -54,41 +53,14 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
   
   const network = getNetwork();
   
-  // Build list of RPC endpoints with fallbacks
+  // Build list of RPC endpoints
   const rpcEndpoints = useMemo(() => {
-    const endpoints: string[] = [];
-    
-    // Primary: environment RPC (validate it's a valid URL)
-    const rpcFromEnv = process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
-    if (rpcFromEnv && rpcFromEnv.trim() !== "" && rpcFromEnv.startsWith("http")) {
-      endpoints.push(rpcFromEnv.trim());
-    }
-    
-    // Add fallbacks for mainnet
-    if (network === WalletAdapterNetwork.Mainnet) {
-      endpoints.push(...MAINNET_FALLBACK_RPCS);
-    } else if (network === WalletAdapterNetwork.Devnet) {
-      endpoints.push(DEFAULT_SOLANA_RPC_URL);
-      endpoints.push("https://api.devnet.solana.com");
-    }
-    
-    // CRITICAL: Ensure we always have at least one valid endpoint
-    if (endpoints.length === 0) {
-      console.warn("No valid RPC endpoints configured, using Solana public RPC");
-      endpoints.push("https://api.mainnet-beta.solana.com");
-    }
-    
-    return [...new Set(endpoints)]; // Remove duplicates
+    // Le WalletProvider est un composant client: dériver l'URL absolue.
+    return [getBrowserRpcEndpoint()];
   }, [network]);
   
   const endpoint = useMemo(() => {
-    const selected = rpcEndpoints[rpcIndex] || rpcEndpoints[0];
-    // Final validation: must be a valid HTTP(S) URL
-    if (!selected || !selected.startsWith("http")) {
-      console.error("Invalid RPC endpoint, falling back to Solana public RPC");
-      return "https://api.mainnet-beta.solana.com";
-    }
-    return selected;
+    return rpcEndpoints[rpcIndex] || rpcEndpoints[0] || getBrowserRpcEndpoint();
   }, [rpcEndpoints, rpcIndex]);
   
   // Test RPC connection and fallback if needed (only once per endpoint)

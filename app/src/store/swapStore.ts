@@ -135,7 +135,7 @@ export interface SwapStore {
 
   // Route State
   routes: RouteState;
-  fetchRoutes: (options?: { userPublicKey?: string | null }) => Promise<void>;
+  fetchRoutes: (options?: { userPublicKey?: string | null; background?: boolean }) => Promise<void>;
   selectRoute: (route: RouteCandidate) => void;
   clearRoutes: () => void;
 
@@ -280,15 +280,22 @@ export const useSwapStore = create<SwapStore>()(
             return;
           }
 
+          const isBackground = options?.background === true;
           set((state) => ({
             routes: {
               ...state.routes,
-              isLoading: true,
+              // En background, on évite d'afficher des loaders et de vider la route courante
+              // pour prévenir le flicker pendant l'auto-refresh.
+              isLoading: isBackground ? state.routes.isLoading : true,
               error: null,
-              jupiterCpi: null,
-              isMock: false,
-              intents: [],
-              reliability: null,
+              ...(isBackground
+                ? {}
+                : {
+                    jupiterCpi: null,
+                    isMock: false,
+                    intents: [],
+                    reliability: null,
+                  }),
             },
           }));
 
@@ -304,6 +311,7 @@ export const useSwapStore = create<SwapStore>()(
             const response = await fetch(getApiUrl(API_ENDPOINTS.quote), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
+              cache: "no-store",
               body: JSON.stringify({
                 inputMint: swap.inputToken.mint,
                 outputMint: swap.outputToken.mint,
@@ -311,6 +319,8 @@ export const useSwapStore = create<SwapStore>()(
                 slippageBps,
                 routingStrategy,
                 userPublicKey: options?.userPublicKey ?? null,
+                // Lors des auto-refresh, on bypass le cache serveur pour éviter des prix figés.
+                forceFresh: isBackground,
               }),
             });
 
@@ -410,6 +420,11 @@ export const useSwapStore = create<SwapStore>()(
             }
           } catch (error) {
             console.error("Error fetching routes:", error);
+            // En background, on garde la dernière quote affichée pour éviter
+            // des resets visuels sur des erreurs transitoires.
+            if (options?.background) {
+              return;
+            }
             set((state) => ({
               routes: {
                 ...state.routes,

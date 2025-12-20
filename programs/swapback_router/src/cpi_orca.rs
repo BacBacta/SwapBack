@@ -26,21 +26,24 @@ pub fn swap(
     let token_owner_a = &account_slice[3];
     let token_owner_b = &account_slice[5];
 
+    // IMPORTANT:
+    // - `token_owner_a/b` sont les comptes utilisateur pour les tokens A/B du pool Orca.
+    // - `user_token_account_a/b` sont les comptes d'entrée/sortie du router SwapBack.
+    // Le sens `a_to_b` concerne le pool, mais la destination attendue côté router est
+    // toujours `user_token_account_b` (output) quel que soit l'ordre des tokens du pool.
     let (a_to_b, destination_account) = if token_owner_a.key() == user_token_a {
+        // Input = token A du pool => output = token B du pool
         (true, token_owner_b)
     } else if token_owner_b.key() == user_token_a {
+        // Input = token B du pool => output = token A du pool
         (false, token_owner_a)
-    } else if token_owner_a.key() == user_token_b {
-        (false, token_owner_b)
-    } else if token_owner_b.key() == user_token_b {
-        (true, token_owner_a)
     } else {
+        // Le compte input du router n'est pas présent dans les comptes Orca => route invalide.
         return err!(ErrorCode::DexExecutionFailed);
     };
 
-    let expected_destination = if a_to_b { user_token_b } else { user_token_a };
-
-    if destination_account.key() != expected_destination {
+    // Destination attendue = output du router
+    if destination_account.key() != user_token_b {
         return err!(ErrorCode::DexExecutionFailed);
     }
 

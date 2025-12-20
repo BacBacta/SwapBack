@@ -5,7 +5,7 @@
       "id": "swapbackRpcUrl",
       "type": "promptString",
       "description": "SOLANA_RPC_URL (RPC HTTP)",
-      "default": "https://api.mainnet-beta.solana.com"
+      "default": "helius"
     },
     {
       "id": "swapbackKeypairPath",
@@ -18,9 +18,43 @@
       "type": "promptString",
       "description": "Helius API key (non stockée) — utilisé pour https://mainnet.helius-rpc.com/?api-key=...",
       "default": ""
+    },
+    {
+      "id": "gitCommitMessage",
+      "type": "promptString",
+      "description": "Message de commit (git commit -m)",
+      "default": "chore: update"
+    },
+    {
+      "id": "flyEnvironment",
+      "type": "pickString",
+      "description": "Environnement Fly.io",
+      "options": ["staging", "production"],
+      "default": "staging"
+    },
+    {
+      "id": "flyApiToken",
+      "type": "promptString",
+      "description": "FLY_API_TOKEN (optionnel). Laissez vide si vous êtes déjà loggé via fly auth login.",
+      "default": ""
     }
   ],
   "tasks": [
+    {
+      "label": "SwapBack: Commit + Push + Deploy Fly",
+      "detail": "Ajoute tous les changements, commit, push puis déploie sur Fly.io via app/scripts/deploy-fly.sh",
+      "type": "shell",
+      "command": "zsh",
+      "args": [
+        "-ic",
+        "cd /workspaces/SwapBack && if [[ -z \"$(git status --porcelain)\" ]]; then print -r -- '[task] Aucun changement git à pousser.'; exit 0; fi && git add -A && (git commit -m \"${input:gitCommitMessage}\" || (print -r -- '[task] Commit annulé (rien à commit?)'; exit 0)) && git push origin HEAD && cd /workspaces/SwapBack/app && export FLY_API_TOKEN=\"${input:flyApiToken}\" && ./scripts/deploy-fly.sh ${input:flyEnvironment}"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
     {
       "label": "SwapBack: Simulate Native Swap (Meteora/Phoenix/Lifinity)",
       "detail": "Simule RouterSwap sur mainnet (simulateTransaction) pour Meteora/Phoenix/Lifinity",
@@ -32,7 +66,7 @@
       "command": "zsh",
       "args": [
         "-ic",
-        "cd /workspaces/SwapBack && export SOLANA_RPC_URL=\"${input:swapbackRpcUrl}\" SWAPBACK_AUTO_CREATE_KEYPAIR=1 && KP=\"${input:swapbackKeypairPath}\" && if [[ -n \"$KP\" && -f \"$KP\" ]]; then export SOLANA_KEYPAIR=\"$KP\"; else unset SOLANA_KEYPAIR; fi && if [ ! -d node_modules ]; then print -r -- \"[task] node_modules manquant: npm ci\"; npm ci; fi && noglob ./node_modules/.bin/tsx ./scripts/simulate-native-swap.ts --venues=METEORA_DLMM,PHOENIX,LIFINITY"
+        "cd /workspaces/SwapBack && export SOLANA_RPC_URL=\"${input:swapbackRpcUrl}\" HELIUS_API_KEY=\"${input:heliusApiKey}\" NEXT_PUBLIC_HELIUS_API_KEY=\"${input:heliusApiKey}\" SWAPBACK_AUTO_CREATE_KEYPAIR=1 && KP=\"${input:swapbackKeypairPath}\" && if [[ -n \"$KP\" && -f \"$KP\" ]]; then export SOLANA_KEYPAIR=\"$KP\"; else unset SOLANA_KEYPAIR; fi && if [ ! -d node_modules ]; then print -r -- \"[task] node_modules manquant: npm ci\"; npm ci; fi && noglob ./node_modules/.bin/tsx ./scripts/simulate-native-swap.ts --venues=METEORA_DLMM,PHOENIX,LIFINITY"
       ],
       "problemMatcher": [],
       "presentation": {

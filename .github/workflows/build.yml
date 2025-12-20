@@ -25,8 +25,7 @@ jobs:
         run: npm ci
 
       - name: Build Next.js application
-        working-directory: ./app
-        run: npm run build
+        run: npm run build -w app
 
       - name: Check build output
         working-directory: ./app
@@ -55,8 +54,7 @@ jobs:
         run: npm ci
 
       - name: Build SDK
-        working-directory: ./sdk
-        run: npm run build
+        run: npm run build -w sdk
 
       - name: Check build output
         working-directory: ./sdk

@@ -8,6 +8,7 @@ import {
   type QuoteParams, 
   type QuoteResult 
 } from "../multiSourceAggregator";
+import { getQuoteCache } from "../../cache/quoteCache";
 
 // Mock global fetch
 const mockFetch = vi.fn();
@@ -27,6 +28,8 @@ describe("MultiSourceQuoteAggregator", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Le QuoteCache est un singleton: le vider pour éviter des hits entre tests.
+    getQuoteCache().clear();
     aggregator = new MultiSourceQuoteAggregator();
     
     // Mock fetch par défaut
@@ -52,6 +55,7 @@ describe("MultiSourceQuoteAggregator", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    getQuoteCache().clear();
     aggregator = new MultiSourceQuoteAggregator();
   });
 
@@ -107,6 +111,58 @@ describe("MultiSourceQuoteAggregator", () => {
       expect(result.bestQuote).toBeDefined();
       expect(result.source).toBe("jupiter");
       expect(result.totalLatencyMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it("devrait bypass le cache si demandé", async () => {
+      // Setup: désactiver toutes les sources sauf Jupiter
+      const sources = aggregator.getSources();
+      for (const source of sources) {
+        if (source.name !== "jupiter") {
+          aggregator.setSourceEnabled(source.name, false);
+        }
+      }
+
+      // 1) Premier appel: remplit le cache interne de l'agrégateur
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            inputMint: mockQuoteParams.inputMint,
+            outputMint: mockQuoteParams.outputMint,
+            inAmount: "1000000000",
+            outAmount: "150000000",
+            otherAmountThreshold: "148500000",
+            priceImpactPct: "0.05",
+            routePlan: [],
+            contextSlot: 123456,
+            timeTaken: 100,
+          }),
+      });
+
+      const first = await aggregator.getBestQuote(mockQuoteParams);
+      expect(first.fromCache).toBe(false);
+
+      // 2) Second appel avec mêmes params, mais bypass cache: doit refetch et ne pas répondre source=cache
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            inputMint: mockQuoteParams.inputMint,
+            outputMint: mockQuoteParams.outputMint,
+            inAmount: "1000000000",
+            outAmount: "151000000",
+            otherAmountThreshold: "149490000",
+            priceImpactPct: "0.05",
+            routePlan: [],
+            contextSlot: 123456,
+            timeTaken: 100,
+          }),
+      });
+
+      const second = await aggregator.getBestQuote({ ...mockQuoteParams, bypassCache: true });
+      expect(second.fromCache).toBe(false);
+      expect(second.source).not.toBe("cache");
+      expect(second.bestQuote.outAmount).toBe("151000000");
     });
 
     it("devrait calculer improvementBps par rapport à Jupiter", async () => {

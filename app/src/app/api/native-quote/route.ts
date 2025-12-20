@@ -2,7 +2,7 @@
  * API Route: Native Quote
  * 
  * Récupère des quotes depuis les venues natives SwapBack
- * (Raydium, Orca, Meteora, Phoenix) au lieu de Jupiter.
+ * (Raydium, Orca, Meteora) au lieu de Jupiter.
  * 
  * Fonctionnalités:
  * - Quotes temps réel depuis les APIs DEX
@@ -16,20 +16,39 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
-// Headers CORS
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Requested-With',
-  'Access-Control-Allow-Credentials': 'true',
-};
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowed = (process.env.ALLOWED_ORIGIN ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const allowOrigin =
+    origin && allowed.length > 0 && allowed.includes(origin)
+      ? origin
+      : allowed.length > 0
+        ? allowed[0]
+        : '*';
+
+  const headers: Record<string, string> = {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Requested-With',
+  };
+
+  if (allowOrigin !== '*') {
+    headers['Access-Control-Allow-Credentials'] = 'true';
+    headers['Vary'] = 'Origin';
+  }
+
+  return headers;
+}
 
 // DEX APIs
 const DEX_APIS = {
   raydium: "https://transaction-v1.raydium.io",
   orca: "https://api.mainnet.orca.so",
   meteora: "https://dlmm-api.meteora.ag",
-  // Phoenix nécessite un SDK, on utilise une estimation basée sur les prix
+  // Phoenix nécessite une quote orderbook (phoenix-sdk). Pas de fallback estimé ici.
 };
 
 // Tokens connus avec leurs décimales
@@ -65,10 +84,10 @@ interface NativeQuoteResponse {
 /**
  * Handler OPTIONS pour les preflight requests
  */
-export async function OPTIONS() {
+export async function OPTIONS(request?: NextRequest) {
   return new NextResponse(null, {
     status: 204,
-    headers: CORS_HEADERS,
+    headers: getCorsHeaders(request?.headers?.get('origin') ?? null),
   });
 }
 
@@ -302,19 +321,8 @@ async function fetchMeteoraQuote(
   }
 }
 
-/**
- * Phoenix n'a pas d'API publique simple, on génère un fallback via /api/price
- * Note: Pour une implémentation complète, utiliser @ellipsis-labs/phoenix-sdk
- */
-async function fetchPhoenixQuote(
-  inputMint: string,
-  outputMint: string,
-  amount: string
-): Promise<VenueQuote | null> {
-  // Phoenix = CLOB avec généralement de meilleurs spreads
-  // Mais sans API publique, on utilise un fallback avec spread minimal
-  return generateFallbackQuote("Phoenix", inputMint, outputMint, amount, 15); // 0.15% spread
-}
+// NOTE: Phoenix (CLOB) requiert une quote orderbook. Tant que ce n'est pas implémenté,
+// on n'expose pas de quote "estimée" pour Phoenix.
 
 /**
  * POST /api/native-quote
@@ -324,6 +332,7 @@ async function fetchPhoenixQuote(
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   const failedVenues: string[] = [];
+  const corsHeaders = getCorsHeaders(request.headers.get('origin'));
 
   try {
     const body = await request.json();
@@ -333,7 +342,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: false,
         error: "Missing required parameters: inputMint, outputMint, amount",
-      }, { status: 400, headers: CORS_HEADERS });
+      }, { status: 400, headers: corsHeaders });
     }
 
     console.log(`[native-quote] Fetching quotes for ${inputMint.slice(0, 8)}... -> ${outputMint.slice(0, 8)}..., amount: ${amount}, slippage: ${slippageBps}bps`);
@@ -343,10 +352,9 @@ export async function POST(request: NextRequest) {
       fetchRaydiumQuote(inputMint, outputMint, amount, slippageBps),
       fetchOrcaQuote(inputMint, outputMint, amount, slippageBps),
       fetchMeteoraQuote(inputMint, outputMint, amount, slippageBps),
-      fetchPhoenixQuote(inputMint, outputMint, amount),
     ];
 
-    const venueNames = ["Raydium", "Orca", "Meteora", "Phoenix"];
+    const venueNames = ["Raydium", "Orca", "Meteora"];
     const results = await Promise.allSettled(quotePromises);
     
     const quotes: VenueQuote[] = [];
@@ -403,7 +411,7 @@ export async function POST(request: NextRequest) {
       response.error = "No venue quotes available for this pair";
     }
 
-    return NextResponse.json(response, { headers: CORS_HEADERS });
+    return NextResponse.json(response, { headers: corsHeaders });
 
   } catch (error) {
     console.error("[native-quote] API error:", error);
@@ -414,7 +422,7 @@ export async function POST(request: NextRequest) {
       totalLatencyMs: Date.now() - startTime,
       error: error instanceof Error ? error.message : "Internal server error",
       failedVenues,
-    }, { status: 500, headers: CORS_HEADERS });
+    }, { status: 500, headers: corsHeaders });
   }
 }
 
@@ -423,7 +431,8 @@ export async function POST(request: NextRequest) {
  * 
  * Returns list of supported venues
  */
-export async function GET() {
+export async function GET(request?: NextRequest) {
+  const corsHeaders = getCorsHeaders(request?.headers?.get('origin') ?? null);
   return NextResponse.json({
     venues: [
       { name: "Raydium", type: "AMM", programId: "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8", apiAvailable: true },
@@ -437,6 +446,6 @@ export async function GET() {
     ],
     routerProgram: "APHj6L2b2bA2q62jwYZp38dqbTxQUqwatqdUum1trPnN",
     fallbackEnabled: true,
-    fallbackSource: "/api/price (Jupiter/Birdeye/DexScreener)",
-  }, { headers: CORS_HEADERS });
+    fallbackSource: "/api/price",
+  }, { headers: corsHeaders });
 }

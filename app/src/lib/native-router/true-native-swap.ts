@@ -13,6 +13,7 @@
 import {
   Connection,
   PublicKey,
+  Keypair,
   Transaction,
   TransactionInstruction,
   VersionedTransaction,
@@ -31,7 +32,7 @@ import {
 } from "@solana/spl-token";
 import BN from "bn.js";
 import { logger } from "@/lib/logger";
-import { getOracleFeedsForPair } from "@/config/oracles";
+import { getOracleFeedsForPair, hasOracleForPair } from "@/config/oracles";
 import { getAllALTs } from "@/lib/alt/swapbackALT";
 import {
   DEXAccounts,
@@ -66,8 +67,29 @@ export const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyT
 
 // Configuration
 const MAX_STALENESS_SECS = 120; // 2 minutes
-const PRIORITY_FEE_MICRO_LAMPORTS = 100_000;
+const PRIORITY_FEE_MICRO_LAMPORTS = 500_000;
 const COMPUTE_UNITS = 400_000;
+
+// Phoenix (CLOB) requiert une quote orderbook (phoenix-sdk). Tant que ce n'est
+// pas implémenté côté client, on l'exclut du best-route pour éviter les IOC
+// failures (custom program error 0xF) dues à un minOut irréaliste.
+// Best-route venues disabled until their quote->CPI coupling is proven reliable.
+// - PHOENIX: quote orderbook not implemented (IOC failures).
+// - RAYDIUM_AMM: REST quote can route through different pools than CPI (can trigger slippage failure 0x1e).
+const DISABLED_BEST_ROUTE_VENUES = new Set<SupportedVenue>(["PHOENIX", "RAYDIUM_AMM"]);
+
+// Venues pour lesquelles on a une implémentation de quote dans ce module.
+const QUOTED_VENUES = new Set<SupportedVenue>([
+  "ORCA_WHIRLPOOL",
+  "METEORA_DLMM",
+  "RAYDIUM_AMM",
+  "LIFINITY",
+  "SABER",
+]);
+
+// Optim perf: on tente d'abord les venues les plus fiables/rapides (DoD V1.1).
+// Les autres venues ne sont interrogées que si ORCA+METEORA ne renvoient aucune quote.
+const PRIMARY_QUOTE_VENUES: SupportedVenue[] = ["ORCA_WHIRLPOOL", "METEORA_DLMM"];
 
 // ============================================================================
 // HELPERS - Using centralized publicKeyUtils
@@ -83,6 +105,8 @@ export interface NativeVenueQuote {
   inputAmount: number;
   outputAmount: number;
   priceImpactBps: number;
+  /** Optionnel: minOut recommandé par le DEX (ex Raydium otherAmountThreshold) */
+  minOutAmount?: number;
   accounts: DEXAccounts;
   latencyMs: number;
 }
@@ -103,6 +127,33 @@ export interface TrueNativeRoute {
   dexAccounts: DEXAccounts;
   /** Toutes les quotes obtenues */
   allQuotes: NativeVenueQuote[];
+
+  /**
+   * V1.1: support optionnel multi-hop (2 legs max).
+   * Représente une exécution en 2 instructions `swap_toc` dans la même transaction:
+   *   input → intermediate → output
+   *
+   * IMPORTANT:
+   * - Le 2e leg utilise `amountIn = minOut(leg1)` pour éviter un échec "insufficient funds"
+   *   si le 1er leg exécute moins bien que la quote (défense en profondeur).
+   */
+  multiHop?: {
+    intermediateMint: PublicKey;
+    firstLeg: {
+      inputMint: PublicKey;
+      outputMint: PublicKey;
+      amountIn: number;
+      minAmountOut: number;
+      route: TrueNativeRoute;
+    };
+    secondLeg: {
+      inputMint: PublicKey;
+      outputMint: PublicKey;
+      amountIn: number;
+      minAmountOut: number;
+      route: TrueNativeRoute;
+    };
+  };
 }
 
 export interface TrueNativeSwapParams {
@@ -112,12 +163,16 @@ export interface TrueNativeSwapParams {
   minAmountOut: number;
   slippageBps: number;
   userPublicKey: PublicKey;
+  /** Optionnel: forcer la route (évite un second choix/quote lors du build) */
+  routeOverride?: TrueNativeRoute;
 }
 
 export interface TrueNativeSwapResult {
   transaction: VersionedTransaction;
   route: TrueNativeRoute;
   planAccount: PublicKey;
+  blockhash: string;
+  lastValidBlockHeight: number;
 }
 
 // ============================================================================
@@ -127,9 +182,102 @@ export interface TrueNativeSwapResult {
 export class TrueNativeSwap {
   private connection: Connection;
   private mintDecimalsCache = new Map<string, number>();
+  private mintOwnerCache = new Map<string, PublicKey>();
+  private temporarilyDisabledVenues = new Map<SupportedVenue, number>();
 
   constructor(connection: Connection) {
     this.connection = connection;
+  }
+
+  markVenueUnavailable(venue: SupportedVenue, ttlMs: number): void {
+    const ttl = Math.max(0, Math.floor(ttlMs));
+    if (ttl === 0) return;
+    this.temporarilyDisabledVenues.set(venue, Date.now() + ttl);
+  }
+
+  private isVenueTemporarilyDisabled(venue: SupportedVenue): boolean {
+    const until = this.temporarilyDisabledVenues.get(venue);
+    if (typeof until !== "number") return false;
+    if (Date.now() <= until) return true;
+    this.temporarilyDisabledVenues.delete(venue);
+    return false;
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return promise;
+
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms (${label})`)), timeoutMs);
+    });
+
+    try {
+      return await Promise.race([promise, timeoutPromise]);
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+    }
+  }
+
+  private async mapWithConcurrency<T, R>(
+    items: T[],
+    concurrency: number,
+    fn: (item: T, index: number) => Promise<R>
+  ): Promise<R[]> {
+    const limit = Math.max(1, Math.floor(concurrency));
+    const results = new Array<R>(items.length);
+
+    let nextIndex = 0;
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (true) {
+        const current = nextIndex;
+        nextIndex += 1;
+        if (current >= items.length) return;
+        // eslint-disable-next-line no-await-in-loop
+        results[current] = await fn(items[current], current);
+      }
+    });
+
+    await Promise.all(workers);
+    return results;
+  }
+
+  private async getAccountInfoWithRetry(pubkey: PublicKey): Promise<Awaited<ReturnType<Connection["getAccountInfo"]>>> {
+    // web3.js a déjà un retry interne, mais sur certains RPC publics ça reste insuffisant.
+    // On ajoute une couche de backoff supplémentaire pour éviter les échecs non déterministes en simulate.
+    const delaysMs = [500, 1000, 2000, 4000, 8000, 12000];
+    let lastErr: unknown;
+    for (let i = 0; i < delaysMs.length; i++) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        return await this.connection.getAccountInfo(pubkey);
+      } catch (e) {
+        lastErr = e;
+        const msg = e instanceof Error ? e.message : String(e);
+        const is429 = msg.includes("429") || msg.toLowerCase().includes("rate limit");
+        if (!is429) throw e;
+        // eslint-disable-next-line no-await-in-loop
+        await this.sleep(delaysMs[i]);
+      }
+    }
+    throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+  }
+
+  private async getMintOwner(mint: PublicKey): Promise<PublicKey> {
+    const key = mint.toBase58();
+    const cached = this.mintOwnerCache.get(key);
+    if (cached) return cached;
+
+    const mintInfo = await this.getAccountInfoWithRetry(mint);
+    if (!mintInfo) {
+      throw new Error(`Mint introuvable: ${key}`);
+    }
+
+    this.mintOwnerCache.set(key, mintInfo.owner);
+    return mintInfo.owner;
   }
 
   private async getMintDecimals(mint: PublicKey): Promise<number> {
@@ -153,7 +301,9 @@ export class TrueNativeSwap {
     inputMint: PublicKey,
     outputMint: PublicKey,
     amountIn: number,
-    userPublicKey: PublicKey
+    userPublicKey: PublicKey,
+    slippageBps?: number,
+    venuesOverride?: SupportedVenue[]
   ): Promise<NativeVenueQuote[]> {
     const safeInputMint = toPublicKey(inputMint);
     const safeOutputMint = toPublicKey(outputMint);
@@ -167,24 +317,60 @@ export class TrueNativeSwap {
       amountIn,
     });
 
-    // Obtenir les comptes pour toutes les venues en parallèle
+    const venuesToResolve = venuesOverride?.length ? venuesOverride : Array.from(QUOTED_VENUES);
+
+    // Résoudre uniquement les comptes des venues pertinentes.
+    const resolveStart = Date.now();
     const allAccounts = await getAllDEXAccounts(
       this.connection,
       safeInputMint,
       safeOutputMint,
-      safeUser
+      safeUser,
+      venuesToResolve
     );
+    const resolveLatencyMs = Date.now() - resolveStart;
 
-    // Pour chaque venue disponible, obtenir une quote
-    for (const [venue, accounts] of allAccounts) {
+    logger.info("TrueNativeSwap", "DEX accounts resolved", {
+      venuesWithAccounts: Array.from(allAccounts.keys()),
+      count: allAccounts.size,
+      resolveLatencyMs,
+    });
+
+    if (allAccounts.size === 0) {
+      logger.warn("TrueNativeSwap", "No DEX pools found for this pair", {
+        inputMint: safeInputMint.toBase58(),
+        outputMint: safeOutputMint.toBase58(),
+      });
+    }
+
+    // Pour chaque venue disponible, obtenir une quote (concurrence limitée pour réduire le temps total)
+    const quoteConcurrencyRaw = Number(process.env.NEXT_PUBLIC_SWAPBACK_QUOTE_CONCURRENCY);
+    const quoteConcurrency = Number.isFinite(quoteConcurrencyRaw) ? quoteConcurrencyRaw : 2;
+    const quoteTimeoutRaw = Number(process.env.NEXT_PUBLIC_SWAPBACK_QUOTE_TIMEOUT_MS);
+    const quoteTimeoutMs = Number.isFinite(quoteTimeoutRaw) ? quoteTimeoutRaw : 12_000;
+
+    const entries = Array.from(allAccounts.entries());
+    const maybeQuotes = await this.mapWithConcurrency(entries, quoteConcurrency, async ([venue, accounts]) => {
+      if (this.isVenueTemporarilyDisabled(venue)) {
+        logger.debug("TrueNativeSwap", `Skipping temporarily disabled venue: ${venue}`);
+        return null;
+      }
+      if (DISABLED_BEST_ROUTE_VENUES.has(venue)) {
+        logger.debug("TrueNativeSwap", `Skipping disabled venue in best-route: ${venue}`);
+        return null;
+      }
+
+      if (!QUOTED_VENUES.has(venue)) {
+        logger.debug("TrueNativeSwap", `Skipping venue without quote implementation: ${venue}`);
+        return null;
+      }
+
       try {
         const startTime = Date.now();
-        const quote = await this.getQuoteForVenue(
-          venue,
-          safeInputMint,
-          safeOutputMint,
-          amountIn,
-          accounts
+        const quote = await this.withTimeout(
+          this.getQuoteForVenue(venue, safeInputMint, safeOutputMint, amountIn, accounts, slippageBps),
+          quoteTimeoutMs,
+          `quote:${venue}`
         );
         const latencyMs = Date.now() - startTime;
 
@@ -192,32 +378,105 @@ export class TrueNativeSwap {
           const venueProgramId = DEX_PROGRAM_IDS[venue];
           if (!venueProgramId) {
             logger.warn("TrueNativeSwap", `Unknown venue program ID for ${venue}`);
-            continue;
+            return null;
           }
-          
-          quotes.push({
-            venue,
-            venueProgramId,
-            inputAmount: amountIn,
-            outputAmount: quote.outputAmount,
-            priceImpactBps: quote.priceImpactBps,
-            accounts,
-            latencyMs,
-          });
 
           logger.debug("TrueNativeSwap", `Quote from ${venue}`, {
             outputAmount: quote.outputAmount,
             priceImpactBps: quote.priceImpactBps,
             latencyMs,
           });
+
+          return {
+            venue,
+            venueProgramId,
+            inputAmount: amountIn,
+            outputAmount: quote.outputAmount,
+            priceImpactBps: quote.priceImpactBps,
+            minOutAmount: quote.minOutAmount,
+            accounts,
+            latencyMs,
+          } satisfies NativeVenueQuote;
         }
+
+        if (venue === "ORCA_WHIRLPOOL") {
+          logger.debug("TrueNativeSwap", `Quote returned null for ${venue}`, {
+            poolAddress: accounts.meta?.poolAddress || "none",
+            latencyMs,
+          });
+        } else {
+          const payload = {
+            poolAddress: accounts.meta?.poolAddress || "none",
+            latencyMs,
+          };
+
+          if (venue === "LIFINITY") {
+            logger.debug("TrueNativeSwap", `Quote returned null for ${venue}`, payload);
+          } else {
+            logger.warn("TrueNativeSwap", `Quote returned null for ${venue}`, payload);
+          }
+        }
+
+        return null;
       } catch (error) {
         logger.warn("TrueNativeSwap", `Failed to get quote from ${venue}`, { error });
+        return null;
       }
+    });
+
+    for (const q of maybeQuotes) {
+      if (q) quotes.push(q);
     }
 
     // Trier par meilleur output
     quotes.sort((a, b) => b.outputAmount - a.outputAmount);
+
+    // IMPORTANT:
+    // Raydium REST quote peut router via d'autres pools que ceux utilisés en CPI,
+    // et sans comptes DEX résolus on ne peut pas exécuter la route de manière fiable.
+    // On laisse un flag explicite pour debug uniquement.
+    const enableRaydiumApiFallback = process.env.SWAPBACK_ENABLE_RAYDIUM_API_FALLBACK === "true";
+    if (enableRaydiumApiFallback && quotes.length === 0 && !allAccounts.has("RAYDIUM_AMM")) {
+      logger.info("TrueNativeSwap", "Trying Raydium API fallback (debug flag enabled)");
+      try {
+        const startTime = Date.now();
+        const emptyAccounts: DEXAccounts = {
+          accounts: [],
+          vaultTokenAccountA: safeInputMint,
+          vaultTokenAccountB: safeOutputMint,
+          meta: { venue: "RAYDIUM_AMM", poolAddress: "", feeRate: 0.0025 },
+        };
+        const raydiumQuote = await this.getRaydiumQuote(
+          safeInputMint,
+          safeOutputMint,
+          amountIn,
+          emptyAccounts,
+          slippageBps
+        );
+        const latencyMs = Date.now() - startTime;
+
+        if (raydiumQuote) {
+          quotes.push({
+            venue: "RAYDIUM_AMM",
+            venueProgramId: DEX_PROGRAM_IDS.RAYDIUM_AMM,
+            inputAmount: amountIn,
+            outputAmount: raydiumQuote.outputAmount,
+            priceImpactBps: raydiumQuote.priceImpactBps,
+            minOutAmount: raydiumQuote.minOutAmount,
+            accounts: emptyAccounts,
+            latencyMs,
+          });
+          logger.info("TrueNativeSwap", "Raydium API fallback succeeded", {
+            outputAmount: raydiumQuote.outputAmount,
+            latencyMs,
+          });
+        }
+      } catch (err) {
+        logger.warn("TrueNativeSwap", "Raydium API fallback failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
 
     return quotes;
   }
@@ -230,19 +489,132 @@ export class TrueNativeSwap {
     inputMint: PublicKey,
     outputMint: PublicKey,
     amountIn: number,
-    accounts: DEXAccounts
-  ): Promise<{ outputAmount: number; priceImpactBps: number } | null> {
+    accounts: DEXAccounts,
+    slippageBps?: number
+  ): Promise<{ outputAmount: number; priceImpactBps: number; minOutAmount?: number } | null> {
     switch (venue) {
       case "ORCA_WHIRLPOOL":
-        return this.getOrcaQuote(inputMint, outputMint, amountIn, accounts);
+        return this.getOrcaQuote(inputMint, outputMint, amountIn, accounts, slippageBps);
       case "METEORA_DLMM":
-        return this.getMeteoraQuote(inputMint, outputMint, amountIn, accounts);
+        return this.getMeteoraQuote(inputMint, outputMint, amountIn, accounts, slippageBps);
       case "RAYDIUM_AMM":
-        return this.getRaydiumQuote(inputMint, outputMint, amountIn, accounts);
+        return this.getRaydiumQuote(inputMint, outputMint, amountIn, accounts, slippageBps);
+      case "LIFINITY":
+        return this.getLifinityQuote(inputMint, outputMint, amountIn, accounts, slippageBps);
+      case "SABER":
+        return this.getSaberQuote(inputMint, outputMint, amountIn, accounts, slippageBps);
       case "PHOENIX":
         return this.getPhoenixQuote(inputMint, outputMint, amountIn, accounts);
       default:
         return null;
+    }
+  }
+
+  /**
+   * Quote Lifinity via SDK (on-chain quote).
+   *
+   * NOTE: Le SDK Lifinity choisit le pool 0 partir de la liste interne.
+   * Cela peut diverger s'il existe plusieurs pools pour la mame paire.
+   * On limite donc l'usage 0 la s0lection best-route + validation 0 la simulation.
+   */
+  private async getLifinityQuote(
+    inputMint: PublicKey,
+    outputMint: PublicKey,
+    amountIn: number,
+    accounts: DEXAccounts,
+    slippageBps?: number
+  ): Promise<{ outputAmount: number; priceImpactBps: number; minOutAmount?: number } | null> {
+    void accounts;
+    try {
+      const bpsRaw = typeof slippageBps === "number" && Number.isFinite(slippageBps) ? slippageBps : 50;
+      const bps = Math.min(10_000, Math.max(0, Math.floor(bpsRaw)));
+
+      // Lifinity SDK attend un pourcentage (ex: 0.5 = 0.5%).
+      const slippagePercent = bps / 100;
+
+      const { getAmountOut } = await import("@lifinity/sdk");
+      const quote: any = await getAmountOut(
+        this.connection,
+        amountIn,
+        inputMint,
+        outputMint,
+        slippagePercent
+      );
+
+      const outputAmount = Number(quote?.amountOut ?? 0);
+      if (!Number.isFinite(outputAmount) || outputAmount <= 0) return null;
+
+      const minOutAmount = Number(quote?.amountOutWithSlippage ?? 0);
+      const priceImpactPct = Number(quote?.priceImpact ?? 0);
+      const priceImpactBps = Number.isFinite(priceImpactPct) ? Math.round(priceImpactPct) : 0;
+
+      return {
+        outputAmount,
+        priceImpactBps,
+        minOutAmount: Number.isFinite(minOutAmount) && minOutAmount > 0 ? minOutAmount : undefined,
+      };
+    } catch (err) {
+      logger.warn("TrueNativeSwap", "Lifinity quote exception", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Quote Saber (StableSwap) 0 partir des vaults r9solus.
+   *
+   * Impl0mentation conservatrice: approximation constant-product sur les vaults.
+   * Pour les paires stables, cela sous-estime g9n0ralement la sortie (donc minOut plus s0r).
+   */
+  private async getSaberQuote(
+    inputMint: PublicKey,
+    outputMint: PublicKey,
+    amountIn: number,
+    accounts: DEXAccounts,
+    slippageBps?: number
+  ): Promise<{ outputAmount: number; priceImpactBps: number; minOutAmount?: number } | null> {
+    void inputMint;
+    void outputMint;
+
+    try {
+      // Indexes align9s avec `getSaberAccounts` (DEXAccountResolvers.ts)
+      const swapSource = accounts.accounts[4];
+      const swapDestination = accounts.accounts[5];
+      if (!swapSource || !swapDestination) return null;
+
+      const [srcInfo, dstInfo] = await this.connection.getMultipleAccountsInfo(
+        [swapSource, swapDestination],
+        "confirmed"
+      );
+      if (!srcInfo || !dstInfo) return null;
+      if (srcInfo.data.length < 72 || dstInfo.data.length < 72) return null;
+
+      const reserveIn = srcInfo.data.readBigUInt64LE(64);
+      const reserveOut = dstInfo.data.readBigUInt64LE(64);
+      if (reserveIn <= 0n || reserveOut <= 0n) return null;
+
+      const amountInBig = BigInt(Math.max(0, Math.floor(amountIn)));
+      if (amountInBig <= 0n) return null;
+
+      const outputBig = (amountInBig * reserveOut) / (reserveIn + amountInBig);
+      const outputAmount = Number(outputBig);
+      if (!Number.isFinite(outputAmount) || outputAmount <= 0) return null;
+
+      const bpsRaw = typeof slippageBps === "number" && Number.isFinite(slippageBps) ? slippageBps : 50;
+      const bps = Math.min(10_000, Math.max(0, Math.floor(bpsRaw)));
+      const minOutAmount = Math.floor(outputAmount * (1 - bps / 10_000));
+
+      return {
+        outputAmount,
+        priceImpactBps: 0,
+        minOutAmount: minOutAmount > 0 ? minOutAmount : undefined,
+      };
+    } catch (err) {
+      logger.warn("TrueNativeSwap", "Saber quote exception", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
     }
   }
 
@@ -253,33 +625,130 @@ export class TrueNativeSwap {
     inputMint: PublicKey,
     outputMint: PublicKey,
     amountIn: number,
-    accounts: DEXAccounts
+    accounts: DEXAccounts,
+    slippageBps?: number
   ): Promise<{ outputAmount: number; priceImpactBps: number } | null> {
     try {
-      // Utiliser l'API Orca pour obtenir une quote
-      const response = await fetch(
+      const bpsRaw = typeof slippageBps === "number" && Number.isFinite(slippageBps) ? slippageBps : 50;
+      const bps = Math.min(10_000, Math.max(0, Math.floor(bpsRaw)));
+
+      const isNode = typeof window === "undefined";
+
+      // En Node/tsx (scripts): utiliser l'Orca Whirlpools SDK (quote on-chain)
+      // pour éviter les incidents REST (Cloudflare, payloads non-JSON, 1016, etc.).
+      if (isNode) {
+        const poolAddress = accounts.meta.poolAddress;
+        if (!poolAddress) return null;
+
+        const [{ AnchorProvider }, { Percentage }, whirlpools] = await Promise.all([
+          import("@coral-xyz/anchor"),
+          import("@orca-so/common-sdk"),
+          import("@orca-so/whirlpools-sdk"),
+        ]);
+
+        const {
+          WhirlpoolContext,
+          buildWhirlpoolClient,
+          swapQuoteByInputToken,
+          UseFallbackTickArray,
+        } = whirlpools as any;
+
+        const payer = Keypair.generate();
+        // Wallet readonly: suffisant pour lire/quote via SDK.
+        const wallet: any = {
+          publicKey: payer.publicKey,
+          payer,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          signTransaction: async (tx: any) => tx,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          signAllTransactions: async (txs: any[]) => txs,
+        };
+
+        const provider = new AnchorProvider(this.connection, wallet, AnchorProvider.defaultOptions());
+        const context = WhirlpoolContext.withProvider(provider);
+        const client = buildWhirlpoolClient(context);
+
+        const pool = await client.getPool(new PublicKey(poolAddress));
+        await pool.refreshData();
+
+        const slippage = Percentage.fromFraction(bps, 10_000);
+        const quote = await swapQuoteByInputToken(
+          pool,
+          inputMint,
+          new BN(amountIn.toString()),
+          slippage,
+          DEX_PROGRAM_IDS.ORCA_WHIRLPOOL,
+          context.fetcher,
+          undefined,
+          UseFallbackTickArray.Situational
+        );
+
+        const outputAmount = Number(quote?.estimatedAmountOut?.toString?.() ?? 0);
+        if (!Number.isFinite(outputAmount) || outputAmount <= 0) {
+          return null;
+        }
+
+        return { outputAmount, priceImpactBps: 0 };
+      }
+
+      // En navigateur: passer par /api/dex/* (évite CORS).
+      const url =
         `/api/dex/orca/quote?` +
-          new URLSearchParams({
-            inputMint: inputMint.toBase58(),
-            outputMint: outputMint.toBase58(),
-            amount: amountIn.toString(),
-            pool: accounts.meta.poolAddress || "",
-          }),
-        { signal: AbortSignal.timeout(5000) }
-      );
+        new URLSearchParams({
+          inputMint: inputMint.toBase58(),
+          outputMint: outputMint.toBase58(),
+          amount: amountIn.toString(),
+          pool: accounts.meta.poolAddress || "",
+          slippageBps: bps.toString(),
+          forceFresh: "1",
+        });
+
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(8000),
+        cache: "no-store",
+      });
 
       if (!response.ok) {
-        // Fallback: estimation basée sur les réserves du pool
-        return this.estimateQuoteFromPool(accounts, amountIn);
+        const errorText = await response.text().catch(() => "");
+        const payload = {
+          status: response.status,
+          error: errorText.slice(0, 200),
+        };
+        if (response.status === 502) {
+          logger.debug("TrueNativeSwap", "Orca API error", payload);
+        } else {
+          logger.warn("TrueNativeSwap", "Orca API error", payload);
+        }
+        return null;
       }
 
       const data = await response.json();
+      const outputAmount = Number(data.outputAmount ?? data.outAmount ?? 0);
+      // /api/dex/orca/quote renvoie priceImpactBps; l'upstream renvoie priceImpactPercent.
+      const priceImpactBps = Number(
+        data.priceImpactBps ??
+          (typeof data.priceImpactPercent === "number"
+            ? Math.round(data.priceImpactPercent * 100)
+            : (typeof data.priceImpact === "number" ? data.priceImpact * 10000 : 0))
+      );
+
+      if (!Number.isFinite(outputAmount) || outputAmount <= 0) {
+        logger.warn("TrueNativeSwap", "Orca quote invalid output", {
+          outputAmount,
+          data: JSON.stringify(data).slice(0, 200),
+        });
+        return null;
+      }
+
       return {
-        outputAmount: data.outputAmount,
-        priceImpactBps: data.priceImpact * 10000,
+        outputAmount,
+        priceImpactBps: Number.isFinite(priceImpactBps) ? priceImpactBps : 0,
       };
-    } catch {
-      return this.estimateQuoteFromPool(accounts, amountIn);
+    } catch (err) {
+      logger.warn("TrueNativeSwap", "Orca quote exception", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
     }
   }
 
@@ -290,29 +759,129 @@ export class TrueNativeSwap {
     inputMint: PublicKey,
     outputMint: PublicKey,
     amountIn: number,
-    accounts: DEXAccounts
+    accounts: DEXAccounts,
+    slippageBps?: number
   ): Promise<{ outputAmount: number; priceImpactBps: number } | null> {
     try {
+      const bpsRaw = typeof slippageBps === "number" && Number.isFinite(slippageBps) ? slippageBps : 50;
+      const bps = Math.min(10_000, Math.max(0, Math.floor(bpsRaw)));
+
+      const isNode = typeof window === "undefined";
+      if (isNode) {
+        const pairAddress = accounts.meta.poolAddress;
+        if (!pairAddress) return null;
+
+        // Note: en Node ESM, l'import ESM de @meteora-ag/dlmm peut échouer
+        // (résolution Anchor "Directory import ... not supported").
+        // En scripts/serveur, on préfère charger la build CJS via createRequire().
+        let dlmmMod: any;
+        try {
+          const nodeModule: any = await import(/* webpackIgnore: true */ "node:module");
+          const createRequire = nodeModule?.createRequire;
+          if (typeof createRequire === "function") {
+            const req = createRequire(import.meta.url);
+            dlmmMod = req("@meteora-ag/dlmm");
+          } else {
+            dlmmMod = await import("@meteora-ag/dlmm");
+          }
+        } catch (e) {
+          try {
+            dlmmMod = await import("@meteora-ag/dlmm");
+          } catch (e2) {
+            logger.warn("TrueNativeSwap", "Meteora DLMM module load failed", {
+              error: e2 instanceof Error ? e2.message : String(e2),
+            });
+            return null;
+          }
+        }
+
+        const DLMM: any = (dlmmMod as any)?.DLMM ?? (dlmmMod as any)?.default ?? dlmmMod;
+
+        const dlmm = await DLMM.create(this.connection, new PublicKey(pairAddress));
+        const tokenXMint: PublicKey =
+          dlmm?.tokenX?.mint?.address ?? dlmm?.tokenX?.mint?.publicKey ?? dlmm?.tokenX?.publicKey;
+        const tokenYMint: PublicKey =
+          dlmm?.tokenY?.mint?.address ?? dlmm?.tokenY?.mint?.publicKey ?? dlmm?.tokenY?.publicKey;
+        if (!tokenXMint || !tokenYMint) return null;
+
+        // Meteora DLMM SDK: `swapForY` correspond à la direction X->Y (output = tokenY).
+        // IMPORTANT: utiliser la direction basée sur tokenX/tokenY, sinon on obtient des quotes absurdes
+        // (ex: BONK->USDC qui renvoie des milliers de USDC pour quelques BONK) et l'exécution échoue.
+        const hasSupportedQuote =
+          tokenXMint.equals(SOL_MINT) ||
+          tokenXMint.equals(USDC_MINT) ||
+          tokenYMint.equals(SOL_MINT) ||
+          tokenYMint.equals(USDC_MINT);
+        if (!hasSupportedQuote) return null;
+
+        const swapForY = inputMint.equals(tokenXMint);
+        let binArrayAccounts: Array<{ publicKey: PublicKey }> = [];
+        for (const depth of [5, 20, 60]) {
+          // eslint-disable-next-line no-await-in-loop
+          binArrayAccounts = await dlmm.getBinArrayForSwap(swapForY, depth);
+          if (binArrayAccounts.length > 0) break;
+        }
+        if (binArrayAccounts.length === 0) return null;
+
+        const quote = await dlmm.swapQuote(
+          new BN(amountIn.toString()),
+          swapForY,
+          new BN(bps.toString()),
+          binArrayAccounts
+        );
+
+        const outAmountStr = quote?.outAmount?.toString?.() ?? "0";
+        const outAmount = Number(outAmountStr);
+        if (!Number.isFinite(outAmount) || outAmount <= 0) return null;
+        return { outputAmount: outAmount, priceImpactBps: 0 };
+      }
+
       const response = await fetch(
-        `https://dlmm-api.meteora.ag/pair/${accounts.meta.poolAddress}/quote?` +
+        `/api/dex/meteora/quote?` +
           new URLSearchParams({
-            swapMode: inputMint.toBase58() < outputMint.toBase58() ? "ExactIn" : "ExactOut",
+            inputMint: inputMint.toBase58(),
+            outputMint: outputMint.toBase58(),
             amount: amountIn.toString(),
+            pairAddress: accounts.meta.poolAddress || "",
+            slippageBps: bps.toString(),
+            forceFresh: "1",
           }),
-        { signal: AbortSignal.timeout(5000) }
+        { signal: AbortSignal.timeout(8000), cache: "no-store" }
       );
 
       if (!response.ok) {
-        return this.estimateQuoteFromPool(accounts, amountIn);
+        const errorText = await response.text().catch(() => "");
+        logger.warn("TrueNativeSwap", "Meteora API error", {
+          status: response.status,
+          poolAddress: accounts.meta.poolAddress,
+          error: errorText.slice(0, 200),
+        });
+        return null;
       }
 
       const data = await response.json();
+      const outputAmount = Number(data.outputAmount ?? data.outAmount ?? 0);
+      
+      if (!Number.isFinite(outputAmount) || outputAmount <= 0) {
+        logger.warn("TrueNativeSwap", "Meteora quote invalid output", {
+          outputAmount,
+          data: JSON.stringify(data).slice(0, 200),
+        });
+        return null;
+      }
+      
       return {
-        outputAmount: parseInt(data.outAmount || "0"),
-        priceImpactBps: (data.priceImpact || 0) * 10000,
+        outputAmount,
+        priceImpactBps:
+          typeof data.priceImpactBps === "number" && Number.isFinite(data.priceImpactBps)
+            ? data.priceImpactBps
+            : (Number(data.priceImpact || 0) || 0) * 10000,
       };
-    } catch {
-      return this.estimateQuoteFromPool(accounts, amountIn);
+    } catch (err) {
+      logger.warn("TrueNativeSwap", "Meteora quote exception", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
     }
   }
 
@@ -323,31 +892,111 @@ export class TrueNativeSwap {
     inputMint: PublicKey,
     outputMint: PublicKey,
     amountIn: number,
-    accounts: DEXAccounts
-  ): Promise<{ outputAmount: number; priceImpactBps: number } | null> {
+    accounts: DEXAccounts,
+    slippageBps?: number
+  ): Promise<{ outputAmount: number; priceImpactBps: number; minOutAmount?: number } | null> {
+    const poolId = accounts.meta.poolAddress;
+    
+    // Note: Si poolId est absent, on laisse l'API Raydium router automatiquement.
+    // C'est moins sûr (risque de décalage quote/CPI) mais permet d'obtenir des quotes.
+    if (!poolId) {
+      logger.debug("TrueNativeSwap", "Raydium quote without specific poolId", {
+        inputMint: inputMint.toBase58(),
+        outputMint: outputMint.toBase58(),
+        amountIn,
+      });
+    }
+    
     try {
-      const response = await fetch(
-        `/api/dex/raydium/quote?` +
+      const isNode = typeof window === "undefined";
+      const params: Record<string, string> = {
+        inputMint: inputMint.toBase58(),
+        outputMint: outputMint.toBase58(),
+        amount: amountIn.toString(),
+      };
+      
+      if (poolId) {
+        params.poolId = poolId;
+      }
+      
+      if (typeof slippageBps === "number" && Number.isFinite(slippageBps)) {
+        params.slippageBps = Math.floor(slippageBps).toString();
+      }
+      
+      const query = new URLSearchParams(params);
+      const url = isNode
+        ? `https://transaction-v1.raydium.io/compute/swap-base-in?` +
           new URLSearchParams({
-            inputMint: inputMint.toBase58(),
-            outputMint: outputMint.toBase58(),
-            amount: amountIn.toString(),
-            poolId: accounts.meta.poolAddress || "",
-          }),
-        { signal: AbortSignal.timeout(5000) }
-      );
+            inputMint: params.inputMint,
+            outputMint: params.outputMint,
+            amount: params.amount,
+            slippageBps: params.slippageBps ?? "50",
+            txVersion: "V0",
+            ...(params.poolId ? { poolId: params.poolId } : {}),
+          })
+        : `/api/dex/raydium/quote?` + new URLSearchParams({
+            ...Object.fromEntries(query.entries()),
+            forceFresh: "1",
+          });
+
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(10000),
+        cache: "no-store",
+      });
 
       if (!response.ok) {
-        return this.estimateQuoteFromPool(accounts, amountIn);
+        const errorText = await response.text().catch(() => "");
+        logger.warn("TrueNativeSwap", "Raydium API error", {
+          status: response.status,
+          poolId,
+          error: errorText.slice(0, 200),
+        });
+        return null;
       }
 
       const data = await response.json();
+
+      // Normaliser format: /api/dex/raydium/quote renvoie directement outputAmount;
+      // l'upstream renvoie { success, data: { outputAmount, otherAmountThreshold, priceImpactPct, ... } }
+      const normalizedOutput = data?.data?.outputAmount ?? data?.outputAmount ?? 0;
+      const normalizedMinOut = data?.data?.otherAmountThreshold ?? data?.minOutAmount;
+      const outputAmount = Number(normalizedOutput);
+      if (!Number.isFinite(outputAmount) || outputAmount <= 0) {
+        logger.warn("TrueNativeSwap", "Raydium quote invalid output", {
+          outputAmount,
+          data: JSON.stringify(data).slice(0, 200),
+        });
+        return null;
+      }
+
+      // Vérifier que le poolId retourné correspond à celui demandé (si on passe par la route interne)
+      if (!isNode && data.poolId && data.poolId !== poolId) {
+        logger.warn("TrueNativeSwap", "Raydium API returned quote for different pool", {
+          requestedPoolId: poolId,
+          returnedPoolId: data.poolId,
+          hint: "Using returned quote but CPI might target different pool",
+        });
+      }
+
+      const priceImpactPctRaw = data?.data?.priceImpactPct ?? data?.priceImpactPct ?? data?.priceImpact;
+      const priceImpactPct = typeof priceImpactPctRaw === "string" ? Number(priceImpactPctRaw) : Number(priceImpactPctRaw ?? 0);
+
       return {
-        outputAmount: data.outputAmount,
-        priceImpactBps: (data.priceImpact || 0) * 10000,
+        outputAmount,
+        // priceImpactPct upstream est un % (ex: 0.15 = 0.15%) ; on convertit en bps.
+        priceImpactBps: Number.isFinite(priceImpactPct) ? Math.round(priceImpactPct * 100) : 0,
+        minOutAmount:
+          typeof normalizedMinOut === "number" && Number.isFinite(normalizedMinOut)
+            ? normalizedMinOut
+            : typeof normalizedMinOut === "string" && Number.isFinite(Number(normalizedMinOut))
+              ? Number(normalizedMinOut)
+            : undefined,
       };
-    } catch {
-      return this.estimateQuoteFromPool(accounts, amountIn);
+    } catch (err) {
+      logger.warn("TrueNativeSwap", "Raydium quote exception", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
     }
   }
 
@@ -360,29 +1009,17 @@ export class TrueNativeSwap {
     amountIn: number,
     accounts: DEXAccounts
   ): Promise<{ outputAmount: number; priceImpactBps: number } | null> {
-    // Phoenix a généralement des spreads serrés, estimation simple
-    const feeRate = accounts.meta.feeRate || 0.001;
-    const outputAmount = Math.floor(amountIn * (1 - feeRate));
-    return {
-      outputAmount,
-      priceImpactBps: Math.round(feeRate * 10000),
-    };
-  }
+    void inputMint;
+    void outputMint;
+    void amountIn;
+    void accounts;
 
-  /**
-   * Estimation de quote basée sur la formule AMM x*y=k
-   */
-  private estimateQuoteFromPool(
-    accounts: DEXAccounts,
-    amountIn: number
-  ): { outputAmount: number; priceImpactBps: number } | null {
-    const feeRate = accounts.meta.feeRate || 0.003;
-    // Estimation conservative: assume 0.3% fee + 0.1% slippage
-    const outputAmount = Math.floor(amountIn * (1 - feeRate - 0.001));
-    return {
-      outputAmount,
-      priceImpactBps: Math.round((feeRate + 0.001) * 10000),
-    };
+    // Phoenix (CLOB) requiert une quote basée sur l'orderbook pour éviter
+    // les IOC failures (custom error 0xF) quand minOut est irréaliste.
+    // Tant qu'une quote orderbook fiable via phoenix-sdk n'est pas implémentée,
+    // on désactive Phoenix au niveau quote pour éviter de sélectionner cette venue.
+    logger.warn("TrueNativeSwap", "Phoenix quote disabled (orderbook quote not implemented)");
+    return null;
   }
 
   // ==========================================================================
@@ -401,31 +1038,198 @@ export class TrueNativeSwap {
     const userPk = toPublicKey(params.userPublicKey);
     const amountIn = params.amountIn;
 
-    const quotes = await this.getNativeQuotes(
-      inputMintPk,
-      outputMintPk,
-      amountIn,
-      userPk
+    // RouterSwap instruction: refuser avant signature si oracle manquant.
+    // IMPORTANT V1.1 multi-hop: le gating oracle doit être évalué par *leg*
+    // (input→USDC et USDC→output), pas uniquement sur la paire finale.
+    const inputMintStr = inputMintPk.toBase58();
+    const outputMintStr = outputMintPk.toBase58();
+    const directOracleOk = hasOracleForPair(inputMintStr, outputMintStr);
+
+    const venuesForBestRoute = Array.from(QUOTED_VENUES).filter(
+      (v) => !DISABLED_BEST_ROUTE_VENUES.has(v)
     );
 
-    if (quotes.length === 0) {
-      logger.warn("TrueNativeSwap", "No native venues available for this pair");
+    let quotes: NativeVenueQuote[] = [];
+    if (directOracleOk) {
+      const primaryVenues = venuesForBestRoute.filter((v) => PRIMARY_QUOTE_VENUES.includes(v));
+      const secondaryVenues = venuesForBestRoute.filter((v) => !PRIMARY_QUOTE_VENUES.includes(v));
+
+      const primaryQuotes = primaryVenues.length
+        ? await this.getNativeQuotes(inputMintPk, outputMintPk, amountIn, userPk, params.slippageBps, primaryVenues)
+        : [];
+
+      if (primaryQuotes.length > 0 || secondaryVenues.length === 0) {
+        quotes = primaryQuotes;
+      } else {
+        const secondaryQuotes = await this.getNativeQuotes(
+          inputMintPk,
+          outputMintPk,
+          amountIn,
+          userPk,
+          params.slippageBps,
+          secondaryVenues
+        );
+        quotes = [...primaryQuotes, ...secondaryQuotes];
+        quotes.sort((a, b) => b.outputAmount - a.outputAmount);
+      }
+    }
+
+    const bestDirect = quotes.find((q) => !DISABLED_BEST_ROUTE_VENUES.has(q.venue)) ?? null;
+
+    // V1.1: Multi-hop simple A→USDC→B (2 legs max) pour améliorer la couverture.
+    // NOTE: On limite volontairement aux venues avec quote+couplage CPI déjà prouvé (Orca/Meteora).
+    let bestMultiHop: TrueNativeRoute | null = null;
+    const slippageBps = params.slippageBps;
+    const enableMultiHop = !inputMintPk.equals(USDC_MINT) && !outputMintPk.equals(USDC_MINT);
+
+    // Optim perf: éviter de refaire deux séries de quotes (leg1+leg2) si une route directe existe déjà.
+    // On peut ré-activer le "compare multi-hop vs direct" via flag si nécessaire.
+    const multiHopCompareAlways = process.env.NEXT_PUBLIC_SWAPBACK_MULTI_HOP_COMPARE_ALWAYS === "true";
+
+    if (enableMultiHop && (multiHopCompareAlways || !bestDirect)) {
+      const usdcStr = USDC_MINT.toBase58();
+      const canOracleLeg1 = hasOracleForPair(inputMintStr, usdcStr);
+      const canOracleLeg2 = hasOracleForPair(usdcStr, outputMintStr);
+      const multiHopVenues = venuesForBestRoute.filter(
+        (v) => v === "ORCA_WHIRLPOOL" || v === "METEORA_DLMM"
+      );
+
+      if (canOracleLeg1 && canOracleLeg2 && multiHopVenues.length > 0) {
+        try {
+          const leg1Quotes = await this.getNativeQuotes(
+            inputMintPk,
+            USDC_MINT,
+            amountIn,
+            userPk,
+            slippageBps,
+            multiHopVenues
+          );
+
+          const leg1Best = leg1Quotes[0];
+          if (leg1Best && leg1Best.outputAmount > 0) {
+            const leg1MinOut = Math.max(
+              0,
+              Math.floor((leg1Best.outputAmount * (10_000 - slippageBps)) / 10_000)
+            );
+
+            if (leg1MinOut > 0) {
+              const leg2Quotes = await this.getNativeQuotes(
+                USDC_MINT,
+                outputMintPk,
+                leg1MinOut,
+                userPk,
+                slippageBps,
+                multiHopVenues
+              );
+
+              const leg2Best = leg2Quotes[0];
+              if (leg2Best && leg2Best.outputAmount > 0) {
+                const leg2MinOut = Math.max(
+                  0,
+                  Math.floor((leg2Best.outputAmount * (10_000 - slippageBps)) / 10_000)
+                );
+
+                const leg1Route: TrueNativeRoute = {
+                  venue: leg1Best.venue,
+                  venueProgramId: leg1Best.venueProgramId,
+                  inputAmount: leg1Best.inputAmount,
+                  outputAmount: leg1Best.outputAmount,
+                  priceImpactBps: leg1Best.priceImpactBps,
+                  platformFeeBps: 15,
+                  dexAccounts: leg1Best.accounts,
+                  allQuotes: leg1Quotes,
+                };
+
+                const leg2Route: TrueNativeRoute = {
+                  venue: leg2Best.venue,
+                  venueProgramId: leg2Best.venueProgramId,
+                  inputAmount: leg2Best.inputAmount,
+                  outputAmount: leg2Best.outputAmount,
+                  priceImpactBps: leg2Best.priceImpactBps,
+                  platformFeeBps: 15,
+                  dexAccounts: leg2Best.accounts,
+                  allQuotes: leg2Quotes,
+                };
+
+                bestMultiHop = {
+                  // Pour rester compatible avec le type `SupportedVenue`,
+                  // on expose la venue du 2e leg comme "venue principale".
+                  venue: leg2Best.venue,
+                  venueProgramId: leg2Best.venueProgramId,
+                  inputAmount: amountIn,
+                  // Output conservateur: basé sur amountIn=leg1MinOut pour le 2e leg.
+                  outputAmount: leg2Best.outputAmount,
+                  priceImpactBps: (leg1Best.priceImpactBps ?? 0) + (leg2Best.priceImpactBps ?? 0),
+                  platformFeeBps: 15,
+                  dexAccounts: leg2Best.accounts,
+                  // Exposer les 2 legs comme "quotes" pour que l'UI puisse au moins
+                  // afficher les venues réellement exécutées.
+                  allQuotes: [leg1Best, leg2Best],
+                  multiHop: {
+                    intermediateMint: USDC_MINT,
+                    firstLeg: {
+                      inputMint: inputMintPk,
+                      outputMint: USDC_MINT,
+                      amountIn,
+                      minAmountOut: leg1MinOut,
+                      route: leg1Route,
+                    },
+                    secondLeg: {
+                      inputMint: USDC_MINT,
+                      outputMint: outputMintPk,
+                      amountIn: leg1MinOut,
+                      minAmountOut: leg2MinOut,
+                      route: leg2Route,
+                    },
+                  },
+                };
+
+                logger.info("TrueNativeSwap", "Multi-hop candidate built", {
+                  legs: [leg1Best.venue, leg2Best.venue],
+                  leg1Out: leg1Best.outputAmount,
+                  leg1MinOut,
+                  finalOut: leg2Best.outputAmount,
+                });
+              }
+            }
+          }
+        } catch (err) {
+          logger.warn("TrueNativeSwap", "Multi-hop quote failed", {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+    }
+
+    if (!bestDirect && !bestMultiHop) {
+      if (!directOracleOk) {
+        logger.warn("TrueNativeSwap", "Oracle missing for direct pair and multi-hop not available", {
+          inputMint: inputMintStr,
+          outputMint: outputMintStr,
+        });
+      } else {
+        logger.warn("TrueNativeSwap", "No native venues available for this pair");
+      }
       return null;
     }
 
-    // Prendre la meilleure quote
-    const best = quotes[0];
+    const selected =
+      bestMultiHop && (!bestDirect || bestMultiHop.outputAmount > bestDirect.outputAmount)
+        ? bestMultiHop
+        : bestDirect
+          ? {
+              venue: bestDirect.venue,
+              venueProgramId: bestDirect.venueProgramId,
+              inputAmount: bestDirect.inputAmount,
+              outputAmount: bestDirect.outputAmount,
+              priceImpactBps: bestDirect.priceImpactBps,
+              platformFeeBps: 15, // 0.15% platform fee
+              dexAccounts: bestDirect.accounts,
+              allQuotes: quotes,
+            }
+          : null;
 
-    return {
-      venue: best.venue,
-      venueProgramId: best.venueProgramId,
-      inputAmount: best.inputAmount,
-      outputAmount: best.outputAmount,
-      priceImpactBps: best.priceImpactBps,
-      platformFeeBps: 15, // 0.15% platform fee
-      dexAccounts: best.accounts,
-      allQuotes: quotes,
-    };
+    return selected;
   }
 
   // ==========================================================================
@@ -559,13 +1363,26 @@ export class TrueNativeSwap {
     const safeInput = toPublicKey(inputMint);
     const safeOutput = toPublicKey(outputMint);
 
+    // IMPORTANT: l'ATA dépend du token program (Tokenkeg vs Token-2022).
+    // Si on dérive avec le mauvais programId, le router on-chain peut:
+    // - inférer une mauvaise direction (ctx.user_token_account_a/b mismatch)
+    // - provoquer TransferChecked: "Account not associated with this Mint" (0x3)
+    const [inputTokenProgram, outputTokenProgram] = await Promise.all([
+      this.getMintOwner(safeInput),
+      this.getMintOwner(safeOutput),
+    ]);
+
     const userTokenAccountA = await getAssociatedTokenAddress(
       safeInput,
-      safeUser
+      safeUser,
+      false,
+      inputTokenProgram
     );
     const userTokenAccountB = await getAssociatedTokenAddress(
       safeOutput,
-      safeUser
+      safeUser,
+      false,
+      outputTokenProgram
     );
 
     // Note: vault_token_account_a/b sont les vaults du DEX pool, pas des PDAs du router
@@ -607,13 +1424,35 @@ export class TrueNativeSwap {
   async buildNativeSwapInstruction(
     userPublicKey: PublicKey,
     route: TrueNativeRoute,
-    params: TrueNativeSwapParams
+    params: TrueNativeSwapParams,
+    overrides?: {
+      userTokenAccountA?: PublicKey;
+      userTokenAccountB?: PublicKey;
+    }
   ): Promise<TransactionInstruction> {
     const safeUser = toPublicKey(userPublicKey);
     const inputMint = toPublicKey(params.inputMint);
     const outputMint = toPublicKey(params.outputMint);
-    const amountIn = params.amountIn;
-    const minAmountOut = params.minAmountOut;
+    const amountIn = Math.floor(params.amountIn);
+    const minAmountOut = Math.floor(params.minAmountOut);
+
+    if (!Number.isFinite(amountIn) || amountIn <= 0) {
+      throw new Error(
+        "Invalid amountIn for SwapToc: must be > 0 (in base units/lamports)."
+      );
+    }
+
+    // Phoenix (CLOB) n'est pas exécutable sans quote orderbook fiable.
+    // Défense en profondeur: gate aussi sur le programId (même si la route est mal étiquetée).
+    if (
+      DISABLED_BEST_ROUTE_VENUES.has(route.venue) ||
+      route.venueProgramId?.equals?.(DEX_PROGRAM_IDS.PHOENIX)
+    ) {
+      throw new Error(
+        `Venue native temporairement désactivée: ${route.venue}. ` +
+          `Phoenix requiert une quote orderbook pour éviter les IOC failures (0xF).`
+      );
+    }
 
     // Dériver les comptes
     const accounts = await this.deriveSwapAccounts(
@@ -621,6 +1460,71 @@ export class TrueNativeSwap {
       inputMint,
       outputMint
     );
+
+    const userTokenAccountA = overrides?.userTokenAccountA ?? accounts.userTokenAccountA;
+    const userTokenAccountB = overrides?.userTokenAccountB ?? accounts.userTokenAccountB;
+
+    // Défense en profondeur: vérifier la cohérence on-chain des ATAs et des reserves
+    try {
+      const { AccountLayout } = await import("@solana/spl-token");
+
+      // Vérifier les ATAs utilisateurs (mint match)
+      const [userAInfo, userBInfo] = await Promise.all([
+        this.connection.getAccountInfo(userTokenAccountA),
+        this.connection.getAccountInfo(userTokenAccountB),
+      ]);
+
+      if (userAInfo?.data) {
+        try {
+          const decoded = AccountLayout.decode(userAInfo.data);
+          const ataMint = new PublicKey(decoded.mint);
+          if (!ataMint.equals(inputMint)) {
+            throw new Error(`User ATA A mint mismatch: expected ${inputMint.toBase58()} got ${ataMint.toBase58()}`);
+          }
+        } catch (e) {
+          throw new Error(`Failed ATA A sanity check: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+
+      if (userBInfo?.data) {
+        try {
+          const decoded = AccountLayout.decode(userBInfo.data);
+          const ataMint = new PublicKey(decoded.mint);
+          if (!ataMint.equals(outputMint)) {
+            throw new Error(`User ATA B mint mismatch: expected ${outputMint.toBase58()} got ${ataMint.toBase58()}`);
+          }
+        } catch (e) {
+          throw new Error(`Failed ATA B sanity check: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+
+      // Vérifier les reserves fournies par le DEX (seulement pour Meteora)
+      if (route.venue === "METEORA_DLMM") {
+        const vaults = [route.dexAccounts.vaultTokenAccountA, route.dexAccounts.vaultTokenAccountB].filter(Boolean) as PublicKey[];
+        if (vaults.length === 2) {
+          const [rxInfo, ryInfo] = await this.connection.getMultipleAccountsInfo(vaults);
+          if (rxInfo?.data && ryInfo?.data) {
+            const rx = AccountLayout.decode(rxInfo.data);
+            const ry = AccountLayout.decode(ryInfo.data);
+            const rxMint = new PublicKey(rx.mint);
+            const ryMint = new PublicKey(ry.mint);
+
+            const tokenXFromDex = route.dexAccounts.accounts[6];
+            const tokenYFromDex = route.dexAccounts.accounts[7];
+            if (!rxMint.equals(tokenXFromDex) && !rxMint.equals(tokenYFromDex)) {
+              throw new Error(`Reserve X mint ${rxMint.toBase58()} does not match tokenX/tokenY from DEX`);
+            }
+            if (!ryMint.equals(tokenXFromDex) && !ryMint.equals(tokenYFromDex)) {
+              throw new Error(`Reserve Y mint ${ryMint.toBase58()} does not match tokenX/tokenY from DEX`);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Faire échouer la construction de la transaction avec un message lisible
+      logger.error("TrueNativeSwap", "Pre-swap sanity check failed", { error: e instanceof Error ? e.message : String(e) });
+      throw new Error(`Pre-swap sanity check failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
 
     const normalizedDexAccounts = route.dexAccounts.accounts.map((pubkey, index) => {
       try {
@@ -726,11 +1630,11 @@ export class TrueNativeSwap {
     // En mode direct DEX, vault_token_account_a/b ne sont pas utilisés par le CPI (les comptes DEX sont en remaining_accounts).
     // Pour éviter d'embarquer des vaults de pool (souvent uniques) et gonfler la taille de la transaction,
     // on pointe vers les ATAs user.
-    const vaultTokenAccountA = accounts.userTokenAccountA;
-    const vaultTokenAccountB = accounts.userTokenAccountB;
+    const vaultTokenAccountA = userTokenAccountA;
+    const vaultTokenAccountB = userTokenAccountB;
 
-    // user_rebate est optionnel : placeholder par défaut pour limiter la taille.
-    const userRebateKey = ROUTER_PROGRAM_ID;
+    // user_rebate est désormais créé automatiquement côté on-chain (init_if_needed).
+    // Le client DOIT toujours fournir le PDA dérivé et le marquer writable.
 
     // Construire les metas des remaining accounts DEX avec les bons flags.
     // IMPORTANT:
@@ -891,9 +1795,9 @@ export class TrueNativeSwap {
         isWritable: false 
       },
       // 5. user_token_account_a
-      { pubkey: accounts.userTokenAccountA, isSigner: false, isWritable: true },
+      { pubkey: userTokenAccountA, isSigner: false, isWritable: true },
       // 6. user_token_account_b
-      { pubkey: accounts.userTokenAccountB, isSigner: false, isWritable: true },
+      { pubkey: userTokenAccountB, isSigner: false, isWritable: true },
       // 7. vault_token_account_a - DEX pool vault
       { pubkey: vaultTokenAccountA, isSigner: false, isWritable: true },
       // 8. vault_token_account_b - DEX pool vault
@@ -910,8 +1814,8 @@ export class TrueNativeSwap {
       { pubkey: ROUTER_PROGRAM_ID, isSigner: false, isWritable: false },
       // 14. user_rebate_account (optional)
       { pubkey: ROUTER_PROGRAM_ID, isSigner: false, isWritable: false },
-      // 15. user_rebate (optional, PDA) - use placeholder if not initialized
-      { pubkey: userRebateKey, isSigner: false, isWritable: false },
+      // 15. user_rebate (PDA, writable) - init_if_needed on-chain
+      { pubkey: accounts.userRebate, isSigner: false, isWritable: true },
       // 16. rebate_vault (writable, PDA)
       { pubkey: accounts.rebateVault, isSigner: false, isWritable: true },
       // 17. oracle_cache (optional, PDA)
@@ -1078,26 +1982,380 @@ export class TrueNativeSwap {
     const userPublicKey = toPublicKey(params.userPublicKey);
     const inputMint = toPublicKey(params.inputMint);
     const outputMint = toPublicKey(params.outputMint);
-    const amountIn = params.amountIn;
-    const minAmountOut = params.minAmountOut;
+    const amountIn = Math.floor(params.amountIn);
+    const slippageBps = params.slippageBps;
 
     logger.info("TrueNativeSwap", "Building true native swap transaction", {
       inputMint: inputMint.toBase58().slice(0, 8),
       outputMint: outputMint.toBase58().slice(0, 8),
       amountIn,
-      minAmountOut,
+      slippageBps,
     });
 
-    // 1. Obtenir la meilleure route native
-    const route = await this.getBestNativeRoute(params);
+    if (!Number.isFinite(amountIn) || amountIn <= 0) {
+      throw new Error(
+        "Invalid amountIn for native swap: must be > 0 (in base units/lamports). " +
+          "If you typed a decimal amount, ensure it did not round down to 0."
+      );
+    }
+
+    if (!Number.isSafeInteger(amountIn)) {
+      throw new Error(
+        "Invalid amountIn for native swap: amountIn must be a safe integer number of base units."
+      );
+    }
+
+    const resolveExistingUserTokenAccountForMint = async (opts: {
+      mint: PublicKey;
+      minAmount: number;
+    }): Promise<PublicKey> => {
+      const { mint, minAmount } = opts;
+
+      const readDecodedTokenAmount = (decoded: any): bigint => {
+        const v = decoded?.amount;
+        if (typeof v === "bigint") return v;
+        if (typeof v === "number") return BigInt(v);
+        if (typeof v === "string") return BigInt(v);
+        if (v && (Buffer.isBuffer(v) || v instanceof Uint8Array)) {
+          return Buffer.from(v).readBigUInt64LE(0);
+        }
+        if (Array.isArray(v)) {
+          return Buffer.from(v).readBigUInt64LE(0);
+        }
+        throw new Error("Unsupported token account amount encoding");
+      };
+
+      const mintInfo = await this.getAccountInfoWithRetry(mint);
+      if (!mintInfo) throw new Error(`Mint introuvable: ${mint.toBase58()}`);
+
+      const tokenProgram = mintInfo.owner;
+      const ata = await getAssociatedTokenAddress(mint, userPublicKey, false, tokenProgram);
+      const ataInfo = await this.getAccountInfoWithRetry(ata);
+
+      if (ataInfo?.data) {
+        try {
+          const { AccountLayout } = await import("@solana/spl-token");
+          const decoded = AccountLayout.decode(ataInfo.data);
+          const ataMint = new PublicKey(decoded.mint);
+          if (ataMint.equals(mint)) {
+            const ataAmt = readDecodedTokenAmount(decoded);
+            if (ataAmt >= BigInt(minAmount)) return ata;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      const { AccountLayout } = await import("@solana/spl-token");
+      const candidates: Array<{ pubkey: PublicKey; amount: bigint }> = [];
+
+      if (tokenProgram.equals(TOKEN_PROGRAM_ID)) {
+        const resp = await this.connection.getTokenAccountsByOwner(userPublicKey, { mint });
+        for (const { pubkey, account } of resp.value) {
+          try {
+            const decoded = AccountLayout.decode(account.data);
+            const accMint = new PublicKey(decoded.mint);
+            if (!accMint.equals(mint)) continue;
+            const amt = readDecodedTokenAmount(decoded);
+            candidates.push({ pubkey, amount: amt });
+          } catch {
+            // ignore
+          }
+        }
+      } else if (tokenProgram.equals(TOKEN_2022_PROGRAM_ID)) {
+        // RPC filter { mint } n'est pas fiable pour Token-2022; on filtre côté client.
+        const resp = await this.connection.getTokenAccountsByOwner(userPublicKey, { programId: TOKEN_2022_PROGRAM_ID });
+        for (const { pubkey, account } of resp.value) {
+          try {
+            const decoded = AccountLayout.decode(account.data);
+            const accMint = new PublicKey(decoded.mint);
+            if (!accMint.equals(mint)) continue;
+            const amt = readDecodedTokenAmount(decoded);
+            candidates.push({ pubkey, amount: amt });
+          } catch {
+            // ignore
+          }
+        }
+      }
+
+      const best = candidates
+        .filter((c) => c.amount >= BigInt(minAmount))
+        .sort((a, b) => (a.amount > b.amount ? -1 : a.amount < b.amount ? 1 : 0))[0];
+
+      if (best) return best.pubkey;
+
+      throw new Error(
+        `No initialized token account found for input mint ${mint.toBase58()} with required amount ${minAmount}. ` +
+          `Fund the wallet with this token (ideally its ATA), or set SOLANA_KEYPAIR to a funded wallet.`
+      );
+    };
+
+    // 1. Obtenir la meilleure route native (ou utiliser celle déjà calculée)
+    const route =
+      params.routeOverride ??
+      (await this.getBestNativeRoute({
+        inputMint,
+        outputMint,
+        amountIn,
+        minAmountOut: 0,
+        slippageBps,
+        userPublicKey,
+      }));
     if (!route) {
       logger.error("TrueNativeSwap", "No native route available");
       return null;
     }
 
+    // V1.1 multi-hop: construire une transaction avec 2 legs.
+    if (route.multiHop) {
+      const instructions: TransactionInstruction[] = [];
+
+      // Priority fee
+      instructions.push(
+        ComputeBudgetProgram.setComputeUnitLimit({ units: COMPUTE_UNITS })
+      );
+      instructions.push(
+        ComputeBudgetProgram.setComputeUnitPrice({
+          microLamports: PRIORITY_FEE_MICRO_LAMPORTS,
+        })
+      );
+
+      // Input side WSOL handling (wrap) si inputMint est SOL.
+      let resolvedUserTokenAccountA: PublicKey | null = null;
+      if (inputMint.equals(SOL_MINT)) {
+        const userWsolAta = await getAssociatedTokenAddress(inputMint, userPublicKey);
+
+        const inputAtaInfo = await this.getAccountInfoWithRetry(userWsolAta);
+        if (!inputAtaInfo) {
+          instructions.push(
+            createAssociatedTokenAccountInstruction(
+              userPublicKey,
+              userWsolAta,
+              userPublicKey,
+              inputMint
+            )
+          );
+        }
+
+        let currentWsolAmount = 0;
+        try {
+          if (inputAtaInfo) {
+            const bal = await this.connection.getTokenAccountBalance(userWsolAta);
+            currentWsolAmount = Number(bal.value.amount);
+          }
+        } catch {
+          currentWsolAmount = 0;
+        }
+
+        const deficit = Math.max(0, amountIn - currentWsolAmount);
+        if (deficit > 0) {
+          instructions.push(
+            SystemProgram.transfer({
+              fromPubkey: userPublicKey,
+              toPubkey: userWsolAta,
+              lamports: deficit,
+            })
+          );
+          instructions.push(createSyncNativeInstruction(userWsolAta));
+        }
+
+        resolvedUserTokenAccountA = userWsolAta;
+      }
+
+      if (!inputMint.equals(SOL_MINT)) {
+        resolvedUserTokenAccountA = await resolveExistingUserTokenAccountForMint({
+          mint: inputMint,
+          minAmount: amountIn,
+        });
+      }
+
+      // Intermédiaire (USDC) ATA: nécessaire avant le 1er swap.
+      const userUsdcAta = await getAssociatedTokenAddress(USDC_MINT, userPublicKey);
+      const usdcAtaInfo = await this.getAccountInfoWithRetry(userUsdcAta);
+      if (!usdcAtaInfo) {
+        instructions.push(
+          createAssociatedTokenAccountInstruction(
+            userPublicKey,
+            userUsdcAta,
+            userPublicKey,
+            USDC_MINT
+          )
+        );
+      }
+
+      // Output ATA (peut être Token-2022): créer si nécessaire.
+      const outputMintInfo = await this.getAccountInfoWithRetry(outputMint);
+      if (!outputMintInfo) {
+        throw new Error(`Mint introuvable (output): ${outputMint.toBase58()}`);
+      }
+      const outputTokenProgram = outputMintInfo.owner;
+
+      const userOutputAta = await getAssociatedTokenAddress(
+        outputMint,
+        userPublicKey,
+        false,
+        outputTokenProgram
+      );
+      const outAtaInfo = await this.getAccountInfoWithRetry(userOutputAta);
+      if (!outAtaInfo) {
+        instructions.push(
+          createAssociatedTokenAccountInstruction(
+            userPublicKey,
+            userOutputAta,
+            userPublicKey,
+            outputMint,
+            outputTokenProgram
+          )
+        );
+      }
+
+      // 1er leg (input -> USDC)
+      const leg1Params: TrueNativeSwapParams = {
+        inputMint: route.multiHop.firstLeg.inputMint,
+        outputMint: route.multiHop.firstLeg.outputMint,
+        amountIn: route.multiHop.firstLeg.amountIn,
+        minAmountOut: route.multiHop.firstLeg.minAmountOut,
+        slippageBps,
+        userPublicKey,
+        routeOverride: route.multiHop.firstLeg.route,
+      };
+      instructions.push(
+        await this.buildNativeSwapInstruction(userPublicKey, route.multiHop.firstLeg.route, leg1Params, {
+          userTokenAccountA: resolvedUserTokenAccountA ?? undefined,
+          userTokenAccountB: userUsdcAta,
+        })
+      );
+
+      // 2e leg (USDC -> output)
+      const leg2Params: TrueNativeSwapParams = {
+        inputMint: route.multiHop.secondLeg.inputMint,
+        outputMint: route.multiHop.secondLeg.outputMint,
+        amountIn: route.multiHop.secondLeg.amountIn,
+        minAmountOut: route.multiHop.secondLeg.minAmountOut,
+        slippageBps,
+        userPublicKey,
+        routeOverride: route.multiHop.secondLeg.route,
+      };
+      instructions.push(
+        await this.buildNativeSwapInstruction(userPublicKey, route.multiHop.secondLeg.route, leg2Params, {
+          userTokenAccountA: userUsdcAta,
+          userTokenAccountB: userOutputAta,
+        })
+      );
+
+      // Output side: unwrap SOL si nécessaire (close WSOL ATA)
+      if (outputMint.equals(SOL_MINT)) {
+        let closeIx: TransactionInstruction | null = null;
+
+        try {
+          const spl: any = await import("@solana/spl-token");
+          const createClose =
+            spl?.createCloseAccountInstruction ??
+            spl?.default?.createCloseAccountInstruction;
+
+          if (typeof createClose === "function") {
+            closeIx = createClose(
+              userOutputAta,
+              userPublicKey,
+              userPublicKey
+            );
+          }
+        } catch {
+          // ignore
+        }
+
+        if (!closeIx) {
+          closeIx = new TransactionInstruction({
+            programId: TOKEN_PROGRAM_ID,
+            keys: [
+              { pubkey: userOutputAta, isSigner: false, isWritable: true },
+              { pubkey: userPublicKey, isSigner: false, isWritable: true },
+              { pubkey: userPublicKey, isSigner: true, isWritable: false },
+            ],
+            data: Buffer.from([9]),
+          });
+        }
+
+        instructions.push(closeIx);
+      }
+
+      const { blockhash, lastValidBlockHeight } =
+        await this.connection.getLatestBlockhash();
+
+      const lookupTables = await getAllALTs(this.connection);
+      const messageV0 = new TransactionMessage({
+        payerKey: userPublicKey,
+        recentBlockhash: blockhash,
+        instructions,
+      }).compileToV0Message(lookupTables);
+
+      const transaction = new VersionedTransaction(messageV0);
+
+      const [planPda] = this.deriveSwapPlanAddress(userPublicKey);
+
+      return {
+        transaction,
+        route,
+        planAccount: planPda,
+        blockhash,
+        lastValidBlockHeight,
+      };
+    }
+
+    if (
+      DISABLED_BEST_ROUTE_VENUES.has(route.venue) ||
+      route.venueProgramId?.equals?.(DEX_PROGRAM_IDS.PHOENIX)
+    ) {
+      throw new Error(
+        `Venue native temporairement désactivée: ${route.venue}. ` +
+          `Phoenix requiert une quote orderbook pour éviter les IOC failures (0xF).`
+      );
+    }
+
     logger.info("TrueNativeSwap", `Best route: ${route.venue}`, {
       outputAmount: route.outputAmount,
       priceImpactBps: route.priceImpactBps,
+    });
+
+    // MinOut strict dérivé de la route réellement utilisée + slippage utilisateur.
+    // IMPORTANT: Raydium renvoie `otherAmountThreshold` (minOut) qui peut inclure
+    // des détails spécifiques (arrondis/frais) et doit être préféré pour éviter
+    // "exceeds desired slippage limit" (custom program error: 0x1e).
+    let minAmountOut = Math.max(
+      0,
+      Math.floor((route.outputAmount * (10_000 - slippageBps)) / 10_000)
+    );
+
+    if (route.venue === "RAYDIUM_AMM") {
+      const raydiumQuote = await this.getRaydiumQuote(
+        inputMint,
+        outputMint,
+        amountIn,
+        route.dexAccounts,
+        slippageBps
+      );
+      if (raydiumQuote?.minOutAmount && Number.isFinite(raydiumQuote.minOutAmount)) {
+        const candidate = Math.max(0, Math.floor(raydiumQuote.minOutAmount));
+        if (candidate > 0) {
+          minAmountOut = candidate;
+        }
+      }
+    }
+
+    // Sanity: si minOut est supérieur au out estimé, la simulation échouera.
+    if (minAmountOut > route.outputAmount) {
+      logger.warn("TrueNativeSwap", "minAmountOut exceeds quoted outputAmount", {
+        minAmountOut,
+        outputAmount: route.outputAmount,
+        venue: route.venue,
+        slippageBps,
+        hint: "MinOut should generally be <= quoted outAmount (after slippage)",
+      });
+    }
+
+    logger.info("TrueNativeSwap", "Derived minAmountOut", {
+      minAmountOut,
+      slippageBps,
     });
 
     // 2. Créer les instructions
@@ -1119,13 +2377,14 @@ export class TrueNativeSwap {
     // - Créer l'ATA WSOL si absent
     // - Transférer uniquement le déficit (si solde WSOL < amountIn)
     // - syncNative pour refléter les lamports dans le amount SPL
+    let resolvedUserTokenAccountA: PublicKey | null = null;
     if (inputMint.equals(SOL_MINT)) {
       const userTokenAccountA = await getAssociatedTokenAddress(
         inputMint,
         userPublicKey
       );
 
-      const inputAtaInfo = await this.connection.getAccountInfo(userTokenAccountA);
+      const inputAtaInfo = await this.getAccountInfoWithRetry(userTokenAccountA);
       if (!inputAtaInfo) {
         instructions.push(
           createAssociatedTokenAccountInstruction(
@@ -1158,28 +2417,100 @@ export class TrueNativeSwap {
         );
         instructions.push(createSyncNativeInstruction(userTokenAccountA));
       }
+
+      resolvedUserTokenAccountA = userTokenAccountA;
     }
+
+    if (!inputMint.equals(SOL_MINT)) {
+      resolvedUserTokenAccountA = await resolveExistingUserTokenAccountForMint({
+        mint: inputMint,
+        minAmount: amountIn,
+      });
+    }
+
+    const outputMintInfo = await this.getAccountInfoWithRetry(outputMint);
+    if (!outputMintInfo) {
+      throw new Error(`Mint introuvable (output): ${outputMint.toBase58()}`);
+    }
+    const outputTokenProgram = outputMintInfo.owner;
 
     const userTokenAccountB = await getAssociatedTokenAddress(
       outputMint,
-      userPublicKey
+      userPublicKey,
+      false,
+      outputTokenProgram
     );
-    const accountInfo = await this.connection.getAccountInfo(userTokenAccountB);
+    const accountInfo = await this.getAccountInfoWithRetry(userTokenAccountB);
     if (!accountInfo) {
       instructions.push(
         createAssociatedTokenAccountInstruction(
           userPublicKey,
           userTokenAccountB,
           userPublicKey,
-          outputMint
+          outputMint,
+          outputTokenProgram
         )
       );
     }
 
+    const resolvedUserTokenAccountB = userTokenAccountB;
+
     // 3. Ajouter l'instruction de swap (chemin direct: pas de SwapPlan)
+    // IMPORTANT: on force l'usage des montants dérivés/validés (évite amount_in=0 → 6014)
+    const effectiveParams: TrueNativeSwapParams = {
+      ...params,
+      amountIn,
+      minAmountOut,
+    };
     instructions.push(
-      await this.buildNativeSwapInstruction(userPublicKey, route, params)
+      await this.buildNativeSwapInstruction(userPublicKey, route, effectiveParams, {
+        userTokenAccountA: resolvedUserTokenAccountA ?? undefined,
+        userTokenAccountB: resolvedUserTokenAccountB,
+      })
     );
+    
+    // Output side: si l'utilisateur a demandé du SOL natif, on swap vers WSOL
+    // (So111...) puis on close le compte WSOL pour unwrap et renvoyer les lamports.
+    // NOTE: on utilise l'ATA WSOL (créé ci-dessus si absent). Il sera recréé au besoin.
+    if (outputMint.equals(SOL_MINT)) {
+      // Certaines versions/bundles de @solana/spl-token n'exportent pas toujours
+      // `createCloseAccountInstruction` de manière stable (CJS/ESM). On fait donc
+      // un import dynamique + fallback sur une instruction CloseAccount manuelle.
+      let closeIx: TransactionInstruction | null = null;
+
+      try {
+        const spl: any = await import("@solana/spl-token");
+        const createClose =
+          spl?.createCloseAccountInstruction ??
+          spl?.default?.createCloseAccountInstruction;
+
+        if (typeof createClose === "function") {
+          closeIx = createClose(
+            userTokenAccountB, // account
+            userPublicKey, // destination
+            userPublicKey // owner
+          );
+        }
+      } catch {
+        // ignore
+      }
+
+      if (!closeIx) {
+        // SPL Token CloseAccount instruction (Tokenkeg): tag = 9
+        // Accounts: [account (w), destination (w), owner (signer)]
+        closeIx = new TransactionInstruction({
+          programId: TOKEN_PROGRAM_ID,
+          keys: [
+            { pubkey: userTokenAccountB, isSigner: false, isWritable: true },
+            { pubkey: userPublicKey, isSigner: false, isWritable: true },
+            { pubkey: userPublicKey, isSigner: true, isWritable: false },
+          ],
+          data: Buffer.from([9]),
+        });
+      }
+
+      instructions.push(closeIx);
+    }
 
     // 4. Construire la transaction versionnée
     const { blockhash, lastValidBlockHeight } =
@@ -1203,6 +2534,8 @@ export class TrueNativeSwap {
       transaction,
       route,
       planAccount: planPda,
+      blockhash,
+      lastValidBlockHeight,
     };
   }
 }

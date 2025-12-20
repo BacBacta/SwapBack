@@ -55,7 +55,14 @@ export async function runInstrumentedFetchRoutes(
     source,
   });
 
-  await fetchRoutes({ userPublicKey: walletAddress });
+  const backgroundRefresh = source === "auto-refresh" && selectedRouter === "swapback";
+  const fetchOptions: { userPublicKey: string | null; background?: true } = {
+    userPublicKey: walletAddress,
+  };
+  if (backgroundRefresh) {
+    fetchOptions.background = true;
+  }
+  await fetchRoutes(fetchOptions);
 
   const finishedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
   const latestRoutes = getRoutesState();

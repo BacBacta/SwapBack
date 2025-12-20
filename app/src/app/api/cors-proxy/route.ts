@@ -47,13 +47,20 @@ function getAllowedDomains(): string[] {
 
 const ALLOWED_DOMAINS = getAllowedDomains();
 
-// Headers CORS pour les réponses
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Requested-With',
-  'Access-Control-Allow-Credentials': 'true',
-};
+function getCorsHeaders(request?: NextRequest): Record<string, string> {
+  // En prod, préférer une origine explicite via ALLOWED_ORIGIN.
+  // Éviter "*" + credentials (invalide côté navigateur).
+  const configured = process.env.ALLOWED_ORIGIN?.trim();
+  const origin = request?.headers.get('origin') || '';
+  const allowOrigin = configured && configured.length > 0 ? configured : origin || '*';
+
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Requested-With',
+    'Vary': 'Origin',
+  };
+}
 
 /**
  * Handler OPTIONS pour les preflight requests
@@ -61,7 +68,7 @@ const CORS_HEADERS = {
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,
-    headers: CORS_HEADERS,
+    headers: getCorsHeaders(),
   });
 }
 
@@ -69,6 +76,7 @@ export async function OPTIONS() {
  * Handler GET - Proxy la requête vers l'URL spécifiée
  */
 export async function GET(request: NextRequest) {
+  const CORS_HEADERS = getCorsHeaders(request);
   const { searchParams } = new URL(request.url);
   const targetUrl = searchParams.get('url');
 
@@ -181,6 +189,7 @@ export async function GET(request: NextRequest) {
  * Handler POST - Proxy les requêtes POST (pour Jupiter swap, etc.)
  */
 export async function POST(request: NextRequest) {
+  const CORS_HEADERS = getCorsHeaders(request);
   const { searchParams } = new URL(request.url);
   const targetUrl = searchParams.get('url');
 
