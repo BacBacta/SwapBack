@@ -24,6 +24,20 @@ import { getOrcaWhirlpool, ORCA_WHIRLPOOL_PROGRAM_ID } from "@/sdk/config/orca-p
 // Route handler: toujours dynamique (aucune exécution au build)
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+export const runtime = "nodejs";
+
+const BUILD_COMMIT =
+  process.env.VERCEL_GIT_COMMIT_SHA ||
+  process.env.VERCEL_GITHUB_COMMIT_SHA ||
+  process.env.GITHUB_SHA ||
+  "unknown";
+
+function withBuildHeaders(headers: Record<string, string>): Record<string, string> {
+  return {
+    ...headers,
+    "X-SwapBack-Commit": BUILD_COMMIT,
+  };
+}
 
 const NO_STORE_HEADERS: Record<string, string> = {
   "Cache-Control": "no-store",
@@ -189,7 +203,7 @@ async function quoteWithOrcaWhirlpoolSdk(params: {
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 204,
-    headers: { ...getCorsHeaders(request.headers.get("origin")), ...NO_STORE_HEADERS },
+    headers: withBuildHeaders({ ...getCorsHeaders(request.headers.get("origin")), ...NO_STORE_HEADERS }),
   });
 }
 
@@ -202,7 +216,7 @@ export async function GET(request: NextRequest) {
   const slippageBpsParam = searchParams.get("slippageBps");
   const forceFresh = searchParams.get("forceFresh") === "1" || searchParams.get("forceFresh") === "true";
   const corsHeaders = getCorsHeaders(request.headers.get("origin"));
-  const responseHeaders = { ...corsHeaders, ...NO_STORE_HEADERS };
+  const responseHeaders = withBuildHeaders({ ...corsHeaders, ...NO_STORE_HEADERS });
 
   if (!inputMint || !outputMint || !amount) {
     return NextResponse.json(
@@ -243,6 +257,7 @@ export async function GET(request: NextRequest) {
         }
       })();
 
+    let sdkErrorFirst: string | null = null;
     if (resolvedPool) {
       try {
         const sdkQuote = await quoteWithOrcaWhirlpoolSdk({
@@ -269,12 +284,13 @@ export async function GET(request: NextRequest) {
           { headers: responseHeaders }
         );
       } catch (sdkError) {
+        sdkErrorFirst = String(sdkError);
         // If SDK fails (pool mismatch, RPC hiccup), continue and try REST retries.
         console.warn("[Orca Quote API] SDK quote failed; falling back to REST", {
           inputMint,
           outputMint,
           pool: resolvedPool,
-          error: String(sdkError),
+          error: sdkErrorFirst,
         });
       }
     }
@@ -420,7 +436,12 @@ export async function GET(request: NextRequest) {
 
     // All retries exhausted (no fallback possible)
     return NextResponse.json(
-      { error: "Orca API unavailable after retries", lastError },
+      {
+        error: "Orca API unavailable after retries",
+        lastError,
+        resolvedPool,
+        sdkError: sdkErrorFirst,
+      },
       { status: 503, headers: responseHeaders }
     );
   } catch (error) {
