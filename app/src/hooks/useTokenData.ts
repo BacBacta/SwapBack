@@ -9,6 +9,8 @@ export const useTokenData = (tokenMint: string) => {
   const { connection } = useConnection();
   const { publicKey, connected } = useWallet();
 
+  const debug = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEBUG_TOKEN_DATA === "1";
+
   const [balance, setBalance] = useState<number>(0);
   const [usdPrice, setUsdPrice] = useState<number>(0);
   const [loading, setLoading] = useState(true); // Start as loading
@@ -20,7 +22,12 @@ export const useTokenData = (tokenMint: string) => {
 
   // Debug: log the tokenMint on mount/change
   useEffect(() => {
-    console.log(`🎯 useTokenData: tokenMint="${tokenMint}", connected=${connected}, publicKey=${publicKey?.toString()?.substring(0,8) || 'null'}`);
+    if (!debug) return;
+    console.debug(
+      `[useTokenData] tokenMint="${tokenMint}" connected=${connected} publicKey=${
+        publicKey?.toString()?.substring(0, 8) || "null"
+      }`
+    );
   }, [tokenMint, connected, publicKey]);
 
     // Récupérer le solde du token
@@ -28,24 +35,33 @@ export const useTokenData = (tokenMint: string) => {
     const fetchBalance = async () => {
       // Check wallet connected status
       if (!connected || !publicKey) {
-        console.warn("⚠️ useTokenData: Wallet not connected", { connected, hasPublicKey: !!publicKey });
+        if (debug) {
+          console.debug("[useTokenData] wallet not connected", { connected, hasPublicKey: !!publicKey });
+        }
         setBalance(0);
         setLoading(false);
         return;
       }
       
       if (!connection || !tokenMint) {
-        console.warn("⚠️ useTokenData: Missing connection or tokenMint", { 
-          hasConnection: !!connection, 
-          tokenMint 
-        });
+        if (debug) {
+          console.debug("[useTokenData] missing connection or tokenMint", {
+            hasConnection: !!connection,
+            tokenMint,
+          });
+        }
         setBalance(0);
         setLoading(false);
         return;
       }
 
-      console.log(`🔍 useTokenData: Fetching balance for mint="${tokenMint}" wallet="${publicKey.toString().substring(0,8)}..."`);
-      console.log(`🔍 Is SOL? ${tokenMint === "So11111111111111111111111111111111111111112"}`);
+      if (debug) {
+        console.debug("[useTokenData] fetching balance", {
+          mint: tokenMint,
+          wallet: publicKey.toString().substring(0, 8) + "...",
+          isSol: tokenMint === "So11111111111111111111111111111111111111112",
+        });
+      }
       setLoading(true);
 
       try {
@@ -55,7 +71,9 @@ export const useTokenData = (tokenMint: string) => {
         ) {
           const lamports = await connection.getBalance(publicKey);
           const solBalance = lamports / 1e9;
-          console.log(`✅ SOL balance: ${solBalance.toFixed(6)} SOL`);
+          if (debug) {
+            console.debug("[useTokenData] SOL balance", solBalance);
+          }
           setBalance(solBalance);
           setLoading(false);
           return; // Important: exit early for native SOL
@@ -72,20 +90,32 @@ export const useTokenData = (tokenMint: string) => {
               TOKEN_PROGRAM_ID
             );
             
-            console.log(`🔍 Checking SPL Token ATA: ${ata.toBase58()}`);
+            if (debug) {
+              console.debug("[useTokenData] checking SPL ATA", ata.toBase58());
+            }
             
             // Use getTokenAccountBalance to get correct decimals from chain
             try {
               const tokenBalance = await connection.getTokenAccountBalance(ata);
               const balance = tokenBalance.value.uiAmount ?? 0;
-              console.log(`✅ SPL Token ${tokenMint.substring(0, 8)}... balance: ${balance} (decimals: ${tokenBalance.value.decimals})`);
+              if (debug) {
+                console.debug("[useTokenData] SPL balance", {
+                  mint: tokenMint.substring(0, 8) + "...",
+                  balance,
+                  decimals: tokenBalance.value.decimals,
+                });
+              }
               setBalance(balance);
               return;
             } catch (balanceError) {
-              console.log(`⚠️ SPL Token getTokenAccountBalance failed:`, balanceError);
+              if (debug) {
+                console.debug("[useTokenData] SPL getTokenAccountBalance failed", balanceError);
+              }
             }
           } catch (splError) {
-            console.log(`⚠️ SPL Token account not found for ${tokenMint.substring(0, 8)}..., error:`, splError);
+            if (debug) {
+              console.debug("[useTokenData] SPL account not found", splError);
+            }
           }
           
           // Fallback to Token-2022
@@ -97,24 +127,38 @@ export const useTokenData = (tokenMint: string) => {
               TOKEN_2022_PROGRAM_ID
             );
             
-            console.log(`🔍 Checking Token-2022 ATA: ${ata.toBase58()}`);
+            if (debug) {
+              console.debug("[useTokenData] checking Token-2022 ATA", ata.toBase58());
+            }
             
             // Use getTokenAccountBalance for Token-2022 as well
             try {
               const tokenBalance = await connection.getTokenAccountBalance(ata);
               const balance = tokenBalance.value.uiAmount ?? 0;
-              console.log(`✅ Token-2022 ${tokenMint.substring(0, 8)}... balance: ${balance} (decimals: ${tokenBalance.value.decimals})`);
+              if (debug) {
+                console.debug("[useTokenData] Token-2022 balance", {
+                  mint: tokenMint.substring(0, 8) + "...",
+                  balance,
+                  decimals: tokenBalance.value.decimals,
+                });
+              }
               setBalance(balance);
               return;
             } catch (balanceError) {
-              console.log(`⚠️ Token-2022 getTokenAccountBalance failed:`, balanceError);
+              if (debug) {
+                console.debug("[useTokenData] Token-2022 getTokenAccountBalance failed", balanceError);
+              }
             }
           } catch (token2022Error) {
-            console.log(`⚠️ Token-2022 account not found for ${tokenMint.substring(0, 8)}..., error:`, token2022Error);
+            if (debug) {
+              console.debug("[useTokenData] Token-2022 account not found", token2022Error);
+            }
           }
           
           // No account found
-          console.log(`❌ No token account found for ${tokenMint.substring(0, 8)}... in either program`);
+          if (debug) {
+            console.debug("[useTokenData] no token account found", tokenMint.substring(0, 8) + "...");
+          }
           setBalance(0);
         }
       } catch (error) {
@@ -170,35 +214,13 @@ export const useTokenData = (tokenMint: string) => {
           const data = await response.json();
           if (data.price && data.price > 0) {
             setUsdPrice(data.price);
-            console.log(`💰 Prix temps réel ${tokenMint.substring(0, 8)}... = $${data.price.toFixed(4)} (source: ${data.source})`);
+            if (debug) {
+              console.debug(
+                `[useTokenData] price ${tokenMint.substring(0, 8)}... = $${data.price.toFixed(4)} (source: ${data.source})`
+              );
+            }
             return;
           }
-        }
-
-        // Fallback: essayer Jupiter directement (peut échouer avec CORS)
-        try {
-          const jupiterResponse = await fetch(
-            `https://api.jup.ag/price/v2?ids=${tokenMint}`,
-            { 
-              signal: AbortSignal.timeout(5000),
-              headers: { 'Accept': 'application/json' }
-            }
-          );
-
-          if (jupiterResponse.ok) {
-            const jupiterData = await jupiterResponse.json();
-            if (jupiterData.data?.[tokenMint]?.price) {
-              const price = parseFloat(jupiterData.data[tokenMint].price);
-              if (price > 0) {
-                setUsdPrice(price);
-                console.log(`💰 Jupiter direct ${tokenMint.substring(0, 8)}... = $${price.toFixed(4)}`);
-                return;
-              }
-            }
-          }
-        } catch (jupiterError) {
-          // Jupiter direct failed, continue to fallback
-          console.warn('Jupiter direct price fetch failed:', jupiterError);
         }
 
         // Dernier fallback: prix statiques pour tokens connus
@@ -210,12 +232,16 @@ export const useTokenData = (tokenMint: string) => {
         const fallbackPrice = fallbackPrices[tokenMint];
         if (fallbackPrice) {
           setUsdPrice(fallbackPrice);
-          console.log(`💰 Fallback ${tokenMint.substring(0, 8)}... = $${fallbackPrice.toFixed(4)}`);
+          if (debug) {
+            console.debug(`💰 Fallback ${tokenMint.substring(0, 8)}... = $${fallbackPrice.toFixed(4)}`);
+          }
           return;
         }
 
         // Aucun prix trouvé
-        console.warn(`⚠️ Pas de prix trouvé pour ${tokenMint.substring(0, 8)}...`);
+        if (debug) {
+          console.debug(`[useTokenData] no price found for ${tokenMint.substring(0, 8)}...`);
+        }
         setUsdPrice(0);
 
       } catch (error) {

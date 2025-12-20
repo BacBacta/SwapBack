@@ -5,7 +5,7 @@ import {
   ConnectionProvider,
   WalletProvider as SolanaWalletProvider,
 } from "@solana/wallet-adapter-react";
-import { WalletAdapterNetwork, WalletError, WalletNotReadyError } from "@solana/wallet-adapter-base";
+import { WalletAdapterNetwork, WalletConnectionError, WalletError, WalletNotReadyError } from "@solana/wallet-adapter-base";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
@@ -27,6 +27,9 @@ function getBrowserRpcEndpoint(): string {
   // Client: construire l'URL absolue
   return `${window.location.origin}/api/solana-rpc`;
 }
+
+const AUTOCONNECT_COOLDOWN_KEY = "swapback-autoconnect-disabled-until";
+const AUTOCONNECT_COOLDOWN_MS = 2 * 60 * 1000;
 
 export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [rpcIndex, setRpcIndex] = useState(0);
@@ -131,6 +134,16 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
     []
   );
 
+  const autoConnect = useCallback(async () => {
+    if (typeof window === "undefined") return false;
+    const disabledUntilRaw = window.localStorage.getItem(AUTOCONNECT_COOLDOWN_KEY);
+    const disabledUntil = disabledUntilRaw ? Number(disabledUntilRaw) : 0;
+    if (Number.isFinite(disabledUntil) && disabledUntil > Date.now()) {
+      return false;
+    }
+    return true;
+  }, []);
+
   // Handle wallet errors gracefully - especially WalletNotReadyError
   const onError = useCallback((error: WalletError) => {
     // Silently ignore WalletNotReadyError - this happens when:
@@ -140,6 +153,24 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
     if (error instanceof WalletNotReadyError) {
       console.debug("Wallet not ready - extension may not be installed or mobile app not detected");
       return;
+    }
+
+    // Si l'utilisateur refuse la demande (souvent due  l'autoConnect),
+    // 	viter de re-tenter immédiatement et de spammer des popups/erreurs.
+    if (
+      error instanceof WalletConnectionError ||
+      (typeof error?.message === "string" && error.message.toLowerCase().includes("rejected"))
+    ) {
+      try {
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(
+            AUTOCONNECT_COOLDOWN_KEY,
+            String(Date.now() + AUTOCONNECT_COOLDOWN_MS)
+          );
+        }
+      } catch {
+        // ignore localStorage errors
+      }
     }
     
     // Log wallet errors to protocol monitor
@@ -157,7 +188,7 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
     <ConnectionProvider endpoint={endpoint}>
       <SolanaWalletProvider
         wallets={wallets}
-        autoConnect={true} // Keep autoConnect for UX, but errors are now handled
+        autoConnect={autoConnect}
         localStorageKey="swapback-wallet" // Clé unique pour éviter les conflits
         onError={onError} // Handle errors gracefully
       >

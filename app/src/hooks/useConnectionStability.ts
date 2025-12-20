@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef, useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 
 /**
@@ -9,6 +9,8 @@ import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 export const useConnectionStability = () => {
   const { connected, connecting, publicKey, connect } = useWallet();
   const { connection } = useConnection();
+  const [isHealthy, setIsHealthy] = useState(true);
+  const isReconnectingRef = useRef(false);
 
   // Vérifier la santé de la connexion périodiquement
   const checkConnectionHealth = useCallback(async () => {
@@ -26,27 +28,23 @@ export const useConnectionStability = () => {
 
   // Tentative de reconnexion automatique
   const attemptReconnect = useCallback(async () => {
-    if (connecting) return; // Éviter les tentatives multiples
+    if (connecting || isReconnectingRef.current) return;
 
+    isReconnectingRef.current = true;
     try {
-      console.log("Attempting to reconnect wallet...");
       await connect();
-    } catch (error) {
-      console.error("Reconnection failed:", error);
-      // Attendre avant de réessayer
-      setTimeout(attemptReconnect, 5000);
+    } finally {
+      isReconnectingRef.current = false;
     }
   }, [connect, connecting]);
 
-  // Gestionnaire de déconnexion inattendue
+  // Ne pas auto-reconnect: l'utilisateur doit tre explicite.
+  // (Sinon certaines extensions ouvrent une popup et peuvent spammer si l'utilisateur refuse.)
   useEffect(() => {
-    if (!connected && !connecting && publicKey) {
-      console.log("Wallet disconnected unexpectedly, attempting reconnect...");
-      // Petite attente avant de tenter la reconnexion
-      const timeoutId = setTimeout(attemptReconnect, 2000);
-      return () => clearTimeout(timeoutId);
+    if (!connected) {
+      setIsHealthy(true);
     }
-  }, [connected, connecting, publicKey, attemptReconnect]);
+  }, [connected]);
 
   // Vérification périodique de la santé de la connexion
   useEffect(() => {
@@ -54,11 +52,7 @@ export const useConnectionStability = () => {
 
     const intervalId = setInterval(async () => {
       const isHealthy = await checkConnectionHealth();
-      if (!isHealthy && connected) {
-        console.log("Connection unhealthy, attempting to refresh...");
-        // Forcer une reconnexion si la connexion est défaillante
-        attemptReconnect();
-      }
+      setIsHealthy(isHealthy);
     }, 30000); // Vérifier toutes les 30 secondes
 
     return () => clearInterval(intervalId);
@@ -68,9 +62,6 @@ export const useConnectionStability = () => {
   useEffect(() => {
     const handleOnline = () => {
       console.log("Network connection restored");
-      if (!connected && publicKey) {
-        attemptReconnect();
-      }
     };
 
     const handleOffline = () => {
@@ -87,7 +78,7 @@ export const useConnectionStability = () => {
   }, [connected, publicKey, attemptReconnect]);
 
   return {
-    isStable: connected && !connecting,
+    isStable: connected && !connecting && isHealthy,
     reconnect: attemptReconnect,
   };
 };
