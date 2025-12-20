@@ -30,6 +30,34 @@ import { getAllRaydiumPools, getRaydiumPool } from "@/sdk/config/raydium-pools";
 const RESOLVER_CACHE_TTL_MS = 60_000; // short-lived cache to absorb bursty API errors
 const MAX_FETCH_ATTEMPTS = 2;
 
+const METEORA_PAIR_CACHE_TTL_MS_DEFAULT = 5 * 60_000;
+
+function isBrowserRuntime(): boolean {
+  return typeof window !== "undefined";
+}
+
+function isEnvTrue(name: string): boolean {
+  const v = process.env[name];
+  return v === "true" || v === "1" || v === "yes";
+}
+
+function getMeteoraPairCacheTtlMs(): number {
+  const ttl =
+    getEnvNumber("NEXT_PUBLIC_SWAPBACK_METEORA_PAIR_CACHE_TTL_MS") ??
+    getEnvNumber("SWAPBACK_METEORA_PAIR_CACHE_TTL_MS") ??
+    METEORA_PAIR_CACHE_TTL_MS_DEFAULT;
+  return Math.max(0, Math.floor(ttl));
+}
+
+function allowMeteoraDeepFallbacks(): boolean {
+  // Deep fallbacks (SDK + on-chain memcmp) peuvent être très lents, surtout en browser.
+  // Par défaut on les désactive côté navigateur; réactivables explicitement en debug.
+  if (isEnvTrue("NEXT_PUBLIC_SWAPBACK_ENABLE_METEORA_DEEP_FALLBACKS") || isEnvTrue("SWAPBACK_ENABLE_METEORA_DEEP_FALLBACKS")) {
+    return true;
+  }
+  return !isBrowserRuntime();
+}
+
 const resolverLogDedupe = new Map<string, number>();
 const shouldLogResolverWarning = (key: string, ttlMs: number = RESOLVER_CACHE_TTL_MS): boolean => {
   const now = Date.now();
@@ -1205,7 +1233,9 @@ async function findDLMMPair(
     const now = Date.now();
     const cached = meteoraPairCache.get(cacheKey);
 
-    if (cached && now - cached.timestamp < RESOLVER_CACHE_TTL_MS) {
+    const pairCacheTtlMs = getMeteoraPairCacheTtlMs();
+
+    if (cached && now - cached.timestamp < pairCacheTtlMs) {
       if (!cached.pair) {
         logger.debug("MeteoraResolver", "Serving cached miss", { cacheKey });
       }
@@ -1213,6 +1243,7 @@ async function findDLMMPair(
     }
 
     let lastError: string | undefined;
+    let apiSaysNoPair = false;
     for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
       try {
         const response = await fetch(
@@ -1255,6 +1286,10 @@ async function findDLMMPair(
             });
           }
         }
+
+        // Si l'API a répondu correctement mais ne contient pas la paire,
+        // on considère que Meteora n'a pas de pool et on évite les fallbacks coûteux par défaut.
+        apiSaysNoPair = true;
         break;
       } catch (error) {
         lastError = error instanceof Error ? error.message : String(error);
@@ -1265,6 +1300,11 @@ async function findDLMMPair(
           error: lastError,
         });
       }
+    }
+
+    if (apiSaysNoPair && !allowMeteoraDeepFallbacks()) {
+      meteoraPairCache.set(cacheKey, { timestamp: now, pair: null });
+      return null;
     }
 
     // Fallback on-chain (no API): ask DLMM SDK to find an existing pair.
@@ -1354,10 +1394,12 @@ async function findDLMMPair(
     // Generic on-chain fallback: targeted search via getProgramAccounts+memcmp.
     // This avoids depending on Meteora API availability and skips dead pairs (validated via bin arrays).
     try {
-      const resolved = await findDLMMPairViaOnChainMints(connection, tokenX, tokenY);
-      if (resolved) {
-        meteoraPairCache.set(cacheKey, { timestamp: now, pair: resolved });
-        return resolved;
+      if (allowMeteoraDeepFallbacks()) {
+        const resolved = await findDLMMPairViaOnChainMints(connection, tokenX, tokenY);
+        if (resolved) {
+          meteoraPairCache.set(cacheKey, { timestamp: now, pair: resolved });
+          return resolved;
+        }
       }
     } catch (error) {
       logger.warn("MeteoraResolver", "On-chain memcmp DLMM pair lookup failed", {
