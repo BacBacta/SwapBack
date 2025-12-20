@@ -1622,14 +1622,8 @@ export class TrueNativeSwap {
     const vaultTokenAccountA = userTokenAccountA;
     const vaultTokenAccountB = userTokenAccountB;
 
-    // user_rebate est optionnel on-chain. Si on passe un placeholder, le programme skip le crédit.
-    // On le passe seulement s'il existe on-chain (sinon Anchor le traite comme None).
-    const userRebatePdaExists = await this.connection
-      .getAccountInfo(accounts.userRebate, "confirmed")
-      .then((info) => !!info)
-      .catch(() => false);
-
-    const userRebateKey = userRebatePdaExists ? accounts.userRebate : ROUTER_PROGRAM_ID;
+    // user_rebate est désormais créé automatiquement côté on-chain (init_if_needed).
+    // Le client DOIT toujours fournir le PDA dérivé et le marquer writable.
 
     // Construire les metas des remaining accounts DEX avec les bons flags.
     // IMPORTANT:
@@ -1809,8 +1803,8 @@ export class TrueNativeSwap {
       { pubkey: ROUTER_PROGRAM_ID, isSigner: false, isWritable: false },
       // 14. user_rebate_account (optional)
       { pubkey: ROUTER_PROGRAM_ID, isSigner: false, isWritable: false },
-      // 15. user_rebate (optional, PDA) - use placeholder if not initialized
-      { pubkey: userRebateKey, isSigner: false, isWritable: userRebatePdaExists },
+      // 15. user_rebate (PDA, writable) - init_if_needed on-chain
+      { pubkey: accounts.userRebate, isSigner: false, isWritable: true },
       // 16. rebate_vault (writable, PDA)
       { pubkey: accounts.rebateVault, isSigner: false, isWritable: true },
       // 17. oracle_cache (optional, PDA)

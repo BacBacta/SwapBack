@@ -1033,11 +1033,13 @@ pub struct SwapToC<'info> {
     /// User's rebate tracking PDA - for deferred claim model
     /// Credits are stored here and claimable after 48h
     #[account(
-        mut,
+        init_if_needed,
+        payer = user,
+        space = UserRebate::LEN,
         seeds = [b"user_rebate", user.key().as_ref()],
         bump
     )]
-    pub user_rebate: Option<Account<'info, UserRebate>>,
+    pub user_rebate: Account<'info, UserRebate>,
 
     /// Rebate vault PDA holding USDC
     #[account(
@@ -1740,6 +1742,13 @@ pub mod swap_toc_processor {
         }
 
         let clock = Clock::get()?;
+
+        // Ensure UserRebate PDA is initialized (init_if_needed creates the account,
+        // but does not populate fields).
+        if ctx.accounts.user_rebate.user == Pubkey::default() {
+            ctx.accounts.user_rebate.user = ctx.accounts.user.key();
+            ctx.accounts.user_rebate.bump = ctx.bumps.user_rebate;
+        }
 
         // --- Phase 2: Oracle Cache Check ---
         if let Some(cache) = &ctx.accounts.oracle_cache {
@@ -2943,14 +2952,7 @@ pub mod swap_toc_processor {
             return Ok(());
         }
 
-        // Si pas de compte user_rebate PDA, on ne peut pas créditer
-        let user_rebate = match &mut ctx.accounts.user_rebate {
-            Some(acc) => acc,
-            None => {
-                msg!("⚠️ No user_rebate account provided, skipping rebate credit");
-                return Ok(());
-            }
-        };
+        let user_rebate = &mut ctx.accounts.user_rebate;
 
         // Calculer le base rebate (70% du NPI)
         let base_rebate = calculate_fee(npi_amount, ctx.accounts.state.rebate_percentage)?;
