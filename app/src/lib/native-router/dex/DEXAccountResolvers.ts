@@ -924,6 +924,47 @@ const USDT_MINT = new PublicKey("Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB");
 // sans dépendre de l'API Meteora (qui peut timeout).
 const METEORA_KNOWN_SOL_USDC_LBPAIR = new PublicKey("5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6");
 
+async function validateDlmmPairHasBins(
+  connection: Connection,
+  pair: PublicKey,
+  tokenX: PublicKey,
+  tokenY: PublicKey
+): Promise<boolean> {
+  try {
+    const DLMM = await loadMeteoraDLMMClass();
+    if (!DLMM?.create) return false;
+
+    const dlmm = await DLMM.create(connection, pair);
+    const tokenXMint: PublicKey =
+      (dlmm as any)?.tokenX?.mint?.address ??
+      (dlmm as any)?.tokenX?.mint?.publicKey ??
+      (dlmm as any)?.tokenX?.publicKey;
+    const tokenYMint: PublicKey =
+      (dlmm as any)?.tokenY?.mint?.address ??
+      (dlmm as any)?.tokenY?.mint?.publicKey ??
+      (dlmm as any)?.tokenY?.publicKey;
+
+    if (!tokenXMint || !tokenYMint) return false;
+
+    const matches =
+      (tokenXMint.equals(tokenX) && tokenYMint.equals(tokenY)) ||
+      (tokenXMint.equals(tokenY) && tokenYMint.equals(tokenX));
+    if (!matches) return false;
+
+    for (const swapForY of [true, false]) {
+      for (const depth of [5, 20, 60]) {
+        // eslint-disable-next-line no-await-in-loop
+        const binArrayAccounts = await dlmm.getBinArrayForSwap(swapForY, depth);
+        if (Array.isArray(binArrayAccounts) && binArrayAccounts.length > 0) return true;
+      }
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 async function loadMeteoraDLMMClass(): Promise<any> {
   // @meteora-ag/dlmm exports: default = DLMM class
   // IMPORTANT:
@@ -1317,8 +1358,11 @@ async function findDLMMPair(
     const fromIndex = getMeteoraPairFromApiIndex(tokenX, tokenY);
     if (fromIndex !== undefined) {
       if (fromIndex) {
-        meteoraPairCache.set(cacheKey, { timestamp: now, pair: fromIndex });
-        return fromIndex;
+        const ok = await validateDlmmPairHasBins(connection, fromIndex, tokenX, tokenY);
+        if (ok) {
+          meteoraPairCache.set(cacheKey, { timestamp: now, pair: fromIndex });
+          return fromIndex;
+        }
       }
       // Index frais mais paire absente.
       if (!allowMeteoraDeepFallbacks()) {
@@ -1355,8 +1399,26 @@ async function findDLMMPair(
         const address = meteoraApiPairsIndexCache.index.get(cacheKey);
         if (address) {
           const resolved = new PublicKey(address);
-          meteoraPairCache.set(cacheKey, { timestamp: now, pair: resolved });
-          return resolved;
+          const ok = await validateDlmmPairHasBins(connection, resolved, tokenX, tokenY);
+          if (ok) {
+            meteoraPairCache.set(cacheKey, { timestamp: now, pair: resolved });
+            return resolved;
+          }
+
+          // Cas fréquent: l'API peut renvoyer un lb_pair "mort" (0 bins).
+          // Pour WSOL/USDC on a un lb_pair connu mainnet qui a des bins; on l'essaie en priorité.
+          const isWsolUsdc =
+            (tokenX.equals(WSOL_MINT) && tokenY.equals(USDC_MINT)) ||
+            (tokenX.equals(USDC_MINT) && tokenY.equals(WSOL_MINT));
+          if (isWsolUsdc) {
+            const okKnown = await validateDlmmPairHasBins(connection, METEORA_KNOWN_SOL_USDC_LBPAIR, tokenX, tokenY);
+            if (okKnown) {
+              meteoraPairCache.set(cacheKey, { timestamp: now, pair: METEORA_KNOWN_SOL_USDC_LBPAIR });
+              return METEORA_KNOWN_SOL_USDC_LBPAIR;
+            }
+          }
+
+          lastError = `api_pair_invalid:${resolved.toBase58()}`;
         }
 
         {
