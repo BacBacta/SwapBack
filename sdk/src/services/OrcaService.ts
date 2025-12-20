@@ -85,10 +85,9 @@ export class OrcaService {
         this.wallet,
         AnchorProvider.defaultOptions()
       );
-      const context = WhirlpoolContext.withProvider(
-        provider,
-        this.programId
-      );
+      // `WhirlpoolContext.withProvider(provider, fetcher?)`
+      // The second argument is a fetcher, not the programId.
+      const context = WhirlpoolContext.withProvider(provider);
       this.fetcher = context.fetcher;
       this.client = buildWhirlpoolClient(context);
     }
