@@ -49,6 +49,98 @@ const saberPoolTokenAccountsCache = new Map<
 
 const SERUM_MARKET_CACHE_TTL_MS = 5 * 60 * 1000;
 
+// Cache: résolution de comptes DEX (UI quote bursts)
+// Objectif: éviter de refaire les mêmes appels RPC/API à chaque rafraîchissement.
+// TTL court pour rester safe sur mainnet (les pools peuvent changer, mais rarement à l'échelle de quelques secondes).
+const DEX_ACCOUNTS_CACHE_MAX_ENTRIES = 750;
+const DEX_ACCOUNTS_POSITIVE_TTL_MS_DEFAULT = 60_000;
+const DEX_ACCOUNTS_NEGATIVE_TTL_MS_DEFAULT = 120_000;
+
+type DexAccountsCacheEntry = {
+  timestamp: number;
+  value: DEXAccounts | null;
+  ttlOverrideMs?: number;
+};
+
+const dexAccountsByVenueCache = new Map<string, DexAccountsCacheEntry>();
+
+const DEX_ACCOUNTS_RESOLVE_TIMEOUT_MS_DEFAULT = 8_000;
+const DEX_ACCOUNTS_RESOLVE_TIMEOUT_METEORA_MS_DEFAULT = 12_000;
+const DEX_ACCOUNTS_TIMEOUT_NEGATIVE_TTL_MS_DEFAULT = 5_000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return promise;
+
+  return new Promise<T>((resolve, reject) => {
+    const handle = setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms (${label})`)), timeoutMs);
+    promise
+      .then((v) => {
+        clearTimeout(handle);
+        resolve(v);
+      })
+      .catch((e) => {
+        clearTimeout(handle);
+        reject(e);
+      });
+  });
+}
+
+function getResolveTimeoutMsForVenue(venue: SupportedVenue): number {
+  const base =
+    getEnvNumber("NEXT_PUBLIC_SWAPBACK_DEX_RESOLVE_TIMEOUT_MS") ??
+    getEnvNumber("SWAPBACK_DEX_RESOLVE_TIMEOUT_MS") ??
+    DEX_ACCOUNTS_RESOLVE_TIMEOUT_MS_DEFAULT;
+
+  if (venue === "METEORA_DLMM") {
+    return (
+      getEnvNumber("NEXT_PUBLIC_SWAPBACK_DEX_RESOLVE_TIMEOUT_METEORA_MS") ??
+      getEnvNumber("SWAPBACK_DEX_RESOLVE_TIMEOUT_METEORA_MS") ??
+      Math.max(base, DEX_ACCOUNTS_RESOLVE_TIMEOUT_METEORA_MS_DEFAULT)
+    );
+  }
+
+  return base;
+}
+
+function getTimeoutNegativeTtlMs(): number {
+  const n =
+    getEnvNumber("NEXT_PUBLIC_SWAPBACK_DEX_TIMEOUT_NEGATIVE_CACHE_MS") ??
+    getEnvNumber("SWAPBACK_DEX_TIMEOUT_NEGATIVE_CACHE_MS") ??
+    DEX_ACCOUNTS_TIMEOUT_NEGATIVE_TTL_MS_DEFAULT;
+  return Math.max(0, Math.floor(n));
+}
+
+function getEnvNumber(name: string): number | null {
+  const raw = process.env[name];
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+function getDexAccountsCacheTtls(): { positiveTtlMs: number; negativeTtlMs: number } {
+  const positiveTtlMs =
+    getEnvNumber("NEXT_PUBLIC_SWAPBACK_DEX_ACCOUNTS_CACHE_MS") ??
+    getEnvNumber("SWAPBACK_DEX_ACCOUNTS_CACHE_MS") ??
+    DEX_ACCOUNTS_POSITIVE_TTL_MS_DEFAULT;
+  const negativeTtlMs =
+    getEnvNumber("NEXT_PUBLIC_SWAPBACK_DEX_ACCOUNTS_NEGATIVE_CACHE_MS") ??
+    getEnvNumber("SWAPBACK_DEX_ACCOUNTS_NEGATIVE_CACHE_MS") ??
+    DEX_ACCOUNTS_NEGATIVE_TTL_MS_DEFAULT;
+
+  return {
+    positiveTtlMs: Math.max(0, Math.floor(positiveTtlMs)),
+    negativeTtlMs: Math.max(0, Math.floor(negativeTtlMs)),
+  };
+}
+
+function pruneDexAccountsCache(): void {
+  while (dexAccountsByVenueCache.size > DEX_ACCOUNTS_CACHE_MAX_ENTRIES) {
+    const firstKey = dexAccountsByVenueCache.keys().next().value as string | undefined;
+    if (!firstKey) return;
+    dexAccountsByVenueCache.delete(firstKey);
+  }
+}
+
 interface SerumMarketMeta {
   bids: PublicKey;
   asks: PublicKey;
@@ -2498,26 +2590,88 @@ export async function getAllDEXAccounts(
     : ['ORCA_WHIRLPOOL', 'METEORA_DLMM', 'PHOENIX', 'RAYDIUM_AMM', 'LIFINITY', 'SABER']
   ).filter((v, i, arr) => arr.indexOf(v) === i);
   
-  const results = await Promise.allSettled(
-    venues.map(venue => getDEXAccounts(connection, venue, safeInputMint, safeOutputMint, safeUser))
-  );
-  
+  const { positiveTtlMs, negativeTtlMs } = getDexAccountsCacheTtls();
+  const now = Date.now();
+  const inputStr = safeInputMint.toBase58();
+  const outputStr = safeOutputMint.toBase58();
+  const userStr = safeUser.toBase58();
   const accountsMap = new Map<SupportedVenue, DEXAccounts>();
-  
-  for (let i = 0; i < results.length; i++) {
-    const result = results[i];
-    const venue = venues[i];
-    if (result.status === 'fulfilled' && result.value) {
-      accountsMap.set(venue, result.value);
-    } else if (result.status === 'rejected') {
-      logger.warn("DEXAccountResolvers", `Failed to resolve ${venue}`, {
-        error: result.reason instanceof Error ? result.reason.message : String(result.reason),
-      });
-    } else {
-      logger.debug("DEXAccountResolvers", `No accounts for ${venue} (null result)`);
+
+  const venuesToFetch: SupportedVenue[] = [];
+
+  for (const venue of venues) {
+    const cacheKey = `${venue}::${inputStr}=>${outputStr}::${userStr}`;
+    const cached = dexAccountsByVenueCache.get(cacheKey);
+    if (cached) {
+      const ttlMs =
+        typeof cached.ttlOverrideMs === "number"
+          ? cached.ttlOverrideMs
+          : cached.value
+            ? positiveTtlMs
+            : negativeTtlMs;
+      if (ttlMs > 0 && now - cached.timestamp < ttlMs) {
+        if (cached.value) {
+          accountsMap.set(venue, cached.value);
+        }
+        continue;
+      }
     }
+    venuesToFetch.push(venue);
   }
-  
+
+  if (venuesToFetch.length > 0) {
+    const start = Date.now();
+    const timeoutNegativeTtlMs = getTimeoutNegativeTtlMs();
+    const results = await Promise.allSettled(
+      venuesToFetch.map((venue) =>
+        withTimeout(
+          getDEXAccounts(connection, venue, safeInputMint, safeOutputMint, safeUser),
+          getResolveTimeoutMsForVenue(venue),
+          `dex-resolve:${venue}`
+        )
+      )
+    );
+
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      const venue = venuesToFetch[i];
+      const cacheKey = `${venue}::${inputStr}=>${outputStr}::${userStr}`;
+
+      if (result.status === "fulfilled") {
+        const value = result.value ?? null;
+        if (value) accountsMap.set(venue, value);
+        dexAccountsByVenueCache.set(cacheKey, { timestamp: now, value });
+      } else {
+        const reasonMsg = result.reason instanceof Error ? result.reason.message : String(result.reason);
+        logger.warn("DEXAccountResolvers", `Failed to resolve ${venue}`, {
+          error: reasonMsg,
+        });
+
+        // Timeout: on cache négatif *très* court pour éviter de bloquer à répétition
+        // tout en permettant une nouvelle tentative rapide.
+        const isTimeout = typeof reasonMsg === "string" && reasonMsg.startsWith("Timeout after");
+        dexAccountsByVenueCache.set(cacheKey, {
+          timestamp: now,
+          value: null,
+          ttlOverrideMs: isTimeout ? timeoutNegativeTtlMs : undefined,
+        });
+      }
+    }
+
+    pruneDexAccountsCache();
+
+    const elapsedMs = Date.now() - start;
+    logger.debug("DEXAccountResolvers", "Resolved DEX accounts", {
+      inputMint: inputStr.slice(0, 8),
+      outputMint: outputStr.slice(0, 8),
+      venuesRequested: venues.length,
+      venuesFetched: venuesToFetch.length,
+      venuesCached: venues.length - venuesToFetch.length,
+      resolved: accountsMap.size,
+      elapsedMs,
+    });
+  }
+
   return accountsMap;
 }
 

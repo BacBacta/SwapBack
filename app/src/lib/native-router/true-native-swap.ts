@@ -301,6 +301,7 @@ export class TrueNativeSwap {
     const venuesToResolve = venuesOverride?.length ? venuesOverride : Array.from(QUOTED_VENUES);
 
     // Résoudre uniquement les comptes des venues pertinentes.
+    const resolveStart = Date.now();
     const allAccounts = await getAllDEXAccounts(
       this.connection,
       safeInputMint,
@@ -308,10 +309,12 @@ export class TrueNativeSwap {
       safeUser,
       venuesToResolve
     );
+    const resolveLatencyMs = Date.now() - resolveStart;
 
     logger.info("TrueNativeSwap", "DEX accounts resolved", {
       venuesWithAccounts: Array.from(allAccounts.keys()),
       count: allAccounts.size,
+      resolveLatencyMs,
     });
 
     if (allAccounts.size === 0) {
