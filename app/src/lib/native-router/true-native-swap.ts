@@ -319,6 +319,71 @@ export class TrueNativeSwap {
 
     const venuesToResolve = venuesOverride?.length ? venuesOverride : Array.from(QUOTED_VENUES);
 
+    // Browser fast-path: avoid heavy RPC account resolution for quotes.
+    // On /app/swap we only need a live quote; dex accounts can be resolved lazily at execution time.
+    if (typeof window !== "undefined") {
+      const bpsRaw = typeof slippageBps === "number" && Number.isFinite(slippageBps) ? slippageBps : 50;
+      const bps = Math.min(10_000, Math.max(0, Math.floor(bpsRaw)));
+
+      if (
+        venuesToResolve.includes("ORCA_WHIRLPOOL") &&
+        !this.isVenueTemporarilyDisabled("ORCA_WHIRLPOOL") &&
+        !DISABLED_BEST_ROUTE_VENUES.has("ORCA_WHIRLPOOL")
+      ) {
+        try {
+          const startTime = Date.now();
+          const response = await fetch(
+            `/api/dex/orca/quote?` +
+              new URLSearchParams({
+                inputMint: safeInputMint.toBase58(),
+                outputMint: safeOutputMint.toBase58(),
+                amount: amountIn.toString(),
+                slippageBps: bps.toString(),
+                forceFresh: "1",
+              }),
+            { signal: AbortSignal.timeout(8000), cache: "no-store" }
+          );
+
+          if (response.ok) {
+            const data = await response.json();
+            const outputAmount = Number(data.outputAmount ?? data.outAmount ?? 0);
+            const priceImpactBps = Number(data.priceImpactBps ?? 0);
+            const latencyMs = Date.now() - startTime;
+            if (Number.isFinite(outputAmount) && outputAmount > 0) {
+              quotes.push({
+                venue: "ORCA_WHIRLPOOL",
+                venueProgramId: DEX_PROGRAM_IDS.ORCA_WHIRLPOOL,
+                inputAmount: amountIn,
+                outputAmount,
+                priceImpactBps: Number.isFinite(priceImpactBps) ? priceImpactBps : 0,
+                accounts: {
+                  accounts: [],
+                  meta: {
+                    venue: "ORCA_WHIRLPOOL",
+                    poolAddress: typeof data.pool === "string" ? data.pool : undefined,
+                  },
+                },
+                latencyMs,
+              });
+              quotes.sort((a, b) => b.outputAmount - a.outputAmount);
+              return quotes;
+            }
+          } else {
+            const errorText = await response.text().catch(() => "");
+            logger.warn("TrueNativeSwap", "Browser fast-quote Orca failed", {
+              status: response.status,
+              error: errorText.slice(0, 200),
+            });
+          }
+        } catch (err) {
+          logger.warn("TrueNativeSwap", "Browser fast-quote Orca exception", {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+      // If fast-path fails, fall back to the full resolver (may still work on some RPCs).
+    }
+
     // Résoudre uniquement les comptes des venues pertinentes.
     const resolveStart = Date.now();
     const allAccounts = await getAllDEXAccounts(
@@ -1463,6 +1528,16 @@ export class TrueNativeSwap {
 
     const userTokenAccountA = overrides?.userTokenAccountA ?? accounts.userTokenAccountA;
     const userTokenAccountB = overrides?.userTokenAccountB ?? accounts.userTokenAccountB;
+
+    // Si la quote a été obtenue via fast-path (browser), les dexAccounts peuvent être vides.
+    // On résout alors les comptes DEX au moment de la construction du swap.
+    if (!route.dexAccounts?.accounts?.length) {
+      const resolved = await getDEXAccounts(this.connection, inputMint, outputMint, safeUser, route.venue);
+      if (!resolved) {
+        throw new Error(`Impossible de résoudre les comptes DEX pour ${route.venue} (${inputMint.toBase58()} -> ${outputMint.toBase58()})`);
+      }
+      route.dexAccounts = resolved;
+    }
 
     // Défense en profondeur: vérifier la cohérence on-chain des ATAs et des reserves
     try {
