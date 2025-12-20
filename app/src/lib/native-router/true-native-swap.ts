@@ -700,9 +700,13 @@ export class TrueNativeSwap {
           amount: amountIn.toString(),
           pool: accounts.meta.poolAddress || "",
           slippageBps: bps.toString(),
+          forceFresh: "1",
         });
 
-      const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(8000),
+        cache: "no-store",
+      });
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => "");
@@ -840,8 +844,9 @@ export class TrueNativeSwap {
             amount: amountIn.toString(),
             pairAddress: accounts.meta.poolAddress || "",
             slippageBps: bps.toString(),
+            forceFresh: "1",
           }),
-        { signal: AbortSignal.timeout(8000) }
+        { signal: AbortSignal.timeout(8000), cache: "no-store" }
       );
 
       if (!response.ok) {
@@ -929,9 +934,15 @@ export class TrueNativeSwap {
             txVersion: "V0",
             ...(params.poolId ? { poolId: params.poolId } : {}),
           })
-        : `/api/dex/raydium/quote?` + query;
+        : `/api/dex/raydium/quote?` + new URLSearchParams({
+            ...Object.fromEntries(query.entries()),
+            forceFresh: "1",
+          });
 
-      const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(10000),
+        cache: "no-store",
+      });
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => "");

@@ -12,18 +12,43 @@ const RAYDIUM_API_BASE = 'https://transaction-v1.raydium.io';
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-// Headers CORS (pattern repo)
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": process.env.ALLOWED_ORIGIN || "*",
-  "Access-Control-Allow-Methods": "GET,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Requested-With",
-  "Access-Control-Allow-Credentials": "true",
+const NO_STORE_HEADERS: Record<string, string> = {
+  "Cache-Control": "no-store",
+  Pragma: "no-cache",
 };
 
-export async function OPTIONS() {
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowed = (process.env.ALLOWED_ORIGIN ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const allowOrigin =
+    origin && allowed.length > 0 && allowed.includes(origin)
+      ? origin
+      : allowed.length > 0
+        ? allowed[0]
+        : "*";
+
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Methods": "GET,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Requested-With",
+    "Access-Control-Max-Age": "86400",
+  };
+
+  if (allowOrigin !== "*") {
+    headers["Access-Control-Allow-Credentials"] = "true";
+    headers["Vary"] = "Origin";
+  }
+
+  return headers;
+}
+
+export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 204,
-    headers: CORS_HEADERS,
+    headers: { ...getCorsHeaders(request.headers.get("origin")), ...NO_STORE_HEADERS },
   });
 }
 
@@ -34,11 +59,14 @@ export async function GET(request: NextRequest) {
   const amount = searchParams.get('amount');
   const poolId = searchParams.get('poolId');
   const slippageBpsParam = searchParams.get('slippageBps');
+  const forceFresh = searchParams.get("forceFresh") === "1" || searchParams.get("forceFresh") === "true";
+  const corsHeaders = getCorsHeaders(request.headers.get("origin"));
+  const responseHeaders = { ...corsHeaders, ...NO_STORE_HEADERS };
 
   if (!inputMint || !outputMint || !amount) {
     return NextResponse.json(
       { error: 'Missing required parameters: inputMint, outputMint, amount' },
-      { status: 400, headers: CORS_HEADERS }
+      { status: 400, headers: responseHeaders }
     );
   }
 
@@ -66,6 +94,7 @@ export async function GET(request: NextRequest) {
         'Content-Type': 'application/json',
       },
       signal: AbortSignal.timeout(10000),
+      ...(forceFresh ? { cache: "no-store" as const } : {}),
     });
 
     if (!response.ok) {
@@ -77,7 +106,7 @@ export async function GET(request: NextRequest) {
     if (!data.success) {
       return NextResponse.json(
         { error: 'Raydium quote failed', details: data.msg },
-        { status: 502, headers: CORS_HEADERS }
+        { status: 502, headers: responseHeaders }
       );
     }
 
@@ -100,12 +129,12 @@ export async function GET(request: NextRequest) {
       fee: data.data?.fee || 0,
       route: data.data?.routePlan || [],
       poolId: data.data?.poolId || poolId,
-    }, { headers: CORS_HEADERS });
+    }, { headers: responseHeaders });
   } catch (error) {
     console.error('[Raydium Quote API] Error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch Raydium quote', details: String(error) },
-      { status: 502, headers: CORS_HEADERS }
+      { status: 502, headers: responseHeaders }
     );
   }
 }

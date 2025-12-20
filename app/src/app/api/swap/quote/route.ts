@@ -710,6 +710,7 @@ export async function POST(request: NextRequest) {
         outputDecimals,
         slippageBps,
         userPublicKey: userPublicKey ?? undefined,
+        bypassCache: shouldBypassCache,
       })
       .catch((aggError) => {
         console.warn("⚠️ Multi-source aggregator failed", aggError);

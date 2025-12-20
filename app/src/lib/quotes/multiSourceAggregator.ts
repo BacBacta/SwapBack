@@ -39,6 +39,11 @@ export interface QuoteParams {
   outputDecimals: number;
   slippageBps: number;
   userPublicKey?: string;
+  /**
+   * Si true, ignore le cache interne de l'agrégateur pour cette requête.
+   * Utile pour les auto-refresh UI afin de forcer une quote fraîche.
+   */
+  bypassCache?: boolean;
 }
 
 export interface QuoteResult {
@@ -590,16 +595,20 @@ export class MultiSourceQuoteAggregator {
   async getBestQuote(params: QuoteParams): Promise<AggregatedQuote> {
     const startTime = Date.now();
 
+    const bypassCache = params.bypassCache === true;
+
     // 1. Vérifier le cache d'abord
-    const cached = this.cache.get(params.inputMint, params.outputMint, params.amountTokens);
-    if (cached) {
-      return {
-        bestQuote: cached,
-        source: "cache",
-        alternativeQuotes: [],
-        totalLatencyMs: Date.now() - startTime,
-        fromCache: true,
-      };
+    if (!bypassCache) {
+      const cached = this.cache.get(params.inputMint, params.outputMint, params.amountTokens);
+      if (cached) {
+        return {
+          bestQuote: cached,
+          source: "cache",
+          alternativeQuotes: [],
+          totalLatencyMs: Date.now() - startTime,
+          fromCache: true,
+        };
+      }
     }
 
     // 2. Filtrer les sources activées ET dont le circuit breaker est fermé
@@ -690,7 +699,7 @@ export class MultiSourceQuoteAggregator {
 
     const best = validResults[0];
 
-    // 8. Mettre en cache
+    // 8. Mettre en cache (même si bypass: on rafraîchit la valeur pour les requêtes suivantes)
     this.cache.set(params.inputMint, params.outputMint, params.amountTokens, best.quote!);
 
     return {
@@ -708,16 +717,20 @@ export class MultiSourceQuoteAggregator {
   async getFastestQuote(params: QuoteParams): Promise<AggregatedQuote> {
     const startTime = Date.now();
 
+    const bypassCache = params.bypassCache === true;
+
     // Cache check
-    const cached = this.cache.get(params.inputMint, params.outputMint, params.amountTokens);
-    if (cached) {
-      return {
-        bestQuote: cached,
-        source: "cache",
-        alternativeQuotes: [],
-        totalLatencyMs: Date.now() - startTime,
-        fromCache: true,
-      };
+    if (!bypassCache) {
+      const cached = this.cache.get(params.inputMint, params.outputMint, params.amountTokens);
+      if (cached) {
+        return {
+          bestQuote: cached,
+          source: "cache",
+          alternativeQuotes: [],
+          totalLatencyMs: Date.now() - startTime,
+          fromCache: true,
+        };
+      }
     }
 
     // Race pour le premier résultat valide

@@ -14,6 +14,11 @@ import BN from "bn.js";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+const NO_STORE_HEADERS: Record<string, string> = {
+  "Cache-Control": "no-store",
+  Pragma: "no-cache",
+};
+
 function getAllowedOrigins(): string[] {
   const raw = process.env.ALLOWED_ORIGIN || "";
   return raw
@@ -69,12 +74,17 @@ async function loadDlmmClass(): Promise<any> {
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 204,
-    headers: getCorsHeaders(request),
+    headers: { ...getCorsHeaders(request), ...NO_STORE_HEADERS },
   });
 }
 
 export async function GET(request: NextRequest) {
   const corsHeaders = getCorsHeaders(request);
+  // forceFresh est accepté pour cohérence avec les autres quote endpoints.
+  // La quote Meteora est calculée on-chain via SDK, donc forceFresh ne change pas le résultat,
+  // mais on s'assure que la réponse n'est jamais cachée.
+  void request.nextUrl.searchParams.get("forceFresh");
+  const responseHeaders = { ...corsHeaders, ...NO_STORE_HEADERS };
   const searchParams = request.nextUrl.searchParams;
   const inputMint = searchParams.get("inputMint");
   const outputMint = searchParams.get("outputMint");
@@ -88,7 +98,7 @@ export async function GET(request: NextRequest) {
         error:
           "Missing required parameters: inputMint, outputMint, amount, pairAddress",
       },
-      { status: 400, headers: corsHeaders }
+      { status: 400, headers: responseHeaders }
     );
   }
 
@@ -96,7 +106,7 @@ export async function GET(request: NextRequest) {
   if (!Number.isFinite(amountIn) || amountIn <= 0) {
     return NextResponse.json(
       { error: "Invalid amount" },
-      { status: 400, headers: corsHeaders }
+      { status: 400, headers: responseHeaders }
     );
   }
 
@@ -117,7 +127,7 @@ export async function GET(request: NextRequest) {
     if (!DLMM?.create) {
       return NextResponse.json(
         { error: "Meteora DLMM SDK unavailable (missing create())" },
-        { status: 502, headers: corsHeaders }
+        { status: 502, headers: responseHeaders }
       );
     }
 
@@ -129,7 +139,7 @@ export async function GET(request: NextRequest) {
     if (!tokenX || !tokenY) {
       return NextResponse.json(
         { error: "Invalid DLMM pair: missing token mints" },
-        { status: 502, headers: corsHeaders }
+        { status: 502, headers: responseHeaders }
       );
     }
 
@@ -148,7 +158,7 @@ export async function GET(request: NextRequest) {
           inputMint,
           outputMint,
         },
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: responseHeaders }
       );
     }
 
@@ -165,7 +175,7 @@ export async function GET(request: NextRequest) {
     if (!Number.isFinite(outAmount) || outAmount <= 0) {
       return NextResponse.json(
         { error: "Invalid Meteora SDK quote output", outAmount: outAmountStr },
-        { status: 502, headers: corsHeaders }
+        { status: 502, headers: responseHeaders }
       );
     }
 
@@ -181,13 +191,13 @@ export async function GET(request: NextRequest) {
         swapForY,
         source: "meteora-sdk",
       },
-      { headers: corsHeaders }
+      { headers: responseHeaders }
     );
   } catch (error) {
     console.error("[Meteora Quote API] Error:", error);
     return NextResponse.json(
       { error: "Failed to fetch Meteora quote", details: String(error) },
-      { status: 502, headers: corsHeaders }
+      { status: 502, headers: responseHeaders }
     );
   }
 }

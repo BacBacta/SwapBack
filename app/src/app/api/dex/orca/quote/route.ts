@@ -25,6 +25,11 @@ import { ORCA_WHIRLPOOL_PROGRAM_ID } from "@/sdk/config/orca-pools";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+const NO_STORE_HEADERS: Record<string, string> = {
+  "Cache-Control": "no-store",
+  Pragma: "no-cache",
+};
+
 // Headers CORS (pattern repo)
 // Note: en prod, éviter `*` + credentials. Si ALLOWED_ORIGIN n'est pas défini,
 // on répond en mode "public" (pas de credentials) pour rester conforme.
@@ -184,7 +189,7 @@ async function quoteWithOrcaWhirlpoolSdk(params: {
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 204,
-    headers: getCorsHeaders(request.headers.get("origin")),
+    headers: { ...getCorsHeaders(request.headers.get("origin")), ...NO_STORE_HEADERS },
   });
 }
 
@@ -195,12 +200,14 @@ export async function GET(request: NextRequest) {
   const amount = searchParams.get('amount');
   const pool = searchParams.get("pool");
   const slippageBpsParam = searchParams.get("slippageBps");
+  const forceFresh = searchParams.get("forceFresh") === "1" || searchParams.get("forceFresh") === "true";
   const corsHeaders = getCorsHeaders(request.headers.get("origin"));
+  const responseHeaders = { ...corsHeaders, ...NO_STORE_HEADERS };
 
   if (!inputMint || !outputMint || !amount) {
     return NextResponse.json(
       { error: 'Missing required parameters: inputMint, outputMint, amount' },
-      { status: 400, headers: corsHeaders }
+      { status: 400, headers: responseHeaders }
     );
   }
 
@@ -215,7 +222,7 @@ export async function GET(request: NextRequest) {
     if (!Number.isFinite(amountIn) || amountIn <= 0) {
       return NextResponse.json(
         { error: "Invalid amount" },
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: responseHeaders }
       );
     }
 
@@ -247,8 +254,12 @@ export async function GET(request: NextRequest) {
       const response = await fetch(url, {
         headers: { Accept: "application/json" },
         signal: AbortSignal.timeout(7000),
-        // Cache faible: l'état pool peut changer vite
-        next: { revalidate: 2 },
+        ...(forceFresh
+          ? { cache: "no-store" as const }
+          : {
+              // Cache faible: l'état pool peut changer vite
+              next: { revalidate: 2 },
+            }),
       });
 
       const contentType = response.headers.get("content-type") ?? "";
@@ -289,7 +300,7 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json(
           { error: "Orca returned invalid JSON", body: body.slice(0, 500) },
-          { status: 502, headers: corsHeaders }
+          { status: 502, headers: responseHeaders }
         );
       }
 
@@ -302,7 +313,7 @@ export async function GET(request: NextRequest) {
       if (!Number.isFinite(outAmount) || outAmount <= 0) {
         return NextResponse.json(
           { error: "Invalid Orca quote response", data },
-          { status: 502, headers: corsHeaders }
+          { status: 502, headers: responseHeaders }
         );
       }
 
@@ -317,7 +328,7 @@ export async function GET(request: NextRequest) {
           slippageBps,
           source: "orca-api",
         },
-        { headers: corsHeaders }
+        { headers: responseHeaders }
       );
     }
 
@@ -344,7 +355,7 @@ export async function GET(request: NextRequest) {
             slippageBps,
             source: "orca-whirlpool-sdk",
           },
-          { headers: corsHeaders }
+          { headers: responseHeaders }
         );
       } catch (sdkError) {
         return NextResponse.json(
@@ -353,7 +364,7 @@ export async function GET(request: NextRequest) {
             lastError,
             sdkError: String(sdkError),
           },
-          { status: 503, headers: corsHeaders }
+          { status: 503, headers: responseHeaders }
         );
       }
     }
@@ -361,13 +372,13 @@ export async function GET(request: NextRequest) {
     // All retries exhausted (no fallback possible)
     return NextResponse.json(
       { error: "Orca API unavailable after retries", lastError },
-      { status: 503, headers: corsHeaders }
+      { status: 503, headers: responseHeaders }
     );
   } catch (error) {
     console.error('[Orca Quote API] Error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch Orca quote', details: String(error) },
-      { status: 502, headers: corsHeaders }
+      { status: 502, headers: responseHeaders }
     );
   }
 }
