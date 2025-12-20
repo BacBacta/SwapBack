@@ -155,6 +155,11 @@ export function SimpleSwapCard() {
   
   // Ref pour rafraîchissement prix USD
   const priceRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Ref pour rafraîchissement quote swap
+  const quoteRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const quoteFetchSeqRef = useRef(0);
+  const quoteInFlightRef = useRef(false);
+  const quoteRef = useRef<QuoteResult | null>(null);
 
   // Paramètres (cachés par défaut)
   const [slippage, setSlippage] = useState(slippageConfig.BASE_SLIPPAGE_BPS / 100); // Utiliser config dynamique
@@ -224,6 +229,11 @@ export function SimpleSwapCard() {
     };
   }, [inputAmount, inputTokenData, outputTokenData]);
 
+  // Garder une ref à jour de la dernière quote (évite de relancer l'effet de fetch)
+  useEffect(() => {
+    quoteRef.current = quote;
+  }, [quote]);
+
   // Calculer le montant en unités de base
   const amountInBaseUnits = useMemo(() => {
     const amount = parseUserAmount(inputAmount);
@@ -239,9 +249,22 @@ export function SimpleSwapCard() {
       return;
     }
 
+    // Clear previous interval
+    if (quoteRefreshIntervalRef.current) {
+      clearInterval(quoteRefreshIntervalRef.current);
+      quoteRefreshIntervalRef.current = null;
+    }
+
+    const seq = ++quoteFetchSeqRef.current;
     const controller = new AbortController();
     const fetchNativeQuote = async () => {
-      setLoading(true);
+      if (controller.signal.aborted) return;
+      if (quoteInFlightRef.current) return;
+
+      quoteInFlightRef.current = true;
+      const shouldShowLoading = !quoteRef.current;
+      if (shouldShowLoading) setLoading(true);
+
       try {
         // Utiliser le router NATIF SwapBack
         const nativeResult = await getSwapQuote(
@@ -254,7 +277,7 @@ export function SimpleSwapCard() {
           0 // userBoostBps - peut être récupéré depuis le statut de lock
         );
 
-        if (nativeResult && !controller.signal.aborted) {
+        if (nativeResult && !controller.signal.aborted && seq === quoteFetchSeqRef.current) {
           const formatted = nativeResult.outputAmount / Math.pow(10, outputToken.decimals);
           const minOutFormatted =
             nativeResult.bestVenue === "RAYDIUM_AMM" &&
@@ -292,15 +315,29 @@ export function SimpleSwapCard() {
           // Ne pas afficher d'erreur si la quote échoue silencieusement
         }
       } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
+        quoteInFlightRef.current = false;
+        if (!controller.signal.aborted && seq === quoteFetchSeqRef.current) {
+          // Éviter le flicker: on n'affiche le loader que lors du premier fetch
+          if (!quoteRef.current) {
+            setLoading(false);
+          }
         }
       }
     };
 
     const timeout = setTimeout(fetchNativeQuote, 300);
+
+    // Auto-refresh quote: garde les prix dynamiques même sans interaction utilisateur
+    quoteRefreshIntervalRef.current = setInterval(() => {
+      void fetchNativeQuote();
+    }, 10_000);
+
     return () => {
       clearTimeout(timeout);
+      if (quoteRefreshIntervalRef.current) {
+        clearInterval(quoteRefreshIntervalRef.current);
+        quoteRefreshIntervalRef.current = null;
+      }
       controller.abort();
     };
   }, [amountInBaseUnits, inputToken.mint, outputToken.mint, outputToken.decimals, slippage, publicKey, getSwapQuote]);

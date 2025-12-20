@@ -424,17 +424,25 @@ export function EnhancedSwapInterface() {
     }
   }, [routes.selectedRoute]);
   
-  // Real-time price refresh countdown (30s interval to avoid rate limits)
+  // Real-time price refresh countdown (10s, sans flicker: refresh en background)
   useEffect(() => {
     if (!hasSearchedRoute || routes.isLoading) return;
     
-    const REFRESH_INTERVAL = 30; // 30 seconds to avoid rate limiting
+    // Aligné avec SimpleSwapCard: refresh fréquent, mais silencieux côté UI.
+    // NB: on limite à SwapBack (router natif) pour éviter d'accroître l'usage Jupiter.
+    const REFRESH_INTERVAL = 10;
     
     const interval = setInterval(() => {
       setPriceRefreshCountdown((prev) => {
         if (prev <= 1) {
           // Auto-refresh route using debounced function
-          if (swap.inputToken && swap.outputToken && parseFloat(swap.inputAmount) > 0 && !isFetchingRef.current) {
+          if (
+            selectedRouter === "swapback" &&
+            swap.inputToken &&
+            swap.outputToken &&
+            parseFloat(swap.inputAmount) > 0 &&
+            !isFetchingRef.current
+          ) {
             debouncedFetchRoutes("auto-refresh");
           }
           return REFRESH_INTERVAL;
@@ -444,7 +452,7 @@ export function EnhancedSwapInterface() {
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [hasSearchedRoute, routes.isLoading, swap.inputToken, swap.outputToken, swap.inputAmount, debouncedFetchRoutes]);
+  }, [hasSearchedRoute, routes.isLoading, selectedRouter, swap.inputToken, swap.outputToken, swap.inputAmount, debouncedFetchRoutes]);
 
   // Handlers
   const handleInputChange = (value: string) => {
