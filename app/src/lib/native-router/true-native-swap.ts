@@ -49,6 +49,7 @@ import {
   type VenueConfig,
 } from "@/config/routing";
 import { benchmarkAgainstJupiter } from "./split-route";
+import { getTokenPrice } from "@/lib/price-service";
 
 // ============================================================================
 // CONSTANTS
@@ -1125,7 +1126,16 @@ export class TrueNativeSwap {
   }
 
   /**
-   * Quote Phoenix via SDK/API
+   * Quote Phoenix via estimation de prix
+   * 
+   * Phoenix est un CLOB (Central Limit Order Book) - pas d'API quote publique simple.
+   * On utilise une estimation basée sur les prix du marché avec un spread conservateur.
+   * 
+   * CHANGEMENT v2.0 (Dec 20, 2025):
+   * - Activé avec estimation basée sur les prix (comme venue-quotes API)
+   * - Spread conservateur de 0.3% pour éviter les IOC failures
+   * 
+   * @see https://docs.phoenix.trade/
    */
   private async getPhoenixQuote(
     inputMint: PublicKey,
@@ -1133,17 +1143,74 @@ export class TrueNativeSwap {
     amountIn: number,
     accounts: DEXAccounts
   ): Promise<{ outputAmount: number; priceImpactBps: number } | null> {
-    void inputMint;
-    void outputMint;
-    void amountIn;
-    void accounts;
+    try {
+      // Vérifier que nous avons un market address
+      if (!accounts?.meta?.poolAddress) {
+        logger.debug("TrueNativeSwap", "Phoenix: no market address found");
+        return null;
+      }
 
-    // Phoenix (CLOB) requiert une quote basée sur l'orderbook pour éviter
-    // les IOC failures (custom error 0xF) quand minOut est irréaliste.
-    // Tant qu'une quote orderbook fiable via phoenix-sdk n'est pas implémentée,
-    // on désactive Phoenix au niveau quote pour éviter de sélectionner cette venue.
-    logger.warn("TrueNativeSwap", "Phoenix quote disabled (orderbook quote not implemented)");
-    return null;
+      const inputMintStr = inputMint.toBase58();
+      const outputMintStr = outputMint.toBase58();
+
+      // Obtenir les prix des tokens via le service de prix centralisé
+      const [inputPriceData, outputPriceData] = await Promise.all([
+        getTokenPrice(inputMintStr),
+        getTokenPrice(outputMintStr),
+      ]);
+
+      const inputPrice = inputPriceData.price;
+      const outputPrice = outputPriceData.price;
+
+      if (inputPrice <= 0 || outputPrice <= 0) {
+        logger.debug("TrueNativeSwap", "Phoenix: unable to get token prices", {
+          inputPrice,
+          outputPrice,
+        });
+        return null;
+      }
+
+      // Déterminer les décimales des tokens
+      const inputDecimals = inputMintStr === SOL_MINT.toBase58() ? 9 : 6;
+      const outputDecimals = outputMintStr === SOL_MINT.toBase58() ? 9 : 6;
+
+      // Calculer la valeur en USD de l'input
+      const inputAmountNormalized = amountIn / Math.pow(10, inputDecimals);
+      const inputValueUsd = inputAmountNormalized * inputPrice;
+
+      // Calculer l'output estimé
+      const outputAmountNormalized = inputValueUsd / outputPrice;
+      const outputAmountRaw = Math.floor(outputAmountNormalized * Math.pow(10, outputDecimals));
+
+      // Appliquer un spread conservateur de 0.3% (30 bps)
+      // Phoenix CLOB peut avoir des spreads variables selon la liquidité
+      const conservativeSpread = 0.997;
+      const outputAmount = Math.floor(outputAmountRaw * conservativeSpread);
+
+      if (outputAmount <= 0) {
+        return null;
+      }
+
+      logger.debug("TrueNativeSwap", "Phoenix quote (estimated)", {
+        inputMint: inputMintStr.slice(0, 8),
+        outputMint: outputMintStr.slice(0, 8),
+        amountIn,
+        outputAmount,
+        inputPrice,
+        outputPrice,
+        source: "price-estimation",
+      });
+
+      return {
+        outputAmount,
+        priceImpactBps: 30, // Impact conservateur pour CLOB
+      };
+    } catch (err) {
+      logger.warn("TrueNativeSwap", "Phoenix quote estimation failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
   }
 
   // ==========================================================================
