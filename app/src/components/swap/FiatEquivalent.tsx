@@ -71,7 +71,7 @@ const CURRENCY_LOCALES: Record<FiatCurrency, string> = {
 
 // Cache de prix (token mint -> price data)
 const priceCache = new Map<string, { data: PriceData; expiry: number }>();
-const CACHE_TTL_MS = 30000; // 30 secondes
+const CACHE_TTL_MS = 10000; // 10 secondes - cache court pour des prix dynamiques
 
 // ============================================================================
 // PRICE FETCHING
@@ -494,6 +494,8 @@ const SYMBOL_TO_MINT: Record<string, string> = {
 /**
  * Simple component to display fiat equivalent for a single token
  * Used for inline display in swap cards
+ * 
+ * Rafraîchit automatiquement le prix toutes les 15 secondes
  */
 export function SingleTokenFiat({
   tokenSymbol,
@@ -504,10 +506,31 @@ export function SingleTokenFiat({
 }: SingleTokenFiatProps) {
   const [fiatValue, setFiatValue] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+  
+  // Polling: rafraîchir le prix toutes les 15 secondes
+  useEffect(() => {
+    if (amount <= 0) return;
+    
+    const interval = setInterval(() => {
+      // Invalider le cache pour ce token
+      const mint = SYMBOL_TO_MINT[tokenSymbol.toUpperCase()];
+      if (mint) {
+        const cacheKey = `${mint}:${currency}`;
+        priceCache.delete(cacheKey);
+      }
+      setRefreshKey(k => k + 1);
+    }, 15000);
+    
+    return () => clearInterval(interval);
+  }, [tokenSymbol, amount, currency]);
   
   useEffect(() => {
     const fetchPrice = async () => {
-      setLoading(true);
+      // Ne pas afficher le loader pour les refresh silencieux
+      if (fiatValue === null) {
+        setLoading(true);
+      }
       
       const mint = SYMBOL_TO_MINT[tokenSymbol.toUpperCase()];
       if (!mint) {
@@ -531,7 +554,7 @@ export function SingleTokenFiat({
       setFiatValue(null);
       setLoading(false);
     }
-  }, [tokenSymbol, amount, currency]);
+  }, [tokenSymbol, amount, currency, refreshKey]);
   
   const formatFiat = (value: number | null) => {
     if (value === null) return '';

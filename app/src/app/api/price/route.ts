@@ -58,12 +58,18 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // Headers de réponse avec no-store pour éviter le cache navigateur
+    const responseHeaders = {
+      ...corsHeaders,
+      'Cache-Control': 'no-store, max-age=0',
+    };
+
     // Essayer Jupiter Price API d'abord (côté serveur, pas de CORS)
     const jupiterResponse = await fetch(
       `https://api.jup.ag/price/v2?ids=${mint}`,
       {
         headers: { 'Accept': 'application/json' },
-        next: { revalidate: 15 }, // Cache 15 secondes
+        cache: 'no-store', // Pas de cache pour des prix frais
       }
     );
 
@@ -73,8 +79,8 @@ export async function GET(request: NextRequest) {
         const price = parseFloat(data.data[mint].price);
         if (price > 0) {
           return NextResponse.json(
-            { price, source: 'jupiter', mint },
-            { headers: corsHeaders }
+            { price, source: 'jupiter', mint, timestamp: Date.now() },
+            { headers: responseHeaders }
           );
         }
       }
@@ -90,7 +96,7 @@ export async function GET(request: NextRequest) {
             'Accept': 'application/json',
             'X-API-KEY': birdeyeApiKey,
           },
-          next: { revalidate: 15 },
+          cache: 'no-store',
         }
       );
 
@@ -98,8 +104,8 @@ export async function GET(request: NextRequest) {
         const birdeyeData = await birdeyeResponse.json();
         if (birdeyeData.data && birdeyeData.data.value) {
           return NextResponse.json(
-            { price: birdeyeData.data.value, source: 'birdeye', mint },
-            { headers: corsHeaders }
+            { price: birdeyeData.data.value, source: 'birdeye', mint, timestamp: Date.now() },
+            { headers: responseHeaders }
           );
         }
       }
@@ -110,7 +116,7 @@ export async function GET(request: NextRequest) {
       `https://api.dexscreener.com/latest/dex/tokens/${mint}`,
       {
         headers: { 'Accept': 'application/json' },
-        next: { revalidate: 15 },
+        cache: 'no-store',
       }
     );
 
@@ -121,8 +127,8 @@ export async function GET(request: NextRequest) {
         const pairWithPrice = dexData.pairs.find((p: { priceUsd?: string }) => p.priceUsd);
         if (pairWithPrice && pairWithPrice.priceUsd) {
           return NextResponse.json(
-            { price: parseFloat(pairWithPrice.priceUsd), source: 'dexscreener', mint },
-            { headers: corsHeaders }
+            { price: parseFloat(pairWithPrice.priceUsd), source: 'dexscreener', mint, timestamp: Date.now() },
+            { headers: responseHeaders }
           );
         }
       }
@@ -130,15 +136,15 @@ export async function GET(request: NextRequest) {
 
     // Aucun prix trouvé
     return NextResponse.json(
-      { price: 0, source: 'none', mint, error: 'Price not found' },
-      { headers: corsHeaders }
+      { price: 0, source: 'none', mint, error: 'Price not found', timestamp: Date.now() },
+      { headers: responseHeaders }
     );
 
   } catch (error) {
     console.error('Price API error:', error);
     return NextResponse.json(
       { price: 0, source: 'error', mint, error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500, headers: corsHeaders }
+      { status: 500, headers: { ...corsHeaders, 'Cache-Control': 'no-store' } }
     );
   }
 }
