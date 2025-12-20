@@ -9,7 +9,7 @@
  * - Historique en section collapsible
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Gift, 
@@ -39,6 +39,16 @@ interface ClaimEvent {
   txSignature: string;
 }
 
+const ROUTER_PROGRAM_ID_STR =
+  process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID ||
+  "APHj6L2b2bA2q62jwYZp38dqbTxQUqwatqdUum1trPnN";
+
+const USDC_MINT_STR = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+const CLAIM_REWARDS_DISCRIMINATOR = Buffer.from([
+  4, 144, 132, 71, 116, 23, 151, 80,
+]);
+
 export function SimpleRebatesCard() {
   const { connected, publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
@@ -49,113 +59,130 @@ export function SimpleRebatesCard() {
   const [rebateData, setRebateData] = useState<RebateData | null>(null);
   const [claimHistory, setClaimHistory] = useState<ClaimEvent[]>([]);
 
-  // Router program ID
-  const ROUTER_PROGRAM_ID = new PublicKey(
-    process.env.NEXT_PUBLIC_ROUTER_PROGRAM_ID || "APHj6L2b2bA2q62jwYZp38dqbTxQUqwatqdUum1trPnN"
+  const fetchSeq = useRef(0);
+
+  const routerProgramId = useMemo(
+    () => new PublicKey(ROUTER_PROGRAM_ID_STR),
+    []
   );
 
-  // Fetch rebate data from on-chain
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!connected || !publicKey) {
-        console.log('[SimpleRebatesCard] Not connected or no publicKey');
+  const usdcMint = useMemo(() => new PublicKey(USDC_MINT_STR), []);
+
+  const fetchData = useCallback(async () => {
+    const seq = ++fetchSeq.current;
+
+    if (!connected || !publicKey) {
+      console.log('[SimpleRebatesCard] Not connected or no publicKey');
+      if (seq === fetchSeq.current) {
         setRebateData(null);
         setLoading(false);
+      }
+      return;
+    }
+
+    console.log('[SimpleRebatesCard] Starting fetchData...');
+    console.log('[SimpleRebatesCard] RPC endpoint:', connection.rpcEndpoint);
+    console.log('[SimpleRebatesCard] Wallet:', publicKey.toBase58().substring(0, 8) + '...');
+
+    setLoading(true);
+    const startTime = Date.now();
+
+    try {
+      // Derive UserRebate PDA
+      const [userRebatePDA] = PublicKey.findProgramAddressSync(
+        [Buffer.from("user_rebate"), publicKey.toBuffer()],
+        routerProgramId
+      );
+      console.log('[SimpleRebatesCard] UserRebate PDA:', userRebatePDA.toBase58().substring(0, 8) + '...');
+
+      console.log('[SimpleRebatesCard] Calling getAccountInfo...');
+      const accountInfo = await connection.getAccountInfo(userRebatePDA, "confirmed");
+      console.log('[SimpleRebatesCard] getAccountInfo completed in', Date.now() - startTime, 'ms');
+
+      if (seq !== fetchSeq.current) {
         return;
       }
 
-      console.log('[SimpleRebatesCard] Starting fetchData...');
-      console.log('[SimpleRebatesCard] RPC endpoint:', connection.rpcEndpoint);
-      console.log('[SimpleRebatesCard] Wallet:', publicKey.toBase58().substring(0, 8) + '...');
-      
-      setLoading(true);
-      const startTime = Date.now();
-      
-      try {
-        // Derive UserRebate PDA
-        const [userRebatePDA] = PublicKey.findProgramAddressSync(
-          [Buffer.from("user_rebate"), publicKey.toBuffer()],
-          ROUTER_PROGRAM_ID
-        );
-        console.log('[SimpleRebatesCard] UserRebate PDA:', userRebatePDA.toBase58().substring(0, 8) + '...');
+      if (accountInfo && accountInfo.data.length >= 81) {
+        console.log('[SimpleRebatesCard] Account found, parsing data...');
+        // Layout: discriminator(8) + user(32) + unclaimed(8) + total_claimed(8) + total_swaps(8) + ...
+        const data = accountInfo.data;
+        let offset = 8; // Skip discriminator
+        offset += 32; // Skip user pubkey
 
-        console.log('[SimpleRebatesCard] Calling getAccountInfo...');
-        const accountInfo = await connection.getAccountInfo(userRebatePDA);
-        console.log('[SimpleRebatesCard] getAccountInfo completed in', Date.now() - startTime, 'ms');
+        const unclaimedRebate = Number(data.readBigUInt64LE(offset)) / 1e6; // USDC 6 decimals
+        offset += 8;
 
-        if (accountInfo && accountInfo.data.length >= 80) {
-          console.log('[SimpleRebatesCard] Account found, parsing data...');
-          // Parse UserRebate account data
-          // Layout: discriminator(8) + user(32) + unclaimed(8) + total_claimed(8) + total_swaps(8) + ...
-          const data = accountInfo.data;
-          let offset = 8; // Skip discriminator
-          offset += 32; // Skip user pubkey
+        const totalClaimed = Number(data.readBigUInt64LE(offset)) / 1e6;
+        offset += 8;
 
-          const unclaimedRebate = Number(data.readBigUInt64LE(offset)) / 1e6; // USDC 6 decimals
-          offset += 8;
+        const totalSwaps = Number(data.readBigUInt64LE(offset));
+        offset += 8;
 
-          const totalClaimed = Number(data.readBigUInt64LE(offset)) / 1e6;
-          offset += 8;
+        // Estimate volume from rebates (0.1% rebate rate)
+        const totalVolume = (unclaimedRebate + totalClaimed) * 1000;
 
-          const totalSwaps = Number(data.readBigUInt64LE(offset));
-          offset += 8;
+        console.log('[SimpleRebatesCard] Parsed data:', { unclaimedRebate, totalClaimed, totalSwaps, totalVolume });
 
-          // Estimate volume from rebates (0.1% rebate rate)
-          const totalVolume = (unclaimedRebate + totalClaimed) * 1000;
+        setRebateData({
+          unclaimedRebate,
+          totalClaimed,
+          totalVolume,
+          totalSwaps,
+        });
+      } else {
+        console.log('[SimpleRebatesCard] No account found or insufficient data length');
+        // No account - user has never swapped
+        setRebateData({
+          unclaimedRebate: 0,
+          totalClaimed: 0,
+          totalVolume: 0,
+          totalSwaps: 0,
+        });
+      }
 
-          console.log('[SimpleRebatesCard] Parsed data:', { unclaimedRebate, totalClaimed, totalSwaps, totalVolume });
-          
-          setRebateData({
-            unclaimedRebate,
-            totalClaimed,
-            totalVolume,
-            totalSwaps,
-          });
-        } else {
-          console.log('[SimpleRebatesCard] No account found or insufficient data length');
-          // No account - user has never swapped
-          setRebateData({
-            unclaimedRebate: 0,
-            totalClaimed: 0,
-            totalVolume: 0,
-            totalSwaps: 0,
-          });
-        }
+      // Fetch claim history from signatures (simplified)
+      // In production, use proper indexer
+      setClaimHistory([]);
+      console.log('[SimpleRebatesCard] fetchData completed successfully in', Date.now() - startTime, 'ms');
+    } catch (error: unknown) {
+      if (seq !== fetchSeq.current) {
+        return;
+      }
 
-        // Fetch claim history from signatures (simplified)
-        // In production, use proper indexer
-        setClaimHistory([]);
-        console.log('[SimpleRebatesCard] fetchData completed successfully in', Date.now() - startTime, 'ms');
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        const errorName = error instanceof Error ? error.name : 'Unknown';
-        
-        console.error('[SimpleRebatesCard] ERROR in fetchData:');
-        console.error('[SimpleRebatesCard] Error name:', errorName);
-        console.error('[SimpleRebatesCard] Error message:', errorMessage);
-        console.error('[SimpleRebatesCard] RPC endpoint:', connection.rpcEndpoint);
-        console.error('[SimpleRebatesCard] Time elapsed:', Date.now() - startTime, 'ms');
-        
-        // Check for specific error types
-        if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests')) {
-          console.error('[SimpleRebatesCard] ⚠️ RATE LIMITED (429) - RPC is blocking requests');
-        }
-        if (errorMessage.includes('fetch failed') || errorMessage.includes('network')) {
-          console.error('[SimpleRebatesCard] ⚠️ NETWORK ERROR - Check RPC endpoint');
-        }
-        
-        console.error('[SimpleRebatesCard] Full error:', error);
-        setRebateData(null);
-      } finally {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorName = error instanceof Error ? error.name : 'Unknown';
+
+      console.error('[SimpleRebatesCard] ERROR in fetchData:');
+      console.error('[SimpleRebatesCard] Error name:', errorName);
+      console.error('[SimpleRebatesCard] Error message:', errorMessage);
+      console.error('[SimpleRebatesCard] RPC endpoint:', connection.rpcEndpoint);
+      console.error('[SimpleRebatesCard] Time elapsed:', Date.now() - startTime, 'ms');
+
+      // Check for specific error types
+      if (errorMessage.includes('429') || errorMessage.includes('Too Many Requests')) {
+        console.error('[SimpleRebatesCard] ⚠️ RATE LIMITED (429) - RPC is blocking requests');
+      }
+      if (errorMessage.includes('fetch failed') || errorMessage.includes('network')) {
+        console.error('[SimpleRebatesCard] ⚠️ NETWORK ERROR - Check RPC endpoint');
+      }
+
+      console.error('[SimpleRebatesCard] Full error:', error);
+      setRebateData(null);
+    } finally {
+      if (seq === fetchSeq.current) {
         setLoading(false);
       }
-    };
+    }
+  }, [connected, publicKey, connection, routerProgramId]);
 
+  // Fetch rebate data from on-chain
+  useEffect(() => {
     // Delay initial fetch to avoid burst of requests on page load
     const timeoutId = setTimeout(fetchData, 300);
     
     return () => clearTimeout(timeoutId);
-  }, [connected, publicKey, connection, ROUTER_PROGRAM_ID]);
+  }, [fetchData]);
 
   const handleClaim = async () => {
     if (!connected || !publicKey || !signTransaction || !rebateData || rebateData.unclaimedRebate <= 0) {
@@ -165,57 +192,79 @@ export function SimpleRebatesCard() {
     setClaiming(true);
     const toastId = toast.loading("Réclamation en cours...");
     try {
-      // Derive PDAs
-      const [userRebatePDA] = PublicKey.findProgramAddressSync(
+      const { Transaction, TransactionInstruction } = await import("@solana/web3.js");
+      const {
+        TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+        getAssociatedTokenAddressSync,
+        createAssociatedTokenAccountIdempotentInstruction,
+      } = await import("@solana/spl-token");
+
+      // PDAs (must match IDL: claim_rewards)
+      const [statePda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("router_state")],
+        routerProgramId
+      );
+
+      const [userRebatePda] = PublicKey.findProgramAddressSync(
         [Buffer.from("user_rebate"), publicKey.toBuffer()],
-        ROUTER_PROGRAM_ID
+        routerProgramId
       );
 
-      const [treasuryPDA] = PublicKey.findProgramAddressSync(
-        [Buffer.from("treasury")],
-        ROUTER_PROGRAM_ID
+      const [rebateVaultPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("rebate_vault"), statePda.toBuffer()],
+        routerProgramId
       );
 
-      // USDC mint
-      const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
-      
-      // Get or create user's USDC token account
-      const { getAssociatedTokenAddress } = await import("@solana/spl-token");
-      const userUsdcAta = await getAssociatedTokenAddress(USDC_MINT, publicKey);
+      const userUsdcAta = getAssociatedTokenAddressSync(usdcMint, publicKey);
 
-      // Build claim instruction
-      // Discriminator for "claim_rebates" instruction
-      const CLAIM_DISCRIMINATOR = Buffer.from([4, 144, 132, 71, 116, 23, 151, 80]);
-      
-      const { Transaction, TransactionInstruction, SystemProgram } = await import("@solana/web3.js");
-      const { TOKEN_PROGRAM_ID } = await import("@solana/spl-token");
+      const transaction = new Transaction();
+
+      // Ensure user ATA exists (idempotent)
+      transaction.add(
+        createAssociatedTokenAccountIdempotentInstruction(
+          publicKey,
+          userUsdcAta,
+          publicKey,
+          usdcMint,
+          TOKEN_PROGRAM_ID,
+          ASSOCIATED_TOKEN_PROGRAM_ID
+        )
+      );
 
       const claimInstruction = new TransactionInstruction({
-        programId: ROUTER_PROGRAM_ID,
+        programId: routerProgramId,
         keys: [
-          { pubkey: userRebatePDA, isSigner: false, isWritable: true },
-          { pubkey: treasuryPDA, isSigner: false, isWritable: true },
-          { pubkey: userUsdcAta, isSigner: false, isWritable: true },
+          { pubkey: statePda, isSigner: false, isWritable: true },
+          { pubkey: userRebatePda, isSigner: false, isWritable: true },
           { pubkey: publicKey, isSigner: true, isWritable: true },
+          { pubkey: userUsdcAta, isSigner: false, isWritable: true },
+          { pubkey: rebateVaultPda, isSigner: false, isWritable: true },
           { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
         ],
-        data: CLAIM_DISCRIMINATOR
+        data: CLAIM_REWARDS_DISCRIMINATOR,
       });
 
-      const transaction = new Transaction().add(claimInstruction);
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+      transaction.add(claimInstruction);
+
+      const { blockhash, lastValidBlockHeight } =
+        await connection.getLatestBlockhash("confirmed");
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = publicKey;
 
       const signedTx = await signTransaction(transaction);
-      const signature = await connection.sendRawTransaction(signedTx.serialize());
-
-      await connection.confirmTransaction({
-        signature,
-        blockhash,
-        lastValidBlockHeight
+      const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+        skipPreflight: false,
       });
+
+      await connection.confirmTransaction(
+        {
+          signature,
+          blockhash,
+          lastValidBlockHeight,
+        },
+        "confirmed"
+      );
 
       toast.success(`${rebateData.unclaimedRebate.toFixed(2)} USDC réclamés !`, { id: toastId });
       
@@ -231,6 +280,9 @@ export function SimpleRebatesCard() {
         { amount: rebateData.unclaimedRebate, timestamp: new Date(), txSignature: signature },
         ...prev
       ]);
+
+      // Re-sync with chain (handles partial claims / delayed indexing)
+      fetchData();
     } catch (error) {
       console.error("Claim error:", error);
       const message = error instanceof Error ? error.message : "Erreur lors de la réclamation";
