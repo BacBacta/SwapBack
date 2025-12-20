@@ -311,6 +311,7 @@ export const useSwapStore = create<SwapStore>()(
             const response = await fetch(getApiUrl(API_ENDPOINTS.quote), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
+              cache: "no-store",
               body: JSON.stringify({
                 inputMint: swap.inputToken.mint,
                 outputMint: swap.outputToken.mint,
@@ -318,6 +319,8 @@ export const useSwapStore = create<SwapStore>()(
                 slippageBps,
                 routingStrategy,
                 userPublicKey: options?.userPublicKey ?? null,
+                // Lors des auto-refresh, on bypass le cache serveur pour éviter des prix figés.
+                forceFresh: isBackground,
               }),
             });
 
