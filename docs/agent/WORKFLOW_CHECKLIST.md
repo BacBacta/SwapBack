@@ -16,5 +16,6 @@
 - [ ] simulateTransaction mainnet: OK (>=2 paires supportées)
 - [ ] paire non supportée: bloquée avant signature + fallback Jupiter
 - [ ] CI: re-run `scripts/simulate-native-swap.ts` avec `SOLANA_RPC_URL` (éviter les 429)
+	- voir: docs/agent/SIMULATE_NATIVE_SWAP.md
 - [ ] lint/test/build OK
 - [ ] diff minimal + notes de release
