@@ -86,7 +86,8 @@ export class OrcaService {
         AnchorProvider.defaultOptions()
       );
       const context = WhirlpoolContext.withProvider(
-        provider
+        provider,
+        this.programId
       );
       this.fetcher = context.fetcher;
       this.client = buildWhirlpoolClient(context);
