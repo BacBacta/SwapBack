@@ -31,6 +31,8 @@ interface RebateData {
   totalClaimed: number;
   totalVolume: number;
   totalSwaps: number;
+  lastSwapTimestamp: number; // unix seconds
+  lastClaimTimestamp: number; // unix seconds
 }
 
 interface ClaimEvent {
@@ -48,6 +50,8 @@ const USDC_MINT_STR = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const CLAIM_REWARDS_DISCRIMINATOR = Buffer.from([
   4, 144, 132, 71, 116, 23, 151, 80,
 ]);
+
+const REBATE_CLAIM_DELAY_SECS = 48 * 60 * 60;
 
 export function SimpleRebatesCard() {
   const { connected, publicKey, signTransaction } = useWallet();
@@ -106,7 +110,7 @@ export function SimpleRebatesCard() {
 
       setRebateAccountMissing(!accountInfo);
 
-      if (accountInfo && accountInfo.data.length >= 81) {
+      if (accountInfo && accountInfo.data.length >= 64) {
         console.log('[SimpleRebatesCard] Account found, parsing data...');
         // Layout: discriminator(8) + user(32) + unclaimed(8) + total_claimed(8) + total_swaps(8) + ...
         const data = accountInfo.data;
@@ -122,16 +126,26 @@ export function SimpleRebatesCard() {
         const totalSwaps = Number(data.readBigUInt64LE(offset));
         offset += 8;
 
+        const lastSwapTimestamp =
+          data.length >= offset + 8 ? Number(data.readBigInt64LE(offset)) : 0;
+        offset += 8;
+
+        const lastClaimTimestamp =
+          data.length >= offset + 8 ? Number(data.readBigInt64LE(offset)) : 0;
+        offset += 8;
+
         // Estimate volume from rebates (0.1% rebate rate)
         const totalVolume = (unclaimedRebate + totalClaimed) * 1000;
 
-        console.log('[SimpleRebatesCard] Parsed data:', { unclaimedRebate, totalClaimed, totalSwaps, totalVolume });
+        console.log('[SimpleRebatesCard] Parsed data:', { unclaimedRebate, totalClaimed, totalSwaps, totalVolume, lastSwapTimestamp, lastClaimTimestamp });
 
         setRebateData({
           unclaimedRebate,
           totalClaimed,
           totalVolume,
           totalSwaps,
+          lastSwapTimestamp,
+          lastClaimTimestamp,
         });
       } else {
         console.log('[SimpleRebatesCard] No account found or insufficient data length');
@@ -141,6 +155,8 @@ export function SimpleRebatesCard() {
           totalClaimed: 0,
           totalVolume: 0,
           totalSwaps: 0,
+          lastSwapTimestamp: 0,
+          lastClaimTimestamp: 0,
         });
       }
 
@@ -189,6 +205,16 @@ export function SimpleRebatesCard() {
 
   const handleClaim = async () => {
     if (!connected || !publicKey || !signTransaction || !rebateData || rebateData.unclaimedRebate <= 0) {
+      return;
+    }
+
+    const nowSecs = Math.floor(Date.now() / 1000);
+    const claimableAfter = (rebateData.lastSwapTimestamp || 0) + REBATE_CLAIM_DELAY_SECS;
+    if (rebateData.lastSwapTimestamp > 0 && nowSecs < claimableAfter) {
+      const remaining = Math.max(0, claimableAfter - nowSecs);
+      const hrs = Math.floor(remaining / 3600);
+      const mins = Math.floor((remaining % 3600) / 60);
+      toast.error(`Réclamation possible dans ${hrs}h ${mins}m (délai 48h après le dernier swap).`);
       return;
     }
 
@@ -288,8 +314,26 @@ export function SimpleRebatesCard() {
       fetchData();
     } catch (error) {
       console.error("Claim error:", error);
-      const message = error instanceof Error ? error.message : "Erreur lors de la réclamation";
-      toast.error(message, { id: toastId });
+      const raw = error instanceof Error ? error.message : String(error);
+      const isTooEarly =
+        raw.includes("RebateClaimTooEarly") ||
+        raw.includes("6017") ||
+        raw.includes("0x1781");
+
+      if (isTooEarly) {
+        const nowSecs = Math.floor(Date.now() / 1000);
+        const claimableAfter = (rebateData.lastSwapTimestamp || 0) + REBATE_CLAIM_DELAY_SECS;
+        const remaining = Math.max(0, claimableAfter - nowSecs);
+        const hrs = Math.floor(remaining / 3600);
+        const mins = Math.floor((remaining % 3600) / 60);
+        toast.error(
+          `Trop tôt: réclamation possible dans ${hrs}h ${mins}m (délai 48h après le dernier swap).`,
+          { id: toastId }
+        );
+      } else {
+        const message = raw || "Erreur lors de la réclamation";
+        toast.error(message, { id: toastId });
+      }
     } finally {
       setClaiming(false);
     }
@@ -326,6 +370,18 @@ export function SimpleRebatesCard() {
   }
 
   const hasRebates = rebateData && (rebateData.unclaimedRebate > 0 || rebateData.totalClaimed > 0);
+  const nowSecs = Math.floor(Date.now() / 1000);
+  const claimableAfterSecs = rebateData?.lastSwapTimestamp
+    ? rebateData.lastSwapTimestamp + REBATE_CLAIM_DELAY_SECS
+    : 0;
+  const claimLocked =
+    !!rebateData &&
+    rebateData.unclaimedRebate > 0 &&
+    rebateData.lastSwapTimestamp > 0 &&
+    nowSecs < claimableAfterSecs;
+  const claimRemainingSecs = claimLocked ? Math.max(0, claimableAfterSecs - nowSecs) : 0;
+  const claimRemainingHrs = claimLocked ? Math.floor(claimRemainingSecs / 3600) : 0;
+  const claimRemainingMins = claimLocked ? Math.floor((claimRemainingSecs % 3600) / 60) : 0;
 
   return (
     <div className="w-full max-w-lg mx-auto theme-light">
@@ -356,10 +412,10 @@ export function SimpleRebatesCard() {
           {/* Bouton Claim */}
           <button
             onClick={handleClaim}
-            disabled={claiming || !rebateData || rebateData.unclaimedRebate <= 0}
+            disabled={claiming || !rebateData || rebateData.unclaimedRebate <= 0 || claimLocked}
             className={`
               w-full py-4 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all
-              ${rebateData && rebateData.unclaimedRebate > 0 
+              ${rebateData && rebateData.unclaimedRebate > 0 && !claimLocked
                 ? "btn-simple" 
                 : "bg-white/5 text-gray-500 cursor-not-allowed"
               }
@@ -373,12 +429,23 @@ export function SimpleRebatesCard() {
             ) : rebateData && rebateData.unclaimedRebate > 0 ? (
               <>
                 <CheckCircle className="w-5 h-5" />
-                Réclamer mes rebates
+                {claimLocked
+                  ? `Disponible dans ${claimRemainingHrs}h ${claimRemainingMins}m`
+                  : "Réclamer mes rebates"}
               </>
             ) : (
               "Aucun rebate à réclamer"
             )}
           </button>
+
+          {claimLocked && (
+            <div className="mt-3 rounded-xl bg-white/5 p-4 text-sm text-gray-300">
+              <div className="font-medium text-white mb-1">Réclamation verrouillée (48h)</div>
+              <div className="text-gray-400">
+                Vous pourrez réclamer dans {claimRemainingHrs}h {claimRemainingMins}m.
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Stats */}
