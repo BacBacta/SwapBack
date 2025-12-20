@@ -647,6 +647,26 @@ export function SimpleSwapCard() {
                     </span>
                   )}
                 </div>
+
+                {/* V1.1: Indicateur multi-hop (2 legs) */}
+                {trueNativeRoute?.multiHop && (
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                      <Clock className="w-3.5 h-3.5 text-gray-500" />
+                      <span>Multi-hop via USDC</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] bg-white/5 border border-white/10 text-gray-300 px-2 py-0.5 rounded-full font-medium">
+                        {trueNativeRoute.multiHop.firstLeg.route.venue}
+                      </span>
+                      <span className="text-[10px] text-gray-600">→</span>
+                      <span className="text-[10px] bg-white/5 border border-white/10 text-gray-300 px-2 py-0.5 rounded-full font-medium">
+                        {trueNativeRoute.multiHop.secondLeg.route.venue}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Visualisation des routes améliorée en mode avancé */}
                 {swapMode === 'advanced' && quote.venues && quote.venues.length > 0 ? (
                   <RouteVisualization
