@@ -1570,10 +1570,13 @@ export async function getMeteoraAccounts(
         `meteora-bitmap:${lbPair.toBase58()}`
       );
       if (!bitmapInfo) {
-        console.warn("[MeteoraResolver] bin_array_bitmap_extension account missing", {
-          lbPair: lbPair.toBase58(),
-          binArrayBitmapExtension: binArrayBitmapExtension.toBase58(),
-        });
+        const key = `MeteoraResolver:bitmap-missing:${lbPair.toBase58()}`;
+        if (shouldLogResolverWarning(key)) {
+          logger.debug("MeteoraResolver", "bin_array_bitmap_extension account missing", {
+            lbPair: lbPair.toBase58(),
+            binArrayBitmapExtension: binArrayBitmapExtension.toBase58(),
+          });
+        }
         meteoraBitmapMissingCache.set(bitmapCacheKey, now);
         return null;
       }

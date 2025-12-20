@@ -87,6 +87,10 @@ const QUOTED_VENUES = new Set<SupportedVenue>([
   "SABER",
 ]);
 
+// Optim perf: on tente d'abord les venues les plus fiables/rapides (DoD V1.1).
+// Les autres venues ne sont interrogées que si ORCA+METEORA ne renvoient aucune quote.
+const PRIMARY_QUOTE_VENUES: SupportedVenue[] = ["ORCA_WHIRLPOOL", "METEORA_DLMM"];
+
 // ============================================================================
 // HELPERS - Using centralized publicKeyUtils
 // ============================================================================
@@ -1034,16 +1038,30 @@ export class TrueNativeSwap {
       (v) => !DISABLED_BEST_ROUTE_VENUES.has(v)
     );
 
-    const quotes = directOracleOk
-      ? await this.getNativeQuotes(
+    let quotes: NativeVenueQuote[] = [];
+    if (directOracleOk) {
+      const primaryVenues = venuesForBestRoute.filter((v) => PRIMARY_QUOTE_VENUES.includes(v));
+      const secondaryVenues = venuesForBestRoute.filter((v) => !PRIMARY_QUOTE_VENUES.includes(v));
+
+      const primaryQuotes = primaryVenues.length
+        ? await this.getNativeQuotes(inputMintPk, outputMintPk, amountIn, userPk, params.slippageBps, primaryVenues)
+        : [];
+
+      if (primaryQuotes.length > 0 || secondaryVenues.length === 0) {
+        quotes = primaryQuotes;
+      } else {
+        const secondaryQuotes = await this.getNativeQuotes(
           inputMintPk,
           outputMintPk,
           amountIn,
           userPk,
           params.slippageBps,
-          venuesForBestRoute
-        )
-      : [];
+          secondaryVenues
+        );
+        quotes = [...primaryQuotes, ...secondaryQuotes];
+        quotes.sort((a, b) => b.outputAmount - a.outputAmount);
+      }
+    }
 
     const bestDirect = quotes.find((q) => !DISABLED_BEST_ROUTE_VENUES.has(q.venue)) ?? null;
 
