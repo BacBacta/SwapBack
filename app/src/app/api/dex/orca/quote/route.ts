@@ -19,7 +19,7 @@ import {
   swapQuoteByInputToken,
 } from "@orca-so/whirlpools-sdk";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
-import { ORCA_WHIRLPOOL_PROGRAM_ID } from "@/sdk/config/orca-pools";
+import { getOrcaWhirlpool, ORCA_WHIRLPOOL_PROGRAM_ID } from "@/sdk/config/orca-pools";
 
 // Route handler: toujours dynamique (aucune exécution au build)
 export const dynamic = "force-dynamic";
@@ -231,6 +231,54 @@ export async function GET(request: NextRequest) {
       process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
       "https://api.mainnet-beta.solana.com";
 
+    // Prefer SDK on-chain quotes when we can resolve a pool address.
+    // This avoids upstream Orca REST instability (Cloudflare diagnostic payloads).
+    const resolvedPool =
+      pool ||
+      (() => {
+        try {
+          return getOrcaWhirlpool(new PublicKey(inputMint), new PublicKey(outputMint))?.toBase58() ?? null;
+        } catch {
+          return null;
+        }
+      })();
+
+    if (resolvedPool) {
+      try {
+        const sdkQuote = await quoteWithOrcaWhirlpoolSdk({
+          rpcUrl,
+          pool: resolvedPool,
+          inputMint,
+          outputMint,
+          amountIn,
+          slippageBps,
+        });
+
+        return NextResponse.json(
+          {
+            inputMint,
+            outputMint,
+            inputAmount: amountIn,
+            outputAmount: sdkQuote.outAmount,
+            priceImpact: 0,
+            priceImpactBps: 0,
+            slippageBps,
+            pool: resolvedPool,
+            source: "orca-whirlpool-sdk",
+          },
+          { headers: responseHeaders }
+        );
+      } catch (sdkError) {
+        // If SDK fails (pool mismatch, RPC hiccup), continue and try REST retries.
+        console.warn("[Orca Quote API] SDK quote failed; falling back to REST", {
+          inputMint,
+          outputMint,
+          pool: resolvedPool,
+          error: String(sdkError),
+        });
+      }
+    }
+
     // Orca Quote API (déjà utilisée ailleurs dans le repo)
     // Note: le paramètre `slippage` est en % (0.5 = 0.5%)
     const slippagePct = (slippageBps / 100).toString();
@@ -332,8 +380,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fallback: Orca Whirlpool SDK on-chain (requires `pool`)
-    if (pool) {
+    // If REST failed and we *only* have a pool provided by the client, keep the old behavior as final attempt.
+    if (pool && pool !== resolvedPool) {
       try {
         const sdkQuote = await quoteWithOrcaWhirlpoolSdk({
           rpcUrl,
@@ -353,6 +401,7 @@ export async function GET(request: NextRequest) {
             priceImpact: 0,
             priceImpactBps: 0,
             slippageBps,
+            pool,
             source: "orca-whirlpool-sdk",
           },
           { headers: responseHeaders }
