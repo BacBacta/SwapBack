@@ -30,6 +30,15 @@ import { getAllRaydiumPools, getRaydiumPool } from "@/sdk/config/raydium-pools";
 const RESOLVER_CACHE_TTL_MS = 60_000; // short-lived cache to absorb bursty API errors
 const MAX_FETCH_ATTEMPTS = 2;
 
+const resolverLogDedupe = new Map<string, number>();
+const shouldLogResolverWarning = (key: string, ttlMs: number = RESOLVER_CACHE_TTL_MS): boolean => {
+  const now = Date.now();
+  const last = resolverLogDedupe.get(key);
+  if (typeof last === "number" && now - last < ttlMs) return false;
+  resolverLogDedupe.set(key, now);
+  return true;
+};
+
 const meteoraPairCache = new Map<string, { timestamp: number; pair: PublicKey | null }>();
 const raydiumPoolCache = new Map<string, { timestamp: number; pool: RaydiumPoolConfig | null }>();
 const serumMarketMetaCache = new Map<string, { timestamp: number; meta: SerumMarketMeta }>();
@@ -190,10 +199,15 @@ export async function getLifinityAccounts(
 
     const pool = await findLifinityPool(safeInputMint, safeOutputMint);
     if (!pool) {
-      logger.warn("LifinityResolver", "No Lifinity pool found for pair", {
-        inputMint: safeInputMint.toBase58(),
-        outputMint: safeOutputMint.toBase58(),
-      });
+      const inputStr = safeInputMint.toBase58();
+      const outputStr = safeOutputMint.toBase58();
+      const key = `LifinityResolver:no-pool:${getPairCacheKey(inputStr, outputStr)}`;
+      if (shouldLogResolverWarning(key)) {
+        logger.warn("LifinityResolver", "No Lifinity pool found for pair", {
+          inputMint: inputStr,
+          outputMint: outputStr,
+        });
+      }
       return null;
     }
 
@@ -202,11 +216,16 @@ export async function getLifinityAccounts(
     // This also makes unit tests deterministic (mock connections returning null should yield no accounts).
     const ammInfo = await connection.getAccountInfo(amm);
     if (!ammInfo) {
-      logger.warn("LifinityResolver", "Lifinity pool account missing", {
-        amm: amm.toBase58(),
-        inputMint: safeInputMint.toBase58(),
-        outputMint: safeOutputMint.toBase58(),
-      });
+      const inputStr = safeInputMint.toBase58();
+      const outputStr = safeOutputMint.toBase58();
+      const key = `LifinityResolver:amm-missing:${amm.toBase58()}:${getPairCacheKey(inputStr, outputStr)}`;
+      if (shouldLogResolverWarning(key)) {
+        logger.warn("LifinityResolver", "Lifinity pool account missing", {
+          amm: amm.toBase58(),
+          inputMint: inputStr,
+          outputMint: outputStr,
+        });
+      }
       return null;
     }
 
@@ -1064,11 +1083,18 @@ async function findDLMMPairViaOnChainMints(
     }
   }
 
-  logger.warn("MeteoraResolver", "On-chain memcmp candidates found but none validated", {
-    inputMint: tokenIn.toBase58(),
-    outputMint: tokenOut.toBase58(),
-    candidateCount: candidates.length,
-  });
+  {
+    const inputStr = tokenIn.toBase58();
+    const outputStr = tokenOut.toBase58();
+    const key = `MeteoraResolver:memcmp-none-validated:${getPairCacheKey(inputStr, outputStr)}`;
+    if (shouldLogResolverWarning(key)) {
+      logger.warn("MeteoraResolver", "On-chain memcmp candidates found but none validated", {
+        inputMint: inputStr,
+        outputMint: outputStr,
+        candidateCount: candidates.length,
+      });
+    }
+  }
   return null;
 }
 
@@ -1128,10 +1154,15 @@ async function findDLMMPair(
           }
         }
 
-        logger.warn("MeteoraResolver", "No DLMM pair returned by API", {
-          inputMint: tokenXStr,
-          outputMint: tokenYStr,
-        });
+        {
+          const key = `MeteoraResolver:api-no-pair:${getPairCacheKey(tokenXStr, tokenYStr)}`;
+          if (shouldLogResolverWarning(key)) {
+            logger.warn("MeteoraResolver", "No DLMM pair returned by API", {
+              inputMint: tokenXStr,
+              outputMint: tokenYStr,
+            });
+          }
+        }
         break;
       } catch (error) {
         lastError = error instanceof Error ? error.message : String(error);
@@ -1207,12 +1238,17 @@ async function findDLMMPair(
           return resolved;
         }
 
-        logger.warn("MeteoraResolver", "SDK fallback returned DLMM pair but no bins/liquidity", {
-          inputMint: tokenXStr,
-          outputMint: tokenYStr,
-          pair: resolved.toBase58(),
-          lastError,
-        });
+        {
+          const key = `MeteoraResolver:sdk-no-bins:${resolved.toBase58()}:${getPairCacheKey(tokenXStr, tokenYStr)}`;
+          if (shouldLogResolverWarning(key)) {
+            logger.warn("MeteoraResolver", "SDK fallback returned DLMM pair but no bins/liquidity", {
+              inputMint: tokenXStr,
+              outputMint: tokenYStr,
+              pair: resolved.toBase58(),
+              lastError,
+            });
+          }
+        }
       }
     } catch (error) {
       logger.warn("MeteoraResolver", "On-chain DLMM pair lookup failed", {
@@ -1283,10 +1319,15 @@ export async function getMeteoraAccounts(
 
     const lbPair = await findDLMMPair(connection, safeInputMint, safeOutputMint);
     if (!lbPair) {
-      logger.warn("MeteoraResolver", "No DLMM pair found for mints", {
-        inputMint: safeInputMint.toBase58(),
-        outputMint: safeOutputMint.toBase58(),
-      });
+      const inputStr = safeInputMint.toBase58();
+      const outputStr = safeOutputMint.toBase58();
+      const key = `MeteoraResolver:no-pair:${getPairCacheKey(inputStr, outputStr)}`;
+      if (shouldLogResolverWarning(key)) {
+        logger.warn("MeteoraResolver", "No DLMM pair found for mints", {
+          inputMint: inputStr,
+          outputMint: outputStr,
+        });
+      }
       return null;
     }
 
@@ -1408,12 +1449,15 @@ export async function getMeteoraAccounts(
       // Les bin arrays sont les principaux contributeurs (comptes dynamiques) à la taille.
       const MAX_BIN_ARRAYS_FOR_TX = 8;
       if (binArrays.length > MAX_BIN_ARRAYS_FOR_TX) {
-        console.warn("[MeteoraResolver] Truncating bin arrays for tx size", {
-          lbPair: lbPair.toBase58(),
-          swapForY,
-          before: binArrays.length,
-          after: MAX_BIN_ARRAYS_FOR_TX,
-        });
+        const key = `MeteoraResolver:truncate-bin-arrays:${lbPair.toBase58()}:${swapForY}`;
+        if (shouldLogResolverWarning(key)) {
+          logger.warn("MeteoraResolver", "Truncating bin arrays for tx size", {
+            lbPair: lbPair.toBase58(),
+            swapForY,
+            before: binArrays.length,
+            after: MAX_BIN_ARRAYS_FOR_TX,
+          });
+        }
         binArrays = binArrays.slice(0, MAX_BIN_ARRAYS_FOR_TX);
       }
     } catch (sdkError) {

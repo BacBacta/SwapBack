@@ -634,7 +634,7 @@ export function useNativeSwap() {
         }
 
         // Garder une référence locale pour logs/erreurs (l'état React peut être stale en catch).
-        const selectedRoute = route;
+        let selectedRoute = route;
 
         setTrueNativeRoute(selectedRoute);
 
@@ -648,7 +648,34 @@ export function useNativeSwap() {
           priceImpactBps: selectedRoute.priceImpactBps,
         });
 
-        const build = async () =>
+        const isProgramFrozenError = (err: unknown): boolean => {
+          const s = (() => {
+            try {
+              return err instanceof Error ? `${err.name}: ${err.message}` : JSON.stringify(err);
+            } catch {
+              return String(err);
+            }
+          })();
+          return /ProgramIsFrozen/i.test(s) || /program\s+is\s+frozen/i.test(s);
+        };
+
+        const pickBestNonLifinityFallback = (base: TrueNativeRoute): TrueNativeRoute | null => {
+          const quotes = (base.allQuotes ?? []).filter((q) => q.venue !== 'LIFINITY' && q.outputAmount > 0);
+          if (quotes.length === 0) return null;
+          quotes.sort((a, b) => b.outputAmount - a.outputAmount);
+          const best = quotes[0];
+          if (!best) return null;
+          return {
+            ...base,
+            venue: best.venue,
+            venueProgramId: best.venueProgramId,
+            outputAmount: best.outputAmount,
+            priceImpactBps: best.priceImpactBps,
+            dexAccounts: best.accounts,
+          };
+        };
+
+        const build = async (routeOverride: TrueNativeRoute) =>
           trueNativeSwap.buildNativeSwapTransaction({
             inputMint: safeInputMint,
             outputMint: safeOutputMint,
@@ -658,11 +685,31 @@ export function useNativeSwap() {
             minAmountOut: 0,
             slippageBps,
             userPublicKey: publicKey,
-            routeOverride: selectedRoute,
+            routeOverride,
           });
 
         // Construire la transaction
-        let result = await build();
+        let result;
+        try {
+          result = await build(selectedRoute);
+        } catch (buildErr) {
+          if (selectedRoute.venue === 'LIFINITY' && isProgramFrozenError(buildErr)) {
+            const fallbackRoute = pickBestNonLifinityFallback(selectedRoute);
+            if (fallbackRoute) {
+              logger.warn('useNativeSwap', 'Lifinity is frozen; retrying with native fallback venue', {
+                originalVenue: selectedRoute.venue,
+                fallbackVenue: fallbackRoute.venue,
+              });
+              selectedRoute = fallbackRoute;
+              setTrueNativeRoute(selectedRoute);
+              result = await build(selectedRoute);
+            } else {
+              throw buildErr;
+            }
+          } else {
+            throw buildErr;
+          }
+        }
 
         if (!result) {
           throw new Error("Impossible de construire la transaction native");
@@ -685,6 +732,45 @@ export function useNativeSwap() {
           // Simuler EXACTEMENT ce qui sera signé/envoyé.
           replaceRecentBlockhash: false,
         });
+
+        // Fallback strictement NATIVE: Lifinity peut être "frozen" (upstream).
+        // Si la simulation échoue sur Lifinity et qu'on a une alternative non-Lifinity, retenter.
+        if (sim.value.err && selectedRoute.venue === 'LIFINITY') {
+          const frozenBySim = isProgramFrozenError({ err: sim.value.err, logs: sim.value.logs?.slice(-40) ?? [] });
+          if (frozenBySim) {
+            const fallbackRoute = pickBestNonLifinityFallback(selectedRoute);
+            if (fallbackRoute) {
+              logger.warn('useNativeSwap', 'Lifinity simulation indicates frozen program; retrying with native fallback venue', {
+                originalVenue: selectedRoute.venue,
+                fallbackVenue: fallbackRoute.venue,
+              });
+
+              const rebuilt = await trueNativeSwap.buildNativeSwapTransaction({
+                inputMint: safeInputMint,
+                outputMint: safeOutputMint,
+                amountIn: params.amount,
+                minAmountOut: 0,
+                slippageBps,
+                userPublicKey: publicKey,
+                routeOverride: fallbackRoute,
+              });
+
+              if (rebuilt) {
+                const fallbackSim = await connection.simulateTransaction(rebuilt.transaction, {
+                  sigVerify: false,
+                  replaceRecentBlockhash: false,
+                });
+
+                if (!fallbackSim.value.err) {
+                  selectedRoute = rebuilt.route;
+                  setTrueNativeRoute(selectedRoute);
+                  result = rebuilt;
+                  sim = fallbackSim;
+                }
+              }
+            }
+          }
+        }
 
         // Fallback strictement NATIVE: si Meteora échoue en slippage (6003), retenter Orca.
         if (sim.value.err && selectedRoute.venue === 'METEORA_DLMM' && isMeteoraSlippage6003(sim.value.err)) {
@@ -855,7 +941,7 @@ export function useNativeSwap() {
             });
 
             // Rebuild + re-simulate + re-sign (1x)
-            result = await build();
+            result = await build(selectedRoute);
             if (!result) {
               throw new Error("Impossible de reconstruire la transaction native");
             }
@@ -888,7 +974,7 @@ export function useNativeSwap() {
               error: msg,
             });
 
-            result = await build();
+            result = await build(selectedRoute);
             if (!result) {
               throw new Error("Impossible de reconstruire la transaction native");
             }
