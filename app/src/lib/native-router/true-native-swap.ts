@@ -179,9 +179,24 @@ export class TrueNativeSwap {
   private connection: Connection;
   private mintDecimalsCache = new Map<string, number>();
   private mintOwnerCache = new Map<string, PublicKey>();
+  private temporarilyDisabledVenues = new Map<SupportedVenue, number>();
 
   constructor(connection: Connection) {
     this.connection = connection;
+  }
+
+  markVenueUnavailable(venue: SupportedVenue, ttlMs: number): void {
+    const ttl = Math.max(0, Math.floor(ttlMs));
+    if (ttl === 0) return;
+    this.temporarilyDisabledVenues.set(venue, Date.now() + ttl);
+  }
+
+  private isVenueTemporarilyDisabled(venue: SupportedVenue): boolean {
+    const until = this.temporarilyDisabledVenues.get(venue);
+    if (typeof until !== "number") return false;
+    if (Date.now() <= until) return true;
+    this.temporarilyDisabledVenues.delete(venue);
+    return false;
   }
 
   private async sleep(ms: number): Promise<void> {
@@ -332,6 +347,10 @@ export class TrueNativeSwap {
 
     const entries = Array.from(allAccounts.entries());
     const maybeQuotes = await this.mapWithConcurrency(entries, quoteConcurrency, async ([venue, accounts]) => {
+      if (this.isVenueTemporarilyDisabled(venue)) {
+        logger.debug("TrueNativeSwap", `Skipping temporarily disabled venue: ${venue}`);
+        return null;
+      }
       if (DISABLED_BEST_ROUTE_VENUES.has(venue)) {
         logger.debug("TrueNativeSwap", `Skipping disabled venue in best-route: ${venue}`);
         return null;

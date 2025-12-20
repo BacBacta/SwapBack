@@ -694,6 +694,7 @@ export function useNativeSwap() {
           result = await build(selectedRoute);
         } catch (buildErr) {
           if (selectedRoute.venue === 'LIFINITY' && isProgramFrozenError(buildErr)) {
+            trueNativeSwap.markVenueUnavailable('LIFINITY', 5 * 60_000);
             const fallbackRoute = pickBestNonLifinityFallback(selectedRoute);
             if (fallbackRoute) {
               logger.warn('useNativeSwap', 'Lifinity is frozen; retrying with native fallback venue', {
@@ -738,6 +739,7 @@ export function useNativeSwap() {
         if (sim.value.err && selectedRoute.venue === 'LIFINITY') {
           const frozenBySim = isProgramFrozenError({ err: sim.value.err, logs: sim.value.logs?.slice(-40) ?? [] });
           if (frozenBySim) {
+            trueNativeSwap.markVenueUnavailable('LIFINITY', 5 * 60_000);
             const fallbackRoute = pickBestNonLifinityFallback(selectedRoute);
             if (fallbackRoute) {
               logger.warn('useNativeSwap', 'Lifinity simulation indicates frozen program; retrying with native fallback venue', {

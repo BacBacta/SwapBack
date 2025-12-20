@@ -852,6 +852,28 @@ const METEORA_DLMM_PROGRAM = new PublicKey("LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9Y
 
 const METEORA_DLMM_API_TIMEOUT_MS = 15_000;
 
+const METEORA_BITMAP_MISSING_TTL_MS_DEFAULT = 10 * 60_000;
+const METEORA_BITMAP_ACCOUNT_TIMEOUT_MS_BROWSER_DEFAULT = 1_500;
+const METEORA_BITMAP_ACCOUNT_TIMEOUT_MS_NODE_DEFAULT = 4_000;
+
+const meteoraBitmapMissingCache = new Map<string, number>();
+
+function getMeteoraBitmapMissingTtlMs(): number {
+  const ttl =
+    getEnvNumber("NEXT_PUBLIC_SWAPBACK_METEORA_BITMAP_MISSING_TTL_MS") ??
+    getEnvNumber("SWAPBACK_METEORA_BITMAP_MISSING_TTL_MS") ??
+    METEORA_BITMAP_MISSING_TTL_MS_DEFAULT;
+  return Math.max(0, Math.floor(ttl));
+}
+
+function getMeteoraBitmapAccountTimeoutMs(): number {
+  const configured =
+    getEnvNumber("NEXT_PUBLIC_SWAPBACK_METEORA_BITMAP_ACCOUNT_TIMEOUT_MS") ??
+    getEnvNumber("SWAPBACK_METEORA_BITMAP_ACCOUNT_TIMEOUT_MS");
+  if (typeof configured === "number") return Math.max(0, Math.floor(configured));
+  return isBrowserRuntime() ? METEORA_BITMAP_ACCOUNT_TIMEOUT_MS_BROWSER_DEFAULT : METEORA_BITMAP_ACCOUNT_TIMEOUT_MS_NODE_DEFAULT;
+}
+
 // L'endpoint `pair/all_by_groups` renvoie un gros payload.
 // Sans cache, chaque recherche de quote (nouvelle paire) retélécharge et re-scan le JSON.
 // On garde un index en mémoire pour accélérer les requêtes suivantes.
@@ -1525,6 +1547,42 @@ export async function getMeteoraAccounts(
       return null;
     }
 
+    // Fast-fail: certains lb_pairs n'ont pas (ou plus) de bitmap extension.
+    // Le check était auparavant effectué en fin de resolver, après des étapes coûteuses (SDK + bin arrays).
+    // Ici on le fait tout de suite et on met en cache le miss pour éviter ~10s de latence en UI.
+    const [binArrayBitmapExtension] = PublicKey.findProgramAddressSync(
+      [Buffer.from("bitmap"), lbPair.toBuffer()],
+      METEORA_DLMM_PROGRAM
+    );
+
+    const bitmapCacheKey = binArrayBitmapExtension.toBase58();
+    const now = Date.now();
+    const missingAt = meteoraBitmapMissingCache.get(bitmapCacheKey);
+    const missingTtlMs = getMeteoraBitmapMissingTtlMs();
+    if (typeof missingAt === "number" && missingTtlMs > 0 && now - missingAt < missingTtlMs) {
+      return null;
+    }
+
+    try {
+      const bitmapInfo = await withTimeout(
+        connection.getAccountInfo(binArrayBitmapExtension),
+        getMeteoraBitmapAccountTimeoutMs(),
+        `meteora-bitmap:${lbPair.toBase58()}`
+      );
+      if (!bitmapInfo) {
+        console.warn("[MeteoraResolver] bin_array_bitmap_extension account missing", {
+          lbPair: lbPair.toBase58(),
+          binArrayBitmapExtension: binArrayBitmapExtension.toBase58(),
+        });
+        meteoraBitmapMissingCache.set(bitmapCacheKey, now);
+        return null;
+      }
+    } catch {
+      // Timeout / RPC err: cache négatif très court pour ne pas bloquer l'UI.
+      meteoraBitmapMissingCache.set(bitmapCacheKey, now);
+      return null;
+    }
+
     // Préférer le SDK DLMM pour:
     // - obtenir les vraies reserves/mints/token programs depuis on-chain,
     // - obtenir les bin arrays exacts (dynamiques) via getBinArrayForSwap.
@@ -1807,19 +1865,7 @@ export async function getMeteoraAccounts(
     const userTokenIn = inputIsX ? userTokenX : userTokenY;
     const userTokenOut = inputIsX ? userTokenY : userTokenX;
     
-    // Bin array bitmap extension (doit exister si fourni)
-    const [binArrayBitmapExtension] = PublicKey.findProgramAddressSync(
-      [Buffer.from("bitmap"), lbPair.toBuffer()],
-      METEORA_DLMM_PROGRAM
-    );
-    const bitmapInfo = await connection.getAccountInfo(binArrayBitmapExtension);
-    if (!bitmapInfo) {
-      console.warn("[MeteoraResolver] bin_array_bitmap_extension account missing", {
-        lbPair: lbPair.toBase58(),
-        binArrayBitmapExtension: binArrayBitmapExtension.toBase58(),
-      });
-      return null;
-    }
+    // binArrayBitmapExtension est validé plus haut (fast-fail + cache).
     
     // Event authority
     const [eventAuthority] = PublicKey.findProgramAddressSync(
