@@ -92,8 +92,8 @@ type DexAccountsCacheEntry = {
 
 const dexAccountsByVenueCache = new Map<string, DexAccountsCacheEntry>();
 
-const DEX_ACCOUNTS_RESOLVE_TIMEOUT_MS_DEFAULT = 8_000;
-const DEX_ACCOUNTS_RESOLVE_TIMEOUT_METEORA_MS_DEFAULT = 12_000;
+const DEX_ACCOUNTS_RESOLVE_TIMEOUT_MS_DEFAULT = 4_000;
+const DEX_ACCOUNTS_RESOLVE_TIMEOUT_METEORA_MS_DEFAULT = 6_000;
 const DEX_ACCOUNTS_TIMEOUT_NEGATIVE_TTL_MS_DEFAULT = 5_000;
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
