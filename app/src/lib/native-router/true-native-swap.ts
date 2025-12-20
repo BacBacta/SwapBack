@@ -178,6 +178,7 @@ export interface TrueNativeSwapResult {
 export class TrueNativeSwap {
   private connection: Connection;
   private mintDecimalsCache = new Map<string, number>();
+  private mintOwnerCache = new Map<string, PublicKey>();
 
   constructor(connection: Connection) {
     this.connection = connection;
@@ -185,6 +186,44 @@ export class TrueNativeSwap {
 
   private async sleep(ms: number): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return promise;
+
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms (${label})`)), timeoutMs);
+    });
+
+    try {
+      return await Promise.race([promise, timeoutPromise]);
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+    }
+  }
+
+  private async mapWithConcurrency<T, R>(
+    items: T[],
+    concurrency: number,
+    fn: (item: T, index: number) => Promise<R>
+  ): Promise<R[]> {
+    const limit = Math.max(1, Math.floor(concurrency));
+    const results = new Array<R>(items.length);
+
+    let nextIndex = 0;
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (true) {
+        const current = nextIndex;
+        nextIndex += 1;
+        if (current >= items.length) return;
+        // eslint-disable-next-line no-await-in-loop
+        results[current] = await fn(items[current], current);
+      }
+    });
+
+    await Promise.all(workers);
+    return results;
   }
 
   private async getAccountInfoWithRetry(pubkey: PublicKey): Promise<Awaited<ReturnType<Connection["getAccountInfo"]>>> {
@@ -206,6 +245,20 @@ export class TrueNativeSwap {
       }
     }
     throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+  }
+
+  private async getMintOwner(mint: PublicKey): Promise<PublicKey> {
+    const key = mint.toBase58();
+    const cached = this.mintOwnerCache.get(key);
+    if (cached) return cached;
+
+    const mintInfo = await this.getAccountInfoWithRetry(mint);
+    if (!mintInfo) {
+      throw new Error(`Mint introuvable: ${key}`);
+    }
+
+    this.mintOwnerCache.set(key, mintInfo.owner);
+    return mintInfo.owner;
   }
 
   private async getMintDecimals(mint: PublicKey): Promise<number> {
@@ -268,26 +321,30 @@ export class TrueNativeSwap {
       });
     }
 
-    // Pour chaque venue disponible, obtenir une quote
-    for (const [venue, accounts] of allAccounts) {
+    // Pour chaque venue disponible, obtenir une quote (concurrence limitée pour réduire le temps total)
+    const quoteConcurrencyRaw = Number(process.env.NEXT_PUBLIC_SWAPBACK_QUOTE_CONCURRENCY);
+    const quoteConcurrency = Number.isFinite(quoteConcurrencyRaw) ? quoteConcurrencyRaw : 2;
+    const quoteTimeoutRaw = Number(process.env.NEXT_PUBLIC_SWAPBACK_QUOTE_TIMEOUT_MS);
+    const quoteTimeoutMs = Number.isFinite(quoteTimeoutRaw) ? quoteTimeoutRaw : 12_000;
+
+    const entries = Array.from(allAccounts.entries());
+    const maybeQuotes = await this.mapWithConcurrency(entries, quoteConcurrency, async ([venue, accounts]) => {
       if (DISABLED_BEST_ROUTE_VENUES.has(venue)) {
         logger.debug("TrueNativeSwap", `Skipping disabled venue in best-route: ${venue}`);
-        continue;
+        return null;
       }
 
       if (!QUOTED_VENUES.has(venue)) {
         logger.debug("TrueNativeSwap", `Skipping venue without quote implementation: ${venue}`);
-        continue;
+        return null;
       }
+
       try {
         const startTime = Date.now();
-        const quote = await this.getQuoteForVenue(
-          venue,
-          safeInputMint,
-          safeOutputMint,
-          amountIn,
-          accounts,
-          slippageBps
+        const quote = await this.withTimeout(
+          this.getQuoteForVenue(venue, safeInputMint, safeOutputMint, amountIn, accounts, slippageBps),
+          quoteTimeoutMs,
+          `quote:${venue}`
         );
         const latencyMs = Date.now() - startTime;
 
@@ -295,10 +352,16 @@ export class TrueNativeSwap {
           const venueProgramId = DEX_PROGRAM_IDS[venue];
           if (!venueProgramId) {
             logger.warn("TrueNativeSwap", `Unknown venue program ID for ${venue}`);
-            continue;
+            return null;
           }
-          
-          quotes.push({
+
+          logger.debug("TrueNativeSwap", `Quote from ${venue}`, {
+            outputAmount: quote.outputAmount,
+            priceImpactBps: quote.priceImpactBps,
+            latencyMs,
+          });
+
+          return {
             venue,
             venueProgramId,
             inputAmount: amountIn,
@@ -307,35 +370,36 @@ export class TrueNativeSwap {
             minOutAmount: quote.minOutAmount,
             accounts,
             latencyMs,
-          });
+          } satisfies NativeVenueQuote;
+        }
 
-          logger.debug("TrueNativeSwap", `Quote from ${venue}`, {
-            outputAmount: quote.outputAmount,
-            priceImpactBps: quote.priceImpactBps,
+        if (venue === "ORCA_WHIRLPOOL") {
+          logger.debug("TrueNativeSwap", `Quote returned null for ${venue}`, {
+            poolAddress: accounts.meta?.poolAddress || "none",
             latencyMs,
           });
         } else {
-          if (venue === "ORCA_WHIRLPOOL") {
-            logger.debug("TrueNativeSwap", `Quote returned null for ${venue}`, {
-              poolAddress: accounts.meta?.poolAddress || "none",
-              latencyMs,
-            });
-          } else {
-            const payload = {
-              poolAddress: accounts.meta?.poolAddress || "none",
-              latencyMs,
-            };
+          const payload = {
+            poolAddress: accounts.meta?.poolAddress || "none",
+            latencyMs,
+          };
 
-            if (venue === "LIFINITY") {
-              logger.debug("TrueNativeSwap", `Quote returned null for ${venue}`, payload);
-            } else {
-              logger.warn("TrueNativeSwap", `Quote returned null for ${venue}`, payload);
-            }
+          if (venue === "LIFINITY") {
+            logger.debug("TrueNativeSwap", `Quote returned null for ${venue}`, payload);
+          } else {
+            logger.warn("TrueNativeSwap", `Quote returned null for ${venue}`, payload);
           }
         }
+
+        return null;
       } catch (error) {
         logger.warn("TrueNativeSwap", `Failed to get quote from ${venue}`, { error });
+        return null;
       }
+    });
+
+    for (const q of maybeQuotes) {
+      if (q) quotes.push(q);
     }
 
     // Trier par meilleur output
@@ -967,7 +1031,11 @@ export class TrueNativeSwap {
     const slippageBps = params.slippageBps;
     const enableMultiHop = !inputMintPk.equals(USDC_MINT) && !outputMintPk.equals(USDC_MINT);
 
-    if (enableMultiHop) {
+    // Optim perf: éviter de refaire deux séries de quotes (leg1+leg2) si une route directe existe déjà.
+    // On peut ré-activer le "compare multi-hop vs direct" via flag si nécessaire.
+    const multiHopCompareAlways = process.env.NEXT_PUBLIC_SWAPBACK_MULTI_HOP_COMPARE_ALWAYS === "true";
+
+    if (enableMultiHop && (multiHopCompareAlways || !bestDirect)) {
       const usdcStr = USDC_MINT.toBase58();
       const canOracleLeg1 = hasOracleForPair(inputMintStr, usdcStr);
       const canOracleLeg2 = hasOracleForPair(usdcStr, outputMintStr);
@@ -1248,19 +1316,10 @@ export class TrueNativeSwap {
     // Si on dérive avec le mauvais programId, le router on-chain peut:
     // - inférer une mauvaise direction (ctx.user_token_account_a/b mismatch)
     // - provoquer TransferChecked: "Account not associated with this Mint" (0x3)
-    const [inputMintInfo, outputMintInfo] = await Promise.all([
-      this.getAccountInfoWithRetry(safeInput),
-      this.getAccountInfoWithRetry(safeOutput),
+    const [inputTokenProgram, outputTokenProgram] = await Promise.all([
+      this.getMintOwner(safeInput),
+      this.getMintOwner(safeOutput),
     ]);
-    if (!inputMintInfo) {
-      throw new Error(`Mint introuvable (input): ${safeInput.toBase58()}`);
-    }
-    if (!outputMintInfo) {
-      throw new Error(`Mint introuvable (output): ${safeOutput.toBase58()}`);
-    }
-
-    const inputTokenProgram = inputMintInfo.owner;
-    const outputTokenProgram = outputMintInfo.owner;
 
     const userTokenAccountA = await getAssociatedTokenAddress(
       safeInput,
