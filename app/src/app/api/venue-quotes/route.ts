@@ -102,17 +102,19 @@ export async function GET(request: NextRequest) {
   const quotes: VenueQuoteResult[] = [];
   const jupiterBenchmark: VenueQuoteResult | null = null;
 
-  // Fetch all quotes in parallel
-  const [raydiumResult, orcaResult, meteoraResult] = await Promise.allSettled([
+  // Fetch all quotes in parallel - including Phoenix (re-enabled in v2.0)
+  const [raydiumResult, orcaResult, meteoraResult, phoenixResult] = await Promise.allSettled([
     fetchRaydiumQuote(inputMint, outputMint, amountNum),
     fetchOrcaQuote(inputMint, outputMint, amountNum),
     fetchMeteoraQuote(inputMint, outputMint, amountNum),
+    fetchPhoenixQuote(inputMint, outputMint, amountNum),
   ]);
 
   console.log('[venue-quotes] Fetch results:', {
     raydium: raydiumResult.status === 'fulfilled' ? raydiumResult.value : 'rejected',
     orca: orcaResult.status === 'fulfilled' ? orcaResult.value : 'rejected',
     meteora: meteoraResult.status === 'fulfilled' ? meteoraResult.value : 'rejected',
+    phoenix: phoenixResult.status === 'fulfilled' ? phoenixResult.value : 'rejected',
   });
 
   // Process all results - les fonctions retournent toujours un objet maintenant
@@ -126,6 +128,10 @@ export async function GET(request: NextRequest) {
 
   if (meteoraResult.status === 'fulfilled' && meteoraResult.value.outputAmount > 0) {
     quotes.push(meteoraResult.value);
+  }
+
+  if (phoenixResult.status === 'fulfilled' && phoenixResult.value.outputAmount > 0) {
+    quotes.push(phoenixResult.value);
   }
 
   console.log('[venue-quotes] Valid quotes:', quotes.length);

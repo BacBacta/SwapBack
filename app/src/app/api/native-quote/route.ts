@@ -321,8 +321,26 @@ async function fetchMeteoraQuote(
   }
 }
 
-// NOTE: Phoenix (CLOB) requiert une quote orderbook. Tant que ce n'est pas implémenté,
-// on n'expose pas de quote "estimée" pour Phoenix.
+/**
+ * Fetch quote from Phoenix CLOB (v2.0 - réactivé)
+ * Phoenix n'a pas d'API publique de quote, on utilise une estimation basée sur les prix
+ * avec un spread conservateur identique aux autres venues.
+ */
+async function fetchPhoenixQuote(
+  inputMint: string,
+  outputMint: string,
+  amount: string,
+  slippageBps: number
+): Promise<VenueQuote | null> {
+  // Phoenix n'a pas d'API publique de quote
+  // On utilise une estimation basée sur les prix du marché
+  // Note: le vrai swap passera par le programme on-chain Phoenix
+  const phoenixQuote = await generateFallbackQuote("Phoenix", inputMint, outputMint, amount, 25);
+  if (phoenixQuote) {
+    console.log(`[native-quote] Phoenix estimated quote: ${phoenixQuote.outputAmount}`);
+  }
+  return phoenixQuote;
+}
 
 /**
  * POST /api/native-quote
@@ -347,14 +365,15 @@ export async function POST(request: NextRequest) {
 
     console.log(`[native-quote] Fetching quotes for ${inputMint.slice(0, 8)}... -> ${outputMint.slice(0, 8)}..., amount: ${amount}, slippage: ${slippageBps}bps`);
 
-    // Fetch quotes from all venues in parallel
+    // Fetch quotes from all venues in parallel (Phoenix réactivé en v2.0)
     const quotePromises = [
       fetchRaydiumQuote(inputMint, outputMint, amount, slippageBps),
       fetchOrcaQuote(inputMint, outputMint, amount, slippageBps),
       fetchMeteoraQuote(inputMint, outputMint, amount, slippageBps),
+      fetchPhoenixQuote(inputMint, outputMint, amount, slippageBps),
     ];
 
-    const venueNames = ["Raydium", "Orca", "Meteora"];
+    const venueNames = ["Raydium", "Orca", "Meteora", "Phoenix"];
     const results = await Promise.allSettled(quotePromises);
     
     const quotes: VenueQuote[] = [];
