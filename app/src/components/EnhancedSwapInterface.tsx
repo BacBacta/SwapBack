@@ -147,6 +147,8 @@ type DexLabelMetadata = {
   programId?: string;
 };
 
+// NOTE: Aligné avec VENUE_CONFIGS dans config/routing.ts
+// Meteora, Phoenix, Lifinity sont maintenant supportés par le router natif
 const DEX_LABEL_METADATA: DexLabelMetadata[] = [
   {
     keyword: "orca",
@@ -160,9 +162,10 @@ const DEX_LABEL_METADATA: DexLabelMetadata[] = [
     supported: true,
     programId: RAYDIUM_PROGRAM_ID_STR,
   },
-  { keyword: "meteora", friendlyName: "Meteora DLMM", supported: false },
-  { keyword: "phoenix", friendlyName: "Phoenix", supported: false },
-  { keyword: "lifinity", friendlyName: "Lifinity", supported: false },
+  { keyword: "meteora", friendlyName: "Meteora DLMM", supported: true },
+  { keyword: "phoenix", friendlyName: "Phoenix", supported: true },
+  { keyword: "lifinity", friendlyName: "Lifinity", supported: true },
+  { keyword: "saber", friendlyName: "Saber", supported: true },
 ];
 
 const matchDexLabel = (label: string): DexLabelMetadata | null => {
@@ -1574,42 +1577,17 @@ export function EnhancedSwapInterface() {
             <ClientOnlyConnectionStatus />
           </div>
 
-          {/* Router Selection */}
+          {/* Router Selection - SwapBack Native Only (Jupiter désactivé selon instructions repo) */}
           <div className="flex gap-2 mb-2">
-            <button
-              onClick={() => {
-                haptic.medium();
-                handleRouterSelection("swapback", "primary-toggle");
-              }}
-              className={`flex-1 py-2 px-3 rounded-lg font-semibold transition-all relative active:scale-95 min-h-[40px] text-sm ${
-                selectedRouter === "swapback"
-                  ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                  : "bg-white/5 text-gray-400 hover:bg-white/10"
-              }`}
-              aria-pressed={selectedRouter === "swapback"}
+            <div
+              className="flex-1 py-2 px-3 rounded-lg font-semibold bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20 min-h-[40px] text-sm"
             >
               <div className="flex items-center justify-center gap-1">
                 <span className="text-sm">⚡</span>
-                <span>SwapBack</span>
+                <span>SwapBack Native Router</span>
               </div>
-            </button>
-            <button
-              onClick={() => {
-                haptic.medium();
-                handleRouterSelection("jupiter", "primary-toggle");
-              }}
-              className={`flex-1 py-2 px-3 rounded-lg font-semibold transition-all relative active:scale-95 min-h-[40px] text-sm ${
-                selectedRouter === "jupiter"
-                  ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
-                  : "bg-white/5 text-gray-400 hover:bg-white/10"
-              }`}
-              aria-pressed={selectedRouter === "jupiter"}
-            >
-              <div className="flex items-center justify-center gap-1">
-                <span className="text-sm">🪐</span>
-                <span>Jupiter</span>
-              </div>
-            </button>
+            </div>
+            {/* Jupiter désactivé tant que le router natif n'est pas 100% validé - voir .github/copilot-instructions.md */}
           </div>
           <div className="grid gap-3 md:grid-cols-2 mb-3">
             <RoutingStrategySelector
@@ -1743,17 +1721,7 @@ export function EnhancedSwapInterface() {
                   >
                     {routes.isLoading ? 'Calcul en cours…' : 'Rafraîchir le devis'}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      haptic.light();
-                      const nextRouter = selectedRouter === 'swapback' ? 'jupiter' : 'swapback';
-                      handleRouterSelection(nextRouter, 'alt-router-cta');
-                    }}
-                    className="px-3 py-2 rounded-xl border border-white/10 text-xs uppercase tracking-wide text-gray-400 hover:text-white hover:border-white/30 transition-colors"
-                  >
-                    {altRouterLabel}
-                  </button>
+                  {/* Alt-router toggle désactivé - Jupiter bloqué selon instructions repo */}
                 </div>
               </div>
             </div>
@@ -2186,45 +2154,7 @@ export function EnhancedSwapInterface() {
                         </button>
                       </div>
                     </div>
-                    {routerComparisonData && (
-                      <div className="pt-2">
-                        <button
-                          onClick={() => {
-                            haptic.medium();
-                            if (routerComparisonData) {
-                              const diff =
-                                routerComparisonData.swapback.outputAmount -
-                                routerComparisonData.jupiter.outputAmount;
-                              const percentDiff =
-                                routerComparisonData.jupiter.outputAmount !== 0
-                                  ? (diff / routerComparisonData.jupiter.outputAmount) * 100
-                                  : 0;
-
-                              trackRouterComparisonViewed({
-                                currentRouter: selectedRouter,
-                                recommendedRouter: diff >= 0 ? "swapback" : "jupiter",
-                                inputToken: swap.inputToken?.symbol,
-                                outputToken: swap.outputToken?.symbol,
-                                inputAmount: parseFloat(swap.inputAmount) || 0,
-                                swapbackOutput: routerComparisonData.swapback.outputAmount,
-                                jupiterOutput: routerComparisonData.jupiter.outputAmount,
-                                difference: diff,
-                                percentDifference: percentDiff,
-                                hasEconomics:
-                                  routerComparisonData.swapback.rebateAmount > 0 ||
-                                  routerComparisonData.swapback.burnAmount > 0,
-                                priceImpact: routerComparisonData.swapback.priceImpact,
-                                source: "detail-card",
-                              });
-                            }
-                            setShowComparisonModal(true);
-                          }}
-                          className="w-full text-xs font-semibold text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg py-1.5 transition-all active:scale-95"
-                        >
-                          Comparer avec Jupiter
-                        </button>
-                      </div>
-                    )}
+                    {/* Bouton comparaison Jupiter désactivé - router natif forcé */}
                   </div>
                 </div>
               </>

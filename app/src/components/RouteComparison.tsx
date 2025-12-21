@@ -18,7 +18,7 @@ import {
 import { useSwapStore } from "@/store/swapStore";
 
 export function RouteComparison() {
-  const { routes } = useSwapStore();
+  const { routes, selectRoute } = useSwapStore();
 
   if (routes.routes.length === 0) {
     return null;
@@ -71,10 +71,11 @@ export function RouteComparison() {
                 ? "bg-blue-900 bg-opacity-30 border border-blue-500"
                 : "bg-gray-800 hover:bg-gray-750"
             }`}
-            onClick={() =>
-              routes.selectedRoute?.id !== route.id &&
-              console.log("Select route", route)
-            }
+            onClick={() => {
+              if (routes.selectedRoute?.id !== route.id) {
+                selectRoute(route);
+              }
+            }}
           >
             <div className="flex justify-between items-center">
               <div>
