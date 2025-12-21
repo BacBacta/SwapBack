@@ -3112,3 +3112,47 @@ export function getNativeRouter(connection: Connection): NativeRouterService {
   }
   return nativeRouterInstance;
 }
+
+// ============================================================================
+// RE-EXPORTS - Phase 1-4 Modules
+// ============================================================================
+
+// Phase 2: Quote Cache with 500ms TTL
+export { 
+  QuoteCache, 
+  getQuoteCache, 
+  resetQuoteCache,
+  DEFAULT_TTL_MS,
+  VOLATILE_TTL_MS,
+  STABLE_TTL_MS,
+  type CachedQuote,
+  type CacheStats,
+} from './cache/QuoteCache';
+
+// Phase 3: Pathfinder for multi-hop routing
+export {
+  Pathfinder,
+  AStarPathOptimizer,
+  INTERMEDIATE_TOKENS,
+  type Route,
+  type RouteHop,
+  type PathfinderConfig,
+} from './pathfinder';
+
+// Phase 4: NPI (Native Price Improvement) and MEV Protection
+export {
+  NPICalculator,
+  getNPICalculator,
+  resetNPICalculator,
+  DEFAULT_NPI_DISTRIBUTION,
+  DEFAULT_NPI_CONFIG,
+  DEFAULT_MEV_CONFIG,
+  JITO_TIP_ACCOUNTS as NPI_JITO_TIP_ACCOUNTS,
+  getRandomJitoTipAccount,
+  calculateRecommendedTip,
+  type NPIResult,
+  type NPIConfig,
+  type NPIDistribution,
+  type SwapComparison,
+  type MEVProtectionConfig,
+} from './npi';

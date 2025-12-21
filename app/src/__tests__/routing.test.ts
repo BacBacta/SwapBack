@@ -38,16 +38,16 @@ describe("Routing Configuration", () => {
       const config = getRoutingConfig();
 
       expect(config.splitRoute.enabled).toBe(true);
-      expect(config.splitRoute.maxSplits).toBe(3);
-      expect(config.splitRoute.minSplitPercent).toBe(10);
+      expect(config.splitRoute.maxSplits).toBe(4); // Updated for Phase 2 optimization
+      expect(config.splitRoute.minSplitPercent).toBe(5); // Finer granularity
     });
 
     it("should have dynamic slippage enabled by default", () => {
       const config = getRoutingConfig();
 
       expect(config.dynamicSlippage.enabled).toBe(true);
-      expect(config.dynamicSlippage.baseSlippageBps).toBe(30);
-      expect(config.dynamicSlippage.maxSlippageBps).toBe(300);
+      expect(config.dynamicSlippage.baseSlippageBps).toBe(100); // Updated for volatile tokens
+      expect(config.dynamicSlippage.maxSlippageBps).toBe(500); // 5% max
     });
 
     it("should have Jupiter benchmark enabled by default", () => {
@@ -163,16 +163,16 @@ describe("Dynamic Slippage", () => {
     it("should return base slippage for small trades", () => {
       const slippage = calculateDynamicSlippage(1000, 10_000_000, 0);
 
-      // Small trade (0.01% of pool) should be close to base
-      expect(slippage).toBe(30);
+      // Small trade (0.01% of pool) should be close to base (100 bps)
+      expect(slippage).toBe(100);
     });
 
     it("should increase slippage for large trades", () => {
       // Trade is 10% of pool (1000 bps), exceeds threshold (50 bps)
       const slippage = calculateDynamicSlippage(1_000_000, 10_000_000, 0);
 
-      // Base (30) + (1000 - 50) = 30 + 950 = 980, capped at 300
-      expect(slippage).toBe(300);
+      // Base (100) + (1000 - 50) = 100 + 950 = 1050, capped at 500
+      expect(slippage).toBe(500);
     });
 
     it("should add volatility component", () => {
@@ -187,14 +187,14 @@ describe("Dynamic Slippage", () => {
       // Very large trade with high volatility
       const slippage = calculateDynamicSlippage(50_000_000, 10_000_000, 500);
 
-      expect(slippage).toBe(300); // maxSlippageBps
+      expect(slippage).toBe(500); // maxSlippageBps (updated to 5%)
     });
 
     it("should add safety margin when TVL is unknown", () => {
       const slippage = calculateDynamicSlippage(1000, 0, 0);
 
-      // Base (30) + safety margin (50) = 80
-      expect(slippage).toBe(80);
+      // Base (100) + safety margin (50) = 150
+      expect(slippage).toBe(150);
     });
   });
 });

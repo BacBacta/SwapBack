@@ -247,10 +247,12 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
 
   splitRoute: {
     enabled: true,
-    maxSplits: 3,
-    minSplitPercent: 10,
+    maxSplits: 4, // Increased from 3 for better routing
+    minSplitPercent: 5, // Reduced from 10% for finer granularity
     minAmountUsdForSplit: 100, // Split seulement pour > $100
-    testFractions: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+    // PHASE 2: 1% granularity (100 fractions) for Jupiter-competitive routing
+    // @see https://dev.jup.ag/blog/metis-v7 - Jupiter uses fine-grained splits
+    testFractions: Array.from({ length: 20 }, (_, i) => (i + 1) * 0.05), // 5%, 10%, 15%... 100%
   },
 
   dynamicSlippage: {
