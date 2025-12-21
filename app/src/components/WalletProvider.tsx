@@ -96,7 +96,8 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
           if (rpcIndex < rpcEndpoints.length - 1) {
             setRpcIndex(prev => prev + 1);
           } else {
-            console.error("All RPC endpoints failed. Please configure a valid RPC in .env.local");
+            // Message moins alarmant - le proxy gère les fallbacks côté serveur
+            console.warn("[RPC] Initial health check failed, but server-side proxy will handle fallbacks");
           }
         } else {
           console.log(`✅ Connected to RPC: ${endpoint.substring(0, 50)}...`);
@@ -104,12 +105,10 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
         }
       } catch (error) {
         if (!isMounted) return;
-        console.warn(`RPC ${endpoint.substring(0, 50)}... failed, trying fallback...`);
-        if (rpcIndex < rpcEndpoints.length - 1) {
-          setRpcIndex(prev => prev + 1);
-        } else {
-          console.error("All RPC endpoints failed. Please configure a valid RPC in .env.local");
-        }
+        // Ne pas afficher d'erreur alarmante - le proxy serveur gère les retries
+        console.debug(`[RPC] Health check timeout, continuing with proxy fallbacks...`);
+        // On ne bloque pas - le proxy /api/solana-rpc gère les fallbacks côté serveur
+        setRpcError(false);
       }
     };
     

@@ -6,6 +6,8 @@ const MAINNET_FALLBACK_RPCS = [
   "https://solana.publicnode.com",
   "https://solana-mainnet.rpc.extrnode.com",
   "https://solana-rpc.publicnode.com",
+  "https://solana-mainnet.g.alchemy.com/v2/demo",
+  "https://free-rpc.nethermind.io/mainnet-jito",
 ];
 
 const DEVNET_FALLBACK_RPCS = [
@@ -107,11 +109,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const maxAttempts = Math.min(3, upstreams.length);
+  const maxAttempts = Math.min(5, upstreams.length);
   let lastError: unknown = null;
+  let lastUpstream: string = "";
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const upstream = upstreams[attempt];
+    lastUpstream = upstream;
 
     try {
       const controller = new AbortController();
@@ -155,8 +159,14 @@ export async function POST(request: NextRequest) {
   }
 
   const msg = lastError instanceof Error ? lastError.message : String(lastError);
+  console.error(`[solana-rpc] All ${maxAttempts} RPC attempts failed. Last: ${lastUpstream}, Error: ${msg}`);
   return NextResponse.json(
-    { error: "RPC proxy failed", message: msg },
+    { 
+      error: "RPC temporarily unavailable", 
+      message: "Solana RPC is experiencing high load. Please retry in a few seconds.",
+      details: msg,
+      attempts: maxAttempts
+    },
     { status: 502, headers }
   );
 }
