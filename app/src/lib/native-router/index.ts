@@ -37,6 +37,8 @@ import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
 import { PYTH_FEED_IDS, getPythFeedIdByMint } from "@/sdk/config/pyth-feeds";
 import { getAllALTs } from "@/lib/alt/swapbackALT";
 import { toPublicKey } from "./utils/publicKeyUtils";
+import { getRoutingConfig, type SupportedVenue } from "@/config/routing";
+import { SplitRouteCalculator, type SplitQuote, type OptimalRoute } from "./split-route";
 
 // ============================================================================
 // CONSTANTS
@@ -182,6 +184,10 @@ export interface NativeRouteQuote {
   platformFeeBps: number;
   /** Meilleur output net après frais + rebates */
   netOutputAmount: number;
+  /** Splits pour les gros ordres (répartition entre venues) */
+  splits?: SplitQuote[];
+  /** Amélioration en bps vs single venue */
+  splitImprovementBps?: number;
 }
 
 export interface NativeSwapParams {
@@ -1257,6 +1263,42 @@ export class NativeRouterService {
   }
   
   /**
+   * Estime la valeur USD d'un ordre pour décider du split
+   */
+  async estimateOrderValueUsd(tokenMint: PublicKey, amount: number): Promise<number> {
+    try {
+      // SOL: utiliser le prix en direct
+      if (tokenMint.equals(SOL_MINT)) {
+        const solPrice = await getSolPrice();
+        // amount est en lamports (9 decimals)
+        return (amount / 1e9) * solPrice;
+      }
+      
+      // USDC/USDT: valeur directe (6 decimals)
+      if (tokenMint.equals(USDC_MINT)) {
+        return amount / 1e6;
+      }
+      
+      // Autres tokens: utiliser le service de prix
+      const priceResult = await getTokenPrice(tokenMint.toBase58());
+      if (priceResult.price > 0) {
+        // Assumer 9 decimals par défaut, ajuster si nécessaire
+        return (amount / 1e9) * priceResult.price;
+      }
+      
+      // Fallback conservateur: estimer via prix SOL (1 token = petit montant)
+      const solPrice = await getSolPrice();
+      return (amount / 1e9) * solPrice * 0.001; // Très conservateur
+    } catch (error) {
+      logger.warn("NativeRouter", "Failed to estimate order USD value", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // Fallback: retourner 0 pour désactiver le split en cas d'erreur
+      return 0;
+    }
+  }
+  
+  /**
    * Récupère des quotes depuis toutes les venues natives disponibles
    * Utilise l'API proxy pour éviter les problèmes CORS côté client
    * Inclut Jupiter comme benchmark pour comparaison
@@ -1418,6 +1460,74 @@ export class NativeRouterService {
       'JUPITER': 0, // Jupiter ne génère pas de NPI
     };
     return npiByVenue[venue] || 10;
+  }
+  
+  /**
+   * Obtient un quote pour une venue spécifique avec un montant donné
+   * Utilisé par le SplitRouteCalculator pour évaluer différentes répartitions
+   */
+  async getSingleVenueQuote(
+    venue: SupportedVenue,
+    inputMint: PublicKey,
+    outputMint: PublicKey,
+    amount: number
+  ): Promise<VenueQuote | null> {
+    try {
+      const inputMintStr = inputMint.toBase58();
+      const outputMintStr = outputMint.toBase58();
+      const isClient = typeof window !== 'undefined';
+      
+      if (isClient) {
+        // Côté client: utiliser l'API proxy avec filtre de venue
+        const response = await fetch(
+          `/api/venue-quotes?inputMint=${inputMintStr}&outputMint=${outputMintStr}&amount=${amount}&venues=${venue}`,
+          { signal: AbortSignal.timeout(5000) }
+        );
+        
+        if (!response.ok) return null;
+        
+        const data = await response.json();
+        const quote = data.quotes?.find((q: { venue: string }) => q.venue === venue);
+        
+        if (!quote || quote.error) return null;
+        
+        return {
+          venue: venue as keyof typeof DEX_PROGRAMS,
+          venueProgramId: DEX_PROGRAMS[venue as keyof typeof DEX_PROGRAMS] || DEX_PROGRAMS.RAYDIUM_AMM,
+          inputAmount: amount,
+          outputAmount: quote.outputAmount,
+          priceImpactBps: quote.priceImpactBps || 0,
+          accounts: [],
+          estimatedNpiBps: this.getEstimatedNpiBps(venue as keyof typeof DEX_PROGRAMS),
+          latencyMs: quote.latencyMs || 0,
+        };
+      } else {
+        // Côté serveur: appeler directement l'API de la venue
+        let quote: VenueQuote | null = null;
+        
+        switch (venue) {
+          case 'RAYDIUM_AMM':
+            quote = await fetchRaydiumQuote(inputMintStr, outputMintStr, amount);
+            break;
+          case 'ORCA_WHIRLPOOL':
+            quote = await fetchOrcaQuote(inputMintStr, outputMintStr, amount);
+            break;
+          case 'METEORA_DLMM':
+            quote = await fetchMeteoraQuote(inputMintStr, outputMintStr, amount);
+            break;
+          case 'PHOENIX':
+            quote = await fetchPhoenixQuote(inputMintStr, outputMintStr, amount);
+            break;
+        }
+        
+        return quote;
+      }
+    } catch (error) {
+      logger.debug("NativeRouter", `Failed to get quote for ${venue}`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
   }
   
   /**
@@ -1595,18 +1705,111 @@ export class NativeRouterService {
       });
     }
     
-    // 5. Stratégie: utiliser la meilleure venue
-    const bestQuote = adjustedQuotes[0];
+    // 5. Vérifier si on doit utiliser le split pour les gros ordres
+    const routingConfig = getRoutingConfig();
+    let optimalSplits: SplitQuote[] | undefined;
+    let splitImprovementBps: number | undefined;
+    let finalOutputAmount = adjustedQuotes[0].outputAmount;
+    let finalVenues: VenueQuote[] = [adjustedQuotes[0]];
+    
+    // Estimer la valeur USD de l'ordre pour décider du split
+    const estimatedUsdValue = await this.estimateOrderValueUsd(safeInputMint, amountIn);
+    
+    if (
+      routingConfig.splitRoute.enabled &&
+      estimatedUsdValue >= routingConfig.splitRoute.minAmountUsdForSplit
+    ) {
+      logger.info("NativeRouter", "Large order detected, attempting split route", {
+        amountIn,
+        estimatedUsdValue,
+        threshold: routingConfig.splitRoute.minAmountUsdForSplit,
+      });
+      
+      // Créer un quoteFetcher à partir de notre méthode getSingleVenueQuote
+      const quoteFetcher = async (
+        venue: SupportedVenue,
+        inputMint: PublicKey,
+        outputMint: PublicKey,
+        amount: number
+      ) => {
+        try {
+          const quote = await this.getSingleVenueQuote(venue, inputMint, outputMint, amount);
+          if (!quote) return null;
+          return {
+            venue,
+            venueProgramId: quote.venueProgramId,
+            inputAmount: quote.inputAmount,
+            outputAmount: quote.outputAmount,
+            priceImpactBps: quote.priceImpactBps,
+            latencyMs: quote.latencyMs,
+            effectivePrice: quote.outputAmount / quote.inputAmount,
+          };
+        } catch {
+          return null;
+        }
+      };
+      
+      const splitCalculator = new SplitRouteCalculator(quoteFetcher);
+      const enabledVenues = adjustedQuotes.map(q => q.venue as SupportedVenue);
+      
+      try {
+        const optimalRoute = await splitCalculator.findOptimalSplit(
+          safeInputMint,
+          safeOutputMint,
+          amountIn,
+          enabledVenues
+        );
+        
+        // Utiliser le split seulement s'il améliore le résultat
+        if (optimalRoute.splits.length > 1 && optimalRoute.improvementVsSingleVenueBps > 0) {
+          optimalSplits = optimalRoute.splits;
+          splitImprovementBps = optimalRoute.improvementVsSingleVenueBps;
+          finalOutputAmount = optimalRoute.totalOutput;
+          
+          // Convertir les splits en VenueQuotes pour l'exécution
+          finalVenues = optimalRoute.splits.map(split => {
+            const originalQuote = adjustedQuotes.find(q => q.venue === split.venue);
+            return {
+              venue: split.venue as keyof typeof DEX_PROGRAMS,
+              venueProgramId: originalQuote?.venueProgramId ?? DEX_PROGRAMS[split.venue as keyof typeof DEX_PROGRAMS],
+              inputAmount: split.inputAmount,
+              outputAmount: split.outputAmount,
+              priceImpactBps: split.priceImpactBps,
+              accounts: originalQuote?.accounts ?? [],
+              estimatedNpiBps: originalQuote?.estimatedNpiBps ?? 0,
+              latencyMs: originalQuote?.latencyMs ?? 0,
+            };
+          });
+          
+          logger.info("NativeRouter", "Split route selected", {
+            splits: optimalRoute.splits.map(s => `${s.venue}:${s.percent}%`),
+            improvement: `+${splitImprovementBps} bps`,
+            totalOutput: finalOutputAmount,
+          });
+        } else {
+          logger.info("NativeRouter", "Split route not beneficial, using single venue", {
+            improvementBps: optimalRoute.improvementVsSingleVenueBps,
+          });
+        }
+      } catch (error) {
+        logger.warn("NativeRouter", "Split route calculation failed, using single venue", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    
+    // 6. Utiliser la meilleure venue ou le split
+    const bestQuote = finalVenues[0];
     
     // Calculer le min output avec slippage
-    const minOutput = Math.floor(bestQuote.outputAmount * (10000 - finalSlippageBps) / 10000);
+    const minOutput = Math.floor(finalOutputAmount * (10000 - finalSlippageBps) / 10000);
     
-    // 6. Calculer le NPI RÉEL en comparant avec le prix du marché (Jupiter)
+    // 7. Calculer le NPI RÉEL en comparant avec le prix du marché (Jupiter)
     const { npi: realNpiBps, jupiterOutput } = await this.calculateRealNPI(
       safeInputMint,
       safeOutputMint,
       amountIn,
-      bestQuote.outputAmount
+      finalOutputAmount
     );
     
     // NPI = amélioration réelle par rapport à Jupiter
@@ -1617,36 +1820,44 @@ export class NativeRouterService {
     // Estimation du NPI et rebates basée sur le NPI réel UNIQUEMENT
     const platformFeeBps = 20; // 0.2%
     const npiEstimate = effectiveNpiBps > 0 
-      ? Math.floor(bestQuote.outputAmount * effectiveNpiBps / 10000)
+      ? Math.floor(finalOutputAmount * effectiveNpiBps / 10000)
       : 0;
     const rebateEstimate = Math.floor(npiEstimate * 0.7); // 70% du NPI va aux rebates
     
     // Net output = output - platform fee + rebate
-    const platformFee = Math.floor(bestQuote.outputAmount * platformFeeBps / 10000);
-    const netOutput = bestQuote.outputAmount - platformFee + rebateEstimate;
+    const platformFee = Math.floor(finalOutputAmount * platformFeeBps / 10000);
+    const netOutput = finalOutputAmount - platformFee + rebateEstimate;
+    
+    // Calculer le price impact pondéré si split
+    const totalPriceImpact = optimalSplits 
+      ? optimalSplits.reduce((sum, s) => sum + s.priceImpactBps * s.percent / 100, 0)
+      : bestQuote.priceImpactBps;
     
     logger.info("NativeRouter", "NPI calculation (REAL)", {
       bestVenue: bestQuote.venue,
-      bestVenueOutput: bestQuote.outputAmount,
+      bestVenueOutput: finalOutputAmount,
       jupiterOutput,
       improvementBps: realNpiBps,
       npiAmount: npiEstimate,
       rebateAmount: rebateEstimate,
-      isJupiterBetter: jupiterOutput > bestQuote.outputAmount,
+      isJupiterBetter: jupiterOutput > finalOutputAmount,
+      usingSplit: !!optimalSplits,
+      splitCount: optimalSplits?.length ?? 1,
     });
     
-    // Ne retourner que la meilleure venue (celle utilisée pour le swap)
-    // Les autres venues sont juste pour comparaison dans les logs
+    // Retourner les venues utilisées (split ou single)
     return {
-      venues: [bestQuote], // SEULEMENT la meilleure venue utilisée
+      venues: finalVenues,
       bestVenue: bestQuote.venue,
       totalInputAmount: amountIn,
-      totalOutputAmount: bestQuote.outputAmount,
-      totalPriceImpactBps: bestQuote.priceImpactBps,
+      totalOutputAmount: finalOutputAmount,
+      totalPriceImpactBps: Math.round(totalPriceImpact),
       estimatedRebate: rebateEstimate,
       estimatedNpi: npiEstimate,
       platformFeeBps,
       netOutputAmount: netOutput,
+      splits: optimalSplits,
+      splitImprovementBps,
     };
   }
   
