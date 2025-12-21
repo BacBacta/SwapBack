@@ -305,8 +305,14 @@ export function SimpleSwapCard() {
           } as QuoteResult);
           
           // Mettre à jour le slippage avec la valeur dynamique calculée
-          if (nativeResult.dynamicSlippageBps && !slippage) {
-            setSlippage(nativeResult.dynamicSlippageBps / 100);
+          // FIX: Toujours utiliser le slippage dynamique s'il est supérieur au slippage actuel
+          // Avant: on ne mettait à jour que si slippage était falsy (jamais le cas car initialisé à 1%)
+          if (nativeResult.dynamicSlippageBps) {
+            const dynamicSlippagePercent = nativeResult.dynamicSlippageBps / 100;
+            if (dynamicSlippagePercent > slippage) {
+              console.log("[SimpleSwapCard] Updating slippage from", slippage, "to", dynamicSlippagePercent, "(dynamic)");
+              setSlippage(dynamicSlippagePercent);
+            }
           }
         }
       } catch (error) {
