@@ -255,8 +255,8 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
 
   dynamicSlippage: {
     enabled: true,
-    baseSlippageBps: 30, // 0.3% base (réduit de 50)
-    maxSlippageBps: 300, // 3% max (réduit de 500)
+    baseSlippageBps: 100, // 1% base (augmenté pour tokens volatils comme JUP)
+    maxSlippageBps: 500, // 5% max
     sizeThresholdBps: 50, // Impact si > 0.5% du pool
     volatilityFactor: 1.5,
     volatilityDivisor: 10,

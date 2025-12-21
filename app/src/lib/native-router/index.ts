@@ -95,11 +95,21 @@ export const PRIORITY_FEE_CONFIG = {
 
 // Slippage Configuration (matches on-chain SlippageConfig)
 export const SLIPPAGE_CONFIG = {
-  BASE_SLIPPAGE_BPS: 50,     // 0.5% base
+  BASE_SLIPPAGE_BPS: 100,    // 1% base (increased for volatile tokens like JUP, BONK)
   MAX_SLIPPAGE_BPS: 500,     // 5% max
   SIZE_THRESHOLD_BPS: 100,   // Impact si > 1% pool
   VOLATILITY_DIVISOR: 10,    // Facteur volatilité
 };
+
+// Tokens known to be volatile (require higher slippage)
+export const VOLATILE_TOKEN_MINTS: Set<string> = new Set([
+  "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",  // JUP
+  "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",  // BONK
+  "WENWENvqqNya429ubCdR81ZmD69brwQaaBYY6p3LCpk",   // WEN
+  "MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5",  // MEW
+  "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr",  // POPCAT
+  "DriFtupJYLTosbwoN8koMbEYSx54aFAVLddWsbksjwg7",  // DRIFT
+]);
 
 // Scoring thresholds
 export const MIN_VENUE_SCORE = 2500; // Score minimum pour inclure une venue
@@ -110,6 +120,35 @@ export const MAX_FALLBACKS = 5;
 export const MAX_STALENESS_SECS = 300; // 5 minutes
 export const MIN_STALENESS_SECS = 10;
 export const MAX_ORACLE_DIVERGENCE_BPS = 200; // 2%
+
+// ============================================================================
+// SLIPPAGE HELPERS
+// ============================================================================
+
+/**
+ * Calculates dynamic slippage based on token volatility and trade size.
+ * Volatile tokens get higher base slippage.
+ */
+export function calculateDynamicSlippageBps(
+  inputMint: string,
+  outputMint: string,
+  priceImpactBps: number = 0
+): number {
+  let slippageBps = SLIPPAGE_CONFIG.BASE_SLIPPAGE_BPS;
+
+  // Boost slippage for volatile tokens
+  if (VOLATILE_TOKEN_MINTS.has(inputMint) || VOLATILE_TOKEN_MINTS.has(outputMint)) {
+    slippageBps = Math.max(slippageBps, 150); // At least 1.5% for volatile
+  }
+
+  // Add price impact to slippage
+  if (priceImpactBps > SLIPPAGE_CONFIG.SIZE_THRESHOLD_BPS) {
+    slippageBps += Math.ceil(priceImpactBps / SLIPPAGE_CONFIG.VOLATILITY_DIVISOR);
+  }
+
+  // Ensure within bounds
+  return Math.min(slippageBps, SLIPPAGE_CONFIG.MAX_SLIPPAGE_BPS);
+}
 
 // ============================================================================
 // TYPES

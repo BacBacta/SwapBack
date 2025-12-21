@@ -134,8 +134,9 @@ export const JITO_TIP_ACCOUNTS = [
 export const DEFAULT_JITO_TIP_LAMPORTS = 10_000; // 0.00001 SOL
 
 // Slippage Configuration (matches on-chain SlippageConfig)
+// IMPORTANT: BASE doit être suffisant pour les tokens volatils (JUP, JTO, etc.)
 export const SLIPPAGE_CONFIG = {
-  BASE_SLIPPAGE_BPS: 50,     // 0.5% base
+  BASE_SLIPPAGE_BPS: 100,    // 1% base (augmenté de 0.5% pour tokens volatils)
   MAX_SLIPPAGE_BPS: 500,     // 5% max
   SIZE_THRESHOLD_BPS: 100,   // Impact si > 1% pool
   VOLATILITY_DIVISOR: 10,    // Facteur volatilité

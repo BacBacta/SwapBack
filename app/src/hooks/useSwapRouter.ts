@@ -27,6 +27,7 @@ import { PROGRAM_IDS } from "@/constants/programIds";
 import { createProgramWithProvider } from "@/lib/program";
 import { getOracleFeedsForPair, type OracleFeedConfig } from "@/config/oracles";
 import { USDC_MINT } from "@/config/constants";
+import { SLIPPAGE_CONFIG } from "@/lib/native-router";
 import toast from "react-hot-toast";
 import { monitor } from "@/lib/protocolMonitor";
 import { getAllALTs } from "@/lib/alt";
@@ -148,7 +149,7 @@ export function useSwapRouter() {
       const args = {
         amountIn: request.amountIn,
         minOut: request.minOut,
-        slippageTolerance: request.slippageBps ?? 50,
+        slippageTolerance: request.slippageBps ?? SLIPPAGE_CONFIG.BASE_SLIPPAGE_BPS,
         twapSlices: request.twapSlices ?? null,
         useDynamicPlan: request.useDynamicPlan ?? false,
         planAccount: request.planAccount ?? null,
@@ -415,7 +416,7 @@ export function useSwapRouter() {
       const args = {
         amountIn: request.amountIn,
         minOut: request.minOut,
-        slippageTolerance: request.slippageBps ?? 50,
+        slippageTolerance: request.slippageBps ?? SLIPPAGE_CONFIG.BASE_SLIPPAGE_BPS,
         twapSlices: request.twapSlices ?? null,
         useDynamicPlan: request.useDynamicPlan ?? false,
         planAccount: request.planAccount ?? null,
