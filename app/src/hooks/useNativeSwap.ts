@@ -227,8 +227,34 @@ export function useNativeSwap() {
         let slippageResult: SlippageResult | undefined;
         
         if (!params.slippageBps) {
-          // Estimer la volatilité
-          const volatilityBps = 100; // 1% par défaut, pourrait venir de l'oracle
+          // Estimer la volatilité selon le type de token
+          // Tokens volatils nécessitent plus de slippage
+          const VOLATILE_TOKENS = [
+            'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN', // JUP
+            'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', // BONK
+            'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm', // WIF
+            'jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL', // JTO
+            'HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3', // PYTH
+            'MEFNBXixkEbait3xn9bkm8WsJzXtVsaJEn4c8Sam21u', // MFRS
+            'rndrizKT3MK1iimdxRdWabcF7Zg7AR5T4nud4EkHBof', // RENDER
+          ];
+          
+          const STABLE_TOKENS = [
+            'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
+            'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', // USDT
+            'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So', // mSOL
+            'bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1', // bSOL
+          ];
+          
+          let volatilityBps: number;
+          if (VOLATILE_TOKENS.includes(inputMintStr) || VOLATILE_TOKENS.includes(outputMintStr)) {
+            volatilityBps = 300; // 3% volatilité pour tokens volatils
+          } else if (STABLE_TOKENS.includes(inputMintStr) && STABLE_TOKENS.includes(outputMintStr)) {
+            volatilityBps = 20; // 0.2% pour stables
+          } else {
+            volatilityBps = 150; // 1.5% par défaut pour autres tokens
+          }
+          
           const poolTvl = 10_000_000_000_000; // 10M par défaut
           
           slippageResult = calculateDynamicSlippage({
