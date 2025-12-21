@@ -626,8 +626,17 @@ export function useNativeSwap() {
 
         params.onProgress?.('preparing');
 
-        // Calculer le min output avec slippage
-        const slippageBps = params.slippageBps ?? SLIPPAGE_CONFIG.BASE_SLIPPAGE_BPS;
+        // Utiliser le slippage dynamique calculé lors du quote, sinon fallback sur params ou base
+        // FIX: Avant, on ignorait currentQuote.dynamicSlippageBps causant des erreurs 0x1e sur tokens volatils
+        const slippageBps = params.slippageBps 
+          ?? currentQuote?.dynamicSlippageBps 
+          ?? SLIPPAGE_CONFIG.BASE_SLIPPAGE_BPS;
+        
+        logger.debug("useNativeSwap", "Slippage used for execution", {
+          fromParams: params.slippageBps,
+          fromQuote: currentQuote?.dynamicSlippageBps,
+          final: slippageBps,
+        });
         
         // Obtenir la meilleure route native
         const route = await trueNativeSwap.getBestNativeRoute({
