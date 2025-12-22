@@ -289,7 +289,7 @@ export function SimpleSwapCard() {
       if (shouldShowLoading) setLoading(true);
 
       try {
-        console.log('📤 [SimpleSwapCard] Calling direct DEX APIs with:', {
+        console.log('📤 [SimpleSwapCard] Calling venue-quotes API with:', {
           inputMint: inputToken.mint,
           outputMint: outputToken.mint,
           amount: amountInBaseUnits,
@@ -297,63 +297,64 @@ export function SimpleSwapCard() {
         });
         
         // ============================================================
-        // APPEL DIRECT AUX APIs DEX (contourne useNativeSwap)
+        // APPEL À /api/venue-quotes (inclut TOUTES les venues: Orca, Raydium, 
+        // Meteora, Phoenix, PumpSwap, Jupiter, etc.)
         // ============================================================
         const slippageBps = Math.round(slippage * 100);
-        const venueApis = [
-          { id: 'ORCA_WHIRLPOOL', path: '/api/dex/orca/quote' },
-          { id: 'RAYDIUM_AMM', path: '/api/dex/raydium/quote' },
-          { id: 'PHOENIX', path: '/api/dex/phoenix/quote' },
-        ];
+        const url = `/api/venue-quotes?inputMint=${inputToken.mint}&outputMint=${outputToken.mint}&amount=${amountInBaseUnits}&slippageBps=${slippageBps}`;
         
-        const quotePromises = venueApis.map(async (venue) => {
-          try {
-            const url = `${venue.path}?inputMint=${inputToken.mint}&outputMint=${outputToken.mint}&amount=${amountInBaseUnits}&slippageBps=${slippageBps}`;
-            const response = await fetch(url, { 
-              signal: AbortSignal.timeout(6000),
-              cache: 'no-store'
-            });
-            if (response.ok) {
-              const data = await response.json();
-              const outputAmount = Number(data.outputAmount ?? data.outAmount ?? 0);
-              if (outputAmount > 0) {
-                return { venue: venue.id, outputAmount, data };
-              }
-            }
-          } catch (e) {
-            console.warn(`[SimpleSwapCard] ${venue.id} quote failed:`, e);
-          }
-          return null;
+        const response = await fetch(url, { 
+          signal: AbortSignal.timeout(10000),
+          cache: 'no-store'
         });
         
-        const venueResults = await Promise.all(quotePromises);
-        const validQuotes = venueResults.filter(Boolean);
-        validQuotes.sort((a, b) => (b?.outputAmount ?? 0) - (a?.outputAmount ?? 0));
+        if (!response.ok) {
+          console.error('[SimpleSwapCard] venue-quotes API error:', response.status);
+          setQuote(null);
+          return;
+        }
         
-        console.log('📥 [SimpleSwapCard] Direct DEX quotes:', validQuotes);
+        const data = await response.json();
+        console.log('📥 [SimpleSwapCard] venue-quotes response:', data);
         
-        const bestQuote = validQuotes[0];
+        // Récupérer toutes les quotes (natives + Jupiter benchmark)
+        const allQuotes = [...(data.quotes || [])];
         
-        if (bestQuote && !controller.signal.aborted && seq === quoteFetchSeqRef.current) {
+        // Ajouter Jupiter comme fallback si aucune quote native
+        if (data.jupiterBenchmark && data.jupiterBenchmark.outputAmount > 0) {
+          allQuotes.push({
+            venue: 'JUPITER',
+            outputAmount: data.jupiterBenchmark.outputAmount,
+            priceImpactBps: data.jupiterBenchmark.priceImpactBps || 0,
+            source: 'jupiter',
+          });
+        }
+        
+        // Trier par meilleur output
+        allQuotes.sort((a: any, b: any) => (b.outputAmount ?? 0) - (a.outputAmount ?? 0));
+        
+        const bestQuote = allQuotes[0];
+        
+        if (bestQuote && bestQuote.outputAmount > 0 && !controller.signal.aborted && seq === quoteFetchSeqRef.current) {
           const formatted = bestQuote.outputAmount / Math.pow(10, outputToken.decimals);
-          const priceImpactBps = bestQuote.data?.priceImpactBps ?? 0;
+          const priceImpactBps = bestQuote.priceImpactBps ?? 0;
           
           setQuote({
             outputAmount: bestQuote.outputAmount.toString(),
             outputAmountFormatted: formatted,
             minOutAmountFormatted: undefined,
             priceImpact: priceImpactBps / 100,
-            cashbackAmount: formatted * 0.003, // 0.3% rebate estimate
+            cashbackAmount: bestQuote.venue !== 'JUPITER' ? formatted * 0.003 : 0, // Rebate seulement pour routes natives
             npiAmount: 0,
             route: [bestQuote.venue],
-            venues: validQuotes.map(q => q?.venue ?? ''),
-            isNativeRoute: true,
+            venues: allQuotes.map((q: any) => q.venue),
+            isNativeRoute: bestQuote.venue !== 'JUPITER',
             bestVenue: bestQuote.venue,
             dynamicSlippageBps: slippageBps,
             slippageBreakdown: undefined,
           } as QuoteResult);
         } else if (!controller.signal.aborted && seq === quoteFetchSeqRef.current) {
-          console.log('❌ [SimpleSwapCard] No valid quotes from any venue');
+          console.log('❌ [SimpleSwapCard] No valid quotes from venue-quotes API');
           setQuote(null);
         }
       } catch (error) {
