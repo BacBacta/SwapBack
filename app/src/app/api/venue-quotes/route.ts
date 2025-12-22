@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
   const quotes: VenueQuoteResult[] = [];
 
   // Fetch all quotes in parallel using INTERNAL APIs
-  // Includes ALL 7 venues: Raydium, Orca, Meteora, Phoenix, Lifinity, Saber, PumpSwap
+  // Includes ALL 8 venues: Raydium, Orca, Meteora, Phoenix, Lifinity, Saber, PumpSwap, LaunchLab
   const [
     raydiumResult, 
     orcaResult, 
@@ -113,6 +113,7 @@ export async function GET(request: NextRequest) {
     lifinityResult, 
     saberResult,
     pumpswapResult,
+    launchlabResult,
     jupiterResult
   ] = await Promise.allSettled([
     fetchInternalQuote(baseUrl, 'raydium', inputMint, outputMint, amountNum, slippageBps),
@@ -122,6 +123,7 @@ export async function GET(request: NextRequest) {
     fetchInternalQuote(baseUrl, 'lifinity', inputMint, outputMint, amountNum, slippageBps),
     fetchInternalQuote(baseUrl, 'saber', inputMint, outputMint, amountNum, slippageBps),
     fetchInternalQuote(baseUrl, 'pumpswap', inputMint, outputMint, amountNum, slippageBps),
+    fetchInternalQuote(baseUrl, 'launchlab', inputMint, outputMint, amountNum, slippageBps),
     fetchJupiterQuote(inputMint, outputMint, amountNum),
   ]);
 
@@ -133,6 +135,7 @@ export async function GET(request: NextRequest) {
     lifinity: lifinityResult.status === 'fulfilled' ? lifinityResult.value?.outputAmount : 'rejected',
     saber: saberResult.status === 'fulfilled' ? saberResult.value?.outputAmount : 'rejected',
     pumpswap: pumpswapResult.status === 'fulfilled' ? pumpswapResult.value?.outputAmount : 'rejected',
+    launchlab: launchlabResult.status === 'fulfilled' ? launchlabResult.value?.outputAmount : 'rejected',
     jupiter: jupiterResult.status === 'fulfilled' ? jupiterResult.value?.outputAmount : 'rejected',
   });
 
@@ -163,6 +166,10 @@ export async function GET(request: NextRequest) {
 
   if (pumpswapResult.status === 'fulfilled' && pumpswapResult.value && pumpswapResult.value.outputAmount > 0) {
     quotes.push(pumpswapResult.value);
+  }
+
+  if (launchlabResult.status === 'fulfilled' && launchlabResult.value && launchlabResult.value.outputAmount > 0) {
+    quotes.push(launchlabResult.value);
   }
 
   // Jupiter benchmark
