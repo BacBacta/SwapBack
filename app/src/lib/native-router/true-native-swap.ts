@@ -240,6 +240,35 @@ export interface TrueNativeSwapResult {
 // TRUE NATIVE SWAP CLASS
 // ============================================================================
 
+// Cache pour les paires sans venue disponible (évite les appels inutiles)
+// Clé: "inputMint:outputMint", Valeur: timestamp d'expiration
+const pairNoVenueCache = new Map<string, number>();
+const PAIR_NO_VENUE_CACHE_TTL_MS = 60_000; // 60 secondes
+
+function getPairNoVenueKey(inputMint: string, outputMint: string): string {
+  return `${inputMint}:${outputMint}`;
+}
+
+function isPairCachedAsNoVenue(inputMint: string, outputMint: string): boolean {
+  const key = getPairNoVenueKey(inputMint, outputMint);
+  const until = pairNoVenueCache.get(key);
+  if (typeof until !== "number") return false;
+  if (Date.now() <= until) return true;
+  pairNoVenueCache.delete(key);
+  return false;
+}
+
+function cachePairAsNoVenue(inputMint: string, outputMint: string): void {
+  const key = getPairNoVenueKey(inputMint, outputMint);
+  pairNoVenueCache.set(key, Date.now() + PAIR_NO_VENUE_CACHE_TTL_MS);
+  
+  // Limiter la taille du cache
+  if (pairNoVenueCache.size > 200) {
+    const firstKey = pairNoVenueCache.keys().next().value as string | undefined;
+    if (firstKey) pairNoVenueCache.delete(firstKey);
+  }
+}
+
 export class TrueNativeSwap {
   private connection: Connection;
   private mintDecimalsCache = new Map<string, number>();
@@ -372,9 +401,22 @@ export class TrueNativeSwap {
 
     const quotes: NativeVenueQuote[] = [];
 
+    const inputMintStr = safeInputMint.toBase58();
+    const outputMintStr = safeOutputMint.toBase58();
+
+    // Fast-path: si cette paire est connue comme n'ayant pas de venue native,
+    // retourner immédiatement un tableau vide (économise les appels réseau)
+    if (isPairCachedAsNoVenue(inputMintStr, outputMintStr)) {
+      logger.debug("TrueNativeSwap", "Pair cached as no-venue, skipping native quotes", {
+        inputMint: inputMintStr.slice(0, 8),
+        outputMint: outputMintStr.slice(0, 8),
+      });
+      return quotes;
+    }
+
     logger.info("TrueNativeSwap", "Fetching native quotes", {
-      inputMint: safeInputMint.toBase58().slice(0, 8),
-      outputMint: safeOutputMint.toBase58().slice(0, 8),
+      inputMint: inputMintStr.slice(0, 8),
+      outputMint: outputMintStr.slice(0, 8),
       amountIn,
     });
 
@@ -402,7 +444,8 @@ export class TrueNativeSwap {
                 slippageBps: bps.toString(),
                 forceFresh: "1",
               }),
-            { signal: AbortSignal.timeout(8000), cache: "no-store" }
+            // Timeout réduit de 8s à 4s pour améliorer la latence perçue
+            { signal: AbortSignal.timeout(4000), cache: "no-store" }
           );
 
           if (response.ok) {
@@ -435,11 +478,28 @@ export class TrueNativeSwap {
               status: response.status,
               error: errorText.slice(0, 200),
             });
+            // Circuit breaker: désactiver temporairement Orca sur erreurs 5xx
+            if (response.status >= 500 && response.status < 600) {
+              // 30 secondes de cooldown sur erreur serveur
+              this.markVenueUnavailable("ORCA_WHIRLPOOL", 30_000);
+              logger.info("TrueNativeSwap", "Orca temporarily disabled (circuit breaker)", {
+                status: response.status,
+                cooldownMs: 30_000,
+              });
+            }
           }
         } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
           logger.warn("TrueNativeSwap", "Browser fast-quote Orca exception", {
-            error: err instanceof Error ? err.message : String(err),
+            error: errMsg,
           });
+          // Circuit breaker: timeout ou erreur réseau = désactiver 15 secondes
+          if (errMsg.includes("Timeout") || errMsg.includes("abort") || errMsg.includes("network")) {
+            this.markVenueUnavailable("ORCA_WHIRLPOOL", 15_000);
+            logger.info("TrueNativeSwap", "Orca temporarily disabled (timeout/network)", {
+              cooldownMs: 15_000,
+            });
+          }
         }
       }
       // If fast-path fails, fall back to the full resolver (may still work on some RPCs).
@@ -473,7 +533,8 @@ export class TrueNativeSwap {
     const quoteConcurrencyRaw = Number(process.env.NEXT_PUBLIC_SWAPBACK_QUOTE_CONCURRENCY);
     const quoteConcurrency = Number.isFinite(quoteConcurrencyRaw) ? quoteConcurrencyRaw : 2;
     const quoteTimeoutRaw = Number(process.env.NEXT_PUBLIC_SWAPBACK_QUOTE_TIMEOUT_MS);
-    const quoteTimeoutMs = Number.isFinite(quoteTimeoutRaw) ? quoteTimeoutRaw : 12_000;
+    // Timeout réduit de 12s à 6s pour améliorer la latence
+    const quoteTimeoutMs = Number.isFinite(quoteTimeoutRaw) ? quoteTimeoutRaw : 6_000;
 
     const entries = Array.from(allAccounts.entries());
     const maybeQuotes = await this.mapWithConcurrency(entries, quoteConcurrency, async ([venue, accounts]) => {
@@ -545,7 +606,19 @@ export class TrueNativeSwap {
 
         return null;
       } catch (error) {
-        logger.warn("TrueNativeSwap", `Failed to get quote from ${venue}`, { error });
+        const errMsg = error instanceof Error ? error.message : String(error);
+        logger.warn("TrueNativeSwap", `Failed to get quote from ${venue}`, { error: errMsg });
+        
+        // Circuit breaker: désactiver la venue sur timeout ou erreur grave
+        if (errMsg.includes("Timeout") || errMsg.includes("503") || errMsg.includes("502")) {
+          // Désactiver 20 secondes pour timeout, 30 pour erreurs 5xx
+          const cooldownMs = errMsg.includes("Timeout") ? 20_000 : 30_000;
+          this.markVenueUnavailable(venue, cooldownMs);
+          logger.info("TrueNativeSwap", `${venue} temporarily disabled (circuit breaker)`, {
+            reason: errMsg.slice(0, 100),
+            cooldownMs,
+          });
+        }
         return null;
       }
     });
@@ -602,6 +675,17 @@ export class TrueNativeSwap {
           error: err instanceof Error ? err.message : String(err),
         });
       }
+    }
+
+    // Si aucune quote trouvée, cacher cette paire comme "sans venue" pour 60 secondes
+    // Cela évite de re-tenter les mêmes appels API pour des paires non supportées
+    if (quotes.length === 0) {
+      cachePairAsNoVenue(inputMintStr, outputMintStr);
+      logger.info("TrueNativeSwap", "No native quotes found, caching pair as no-venue", {
+        inputMint: inputMintStr.slice(0, 8),
+        outputMint: outputMintStr.slice(0, 8),
+        cacheTtlMs: PAIR_NO_VENUE_CACHE_TTL_MS,
+      });
     }
 
     return quotes;

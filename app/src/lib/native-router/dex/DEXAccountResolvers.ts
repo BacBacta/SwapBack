@@ -94,7 +94,8 @@ const dexAccountsByVenueCache = new Map<string, DexAccountsCacheEntry>();
 
 const DEX_ACCOUNTS_RESOLVE_TIMEOUT_MS_DEFAULT = 4_000;
 const DEX_ACCOUNTS_RESOLVE_TIMEOUT_METEORA_MS_DEFAULT = 6_000;
-const DEX_ACCOUNTS_TIMEOUT_NEGATIVE_TTL_MS_DEFAULT = 5_000;
+// Augmenté de 5s à 20s pour éviter les re-tentatives trop fréquentes sur venues instables
+const DEX_ACCOUNTS_TIMEOUT_NEGATIVE_TTL_MS_DEFAULT = 20_000;
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return promise;
