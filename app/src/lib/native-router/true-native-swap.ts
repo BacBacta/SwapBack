@@ -243,7 +243,7 @@ export interface TrueNativeSwapResult {
 // Cache pour les paires sans venue disponible (évite les appels inutiles)
 // Clé: "inputMint:outputMint", Valeur: timestamp d'expiration
 const pairNoVenueCache = new Map<string, number>();
-const PAIR_NO_VENUE_CACHE_TTL_MS = 60_000; // 60 secondes
+const PAIR_NO_VENUE_CACHE_TTL_MS = 20_000; // 20 secondes - réduit pour retenter plus tôt
 
 function getPairNoVenueKey(inputMint: string, outputMint: string): string {
   return `${inputMint}:${outputMint}`;

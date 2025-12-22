@@ -55,6 +55,77 @@ import { useBoostCalculations } from "./useBoostCalculations";
 import { logger } from "@/lib/logger";
 
 // ============================================================================
+// JUPITER REFERENCE QUOTE (pour calcul NPI dynamique)
+// ============================================================================
+
+/**
+ * Récupère une quote Jupiter de référence pour calculer le NPI réel
+ * NPI = différence entre le prix natif et le prix Jupiter
+ */
+async function fetchJupiterReferenceQuote(
+  inputMint: string,
+  outputMint: string,
+  amount: number,
+  slippageBps: number = 50
+): Promise<{ outputAmount: number; source: string } | null> {
+  try {
+    const response = await fetch(
+      `https://quote-api.jup.ag/v6/quote?` +
+        new URLSearchParams({
+          inputMint,
+          outputMint,
+          amount: amount.toString(),
+          slippageBps: slippageBps.toString(),
+        }),
+      { signal: AbortSignal.timeout(3000) } // Timeout court pour ne pas bloquer
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    const outAmount = Number(data.outAmount);
+    
+    if (Number.isFinite(outAmount) && outAmount > 0) {
+      return { outputAmount: outAmount, source: 'jupiter-v6' };
+    }
+    return null;
+  } catch (err) {
+    // Ne pas logger l'erreur pour éviter le spam - c'est juste une référence
+    return null;
+  }
+}
+
+/**
+ * Calcule le NPI réel basé sur la comparaison avec Jupiter
+ * Retourne 0 si Jupiter n'est pas disponible ou si le prix natif est pire
+ */
+function calculateRealNpi(
+  nativeOutputAmount: number,
+  jupiterOutputAmount: number | null
+): { npi: number; npiBps: number; source: string } {
+  if (!jupiterOutputAmount || jupiterOutputAmount <= 0) {
+    // Fallback: estimation conservatrice de 0.05% si Jupiter indisponible
+    const fallbackNpi = Math.floor(nativeOutputAmount * 0.0005);
+    return { npi: fallbackNpi, npiBps: 5, source: 'estimated' };
+  }
+
+  // NPI = différence positive entre natif et Jupiter
+  const improvement = nativeOutputAmount - jupiterOutputAmount;
+  
+  if (improvement <= 0) {
+    // Le prix natif est égal ou pire que Jupiter - pas de NPI
+    return { npi: 0, npiBps: 0, source: 'jupiter-comparison' };
+  }
+
+  // Calculer le NPI en bps
+  const npiBps = Math.floor((improvement / jupiterOutputAmount) * 10000);
+  
+  return { npi: improvement, npiBps, source: 'jupiter-comparison' };
+}
+
+// ============================================================================
 // TYPES
 // ============================================================================
 
@@ -272,9 +343,31 @@ export function useNativeSwap() {
           });
         }
 
-        // Estimations (alignées avec executeTrueNativeSwap)
-        const estimatedNpi = Math.floor(route.outputAmount * 0.001);
+        // Calcul NPI dynamique: comparer avec Jupiter pour avoir le vrai gain
+        const jupiterRef = await fetchJupiterReferenceQuote(
+          inputMintStr,
+          outputMintStr,
+          params.amount,
+          dynamicSlippageBps
+        );
+        
+        const npiResult = calculateRealNpi(
+          route.outputAmount,
+          jupiterRef?.outputAmount ?? null
+        );
+        
+        const estimatedNpi = npiResult.npi;
+        // Rebate = 70% du NPI réel (partagé avec l'utilisateur)
         const estimatedRebate = Math.floor(estimatedNpi * 0.7);
+        
+        logger.info("useNativeSwap", "Dynamic NPI calculation", {
+          nativeOutput: route.outputAmount,
+          jupiterOutput: jupiterRef?.outputAmount ?? "unavailable",
+          npi: estimatedNpi,
+          npiBps: npiResult.npiBps,
+          npiSource: npiResult.source,
+          rebate: estimatedRebate,
+        });
 
         // Calculer les rebates avec boost
         const baseRebate = estimatedRebate;

@@ -81,8 +81,8 @@ const SERUM_MARKET_CACHE_TTL_MS = 5 * 60 * 1000;
 // Objectif: éviter de refaire les mêmes appels RPC/API à chaque rafraîchissement.
 // TTL court pour rester safe sur mainnet (les pools peuvent changer, mais rarement à l'échelle de quelques secondes).
 const DEX_ACCOUNTS_CACHE_MAX_ENTRIES = 750;
-const DEX_ACCOUNTS_POSITIVE_TTL_MS_DEFAULT = 60_000;
-const DEX_ACCOUNTS_NEGATIVE_TTL_MS_DEFAULT = 120_000;
+const DEX_ACCOUNTS_POSITIVE_TTL_MS_DEFAULT = 30_000; // 30s - réduit pour données plus fraîches
+const DEX_ACCOUNTS_NEGATIVE_TTL_MS_DEFAULT = 30_000; // 30s - réduit pour retenter plus tôt
 
 type DexAccountsCacheEntry = {
   timestamp: number;

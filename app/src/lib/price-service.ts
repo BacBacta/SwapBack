@@ -19,7 +19,7 @@ interface PriceCache {
 }
 
 const priceCache = new Map<string, PriceCache>();
-const CACHE_TTL_MS = 15_000; // 15 seconds
+const CACHE_TTL_MS = 5_000; // 5 seconds - réduit pour prix plus frais
 
 // Well-known token addresses
 const KNOWN_TOKENS: Record<string, string> = {
