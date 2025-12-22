@@ -398,9 +398,19 @@ export function EnhancedSwapInterface() {
   const currentInputAmount = swap.inputAmount;
   
   useEffect(() => {
+    console.log('🔍 [EnhancedSwapInterface] Route fetch effect:', {
+      inputTokenMint,
+      outputTokenMint,
+      currentInputAmount,
+      parsedAmount: parseFloat(currentInputAmount),
+      hasValidInputs: inputTokenMint && outputTokenMint && parseFloat(currentInputAmount) > 0,
+    });
+    
     if (inputTokenMint && outputTokenMint && parseFloat(currentInputAmount) > 0) {
+      console.log('✅ [EnhancedSwapInterface] Triggering debouncedFetchRoutes');
       debouncedFetchRoutes("input-change");
     } else {
+      console.log('❌ [EnhancedSwapInterface] Invalid inputs, clearing routes');
       // Clear routes if inputs are invalid
       clearRoutes();
       setHasSearchedRoute(false);

@@ -276,7 +276,15 @@ export const useSwapStore = create<SwapStore>()(
         fetchRoutes: async (options) => {
           const { swap, routingStrategy } = get();
           
+          console.log('🔍 [swapStore] fetchRoutes called', {
+            inputToken: swap.inputToken?.symbol,
+            outputToken: swap.outputToken?.symbol,
+            inputAmount: swap.inputAmount,
+            background: options?.background,
+          });
+          
           if (!swap.inputToken || !swap.outputToken || !swap.inputAmount) {
+            console.log('❌ [swapStore] Missing required fields, skipping fetch');
             return;
           }
 
@@ -308,7 +316,10 @@ export const useSwapStore = create<SwapStore>()(
             const slippageBps = Math.max(1, Math.floor(swap.slippageTolerance * 10000));
 
             // Call API route (uses Fly.io in production to avoid Vercel DNS issues)
-            const response = await fetch(getApiUrl(API_ENDPOINTS.quote), {
+            const apiUrl = getApiUrl(API_ENDPOINTS.quote);
+            console.log('🚀 [swapStore] Calling API:', apiUrl);
+            
+            const response = await fetch(apiUrl, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               cache: "no-store",
@@ -323,6 +334,8 @@ export const useSwapStore = create<SwapStore>()(
                 forceFresh: isBackground,
               }),
             });
+            
+            console.log('📥 [swapStore] API response status:', response.status);
 
             if (!response.ok) {
               const errorData = await response.json();
