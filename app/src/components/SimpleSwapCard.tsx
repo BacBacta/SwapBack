@@ -251,10 +251,11 @@ export function SimpleSwapCard() {
   }, [inputAmount, inputToken.decimals]);
 
   // Fetch quote via le ROUTER NATIF (pas Jupiter!)
+  // Note: Le wallet n'est PAS requis pour afficher les quotes (seulement pour exécuter)
   useEffect(() => {
     console.log('🔍 [SimpleSwapCard] Quote effect triggered:', {
       amountInBaseUnits,
-      publicKey: publicKey?.toBase58()?.slice(0, 8) + '...',
+      publicKey: publicKey?.toBase58()?.slice(0, 8) || 'not-connected',
       inputMint: inputToken.mint.slice(0, 8) + '...',
       outputMint: outputToken.mint.slice(0, 8) + '...',
     });
@@ -265,11 +266,7 @@ export function SimpleSwapCard() {
       return;
     }
     
-    if (!publicKey) {
-      console.log('❌ [SimpleSwapCard] No wallet connected, skipping quote fetch');
-      setQuote(null);
-      return;
-    }
+    // Wallet n'est plus requis pour les quotes - supprimé la vérification publicKey
 
     // Clear previous interval
     if (quoteRefreshIntervalRef.current) {
