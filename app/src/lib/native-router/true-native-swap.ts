@@ -424,85 +424,96 @@ export class TrueNativeSwap {
 
     // Browser fast-path: avoid heavy RPC account resolution for quotes.
     // On /app/swap we only need a live quote; dex accounts can be resolved lazily at execution time.
+    // Étend le fast-path pour tester TOUTES les venues via leurs API internes.
     if (typeof window !== "undefined") {
       const bpsRaw = typeof slippageBps === "number" && Number.isFinite(slippageBps) ? slippageBps : 50;
       const bps = Math.min(10_000, Math.max(0, Math.floor(bpsRaw)));
 
-      if (
-        venuesToResolve.includes("ORCA_WHIRLPOOL") &&
-        !this.isVenueTemporarilyDisabled("ORCA_WHIRLPOOL") &&
-        !DISABLED_BEST_ROUTE_VENUES.has("ORCA_WHIRLPOOL")
-      ) {
-        try {
-          const startTime = Date.now();
-          const response = await fetch(
-            `/api/dex/orca/quote?` +
-              new URLSearchParams({
-                inputMint: safeInputMint.toBase58(),
-                outputMint: safeOutputMint.toBase58(),
-                amount: amountIn.toString(),
-                slippageBps: bps.toString(),
-                forceFresh: "1",
-              }),
-            // Timeout réduit de 8s à 4s pour améliorer la latence perçue
-            { signal: AbortSignal.timeout(4000), cache: "no-store" }
-          );
+      // Définir les venues à tester via API interne (ordre de priorité)
+      const browserVenues: Array<{
+        id: SupportedVenue;
+        apiPath: string;
+        programId: PublicKey;
+      }> = [
+        { id: "ORCA_WHIRLPOOL", apiPath: "/api/dex/orca/quote", programId: DEX_PROGRAM_IDS.ORCA_WHIRLPOOL },
+        { id: "METEORA_DLMM", apiPath: "/api/dex/meteora/quote", programId: DEX_PROGRAM_IDS.METEORA_DLMM },
+        { id: "RAYDIUM_AMM", apiPath: "/api/dex/raydium/quote", programId: DEX_PROGRAM_IDS.RAYDIUM_AMM },
+        { id: "PHOENIX", apiPath: "/api/dex/phoenix/quote", programId: DEX_PROGRAM_IDS.PHOENIX },
+      ];
 
-          if (response.ok) {
-            const data = await response.json();
-            const outputAmount = Number(data.outputAmount ?? data.outAmount ?? 0);
-            const priceImpactBps = Number(data.priceImpactBps ?? 0);
-            const latencyMs = Date.now() - startTime;
-            if (Number.isFinite(outputAmount) && outputAmount > 0) {
-              quotes.push({
-                venue: "ORCA_WHIRLPOOL",
-                venueProgramId: DEX_PROGRAM_IDS.ORCA_WHIRLPOOL,
-                inputAmount: amountIn,
-                outputAmount,
-                priceImpactBps: Number.isFinite(priceImpactBps) ? priceImpactBps : 0,
-                accounts: {
-                  accounts: [],
-                  meta: {
-                    venue: "ORCA_WHIRLPOOL",
-                    poolAddress: typeof data.pool === "string" ? data.pool : undefined,
+      // Fetch toutes les venues en parallèle
+      const venuePromises = browserVenues
+        .filter(v => 
+          venuesToResolve.includes(v.id) && 
+          !this.isVenueTemporarilyDisabled(v.id) && 
+          !DISABLED_BEST_ROUTE_VENUES.has(v.id)
+        )
+        .map(async (venue) => {
+          try {
+            const startTime = Date.now();
+            const response = await fetch(
+              `${venue.apiPath}?` +
+                new URLSearchParams({
+                  inputMint: safeInputMint.toBase58(),
+                  outputMint: safeOutputMint.toBase58(),
+                  amount: amountIn.toString(),
+                  slippageBps: bps.toString(),
+                }),
+              { signal: AbortSignal.timeout(5000), cache: "no-store" }
+            );
+
+            if (response.ok) {
+              const data = await response.json();
+              const outputAmount = Number(data.outputAmount ?? data.outAmount ?? 0);
+              const priceImpactBps = Number(data.priceImpactBps ?? 0);
+              const latencyMs = Date.now() - startTime;
+              if (Number.isFinite(outputAmount) && outputAmount > 0) {
+                return {
+                  venue: venue.id,
+                  venueProgramId: venue.programId,
+                  inputAmount: amountIn,
+                  outputAmount,
+                  priceImpactBps: Number.isFinite(priceImpactBps) ? priceImpactBps : 0,
+                  accounts: {
+                    accounts: [],
+                    meta: {
+                      venue: venue.id,
+                      poolAddress: typeof data.pool === "string" ? data.pool : undefined,
+                    },
                   },
-                },
-                latencyMs,
-              });
-              quotes.sort((a, b) => b.outputAmount - a.outputAmount);
-              return quotes;
+                  latencyMs,
+                } as NativeVenueQuote;
+              }
+            } else if (response.status >= 500) {
+              this.markVenueUnavailable(venue.id, 30_000);
             }
-          } else {
-            const errorText = await response.text().catch(() => "");
-            logger.warn("TrueNativeSwap", "Browser fast-quote Orca failed", {
-              status: response.status,
-              error: errorText.slice(0, 200),
-            });
-            // Circuit breaker: désactiver temporairement Orca sur erreurs 5xx
-            if (response.status >= 500 && response.status < 600) {
-              // 30 secondes de cooldown sur erreur serveur
-              this.markVenueUnavailable("ORCA_WHIRLPOOL", 30_000);
-              logger.info("TrueNativeSwap", "Orca temporarily disabled (circuit breaker)", {
-                status: response.status,
-                cooldownMs: 30_000,
-              });
+          } catch (err) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            if (errMsg.includes("Timeout") || errMsg.includes("abort")) {
+              this.markVenueUnavailable(venue.id, 15_000);
             }
           }
-        } catch (err) {
-          const errMsg = err instanceof Error ? err.message : String(err);
-          logger.warn("TrueNativeSwap", "Browser fast-quote Orca exception", {
-            error: errMsg,
-          });
-          // Circuit breaker: timeout ou erreur réseau = désactiver 15 secondes
-          if (errMsg.includes("Timeout") || errMsg.includes("abort") || errMsg.includes("network")) {
-            this.markVenueUnavailable("ORCA_WHIRLPOOL", 15_000);
-            logger.info("TrueNativeSwap", "Orca temporarily disabled (timeout/network)", {
-              cooldownMs: 15_000,
-            });
-          }
-        }
+          return null;
+        });
+
+      const venueResults = await Promise.all(venuePromises);
+      for (const result of venueResults) {
+        if (result) quotes.push(result);
       }
-      // If fast-path fails, fall back to the full resolver (may still work on some RPCs).
+
+      // Si on a des quotes, les retourner triées
+      if (quotes.length > 0) {
+        quotes.sort((a, b) => b.outputAmount - a.outputAmount);
+        logger.info("TrueNativeSwap", "Browser fast-path quotes", {
+          count: quotes.length,
+          best: quotes[0]?.venue,
+          bestOutput: quotes[0]?.outputAmount,
+        });
+        return quotes;
+      }
+
+      // Sinon, on continue vers le full resolver (fallback)
+      logger.warn("TrueNativeSwap", "Browser fast-path returned no quotes, trying full resolver");
     }
 
     // Résoudre uniquement les comptes des venues pertinentes.
