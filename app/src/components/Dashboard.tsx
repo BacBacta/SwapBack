@@ -19,9 +19,9 @@ import { createClaimNpiTransaction } from "@/lib/claimNpi";
 import { VolumeChart, ActivityChart } from "./Charts";
 import OnChainHistoryWidget from "./OnChainHistoryWidget";
 
-// Lazy load EnhancedSwapInterface to avoid webpack issues
-const EnhancedSwapInterface = dynamic(
-  () => import("@/components/EnhancedSwapInterface").then(mod => ({ default: mod.EnhancedSwapInterface })),
+// Lazy load SimpleSwapCard - router natif exclusivement
+const SimpleSwapCard = dynamic(
+  () => import("@/components/SimpleSwapCard").then(mod => ({ default: mod.SimpleSwapCard })),
   { 
     ssr: false,
     loading: () => (
@@ -340,7 +340,7 @@ export const Dashboard = () => {
       {/* Content based on active tab */}
       {activeTab === "dca" && (
         <div className="space-y-6">
-          <EnhancedSwapInterface />
+          <SimpleSwapCard />
         </div>
       )}
 

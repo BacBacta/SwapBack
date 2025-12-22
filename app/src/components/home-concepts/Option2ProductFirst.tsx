@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useGlobalState } from "@/hooks/useGlobalState";
 import dynamic from "next/dynamic";
 
-const EnhancedSwapInterface = dynamic(
-  () => import("@/components/EnhancedSwapInterface").then(mod => ({ default: mod.EnhancedSwapInterface })),
+const SimpleSwapCard = dynamic(
+  () => import("@/components/SimpleSwapCard").then(mod => ({ default: mod.SimpleSwapCard })),
   { ssr: false }
 );
 
@@ -81,7 +81,7 @@ export default function Option2ProductFirst() {
               <span className="terminal-text text-sm tracking-wider text-[var(--muted)]">LIVE_INTERFACE</span>
               <span className="w-2 h-2 bg-[var(--secondary)] rounded-full animate-pulse"></span>
             </div>
-            <EnhancedSwapInterface />
+            <SimpleSwapCard />
           </div>
         </div>
       </div>

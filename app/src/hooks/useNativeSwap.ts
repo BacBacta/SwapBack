@@ -221,16 +221,16 @@ export function useNativeSwap() {
 
   /**
    * Obtenir une quote de swap via les venues natives
+   * Note: Le wallet n'est PAS requis pour obtenir une quote (seulement pour exécuter)
    */
   const getSwapQuote = useCallback(
     async (
       params: NativeSwapParams,
       userBoostBps: number = 0
     ): Promise<NativeSwapQuote | null> => {
-      if (!publicKey) {
-        setError("Veuillez connecter votre wallet");
-        return null;
-      }
+      // Wallet n'est pas requis pour les quotes - seulement pour l'exécution
+      // On utilise une clé publique de placeholder si pas connecté
+      const userPubkey = publicKey ?? new PublicKey("11111111111111111111111111111111");
 
       setQuoteLoading(true);
       setError(null);
@@ -277,7 +277,7 @@ export function useNativeSwap() {
           amountIn: params.amount,
           minAmountOut: 0,
           slippageBps,
-          userPublicKey: publicKey,
+          userPublicKey: userPubkey,
         });
 
         if (!route || route.allQuotes.length === 0) {
