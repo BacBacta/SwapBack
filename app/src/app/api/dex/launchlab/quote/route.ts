@@ -107,12 +107,16 @@ export async function GET(request: NextRequest) {
 
   const SOL_MINT = 'So11111111111111111111111111111111111111112';
   
-  // LaunchLab typically pairs tokens against SOL
-  // Determine which token to look up (the non-SOL token)
-  const lookupMint = inputMint === SOL_MINT ? outputMint : inputMint;
+  // LaunchLab pairs tokens against SOL or USD1
+  // Determine which token to look up (use input mint first, then output)
+  const lookupMint = inputMint;
+  const fallbackLookupMint = outputMint;
 
   try {
     // Use DexScreener to find LaunchLab pools
+    let pairs: DexScreenerPair[] = [];
+    
+    // Try looking up by input mint first
     const response = await fetch(
       `https://api.dexscreener.com/tokens/v1/solana/${lookupMint}`,
       {
@@ -121,21 +125,40 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: "DexScreener API unavailable", status: response.status },
-        { status: 502, headers: responseHeaders }
-      );
+    if (response.ok) {
+      pairs = await response.json();
     }
 
-    const pairs: DexScreenerPair[] = await response.json();
+    // Filter for LaunchLab pools that match our pair
+    let launchlabPairs = pairs.filter(p => 
+      p.dexId === 'launchlab' && 
+      ((p.baseToken.address === inputMint && p.quoteToken.address === outputMint) ||
+       (p.baseToken.address === outputMint && p.quoteToken.address === inputMint))
+    );
 
-    // Filter for LaunchLab pools only
-    const launchlabPairs = pairs.filter(p => p.dexId === 'launchlab');
+    // If no match, try looking up by output mint
+    if (launchlabPairs.length === 0 && lookupMint !== fallbackLookupMint) {
+      const response2 = await fetch(
+        `https://api.dexscreener.com/tokens/v1/solana/${fallbackLookupMint}`,
+        {
+          headers: { Accept: 'application/json', 'User-Agent': 'SwapBack/1.0' },
+          signal: AbortSignal.timeout(8000),
+        }
+      );
+
+      if (response2.ok) {
+        const pairs2: DexScreenerPair[] = await response2.json();
+        launchlabPairs = pairs2.filter(p => 
+          p.dexId === 'launchlab' && 
+          ((p.baseToken.address === inputMint && p.quoteToken.address === outputMint) ||
+           (p.baseToken.address === outputMint && p.quoteToken.address === inputMint))
+        );
+      }
+    }
 
     if (launchlabPairs.length === 0) {
       return NextResponse.json(
-        { error: "No LaunchLab pool found for this token" },
+        { error: "No LaunchLab pool found for this token pair" },
         { status: 404, headers: responseHeaders }
       );
     }
@@ -147,7 +170,7 @@ export async function GET(request: NextRequest) {
       return currentLiq > bestLiq ? current : best;
     });
 
-    if (!bestPool.priceNative || !bestPool.liquidity) {
+    if (!bestPool.priceNative) {
       return NextResponse.json(
         { error: "Insufficient pool data from DexScreener" },
         { status: 404, headers: responseHeaders }
@@ -155,37 +178,40 @@ export async function GET(request: NextRequest) {
     }
 
     // Calculate quote based on price and direction
+    // priceNative = baseToken price in terms of quoteToken
     const priceNative = parseFloat(bestPool.priceNative);
     const inputDecimals = getTokenDecimals(inputMint);
     const outputDecimals = getTokenDecimals(outputMint);
 
+    // Determine if we're selling base (input is base) or buying base (input is quote)
+    const inputIsBase = bestPool.baseToken.address === inputMint;
+    
     let outputAmount: number;
-    let isBuying: boolean;
 
-    if (inputMint === SOL_MINT) {
-      // Buying token with SOL: divide by price (price is token/SOL)
-      const amountInSol = amountIn / Math.pow(10, inputDecimals);
-      const tokensOut = amountInSol / priceNative;
-      outputAmount = Math.floor(tokensOut * Math.pow(10, outputDecimals));
-      isBuying = true;
-    } else {
-      // Selling token for SOL: multiply by price
+    if (inputIsBase) {
+      // Selling base token for quote token: output = input * price
       const amountInTokens = amountIn / Math.pow(10, inputDecimals);
-      const solOut = amountInTokens * priceNative;
-      outputAmount = Math.floor(solOut * Math.pow(10, outputDecimals));
-      isBuying = false;
+      const quoteOut = amountInTokens * priceNative;
+      outputAmount = Math.floor(quoteOut * Math.pow(10, outputDecimals));
+    } else {
+      // Buying base token with quote token: output = input / price
+      const amountInQuote = amountIn / Math.pow(10, inputDecimals);
+      const baseOut = amountInQuote / priceNative;
+      outputAmount = Math.floor(baseOut * Math.pow(10, outputDecimals));
     }
 
     // Calculate price impact based on trade size vs liquidity
-    const liquidityUsd = bestPool.liquidity.usd || 1;
-    // Estimate trade value in USD (rough: assume SOL = $130)
-    const solPrice = 130;
-    const tradeValueUsd = inputMint === SOL_MINT 
-      ? (amountIn / Math.pow(10, inputDecimals)) * solPrice
-      : (outputAmount / Math.pow(10, outputDecimals)) * solPrice;
+    const liquidityUsd = bestPool.liquidity?.usd || 1000; // Default to $1000 if no liquidity data
+    // Estimate trade value in USD using priceUsd if available
+    const priceUsd = bestPool.priceUsd ? parseFloat(bestPool.priceUsd) : 0;
+    const tradeValueUsd = inputIsBase
+      ? (amountIn / Math.pow(10, inputDecimals)) * priceUsd
+      : (outputAmount / Math.pow(10, outputDecimals)) * priceUsd;
     
     // Price impact: larger trades relative to liquidity have more impact
-    const impactPercent = Math.min((tradeValueUsd / liquidityUsd) * 100, 50);
+    const impactPercent = liquidityUsd > 0 
+      ? Math.min((tradeValueUsd / liquidityUsd) * 100, 50) 
+      : 0.5; // Default 0.5% if no liquidity data
     const priceImpactBps = Math.floor(impactPercent * 100);
 
     // Apply price impact to output (reduce output for slippage)
@@ -196,12 +222,14 @@ export async function GET(request: NextRequest) {
 
     console.log('[LaunchLab] Quote:', {
       pool: bestPool.pairAddress,
+      baseToken: bestPool.baseToken.symbol,
+      quoteToken: bestPool.quoteToken.symbol,
       priceNative,
+      inputIsBase,
       inputAmount: amountIn,
       outputAmount: outputWithImpact,
       priceImpactBps,
       liquidityUsd,
-      isBuying,
     });
 
     return NextResponse.json({
@@ -215,6 +243,7 @@ export async function GET(request: NextRequest) {
       pool: bestPool.pairAddress,
       liquidity: liquidityUsd,
       source: 'launchlab-dexscreener',
+      venue: 'LAUNCHLAB',
       baseToken: bestPool.baseToken,
       quoteToken: bestPool.quoteToken,
     }, { headers: responseHeaders });
