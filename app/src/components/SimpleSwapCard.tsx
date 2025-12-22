@@ -289,63 +289,72 @@ export function SimpleSwapCard() {
       if (shouldShowLoading) setLoading(true);
 
       try {
-        console.log('📤 [SimpleSwapCard] Calling getSwapQuote with:', {
+        console.log('📤 [SimpleSwapCard] Calling direct DEX APIs with:', {
           inputMint: inputToken.mint,
           outputMint: outputToken.mint,
           amount: amountInBaseUnits,
           slippageBps: Math.round(slippage * 100),
         });
         
-        // Utiliser le router NATIF SwapBack
-        const nativeResult = await getSwapQuote(
-          {
-            inputMint: new PublicKey(inputToken.mint),
-            outputMint: new PublicKey(outputToken.mint),
-            amount: amountInBaseUnits,
-            slippageBps: Math.round(slippage * 100),
-          },
-          0 // userBoostBps - peut être récupéré depuis le statut de lock
-        );
-
-        console.log('📥 [SimpleSwapCard] getSwapQuote returned:', nativeResult);
-
-        if (nativeResult && !controller.signal.aborted && seq === quoteFetchSeqRef.current) {
-          const formatted = nativeResult.outputAmount / Math.pow(10, outputToken.decimals);
-          const minOutFormatted =
-            nativeResult.bestVenue === "RAYDIUM_AMM" &&
-            typeof nativeResult.selectedMinOutAmount === "number" &&
-            Number.isFinite(nativeResult.selectedMinOutAmount) &&
-            nativeResult.selectedMinOutAmount > 0
-              ? nativeResult.selectedMinOutAmount / Math.pow(10, outputToken.decimals)
-              : undefined;
-          const cashbackFormatted = nativeResult.boostedRebate / Math.pow(10, outputToken.decimals);
-          const npiFormatted = nativeResult.estimatedNpi / Math.pow(10, outputToken.decimals);
-
-          setQuote({
-            outputAmount: nativeResult.outputAmount.toString(),
-            outputAmountFormatted: formatted,
-            minOutAmountFormatted: minOutFormatted,
-            priceImpact: nativeResult.priceImpactBps / 100,
-            cashbackAmount: cashbackFormatted,
-            npiAmount: npiFormatted,
-            route: nativeResult.venues.map(v => v.venue),
-            venues: nativeResult.venues.map(v => v.venue),
-            isNativeRoute: true,
-            bestVenue: nativeResult.bestVenue,
-            dynamicSlippageBps: nativeResult.dynamicSlippageBps,
-            slippageBreakdown: nativeResult.slippageResult,
-          } as QuoteResult);
-          
-          // Mettre à jour le slippage avec la valeur dynamique calculée
-          // FIX: Toujours utiliser le slippage dynamique s'il est supérieur au slippage actuel
-          // Avant: on ne mettait à jour que si slippage était falsy (jamais le cas car initialisé à 1%)
-          if (nativeResult.dynamicSlippageBps) {
-            const dynamicSlippagePercent = nativeResult.dynamicSlippageBps / 100;
-            if (dynamicSlippagePercent > slippage) {
-              console.log("[SimpleSwapCard] Updating slippage from", slippage, "to", dynamicSlippagePercent, "(dynamic)");
-              setSlippage(dynamicSlippagePercent);
+        // ============================================================
+        // APPEL DIRECT AUX APIs DEX (contourne useNativeSwap)
+        // ============================================================
+        const slippageBps = Math.round(slippage * 100);
+        const venueApis = [
+          { id: 'ORCA_WHIRLPOOL', path: '/api/dex/orca/quote' },
+          { id: 'RAYDIUM_AMM', path: '/api/dex/raydium/quote' },
+          { id: 'PHOENIX', path: '/api/dex/phoenix/quote' },
+        ];
+        
+        const quotePromises = venueApis.map(async (venue) => {
+          try {
+            const url = `${venue.path}?inputMint=${inputToken.mint}&outputMint=${outputToken.mint}&amount=${amountInBaseUnits}&slippageBps=${slippageBps}`;
+            const response = await fetch(url, { 
+              signal: AbortSignal.timeout(6000),
+              cache: 'no-store'
+            });
+            if (response.ok) {
+              const data = await response.json();
+              const outputAmount = Number(data.outputAmount ?? data.outAmount ?? 0);
+              if (outputAmount > 0) {
+                return { venue: venue.id, outputAmount, data };
+              }
             }
+          } catch (e) {
+            console.warn(`[SimpleSwapCard] ${venue.id} quote failed:`, e);
           }
+          return null;
+        });
+        
+        const venueResults = await Promise.all(quotePromises);
+        const validQuotes = venueResults.filter(Boolean);
+        validQuotes.sort((a, b) => (b?.outputAmount ?? 0) - (a?.outputAmount ?? 0));
+        
+        console.log('📥 [SimpleSwapCard] Direct DEX quotes:', validQuotes);
+        
+        const bestQuote = validQuotes[0];
+        
+        if (bestQuote && !controller.signal.aborted && seq === quoteFetchSeqRef.current) {
+          const formatted = bestQuote.outputAmount / Math.pow(10, outputToken.decimals);
+          const priceImpactBps = bestQuote.data?.priceImpactBps ?? 0;
+          
+          setQuote({
+            outputAmount: bestQuote.outputAmount.toString(),
+            outputAmountFormatted: formatted,
+            minOutAmountFormatted: undefined,
+            priceImpact: priceImpactBps / 100,
+            cashbackAmount: formatted * 0.003, // 0.3% rebate estimate
+            npiAmount: 0,
+            route: [bestQuote.venue],
+            venues: validQuotes.map(q => q?.venue ?? ''),
+            isNativeRoute: true,
+            bestVenue: bestQuote.venue,
+            dynamicSlippageBps: slippageBps,
+            slippageBreakdown: undefined,
+          } as QuoteResult);
+        } else if (!controller.signal.aborted && seq === quoteFetchSeqRef.current) {
+          console.log('❌ [SimpleSwapCard] No valid quotes from any venue');
+          setQuote(null);
         }
       } catch (error) {
         console.error("❌ [SimpleSwapCard] Quote fetch error:", error);
