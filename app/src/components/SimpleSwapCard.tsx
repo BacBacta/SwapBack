@@ -303,8 +303,9 @@ export function SimpleSwapCard() {
         const slippageBps = Math.round(slippage * 100);
         const url = `/api/venue-quotes?inputMint=${inputToken.mint}&outputMint=${outputToken.mint}&amount=${amountInBaseUnits}&slippageBps=${slippageBps}`;
         
+        // Timeout 25s pour cold start Vercel + latence multi-DEX
         const response = await fetch(url, { 
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(25000),
           cache: 'no-store'
         });
         
@@ -377,10 +378,10 @@ export function SimpleSwapCard() {
 
     const timeout = setTimeout(fetchNativeQuote, 300);
 
-    // Auto-refresh quote: garde les prix dynamiques même sans interaction utilisateur
+    // Auto-refresh quote toutes les 30s (évite collision avec timeout 25s)
     quoteRefreshIntervalRef.current = setInterval(() => {
       void fetchNativeQuote();
-    }, 10_000);
+    }, 30_000);
 
     return () => {
       clearTimeout(timeout);
