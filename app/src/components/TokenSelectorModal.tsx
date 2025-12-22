@@ -35,6 +35,7 @@ interface Token {
   priceUSD?: number;
   verified?: boolean;
   tags?: string[];
+  source?: "jupiter-verified" | "jupiter-all" | "dexscreener" | "on-chain";
 }
 
 interface TokenSelectorModalProps {
@@ -173,29 +174,39 @@ export function TokenSelectorModal({
     setSearchError(null);
     try {
       // Use our internal API to search by address (avoids CORS)
+      // API tries: Jupiter verified → Jupiter all → DexScreener → On-chain
       const response = await fetch(getApiUrl(`${API_ENDPOINTS.tokens}?address=${encodeURIComponent(trimmedQuery)}`));
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.tokens?.length > 0) {
+          const source = data.source as Token["source"];
           setSearchedTokens(data.tokens.map((t: { address: string; symbol: string; name: string; decimals: number; logoURI?: string; verified?: boolean; tags?: string[] }) => ({
             address: t.address,
             symbol: t.symbol,
             name: t.name,
             decimals: t.decimals,
             logoURI: t.logoURI,
-            verified: t.verified !== false,
-            tags: t.tags || []
+            verified: source === "jupiter-verified",
+            tags: t.tags || [],
+            source,
           })));
-          setSearchError(null);
+          // Show info message for non-Jupiter tokens
+          if (source === "dexscreener") {
+            setSearchError(null); // Clear error, token found
+          } else if (source === "on-chain") {
+            setSearchError(null); // Token found on-chain
+          } else {
+            setSearchError(null);
+          }
         } else {
           setSearchedTokens([]);
-          setSearchError("Token non trouvé. Vérifiez l'adresse.");
+          setSearchError("Token non trouvé. Vérifiez que l'adresse est un mint SPL valide.");
         }
       }
     } catch (error) {
       console.warn('Token search failed:', error);
       setSearchedTokens([]);
-      setSearchError("Erreur de recherche. Réessayez.");
+      setSearchError("Erreur de recherche. Vérifiez votre connexion.");
     } finally {
       setIsSearching(false);
     }
@@ -558,7 +569,16 @@ export function TokenSelectorModal({
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-white truncate">{token.symbol}</span>
                           {isFavorite && <StarIconSolid className="w-4 h-4 text-yellow-500 flex-shrink-0" />}
-                          {!token.verified && (
+                          {!token.verified && token.source === "dexscreener" && (
+                            <span className="text-xs px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded" title="Trouvé via DexScreener">DexScreener</span>
+                          )}
+                          {!token.verified && token.source === "on-chain" && (
+                            <span className="text-xs px-1.5 py-0.5 bg-orange-500/20 text-orange-400 rounded" title="Métadonnées on-chain">On-chain</span>
+                          )}
+                          {!token.verified && token.source === "jupiter-all" && (
+                            <span className="text-xs px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 rounded" title="Non vérifié sur Jupiter">Non vérifié</span>
+                          )}
+                          {!token.verified && !token.source && (
                             <span className="text-xs px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 rounded">Non vérifié</span>
                           )}
                         </div>
@@ -611,7 +631,7 @@ export function TokenSelectorModal({
             <span className="text-xs text-gray-500">
               {filteredTokens.length} token{filteredTokens.length !== 1 ? 's' : ''} disponible{filteredTokens.length !== 1 ? 's' : ''}
             </span>
-            <span className="text-xs text-gray-600">Données: Jupiter API</span>
+            <span className="text-xs text-gray-600">Jupiter • DexScreener • On-chain</span>
           </div>
         </motion.div>
       </motion.div>

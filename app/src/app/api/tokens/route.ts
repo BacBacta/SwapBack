@@ -37,6 +37,101 @@ interface JupiterToken {
   tags?: string[];
 }
 
+interface DexScreenerPair {
+  chainId: string;
+  baseToken: { address: string; name: string; symbol: string };
+  quoteToken: { address: string; name: string; symbol: string };
+  priceUsd?: string;
+  liquidity?: { usd: number };
+  info?: { imageUrl?: string };
+}
+
+/**
+ * Fetch token from DexScreener API
+ * This catches tokens not on Jupiter (PumpSwap, new memecoins, etc.)
+ */
+async function fetchFromDexScreener(address: string): Promise<JupiterToken | null> {
+  try {
+    const response = await fetch(
+      `https://api.dexscreener.com/tokens/v1/solana/${address}`,
+      {
+        headers: { Accept: "application/json", "User-Agent": "SwapBack/1.0" },
+        signal: AbortSignal.timeout(5000),
+      }
+    );
+    if (!response.ok) return null;
+    
+    const pairs: DexScreenerPair[] = await response.json();
+    if (!pairs || pairs.length === 0) return null;
+    
+    // Find the pair where our address is the baseToken
+    const relevantPair = pairs.find(p => 
+      p.baseToken?.address?.toLowerCase() === address.toLowerCase()
+    );
+    
+    if (!relevantPair?.baseToken) return null;
+    
+    return {
+      address: relevantPair.baseToken.address,
+      symbol: relevantPair.baseToken.symbol || "UNKNOWN",
+      name: relevantPair.baseToken.name || "Unknown Token",
+      decimals: 9, // Default, will be updated by on-chain fetch if needed
+      logoURI: relevantPair.info?.imageUrl,
+      tags: ["dexscreener"],
+    };
+  } catch (e) {
+    console.warn("DexScreener fetch failed:", e);
+    return null;
+  }
+}
+
+/**
+ * Fetch token metadata from on-chain (Metaplex/SPL Token)
+ * Last resort for tokens not on any API
+ */
+async function fetchFromOnChain(address: string): Promise<JupiterToken | null> {
+  try {
+    const rpcUrl = process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_HELIUS_RPC_URL;
+    if (!rpcUrl) return null;
+    
+    // Fetch account info to verify it's a valid mint
+    const response = await fetch(rpcUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getAccountInfo",
+        params: [address, { encoding: "jsonParsed" }],
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    
+    if (!response.ok) return null;
+    const data = await response.json();
+    
+    if (!data.result?.value) return null;
+    
+    const accountData = data.result.value.data;
+    if (accountData?.program !== "spl-token") return null;
+    
+    const mintInfo = accountData.parsed?.info;
+    if (!mintInfo) return null;
+    
+    return {
+      address,
+      symbol: "???", // Unknown symbol
+      name: `Token ${address.slice(0, 8)}...`,
+      decimals: mintInfo.decimals || 9,
+      logoURI: undefined,
+      tags: ["on-chain", "unverified"],
+    };
+  } catch (e) {
+    console.warn("On-chain fetch failed:", e);
+    return null;
+  }
+}
+
 // Comprehensive token list with categories (real mainnet addresses)
 const FALLBACK_TOKENS: JupiterToken[] = [
   // Blue chips
@@ -127,10 +222,11 @@ export async function GET(request: NextRequest) {
 
     // Filter by address (supports partial match for better UX)
     if (address) {
-      // First try exact match
-      let found = tokens.find((t) => t.address === address);
+      // First try exact match in verified tokens
+      let found: JupiterToken | null = tokens.find((t) => t.address === address) || null;
+      let source = "jupiter-verified";
       
-      // If not found in strict list, try fetching from all tokens
+      // If not found in strict list, try fetching from Jupiter all tokens
       if (!found) {
         try {
           const allResponse = await fetch(`https://token.jup.ag/all`, {
@@ -139,27 +235,39 @@ export async function GET(request: NextRequest) {
           });
           if (allResponse.ok) {
             const allTokens: JupiterToken[] = await allResponse.json();
-            found = allTokens.find((t) => t.address === address);
-            if (found) {
-              return NextResponse.json({
-                success: true,
-                tokens: [{ ...found, verified: false, tags: found.tags || [] }],
-                total: 1,
-                source: "jupiter-all",
-              }, { headers: CORS_HEADERS });
-            }
+            found = allTokens.find((t) => t.address === address) || null;
+            if (found) source = "jupiter-all";
           }
         } catch {
           // Ignore errors for unverified token lookup
         }
       }
+      
+      // If still not found, try DexScreener (catches PumpSwap, new memecoins)
+      if (!found) {
+        console.log(`🔍 Token ${address} not on Jupiter, trying DexScreener...`);
+        found = await fetchFromDexScreener(address);
+        if (found) source = "dexscreener";
+      }
+      
+      // Last resort: fetch on-chain metadata
+      if (!found) {
+        console.log(`🔍 Token ${address} not on DexScreener, trying on-chain...`);
+        found = await fetchFromOnChain(address);
+        if (found) source = "on-chain";
+      }
 
       if (found) {
+        const isVerified = source === "jupiter-verified";
         return NextResponse.json({
           success: true,
-          tokens: [found],
+          tokens: [{ 
+            ...found, 
+            verified: isVerified,
+            tags: found.tags || (isVerified ? ["verified"] : ["unverified"]),
+          }],
           total: 1,
-          source: "jupiter-verified",
+          source,
         }, { headers: CORS_HEADERS });
       }
 
@@ -167,7 +275,7 @@ export async function GET(request: NextRequest) {
         success: true,
         tokens: [],
         total: 0,
-        message: "Token not found. Make sure the address is correct.",
+        message: "Token not found. Make sure the address is a valid Solana mint.",
       }, { headers: CORS_HEADERS });
     }
 
