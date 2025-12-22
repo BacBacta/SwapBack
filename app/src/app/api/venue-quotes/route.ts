@@ -104,11 +104,22 @@ export async function GET(request: NextRequest) {
   const quotes: VenueQuoteResult[] = [];
 
   // Fetch all quotes in parallel using INTERNAL APIs
-  const [raydiumResult, orcaResult, meteoraResult, phoenixResult, jupiterResult] = await Promise.allSettled([
+  // Now includes ALL venues: Raydium, Orca, Meteora, Phoenix, Lifinity, Saber
+  const [
+    raydiumResult, 
+    orcaResult, 
+    meteoraResult, 
+    phoenixResult, 
+    lifinityResult, 
+    saberResult,
+    jupiterResult
+  ] = await Promise.allSettled([
     fetchInternalQuote(baseUrl, 'raydium', inputMint, outputMint, amountNum, slippageBps),
     fetchInternalQuote(baseUrl, 'orca', inputMint, outputMint, amountNum, slippageBps),
     fetchInternalQuote(baseUrl, 'meteora', inputMint, outputMint, amountNum, slippageBps),
     fetchInternalQuote(baseUrl, 'phoenix', inputMint, outputMint, amountNum, slippageBps),
+    fetchInternalQuote(baseUrl, 'lifinity', inputMint, outputMint, amountNum, slippageBps),
+    fetchInternalQuote(baseUrl, 'saber', inputMint, outputMint, amountNum, slippageBps),
     fetchJupiterQuote(inputMint, outputMint, amountNum),
   ]);
 
@@ -117,6 +128,8 @@ export async function GET(request: NextRequest) {
     orca: orcaResult.status === 'fulfilled' ? orcaResult.value?.outputAmount : 'rejected',
     meteora: meteoraResult.status === 'fulfilled' ? meteoraResult.value?.outputAmount : 'rejected',
     phoenix: phoenixResult.status === 'fulfilled' ? phoenixResult.value?.outputAmount : 'rejected',
+    lifinity: lifinityResult.status === 'fulfilled' ? lifinityResult.value?.outputAmount : 'rejected',
+    saber: saberResult.status === 'fulfilled' ? saberResult.value?.outputAmount : 'rejected',
     jupiter: jupiterResult.status === 'fulfilled' ? jupiterResult.value?.outputAmount : 'rejected',
   });
 
@@ -135,6 +148,14 @@ export async function GET(request: NextRequest) {
 
   if (phoenixResult.status === 'fulfilled' && phoenixResult.value && phoenixResult.value.outputAmount > 0) {
     quotes.push(phoenixResult.value);
+  }
+
+  if (lifinityResult.status === 'fulfilled' && lifinityResult.value && lifinityResult.value.outputAmount > 0) {
+    quotes.push(lifinityResult.value);
+  }
+
+  if (saberResult.status === 'fulfilled' && saberResult.value && saberResult.value.outputAmount > 0) {
+    quotes.push(saberResult.value);
   }
 
   // Jupiter benchmark
@@ -195,7 +216,7 @@ function getBaseUrl(request: NextRequest): string {
 
 async function fetchInternalQuote(
   baseUrl: string,
-  venue: 'raydium' | 'orca' | 'meteora' | 'phoenix',
+  venue: 'raydium' | 'orca' | 'meteora' | 'phoenix' | 'lifinity' | 'saber',
   inputMint: string,
   outputMint: string,
   amount: number,
