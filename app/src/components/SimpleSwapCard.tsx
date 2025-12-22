@@ -761,19 +761,30 @@ export function SimpleSwapCard() {
               </motion.div>
             )}
 
-            {/* Indicateur Route Native */}
-            {quote && quote.isNativeRoute && (
+            {/* Indicateur Route - Afficher TOUJOURS les venues disponibles */}
+            {quote && quote.venues && quote.venues.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-gradient-to-r from-emerald-500/10 to-blue-500/10 border border-emerald-500/20 rounded-xl p-3"
+                className={`rounded-xl p-3 ${
+                  quote.isNativeRoute 
+                    ? 'bg-gradient-to-r from-emerald-500/10 to-blue-500/10 border border-emerald-500/20'
+                    : 'bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20'
+                }`}
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <Zap className="w-4 h-4 text-emerald-400" />
-                  <span className="text-sm font-medium text-emerald-400">Route Native SwapBack</span>
-                  {mevProtection && (
+                  <Zap className={`w-4 h-4 ${quote.isNativeRoute ? 'text-emerald-400' : 'text-blue-400'}`} />
+                  <span className={`text-sm font-medium ${quote.isNativeRoute ? 'text-emerald-400' : 'text-blue-400'}`}>
+                    {quote.isNativeRoute ? 'Route Native SwapBack' : `Route via ${quote.bestVenue || 'Jupiter'}`}
+                  </span>
+                  {quote.isNativeRoute && mevProtection && (
                     <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full">
                       🛡️ MEV Protected
+                    </span>
+                  )}
+                  {!quote.isNativeRoute && (
+                    <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full">
+                      Fallback
                     </span>
                   )}
                 </div>
