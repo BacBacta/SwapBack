@@ -738,11 +738,115 @@ export function useNativeSwap() {
           return null;
         }
 
-        // Gating oracle AVANT toute signature
-        if (!hasOracleForPair(safeInputMint.toBase58(), safeOutputMint.toBase58())) {
-          throw new Error(
-            "Cette paire n'est pas supportée par le swap natif (oracle manquant)."
-          );
+        // Vérifier si on a un oracle pour cette paire
+        const hasOracle = hasOracleForPair(safeInputMint.toBase58(), safeOutputMint.toBase58());
+        
+        // Si pas d'oracle, utiliser Jupiter comme fallback
+        if (!hasOracle) {
+          logger.info("useNativeSwap", "No oracle for pair, using Jupiter fallback", {
+            inputMint: safeInputMint.toBase58().slice(0, 8),
+            outputMint: safeOutputMint.toBase58().slice(0, 8),
+          });
+          
+          // Utiliser Jupiter via l'API /api/swap/quote
+          try {
+            params.onProgress?.('preparing');
+            
+            const slippageBps = params.slippageBps ?? SLIPPAGE_CONFIG.BASE_SLIPPAGE_BPS;
+            
+            // 1. Obtenir quote et transaction Jupiter
+            const quoteResponse = await fetch('/api/swap/quote', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                inputMint: safeInputMint.toBase58(),
+                outputMint: safeOutputMint.toBase58(),
+                amount: params.amount,
+                slippageBps,
+                userPublicKey: publicKey.toBase58(),
+              }),
+            });
+            
+            if (!quoteResponse.ok) {
+              const errorData = await quoteResponse.json().catch(() => ({}));
+              throw new Error(errorData.error || `Jupiter quote failed: ${quoteResponse.status}`);
+            }
+            
+            const quoteData = await quoteResponse.json();
+            
+            if (!quoteData.success || !quoteData.quote) {
+              throw new Error(quoteData.error || "Impossible d'obtenir une quote Jupiter");
+            }
+            
+            // 2. Obtenir la transaction swap
+            const swapResponse = await fetch('https://quote-api.jup.ag/v6/swap', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                quoteResponse: quoteData.quote,
+                userPublicKey: publicKey.toBase58(),
+                wrapAndUnwrapSol: true,
+                dynamicComputeUnitLimit: true,
+                prioritizationFeeLamports: 'auto',
+              }),
+            });
+            
+            if (!swapResponse.ok) {
+              const errorText = await swapResponse.text();
+              throw new Error(`Jupiter swap API error: ${errorText}`);
+            }
+            
+            const swapData = await swapResponse.json();
+            
+            if (!swapData.swapTransaction) {
+              throw new Error("Jupiter n'a pas retourné de transaction");
+            }
+            
+            // 3. Signer et envoyer la transaction
+            params.onProgress?.('signing');
+            
+            const swapTransactionBuf = Buffer.from(swapData.swapTransaction, 'base64');
+            const transaction = VersionedTransaction.deserialize(swapTransactionBuf);
+            
+            const signedTx = await signTransaction(transaction);
+            
+            params.onProgress?.('sending');
+            
+            // Envoyer via RPC
+            const rawTransaction = signedTx.serialize();
+            const txid = await connection.sendRawTransaction(rawTransaction, {
+              skipPreflight: true,
+              maxRetries: 3,
+            });
+            
+            params.onProgress?.('confirming');
+            
+            // Attendre confirmation
+            const confirmation = await connection.confirmTransaction(txid, 'confirmed');
+            
+            if (confirmation.value.err) {
+              throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+            }
+            
+            params.onProgress?.('confirmed');
+            
+            logger.info("useNativeSwap", "Jupiter fallback swap successful", {
+              signature: txid,
+              outputAmount: quoteData.quote.outAmount,
+            });
+            
+            return {
+              signature: txid,
+              venues: ['JUPITER'],
+              outputAmount: Number(quoteData.quote.outAmount),
+              priceImpactBps: Math.floor(parseFloat(quoteData.quote.priceImpactPct || '0') * 100),
+              rebateAmount: 0, // Pas de rebate pour Jupiter fallback
+            };
+          } catch (jupError) {
+            const errorMsg = jupError instanceof Error ? jupError.message : String(jupError);
+            logger.error("useNativeSwap", "Jupiter fallback failed", { error: errorMsg });
+            throw new Error(`Swap impossible: ${errorMsg}`);
+          }
         }
 
         logger.info("useNativeSwap", "🔥 Executing TRUE native swap (direct DEX CPI)", {
