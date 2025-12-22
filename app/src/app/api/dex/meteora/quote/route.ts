@@ -19,6 +19,26 @@ const NO_STORE_HEADERS: Record<string, string> = {
   Pragma: "no-cache",
 };
 
+// Known high-liquidity Meteora DLMM pools for major pairs
+// This avoids the slow fetch of all 10,000+ pools from the API
+const KNOWN_METEORA_POOLS: Record<string, string> = {
+  // SOL/USDC pools (most liquid)
+  'So11111111111111111111111111111111111111112:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 'FoSDw2L5DmTuQTFe55gWPDXf88euaxAEKFre74CnvQbX',
+  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v:So11111111111111111111111111111111111111112': 'FoSDw2L5DmTuQTFe55gWPDXf88euaxAEKFre74CnvQbX',
+  // SOL/USDT
+  'So11111111111111111111111111111111111111112:Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': '6EdpDdvowKUTvQ3Y8mWrVgWKMZ2nj6mxhgagFqEJNDEn',
+  'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB:So11111111111111111111111111111111111111112': '6EdpDdvowKUTvQ3Y8mWrVgWKMZ2nj6mxhgagFqEJNDEn',
+  // USDC/USDT
+  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v:Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': 'ARwi1S4DaiTG5DX7S4M4ZsrXqpMD1MrTmbu9ue2tpmEq',
+  'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 'ARwi1S4DaiTG5DX7S4M4ZsrXqpMD1MrTmbu9ue2tpmEq',
+  // JUP/SOL
+  'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN:So11111111111111111111111111111111111111112': '6shHmqVs4d9qwReVDPqFKNJJLKVm8k1VoLYkpoKq4WjD',
+  'So11111111111111111111111111111111111111112:JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN': '6shHmqVs4d9qwReVDPqFKNJJLKVm8k1VoLYkpoKq4WjD',
+  // JUP/USDC
+  'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': '6U49JHvkSLdzVDaFTidLR5VD8qsLxNMorr6CbLzrDYQ5',
+  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v:JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN': '6U49JHvkSLdzVDaFTidLR5VD8qsLxNMorr6CbLzrDYQ5',
+};
+
 function getAllowedOrigins(): string[] {
   const raw = process.env.ALLOWED_ORIGIN || "";
   return raw
@@ -102,50 +122,58 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Si pairAddress n'est pas fourni, on découvre le pool via l'API Meteora
-  // On sélectionne le pool avec la plus haute liquidité pour de meilleurs quotes
+  // Si pairAddress n'est pas fourni, on utilise d'abord les pools connus
+  // puis on fallback sur l'API Meteora
   if (!pairAddress) {
-    try {
-      const pairsResponse = await fetch(
-        `https://dlmm-api.meteora.ag/pair/all`,
-        { signal: AbortSignal.timeout(8000) }
-      );
-      if (pairsResponse.ok) {
-        const pairs = await pairsResponse.json();
-        // Find ALL matching pools for this pair
-        const matchingPools = pairs.filter((p: any) => 
-          (p.mint_x === inputMint && p.mint_y === outputMint) ||
-          (p.mint_y === inputMint && p.mint_x === outputMint)
+    // 1. Check known pools first (fast path)
+    const pairKey = `${inputMint}:${outputMint}`;
+    if (KNOWN_METEORA_POOLS[pairKey]) {
+      pairAddress = KNOWN_METEORA_POOLS[pairKey];
+      console.log(`[Meteora] Using known pool: ${pairAddress}`);
+    } else {
+      // 2. Fallback to API discovery (slow path)
+      try {
+        const pairsResponse = await fetch(
+          `https://dlmm-api.meteora.ag/pair/all`,
+          { signal: AbortSignal.timeout(8000) }
         );
-        
-        if (matchingPools.length > 0) {
-          // Sort by liquidity (descending) and pick the most liquid pool
-          const sortedPools = matchingPools.sort((a: any, b: any) => {
-            const liqA = parseFloat(a.liquidity || '0');
-            const liqB = parseFloat(b.liquidity || '0');
-            return liqB - liqA;
-          });
+        if (pairsResponse.ok) {
+          const pairs = await pairsResponse.json();
+          // Find ALL matching pools for this pair
+          const matchingPools = pairs.filter((p: any) => 
+            (p.mint_x === inputMint && p.mint_y === outputMint) ||
+            (p.mint_y === inputMint && p.mint_x === outputMint)
+          );
           
-          // Try pools in order of liquidity until we find one that works
-          // Start with the top 3 most liquid pools
-          for (const pool of sortedPools.slice(0, 3)) {
-            const liq = parseFloat(pool.liquidity || '0');
-            if (liq > 0.1) { // Minimum liquidity threshold
-              pairAddress = pool.address;
-              console.log(`[Meteora] Selected pool ${pool.address} with liquidity ${liq}`);
-              break;
+          if (matchingPools.length > 0) {
+            // Sort by liquidity (descending) and pick the most liquid pool
+            const sortedPools = matchingPools.sort((a: any, b: any) => {
+              const liqA = parseFloat(a.liquidity || '0');
+              const liqB = parseFloat(b.liquidity || '0');
+              return liqB - liqA;
+            });
+          
+            // Try pools in order of liquidity until we find one that works
+            // Start with the top 3 most liquid pools
+            for (const pool of sortedPools.slice(0, 3)) {
+              const liq = parseFloat(pool.liquidity || '0');
+              if (liq > 0.1) { // Minimum liquidity threshold
+                pairAddress = pool.address;
+                console.log(`[Meteora] Selected pool ${pool.address} with liquidity ${liq}`);
+                break;
+              }
+            }
+          
+            // If no pool meets threshold, use the most liquid one anyway
+            if (!pairAddress && sortedPools[0]?.address) {
+              pairAddress = sortedPools[0].address;
+              console.log(`[Meteora] Using best available pool ${pairAddress}`);
             }
           }
-          
-          // If no pool meets threshold, use the most liquid one anyway
-          if (!pairAddress && sortedPools[0]?.address) {
-            pairAddress = sortedPools[0].address;
-            console.log(`[Meteora] Using best available pool ${pairAddress}`);
-          }
         }
+      } catch (e) {
+        console.warn("[Meteora Quote] Pool discovery failed:", e);
       }
-    } catch (e) {
-      console.warn("[Meteora Quote] Pool discovery failed:", e);
     }
     
     if (!pairAddress) {
