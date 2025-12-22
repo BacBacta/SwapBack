@@ -136,14 +136,15 @@ export async function GET(request: NextRequest) {
 
   const quotes: VenueQuoteResult[] = [];
 
-  // Fetch all quotes in parallel (including new venues: Saber, Lifinity)
-  const [raydiumResult, orcaResult, meteoraResult, phoenixResult, saberResult, lifinityResult, jupiterResult] = await Promise.allSettled([
+  // Fetch all quotes in parallel (including new venues: Saber, Lifinity, PumpSwap)
+  const [raydiumResult, orcaResult, meteoraResult, phoenixResult, saberResult, lifinityResult, pumpSwapResult, jupiterResult] = await Promise.allSettled([
     fetchRaydiumQuote(inputMint, outputMint, amountNum),
     fetchOrcaQuote(inputMint, outputMint, amountNum),
     fetchMeteoraQuote(inputMint, outputMint, amountNum),
     fetchPhoenixQuote(inputMint, outputMint, amountNum),
     fetchSaberQuote(inputMint, outputMint, amountNum),
     fetchLifinityQuote(inputMint, outputMint, amountNum),
+    fetchPumpSwapQuote(inputMint, outputMint, amountNum),
     fetchJupiterQuote(inputMint, outputMint, amountNum),
   ]);
 
@@ -154,6 +155,7 @@ export async function GET(request: NextRequest) {
     phoenix: phoenixResult.status === 'fulfilled' ? phoenixResult.value?.outputAmount : 'rejected',
     saber: saberResult.status === 'fulfilled' ? saberResult.value?.outputAmount : 'rejected',
     lifinity: lifinityResult.status === 'fulfilled' ? lifinityResult.value?.outputAmount : 'rejected',
+    pumpswap: pumpSwapResult.status === 'fulfilled' ? pumpSwapResult.value?.outputAmount : 'rejected',
     jupiter: jupiterResult.status === 'fulfilled' ? jupiterResult.value?.outputAmount : 'rejected',
   });
 
@@ -180,6 +182,10 @@ export async function GET(request: NextRequest) {
 
   if (lifinityResult.status === 'fulfilled' && lifinityResult.value && lifinityResult.value.outputAmount > 0) {
     quotes.push(lifinityResult.value);
+  }
+
+  if (pumpSwapResult.status === 'fulfilled' && pumpSwapResult.value && pumpSwapResult.value.outputAmount > 0) {
+    quotes.push(pumpSwapResult.value);
   }
 
   // Jupiter benchmark (for comparison, NOT added to native quotes)
@@ -830,4 +836,148 @@ async function fetchLifinityQuote(
     error: 'Quote failed',
     source: 'api',
   };
+}
+
+// ============================================================================
+// PUMPSWAP QUOTE - Uses DexScreener API for pump.fun AMM pools
+// NO artificial spread applied - DexScreener provides real-time data
+// Program ID: pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+// @see https://docs.dexscreener.com/api/reference
+// ============================================================================
+
+interface DexScreenerPair {
+  chainId: string;
+  dexId: string;
+  pairAddress: string;
+  baseToken: { address: string; name: string; symbol: string };
+  quoteToken: { address: string; name: string; symbol: string };
+  priceNative: string;
+  priceUsd?: string;
+  liquidity?: { usd: number; base: number; quote: number };
+}
+
+async function fetchPumpSwapQuote(
+  inputMint: string,
+  outputMint: string,
+  amountIn: number
+): Promise<VenueQuoteResult> {
+  const startTime = Date.now();
+  
+  // PumpSwap typically pairs tokens against SOL
+  const SOL_MINT = 'So11111111111111111111111111111111111111112';
+  
+  // Determine which token to look up (the non-SOL token)
+  const lookupMint = inputMint === SOL_MINT ? outputMint : inputMint;
+  
+  try {
+    // Use DexScreener to find PumpSwap pools
+    const response = await fetch(
+      `https://api.dexscreener.com/tokens/v1/solana/${lookupMint}`,
+      {
+        headers: { Accept: 'application/json', 'User-Agent': 'SwapBack/1.0' },
+        signal: AbortSignal.timeout(5000),
+      }
+    );
+    
+    if (!response.ok) {
+      return {
+        venue: 'PUMPSWAP',
+        outputAmount: 0,
+        priceImpactBps: 0,
+        latencyMs: Date.now() - startTime,
+        error: 'DexScreener API unavailable',
+        source: 'api',
+      };
+    }
+    
+    const pairs: DexScreenerPair[] = await response.json();
+    
+    // Filter for PumpSwap pools only
+    const pumpSwapPairs = pairs.filter(p => p.dexId === 'pumpswap');
+    
+    if (pumpSwapPairs.length === 0) {
+      return {
+        venue: 'PUMPSWAP',
+        outputAmount: 0,
+        priceImpactBps: 0,
+        latencyMs: Date.now() - startTime,
+        error: 'No PumpSwap pool found',
+        source: 'api',
+      };
+    }
+    
+    // Find the best pool (highest liquidity)
+    const bestPool = pumpSwapPairs.reduce((best, current) => {
+      const currentLiq = current.liquidity?.usd || 0;
+      const bestLiq = best.liquidity?.usd || 0;
+      return currentLiq > bestLiq ? current : best;
+    });
+    
+    if (!bestPool.priceNative || !bestPool.liquidity) {
+      return {
+        venue: 'PUMPSWAP',
+        outputAmount: 0,
+        priceImpactBps: 0,
+        latencyMs: Date.now() - startTime,
+        error: 'Insufficient pool data',
+        source: 'api',
+      };
+    }
+    
+    // Calculate quote based on price and direction
+    const priceNative = parseFloat(bestPool.priceNative);
+    const inputDecimals = getTokenDecimals(inputMint);
+    const outputDecimals = getTokenDecimals(outputMint);
+    
+    let outputAmount: number;
+    
+    if (inputMint === SOL_MINT) {
+      // Buying token with SOL: divide by price
+      // amountIn is in lamports, convert to SOL first
+      const amountInSol = amountIn / Math.pow(10, inputDecimals);
+      const tokensOut = amountInSol / priceNative;
+      outputAmount = Math.floor(tokensOut * Math.pow(10, outputDecimals));
+    } else {
+      // Selling token for SOL: multiply by price
+      const amountInTokens = amountIn / Math.pow(10, inputDecimals);
+      const solOut = amountInTokens * priceNative;
+      outputAmount = Math.floor(solOut * Math.pow(10, outputDecimals));
+    }
+    
+    // Calculate price impact based on trade size vs liquidity
+    const tradeValueUsd = (amountIn / Math.pow(10, inputDecimals)) * 
+      (inputMint === SOL_MINT ? 127 : parseFloat(bestPool.priceUsd || '0'));
+    const liquidityUsd = bestPool.liquidity.usd || 1;
+    const impactBps = Math.min(Math.floor((tradeValueUsd / liquidityUsd) * 10000), 1000);
+    
+    // Apply price impact to output
+    const outputWithImpact = Math.floor(outputAmount * (1 - impactBps / 10000));
+    
+    console.log('[PUMPSWAP] Quote:', {
+      pool: bestPool.pairAddress,
+      priceNative,
+      amountIn,
+      outputAmount: outputWithImpact,
+      impactBps,
+      liquidityUsd,
+    });
+    
+    return {
+      venue: 'PUMPSWAP',
+      outputAmount: outputWithImpact,
+      priceImpactBps: impactBps,
+      latencyMs: Date.now() - startTime,
+      source: 'api',
+    };
+  } catch (e) {
+    console.log('[PUMPSWAP] Error:', e);
+    return {
+      venue: 'PUMPSWAP',
+      outputAmount: 0,
+      priceImpactBps: 0,
+      latencyMs: Date.now() - startTime,
+      error: e instanceof Error ? e.message : 'Quote failed',
+      source: 'api',
+    };
+  }
 }

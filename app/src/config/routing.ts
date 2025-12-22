@@ -26,7 +26,8 @@ export type SupportedVenue =
   | "PHOENIX"
   | "LIFINITY"
   | "SANCTUM"
-  | "SABER";
+  | "SABER"
+  | "PUMPSWAP";
 
 export interface VenueConfig {
   /** Identifiant unique de la venue */
@@ -124,6 +125,7 @@ export const DEX_PROGRAM_IDS = {
   LIFINITY: new PublicKey("EewxydAPCCVuNEyrVN68PuSYdQ7wKn27V9Gjeoi8dy3S"),
   SANCTUM: new PublicKey("5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx"),
   SABER: new PublicKey("SSwpkEEcbUqx4vtoEByFjSkhKdCT862DNVb52nZg1UZ"),
+  PUMPSWAP: new PublicKey("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"),
 } as const;
 
 // ============================================================================
@@ -227,6 +229,16 @@ export const VENUE_CONFIGS: VenueConfig[] = [
     feeBps: 10, // 0.1%
     quotePriority: 8,
     notes: "LST swaps only",
+  },
+  {
+    id: "PUMPSWAP",
+    displayName: "PumpSwap",
+    programId: DEX_PROGRAM_IDS.PUMPSWAP,
+    enabled: true,
+    hasQuoteAPI: true, // Via DexScreener
+    feeBps: 100, // 1% - pump.fun AMM fee
+    quotePriority: 9,
+    notes: "Pump.fun AMM for memecoins, uses DexScreener for quotes",
   },
 ];
 
