@@ -89,17 +89,46 @@ export async function GET(request: NextRequest) {
   const inputMint = searchParams.get("inputMint");
   const outputMint = searchParams.get("outputMint");
   const amount = searchParams.get("amount");
-  const pairAddress = searchParams.get("pairAddress");
+  let pairAddress = searchParams.get("pairAddress");
   const slippageBpsParam = searchParams.get("slippageBps");
 
-  if (!inputMint || !outputMint || !amount || !pairAddress) {
+  if (!inputMint || !outputMint || !amount) {
     return NextResponse.json(
       {
         error:
-          "Missing required parameters: inputMint, outputMint, amount, pairAddress",
+          "Missing required parameters: inputMint, outputMint, amount",
       },
       { status: 400, headers: responseHeaders }
     );
+  }
+
+  // Si pairAddress n'est pas fourni, on découvre le pool via l'API Meteora
+  if (!pairAddress) {
+    try {
+      const pairsResponse = await fetch(
+        `https://dlmm-api.meteora.ag/pair/all`,
+        { signal: AbortSignal.timeout(5000) }
+      );
+      if (pairsResponse.ok) {
+        const pairs = await pairsResponse.json();
+        const matchingPool = pairs.find((p: any) => 
+          (p.mint_x === inputMint && p.mint_y === outputMint) ||
+          (p.mint_y === inputMint && p.mint_x === outputMint)
+        );
+        if (matchingPool?.address) {
+          pairAddress = matchingPool.address;
+        }
+      }
+    } catch (e) {
+      console.warn("[Meteora Quote] Pool discovery failed:", e);
+    }
+    
+    if (!pairAddress) {
+      return NextResponse.json(
+        { error: "No Meteora DLMM pool found for this pair" },
+        { status: 404, headers: responseHeaders }
+      );
+    }
   }
 
   const amountIn = Number(amount);
