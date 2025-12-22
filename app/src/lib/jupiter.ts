@@ -128,54 +128,74 @@ export class JupiterService {
     });
 
     let response: Response;
+    
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
 
-    if (isBrowser) {
-      // Browser: use POST to Next.js API proxy to avoid CORS
-      response = await fetch('/api/swap/quote', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json' 
-        },
-        body: JSON.stringify({
-          inputMint: params.inputMint,
-          outputMint: params.outputMint,
-          amount: params.amount,
-          slippageBps: params.slippageBps ?? 50,
-          swapMode: params.swapMode ?? 'ExactIn',
-          onlyDirectRoutes: params.onlyDirectRoutes,
-          asLegacyTransaction: params.asLegacyTransaction,
-          maxAccounts: params.maxAccounts,
-        }),
-      });
-    } else {
-      // Server-side: direct GET to Jupiter API (public.jupiterapi.com resolves better)
-      const url = new URL('https://public.jupiterapi.com/quote');
-      url.searchParams.set('inputMint', params.inputMint);
-      url.searchParams.set('outputMint', params.outputMint);
-      url.searchParams.set('amount', params.amount.toString());
-      url.searchParams.set('slippageBps', (params.slippageBps ?? 50).toString());
-      url.searchParams.set('swapMode', params.swapMode ?? 'ExactIn');
-      
-      if (params.onlyDirectRoutes !== undefined) {
-        url.searchParams.set('onlyDirectRoutes', params.onlyDirectRoutes.toString());
-      }
-      if (params.asLegacyTransaction !== undefined) {
-        url.searchParams.set('asLegacyTransaction', params.asLegacyTransaction.toString());
-      }
-      if (params.maxAccounts !== undefined) {
-        url.searchParams.set('maxAccounts', params.maxAccounts.toString());
-      }
+    try {
+      if (isBrowser) {
+        // Browser: use POST to Next.js API proxy to avoid CORS
+        console.log('🔍 [JupiterService] Fetching quote via /api/swap/quote');
+        response = await fetch('/api/swap/quote', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json' 
+          },
+          body: JSON.stringify({
+            inputMint: params.inputMint,
+            outputMint: params.outputMint,
+            amount: params.amount,
+            slippageBps: params.slippageBps ?? 50,
+            swapMode: params.swapMode ?? 'ExactIn',
+            onlyDirectRoutes: params.onlyDirectRoutes,
+            asLegacyTransaction: params.asLegacyTransaction,
+            maxAccounts: params.maxAccounts,
+          }),
+          signal: controller.signal,
+        });
+        console.log('🔍 [JupiterService] Response status:', response.status);
+      } else {
+        // Server-side: direct GET to Jupiter API (public.jupiterapi.com resolves better)
+        const url = new URL('https://public.jupiterapi.com/quote');
+        url.searchParams.set('inputMint', params.inputMint);
+        url.searchParams.set('outputMint', params.outputMint);
+        url.searchParams.set('amount', params.amount.toString());
+        url.searchParams.set('slippageBps', (params.slippageBps ?? 50).toString());
+        url.searchParams.set('swapMode', params.swapMode ?? 'ExactIn');
+        
+        if (params.onlyDirectRoutes !== undefined) {
+          url.searchParams.set('onlyDirectRoutes', params.onlyDirectRoutes.toString());
+        }
+        if (params.asLegacyTransaction !== undefined) {
+          url.searchParams.set('asLegacyTransaction', params.asLegacyTransaction.toString());
+        }
+        if (params.maxAccounts !== undefined) {
+          url.searchParams.set('maxAccounts', params.maxAccounts.toString());
+        }
 
-      response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' }
-      });
+        response = await fetch(url.toString(), {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+          signal: controller.signal,
+        });
+      }
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if ((error as Error).name === 'AbortError') {
+        console.error('❌ [JupiterService] Request timed out after 15s');
+        throw new Error('Quote request timed out. Please try again.');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
     }
 
     if (!response.ok) {
       const errorText = await response.text();
       logger.error('JupiterService', 'Quote request failed', { status: response.status, error: errorText });
+      console.error('❌ [JupiterService] Quote failed:', response.status, errorText);
       throw new Error(`Jupiter quote failed: ${response.status} - ${errorText}`);
     }
 

@@ -23,7 +23,8 @@ export interface SwapParams {
   inputMint: PublicKey;
   outputMint: PublicKey;
   amount: number;
-  slippage?: number; // Default 0.5%
+  slippage?: number; // Percentage (e.g., 0.5 for 0.5%) - DEPRECATED, use slippageBps
+  slippageBps?: number; // Basis points (e.g., 50 for 0.5%)
 }
 
 export interface SwapResult {
@@ -65,6 +66,17 @@ export function useSwapWithBoost() {
     ): Promise<SwapQuote | null> => {
       try {
         setError(null);
+        
+        // Calculate slippage in bps
+        // Priority: slippageBps > slippage (converted) > default 50
+        const slippageBps = params.slippageBps ?? (params.slippage ? Math.floor(params.slippage * 100) : 50);
+        
+        console.log('🔍 [useSwapWithBoost] Getting quote', {
+          inputMint: params.inputMint.toString(),
+          outputMint: params.outputMint.toString(),
+          amount: params.amount,
+          slippageBps,
+        });
 
         // Utiliser Jupiter V6 API pour obtenir une vraie quote
         const jupiterService = getJupiterService(connection);
@@ -73,7 +85,7 @@ export function useSwapWithBoost() {
           inputMint: params.inputMint.toString(),
           outputMint: params.outputMint.toString(),
           amount: params.amount,
-          slippageBps: Math.floor((params.slippage ?? 0.5) * 100), // Convert % to bps
+          slippageBps,
         });
 
         // Calculer les rebates
