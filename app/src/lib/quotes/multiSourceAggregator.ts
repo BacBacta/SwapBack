@@ -494,40 +494,49 @@ async function fetchSaberQuote(params: QuoteParams): Promise<JupiterQuoteRespons
 
 /**
  * Fetch quote depuis PumpSwap via internal API (Pump.fun AMM)
+ * Uses native on-chain quote with DexScreener fallback
  */
 async function fetchPumpSwapQuote(params: QuoteParams): Promise<JupiterQuoteResponse | null> {
   try {
     const baseUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
     const url = `${baseUrl}/api/dex/pumpswap/quote?inputMint=${params.inputMint}&outputMint=${params.outputMint}&amount=${Math.floor(params.amountLamports)}&slippageBps=${params.slippageBps}`;
     
-    const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
     
     if (!response.ok) return null;
 
     const data = await response.json();
     
-    if (data.error || !data.outputAmount || data.outputAmount <= 0) return null;
+    if (data.error) return null;
+    
+    // Parse outputAmount (can be string or number depending on source)
+    const outputLamports = typeof data.outputAmount === 'string' 
+      ? parseInt(data.outputAmount, 10) 
+      : Number(data.outputAmount);
+    
+    if (!outputLamports || outputLamports <= 0) return null;
 
     const inputLamports = Math.floor(params.amountLamports);
-    const outputLamports = data.outputAmount;
-    const priceImpact = data.priceImpact ?? 0;
+    const priceImpactBps = data.priceImpactBps ?? 0;
+    const feeBps = data.feeBps ?? 100; // PumpSwap default 1%
+    const feeAmount = data.feeAmount ? parseInt(data.feeAmount, 10) : Math.floor(outputLamports * feeBps / 10000);
 
     return {
       inputMint: params.inputMint,
       outputMint: params.outputMint,
       inAmount: inputLamports.toString(),
       outAmount: outputLamports.toString(),
-      otherAmountThreshold: Math.floor(outputLamports * 0.99).toString(),
-      priceImpactPct: (priceImpact * 100).toString(),
+      otherAmountThreshold: Math.floor(outputLamports * (1 - params.slippageBps / 10000)).toString(),
+      priceImpactPct: (priceImpactBps / 100).toString(), // Convert bps to percentage
       routePlan: [{
         swapInfo: {
           ammKey: data.pool || "pumpswap-amm",
-          label: "PumpSwap",
+          label: data.source === 'pumpswap-native' ? "PumpSwap (Native)" : "PumpSwap",
           inputMint: params.inputMint,
           outputMint: params.outputMint,
           inAmount: inputLamports.toString(),
           outAmount: outputLamports.toString(),
-          feeAmount: (data.fee || 0).toString(),
+          feeAmount: feeAmount.toString(),
           feeMint: params.inputMint,
         },
         percent: 100,
