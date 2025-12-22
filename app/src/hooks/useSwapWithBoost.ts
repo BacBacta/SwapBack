@@ -45,6 +45,14 @@ export interface SwapQuote {
   boostBP: number;
   estimatedGas: number;
   priceImpact: number;
+  // Additional fields expected by SimpleSwapCard
+  bestVenue?: string;
+  venues?: Array<{ venue: string }>;
+  estimatedNpi?: number;
+  priceImpactBps?: number;
+  dynamicSlippageBps?: number;
+  slippageResult?: unknown;
+  selectedMinOutAmount?: number;
 }
 
 export function useSwapWithBoost() {
@@ -97,14 +105,24 @@ export function useSwapWithBoost() {
         // Appliquer le boost
         const rebateCalc = calculateBoostedRebate(baseRebate, userBoostBP);
 
+        // Extract venue from route plan
+        const routePlan = quote.routePlan || [];
+        const venues = routePlan.map((step: { swapInfo?: { label?: string } }) => ({ 
+          venue: step.swapInfo?.label || 'Unknown' 
+        }));
+        const bestVenue = venues[0]?.venue || 'Jupiter';
+
         logger.info('useSwapWithBoost', 'Quote received with boost', {
           inAmount: inputAmountNum,
           outAmount: outputAmountNum,
           boostBP: userBoostBP,
           baseRebate,
           boostedRebate: rebateCalc.boostedRebate,
+          bestVenue,
         });
 
+        const priceImpactPercent = parseFloat(quote.priceImpactPct || '0');
+        
         return {
           inputAmount: inputAmountNum,
           outputAmount: outputAmountNum,
@@ -112,7 +130,15 @@ export function useSwapWithBoost() {
           boostedRebate: rebateCalc.boostedRebate,
           boostBP: userBoostBP,
           estimatedGas: 0.000005, // ~5000 lamports
-          priceImpact: parseFloat(quote.priceImpactPct),
+          priceImpact: priceImpactPercent,
+          // Additional fields for SimpleSwapCard
+          bestVenue,
+          venues,
+          estimatedNpi: 0, // No NPI for Jupiter routes
+          priceImpactBps: Math.round(priceImpactPercent * 100),
+          dynamicSlippageBps: slippageBps,
+          slippageResult: null,
+          selectedMinOutAmount: parseInt(quote.otherAmountThreshold || '0'),
         };
       } catch (err) {
         const message =
@@ -120,6 +146,7 @@ export function useSwapWithBoost() {
             ? err.message
             : "Erreur lors de la récupération de la quote";
         logger.error('useSwapWithBoost', 'Quote error', { error: message });
+        console.error('❌ [useSwapWithBoost] Quote error:', err);
         setError(message);
         return null;
       }
