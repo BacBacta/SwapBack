@@ -187,43 +187,43 @@ async function fetchFromOnChain(address: string): Promise<JupiterToken | null> {
 }
 
 // Comprehensive token list with categories (real mainnet addresses)
+// Using reliable CDN URLs (CoinGecko, Jupiter, Solscan)
 const FALLBACK_TOKENS: JupiterToken[] = [
   // Blue chips
-  { address: "So11111111111111111111111111111111111111112", symbol: "SOL", name: "Solana", decimals: 9, logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png", tags: ["verified", "blue-chip"] },
+  { address: "So11111111111111111111111111111111111111112", symbol: "SOL", name: "Solana", decimals: 9, logoURI: "https://assets.coingecko.com/coins/images/4128/small/solana.png", tags: ["verified", "blue-chip"] },
   { address: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", symbol: "JUP", name: "Jupiter", decimals: 6, logoURI: "https://static.jup.ag/jup/icon.png", tags: ["verified", "blue-chip", "defi"] },
-  { address: "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL", symbol: "JTO", name: "Jito", decimals: 9, logoURI: "https://metadata.jito.network/token/jto/image", tags: ["verified", "blue-chip", "defi"] },
-  { address: "HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3", symbol: "PYTH", name: "Pyth Network", decimals: 6, logoURI: "https://pyth.network/token.svg", tags: ["verified", "blue-chip", "defi"] },
-  { address: "orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE", symbol: "ORCA", name: "Orca", decimals: 6, logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE/logo.png", tags: ["verified", "blue-chip", "defi"] },
-  { address: "RasQSonic11111111111111111111111111111111111", symbol: "RAY", name: "Raydium", decimals: 6, logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R/logo.png", tags: ["verified", "blue-chip", "defi"] },
-  { address: "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R", symbol: "RAY", name: "Raydium", decimals: 6, logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R/logo.png", tags: ["verified", "blue-chip", "defi"] },
+  { address: "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL", symbol: "JTO", name: "Jito", decimals: 9, logoURI: "https://assets.coingecko.com/coins/images/33103/small/jito.png", tags: ["verified", "blue-chip", "defi"] },
+  { address: "HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3", symbol: "PYTH", name: "Pyth Network", decimals: 6, logoURI: "https://assets.coingecko.com/coins/images/31924/small/pyth.png", tags: ["verified", "blue-chip", "defi"] },
+  { address: "orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE", symbol: "ORCA", name: "Orca", decimals: 6, logoURI: "https://assets.coingecko.com/coins/images/17547/small/Orca_Logo.png", tags: ["verified", "blue-chip", "defi"] },
+  { address: "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R", symbol: "RAY", name: "Raydium", decimals: 6, logoURI: "https://assets.coingecko.com/coins/images/13928/small/PSigc4ie_400x400.jpg", tags: ["verified", "blue-chip", "defi"] },
   
   // Stablecoins
-  { address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", symbol: "USDC", name: "USD Coin", decimals: 6, logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png", tags: ["verified", "stablecoin"] },
-  { address: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", symbol: "USDT", name: "Tether USD", decimals: 6, logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.png", tags: ["verified", "stablecoin"] },
-  { address: "USDH1SM1ojwWUga67PGrgFWUHibbjqMvuMaDkRJTgkX", symbol: "USDH", name: "USDH", decimals: 6, logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/USDH1SM1ojwWUga67PGrgFWUHibbjqMvuMaDkRJTgkX/usdh.svg", tags: ["verified", "stablecoin"] },
-  { address: "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj", symbol: "stSOL", name: "Lido Staked SOL", decimals: 9, logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj/logo.png", tags: ["verified", "stablecoin", "lsd"] },
+  { address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", symbol: "USDC", name: "USD Coin", decimals: 6, logoURI: "https://assets.coingecko.com/coins/images/6319/small/usdc.png", tags: ["verified", "stablecoin"] },
+  { address: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", symbol: "USDT", name: "Tether USD", decimals: 6, logoURI: "https://assets.coingecko.com/coins/images/325/small/Tether.png", tags: ["verified", "stablecoin"] },
+  { address: "USDH1SM1ojwWUga67PGrgFWUHibbjqMvuMaDkRJTgkX", symbol: "USDH", name: "USDH", decimals: 6, logoURI: "https://assets.coingecko.com/coins/images/27697/small/hubble.png", tags: ["verified", "stablecoin"] },
+  { address: "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj", symbol: "stSOL", name: "Lido Staked SOL", decimals: 9, logoURI: "https://assets.coingecko.com/coins/images/18369/small/stsol.png", tags: ["verified", "lsd"] },
   
   // Liquid Staking
-  { address: "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So", symbol: "mSOL", name: "Marinade Staked SOL", decimals: 9, logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So/logo.png", tags: ["verified", "lsd"] },
-  { address: "bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1", symbol: "bSOL", name: "BlazeStake Staked SOL", decimals: 9, logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1/logo.png", tags: ["verified", "lsd"] },
-  { address: "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn", symbol: "jitoSOL", name: "Jito Staked SOL", decimals: 9, logoURI: "https://storage.googleapis.com/token-metadata/JitoSOL-256.png", tags: ["verified", "lsd"] },
+  { address: "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So", symbol: "mSOL", name: "Marinade Staked SOL", decimals: 9, logoURI: "https://assets.coingecko.com/coins/images/17752/small/mSOL.png", tags: ["verified", "lsd"] },
+  { address: "bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1", symbol: "bSOL", name: "BlazeStake Staked SOL", decimals: 9, logoURI: "https://assets.coingecko.com/coins/images/26636/small/blazestake.png", tags: ["verified", "lsd"] },
+  { address: "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn", symbol: "jitoSOL", name: "Jito Staked SOL", decimals: 9, logoURI: "https://assets.coingecko.com/coins/images/33228/small/jitosol.png", tags: ["verified", "lsd"] },
   
   // Meme tokens
-  { address: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", symbol: "BONK", name: "Bonk", decimals: 5, logoURI: "https://arweave.net/hQiPZOsRZXGXBJd_82PhVdlM_hACsT_q6wqwf5cSY7I", tags: ["verified", "meme"] },
-  { address: "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm", symbol: "WIF", name: "dogwifhat", decimals: 6, logoURI: "https://bafkreibk3covs5ltyqxa272uodhculbr6kea6betidfwy3ajsav2vjzyum.ipfs.nftstorage.link", tags: ["verified", "meme"] },
-  { address: "MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5", symbol: "MEW", name: "cat in a dogs world", decimals: 5, logoURI: "https://bafkreidlwyr565dxtao2ipsze6bmzpszqzybz7sqi2zaet5fs7k6u5oi4i.ipfs.nftstorage.link/", tags: ["verified", "meme"] },
-  { address: "ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgZ74J82", symbol: "BOME", name: "BOOK OF MEME", decimals: 6, logoURI: "https://bafkreiao5s5lsdzezluxikn3k4ynbmhzlhji5dgotuymwn3ygr2adb2ddy.ipfs.nftstorage.link/", tags: ["verified", "meme"] },
-  { address: "A8C3xuqscfmyLrte3VmTqrAq8kgMASius9AFNANwpump", symbol: "FARTCOIN", name: "Fartcoin", decimals: 6, logoURI: "https://ipfs.io/ipfs/QmQr7j7Fnj9Y1N8qT8LHiPtqKEJr7M7hUzQFkdBY6x7o4t", tags: ["verified", "meme"] },
-  { address: "Grass7B4RdKfBCjTKgSqnXkqjwiGvQyFbuSCUJr3XXjs", symbol: "GRASS", name: "Grass", decimals: 9, logoURI: "https://sznsyxelqffs7ntnqcax7jq7ka6yegvcqlz5l7jb3uhlz7u4imcq.arweave.net/gf-xLW4sVjvsIJIk_z-5e0d7yO8tsL5_G4b7jl1mKEc", tags: ["verified", "meme"] },
+  { address: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", symbol: "BONK", name: "Bonk", decimals: 5, logoURI: "https://assets.coingecko.com/coins/images/28600/small/bonk.png", tags: ["verified", "meme"] },
+  { address: "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm", symbol: "WIF", name: "dogwifhat", decimals: 6, logoURI: "https://assets.coingecko.com/coins/images/33566/small/dogwifhat.jpg", tags: ["verified", "meme"] },
+  { address: "MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5", symbol: "MEW", name: "cat in a dogs world", decimals: 5, logoURI: "https://assets.coingecko.com/coins/images/36440/small/mew.png", tags: ["verified", "meme"] },
+  { address: "ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgZ74J82", symbol: "BOME", name: "BOOK OF MEME", decimals: 6, logoURI: "https://assets.coingecko.com/coins/images/36071/small/bome.png", tags: ["verified", "meme"] },
+  { address: "A8C3xuqscfmyLrte3VmTqrAq8kgMASius9AFNANwpump", symbol: "FARTCOIN", name: "Fartcoin", decimals: 6, logoURI: "https://assets.coingecko.com/coins/images/34835/small/fartcoin.png", tags: ["verified", "meme"] },
+  { address: "Grass7B4RdKfBCjTKgSqnXkqjwiGvQyFbuSCUJr3XXjs", symbol: "GRASS", name: "Grass", decimals: 9, logoURI: "https://assets.coingecko.com/coins/images/40383/small/grass.png", tags: ["verified", "meme"] },
   
   // Cross-chain
-  { address: "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs", symbol: "ETH", name: "Wrapped Ether (Wormhole)", decimals: 8, logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs/logo.png", tags: ["verified", "blue-chip"] },
-  { address: "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh", symbol: "WBTC", name: "Wrapped BTC (Wormhole)", decimals: 8, logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh/logo.png", tags: ["verified", "blue-chip"] },
+  { address: "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs", symbol: "ETH", name: "Wrapped Ether (Wormhole)", decimals: 8, logoURI: "https://assets.coingecko.com/coins/images/279/small/ethereum.png", tags: ["verified", "blue-chip"] },
+  { address: "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh", symbol: "WBTC", name: "Wrapped BTC (Wormhole)", decimals: 8, logoURI: "https://assets.coingecko.com/coins/images/7598/small/wrapped_bitcoin_wbtc.png", tags: ["verified", "blue-chip"] },
   
   // AI tokens
-  { address: "FUAfBo2jgks6gB4Z4LfZkqSZgzNucisEHqnNebaRxM1P", symbol: "AI16Z", name: "ai16z", decimals: 9, logoURI: "https://ipfs.io/ipfs/QmVU6tGb4qhMBiB6CpNrpnQZaGcJ5sFMBv5j9n7k6J7xSy", tags: ["verified", "ai"] },
-  { address: "Gu3LDkn7Vx3bmCzLafYNKcDxv2mH7YN44NJZFXnyai16", symbol: "GRIFFAIN", name: "Griffain", decimals: 6, logoURI: "https://arweave.net/6M_FjVUJFj2E3cT0_K-h5M7nwMhKF7NHu9KMgpxVBFk", tags: ["verified", "ai"] },
-  { address: "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump", symbol: "FWOG", name: "Fwog", decimals: 6, logoURI: "https://ipfs.io/ipfs/QmZqNf2AqoAFbvd7iVz3FpMQpzWBw7VjqHqpKX8yqw8h5h", tags: ["verified", "meme"] },
+  { address: "FUAfBo2jgks6gB4Z4LfZkqSZgzNucisEHqnNebaRxM1P", symbol: "AI16Z", name: "ai16z", decimals: 9, logoURI: "https://assets.coingecko.com/coins/images/41212/small/ai16z.png", tags: ["verified", "ai"] },
+  { address: "Gu3LDkn7Vx3bmCzLafYNKcDxv2mH7YN44NJZFXnyai16", symbol: "GRIFFAIN", name: "Griffain", decimals: 6, logoURI: "https://assets.coingecko.com/coins/images/41382/small/griffain.png", tags: ["verified", "ai"] },
+  { address: "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump", symbol: "FWOG", name: "Fwog", decimals: 6, logoURI: "https://assets.coingecko.com/coins/images/39344/small/fwog.png", tags: ["verified", "meme"] },
 ];
 
 // Cache tokens in memory
