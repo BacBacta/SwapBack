@@ -244,7 +244,21 @@ export function SimpleSwapCard() {
 
   // Fetch quote via le ROUTER NATIF (pas Jupiter!)
   useEffect(() => {
-    if (!amountInBaseUnits || amountInBaseUnits <= 0 || !publicKey) {
+    console.log('🔍 [SimpleSwapCard] Quote effect triggered:', {
+      amountInBaseUnits,
+      publicKey: publicKey?.toBase58()?.slice(0, 8) + '...',
+      inputMint: inputToken.mint.slice(0, 8) + '...',
+      outputMint: outputToken.mint.slice(0, 8) + '...',
+    });
+    
+    if (!amountInBaseUnits || amountInBaseUnits <= 0) {
+      console.log('❌ [SimpleSwapCard] No amount, skipping quote fetch');
+      setQuote(null);
+      return;
+    }
+    
+    if (!publicKey) {
+      console.log('❌ [SimpleSwapCard] No wallet connected, skipping quote fetch');
       setQuote(null);
       return;
     }
@@ -259,13 +273,24 @@ export function SimpleSwapCard() {
     const controller = new AbortController();
     const fetchNativeQuote = async () => {
       if (controller.signal.aborted) return;
-      if (quoteInFlightRef.current) return;
+      if (quoteInFlightRef.current) {
+        console.log('⏳ [SimpleSwapCard] Quote already in flight, skipping');
+        return;
+      }
 
+      console.log('🚀 [SimpleSwapCard] Starting quote fetch...');
       quoteInFlightRef.current = true;
       const shouldShowLoading = !quoteRef.current;
       if (shouldShowLoading) setLoading(true);
 
       try {
+        console.log('📤 [SimpleSwapCard] Calling getSwapQuote with:', {
+          inputMint: inputToken.mint,
+          outputMint: outputToken.mint,
+          amount: amountInBaseUnits,
+          slippageBps: Math.round(slippage * 100),
+        });
+        
         // Utiliser le router NATIF SwapBack
         const nativeResult = await getSwapQuote(
           {
@@ -276,6 +301,8 @@ export function SimpleSwapCard() {
           },
           0 // userBoostBps - peut être récupéré depuis le statut de lock
         );
+
+        console.log('📥 [SimpleSwapCard] getSwapQuote returned:', nativeResult);
 
         if (nativeResult && !controller.signal.aborted && seq === quoteFetchSeqRef.current) {
           const formatted = nativeResult.outputAmount / Math.pow(10, outputToken.decimals);
@@ -316,11 +343,13 @@ export function SimpleSwapCard() {
           }
         }
       } catch (error) {
+        console.error("❌ [SimpleSwapCard] Quote fetch error:", error);
         if ((error as Error).name !== "AbortError") {
           console.error("Native quote error:", error);
           // Ne pas afficher d'erreur si la quote échoue silencieusement
         }
       } finally {
+        console.log('🏁 [SimpleSwapCard] Quote fetch finished');
         quoteInFlightRef.current = false;
         if (!controller.signal.aborted && seq === quoteFetchSeqRef.current) {
           // Éviter le flicker: on n'affiche le loader que lors du premier fetch
