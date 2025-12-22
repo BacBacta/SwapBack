@@ -94,6 +94,14 @@ export function SimpleSwapCard() {
   const { connected, publicKey } = useWallet();
   const wallet = useWallet();
   
+  // Debug: Log au montage du composant
+  useEffect(() => {
+    console.log('🔵 [SimpleSwapCard] Component mounted', {
+      connected,
+      publicKey: publicKey?.toBase58()?.slice(0, 8) + '...',
+    });
+  }, [connected, publicKey]);
+  
   // Hook pour exécuter les swaps NATIFS (pas Jupiter!)
   const { 
     getSwapQuote, 
