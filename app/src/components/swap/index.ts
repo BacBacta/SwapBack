@@ -5,6 +5,9 @@
  * - SwapModeSelector: Sélecteur mode simple/avancé
  * - RouteVisualization: Visualisation des routes
  * - FiatEquivalent: Équivalents fiat
+ * - QuoteCountdown: Countdown de validité quote
+ * - FeeEstimate: Estimation des frais
+ * - TransactionProgress: Progression transaction
  * 
  * @author SwapBack Team
  * @date January 2025
@@ -56,6 +59,41 @@ export type {
   PriceData,
   SingleTokenFiatProps,
 } from './FiatEquivalent';
+
+// ============================================================================
+// QUOTE COUNTDOWN
+// ============================================================================
+
+export {
+  QuoteCountdown,
+  useQuoteCountdown,
+} from './QuoteCountdown';
+
+// ============================================================================
+// FEE ESTIMATE
+// ============================================================================
+
+export {
+  FeeEstimate,
+  useSolPrice,
+} from './FeeEstimate';
+
+export type {
+  PriorityLevel,
+} from './FeeEstimate';
+
+// ============================================================================
+// TRANSACTION PROGRESS
+// ============================================================================
+
+export {
+  TransactionProgress,
+} from './TransactionProgress';
+
+export type {
+  TransactionStep,
+  TransactionProgressProps,
+} from './TransactionProgress';
 
 // ============================================================================
 // ENHANCED SWAP CARD

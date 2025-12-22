@@ -8,20 +8,32 @@
  * 
  * @author SwapBack Team
  * @date December 8, 2025 - Migration vers routes natives
+ * @updated December 22, 2025 - UX improvements (countdown, fees, persistence)
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { ArrowDownUp, Settings, Loader2, ChevronRight, Sparkles, Zap, Clock, ExternalLink } from "lucide-react";
+import { ArrowDownUp, Settings, Loader2, ChevronRight, Sparkles, Zap, Clock, ExternalLink, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TokenSelectorModal } from "./TokenSelectorModal";
 import { AdvancedOptionsPanel } from "./AdvancedOptionsPanel";
 import { TransactionStatusModal, TransactionStatus } from "./TransactionStatusModal";
-import { SwapModeSelector, RouteVisualization, SingleTokenFiat, SIMPLE_MODE_CONFIG, ADVANCED_MODE_CONFIG, type SwapModeConfig } from "./swap";
+import { 
+  SwapModeSelector, 
+  RouteVisualization, 
+  SingleTokenFiat, 
+  SIMPLE_MODE_CONFIG, 
+  ADVANCED_MODE_CONFIG, 
+  QuoteCountdown,
+  FeeEstimate,
+  useSolPrice,
+  type SwapModeConfig 
+} from "./swap";
 import { useTokenData } from "../hooks/useTokenData";
 import { useNativeSwap } from "../hooks/useNativeSwap";
 import { useEnhancedNativeSwap } from "../hooks/useEnhancedNativeSwap";
+import { useSwapPreferences } from "../hooks/usePersistedState";
 import toast from "react-hot-toast";
 
 // Interface pour l'historique des transactions
@@ -168,10 +180,37 @@ export function SimpleSwapCard() {
   const quoteFetchSeqRef = useRef(0);
   const quoteInFlightRef = useRef(false);
   const quoteRef = useRef<QuoteResult | null>(null);
+  
+  // 🆕 Timestamp de la dernière quote pour countdown
+  const [lastQuoteTime, setLastQuoteTime] = useState<number | null>(null);
+  
+  // 🆕 Prix SOL pour estimation des frais
+  const { solPrice } = useSolPrice();
+  
+  // 🆕 Préférences persistées (slippage, MEV, etc.)
+  const { preferences, updatePreference } = useSwapPreferences();
 
-  // Paramètres (cachés par défaut)
-  const [slippage, setSlippage] = useState(slippageConfig.BASE_SLIPPAGE_BPS / 100); // Utiliser config dynamique
-  const [mevProtection, setMevProtection] = useState(useMevProtection);
+  // Paramètres - utiliser les préférences persistées
+  const [slippage, setSlippageLocal] = useState(preferences.slippage);
+  const [mevProtection, setMevProtectionLocal] = useState(preferences.mevProtection);
+  
+  // Synchroniser les préférences avec l'état local
+  useEffect(() => {
+    setSlippageLocal(preferences.slippage);
+    setMevProtectionLocal(preferences.mevProtection);
+  }, [preferences.slippage, preferences.mevProtection]);
+  
+  // Wrapper pour persister les changements de slippage
+  const setSlippage = useCallback((value: number) => {
+    setSlippageLocal(value);
+    updatePreference('slippage', value);
+  }, [updatePreference]);
+  
+  // Wrapper pour persister les changements MEV
+  const setMevProtection = useCallback((value: boolean) => {
+    setMevProtectionLocal(value);
+    updatePreference('mevProtection', value);
+  }, [updatePreference]);
 
   // Parsing robuste des montants utilisateur (ex: locale FR "0,01" => 0.01)
   const parseUserAmount = useCallback((raw: string): number => {
@@ -354,6 +393,9 @@ export function SimpleSwapCard() {
             dynamicSlippageBps: slippageBps,
             slippageBreakdown: undefined,
           } as QuoteResult);
+          
+          // 🆕 Enregistrer le timestamp de la quote pour le countdown
+          setLastQuoteTime(Date.now());
         } else if (!controller.signal.aborted && seq === quoteFetchSeqRef.current) {
           console.log('❌ [SimpleSwapCard] No valid quotes from venue-quotes API');
           setQuote(null);
@@ -862,6 +904,43 @@ export function SimpleSwapCard() {
                     )}
                 </div>
               </motion.div>
+            )}
+
+            {/* 🆕 Quote Countdown + Fee Estimate */}
+            {quote && (
+              <div className="space-y-2 pt-2 border-t border-white/5">
+                {/* Quote countdown avec refresh button */}
+                <div className="flex items-center justify-between">
+                  <QuoteCountdown
+                    refreshInterval={30}
+                    lastQuoteTime={lastQuoteTime}
+                    isLoading={loading}
+                    onRefresh={() => {
+                      quoteFetchSeqRef.current++;
+                      setLastQuoteTime(null);
+                    }}
+                    variant="compact"
+                  />
+                  <button
+                    onClick={() => {
+                      quoteFetchSeqRef.current++;
+                      setLastQuoteTime(null);
+                    }}
+                    className="text-xs text-gray-400 hover:text-white flex items-center gap-1 transition-colors"
+                    title="Refresh quote now"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Refresh
+                  </button>
+                </div>
+                
+                {/* Fee estimate */}
+                <FeeEstimate
+                  solPrice={solPrice || 125}
+                  priority="medium"
+                  compact
+                />
+              </div>
             )}
 
             {/* Bouton Swap */}
