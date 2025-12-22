@@ -172,15 +172,24 @@ export function TokenSelectorModal({
     
     setIsSearching(true);
     setSearchError(null);
+    console.log(`🔍 [TokenSelector] Searching for address: ${trimmedQuery}`);
+    
     try {
       // Use our internal API to search by address (avoids CORS)
       // API tries: Jupiter verified → Jupiter all → DexScreener → On-chain
-      const response = await fetch(getApiUrl(`${API_ENDPOINTS.tokens}?address=${encodeURIComponent(trimmedQuery)}`));
+      const apiUrl = getApiUrl(`${API_ENDPOINTS.tokens}?address=${encodeURIComponent(trimmedQuery)}`);
+      console.log(`🔍 [TokenSelector] API URL: ${apiUrl}`);
+      
+      const response = await fetch(apiUrl);
+      console.log(`🔍 [TokenSelector] Response status: ${response.status}`);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log(`🔍 [TokenSelector] Response data:`, data);
+        
         if (data.success && data.tokens?.length > 0) {
           const source = data.source as Token["source"];
-          setSearchedTokens(data.tokens.map((t: { address: string; symbol: string; name: string; decimals: number; logoURI?: string; verified?: boolean; tags?: string[] }) => ({
+          const tokens = data.tokens.map((t: { address: string; symbol: string; name: string; decimals: number; logoURI?: string; verified?: boolean; tags?: string[] }) => ({
             address: t.address,
             symbol: t.symbol,
             name: t.name,
@@ -189,22 +198,22 @@ export function TokenSelectorModal({
             verified: source === "jupiter-verified",
             tags: t.tags || [],
             source,
-          })));
-          // Show info message for non-Jupiter tokens
-          if (source === "dexscreener") {
-            setSearchError(null); // Clear error, token found
-          } else if (source === "on-chain") {
-            setSearchError(null); // Token found on-chain
-          } else {
-            setSearchError(null);
-          }
+          }));
+          console.log(`✅ [TokenSelector] Found ${tokens.length} token(s) via ${source}:`, tokens);
+          setSearchedTokens(tokens);
+          setSearchError(null);
         } else {
+          console.log(`❌ [TokenSelector] No tokens found in response`);
           setSearchedTokens([]);
           setSearchError("Token non trouvé sur Jupiter/DexScreener. Il peut être trop récent ou l'adresse invalide.");
         }
+      } else {
+        console.log(`❌ [TokenSelector] API error: ${response.status} ${response.statusText}`);
+        setSearchedTokens([]);
+        setSearchError(`Erreur API: ${response.status}`);
       }
     } catch (error) {
-      console.warn('Token search failed:', error);
+      console.warn('❌ [TokenSelector] Token search failed:', error);
       setSearchedTokens([]);
       setSearchError("Erreur de recherche. Vérifiez votre connexion.");
     } finally {
@@ -235,6 +244,9 @@ export function TokenSelectorModal({
 
   // Filter and search tokens
   const filteredTokens = useMemo(() => {
+    // If we're searching by address (>= 32 chars), show searched tokens first without category filters
+    const isAddressSearch = searchQuery && searchQuery.length >= 32;
+    
     // Combine searched tokens with all tokens
     let tokens = searchedTokens.length > 0 ? [...searchedTokens, ...allTokens] : allTokens;
 
@@ -246,19 +258,22 @@ export function TokenSelectorModal({
       return true;
     });
 
-    // Apply filter
-    if (activeFilter === "favorites") {
-      tokens = tokens.filter(t => favorites.has(t.address));
-    } else if (activeFilter === "stablecoins") {
-      tokens = tokens.filter(t => t.tags?.includes("stablecoin") || t.symbol.includes('USD'));
-    } else if (activeFilter === "blue-chips") {
-      tokens = tokens.filter(t => t.tags?.includes("blue-chip"));
-    } else if (activeFilter === "meme") {
-      tokens = tokens.filter(t => t.tags?.includes("meme"));
-    } else if (activeFilter === "defi") {
-      tokens = tokens.filter(t => t.tags?.includes("defi"));
-    } else if (activeFilter === "lsd") {
-      tokens = tokens.filter(t => t.tags?.includes("lsd"));
+    // Apply category filter ONLY if NOT an address search
+    // When searching by address, we want to show the result regardless of category
+    if (!isAddressSearch) {
+      if (activeFilter === "favorites") {
+        tokens = tokens.filter(t => favorites.has(t.address));
+      } else if (activeFilter === "stablecoins") {
+        tokens = tokens.filter(t => t.tags?.includes("stablecoin") || t.symbol.includes('USD'));
+      } else if (activeFilter === "blue-chips") {
+        tokens = tokens.filter(t => t.tags?.includes("blue-chip"));
+      } else if (activeFilter === "meme") {
+        tokens = tokens.filter(t => t.tags?.includes("meme"));
+      } else if (activeFilter === "defi") {
+        tokens = tokens.filter(t => t.tags?.includes("defi"));
+      } else if (activeFilter === "lsd") {
+        tokens = tokens.filter(t => t.tags?.includes("lsd"));
+      }
     }
 
     // Apply search (for non-address searches)
@@ -271,8 +286,13 @@ export function TokenSelectorModal({
       );
     }
 
-    // Sort: favorites first, then by balance, then by symbol
+    // Sort: searched tokens first, then favorites, then by balance, then by symbol
     return tokens.sort((a, b) => {
+      // Searched tokens (from address lookup) come first
+      const aSearched = searchedTokens.some(st => st.address === a.address) ? 1 : 0;
+      const bSearched = searchedTokens.some(st => st.address === b.address) ? 1 : 0;
+      if (bSearched !== aSearched) return bSearched - aSearched;
+      
       const aFav = favorites.has(a.address) ? 1 : 0;
       const bFav = favorites.has(b.address) ? 1 : 0;
       if (bFav !== aFav) return bFav - aFav;
