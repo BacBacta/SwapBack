@@ -778,8 +778,8 @@ export function useNativeSwap() {
               throw new Error(quoteData.error || "Impossible d'obtenir une quote Jupiter");
             }
             
-            // 2. Obtenir la transaction swap
-            const swapResponse = await fetch('https://quote-api.jup.ag/v6/swap', {
+            // 2. Obtenir la transaction swap via notre proxy (évite CORS)
+            const swapResponse = await fetch('/api/swap/transaction', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -792,8 +792,8 @@ export function useNativeSwap() {
             });
             
             if (!swapResponse.ok) {
-              const errorText = await swapResponse.text();
-              throw new Error(`Jupiter swap API error: ${errorText}`);
+              const errorData = await swapResponse.json().catch(() => ({}));
+              throw new Error(errorData.error || `Swap transaction error: ${swapResponse.status}`);
             }
             
             const swapData = await swapResponse.json();
