@@ -45,14 +45,39 @@ export async function OPTIONS(request?: NextRequest) {
   });
 }
 
+// Mapping des symboles connus vers leurs mints
+const SYMBOL_TO_MINT: Record<string, string> = {
+  SOL: 'So11111111111111111111111111111111111111112',
+  WSOL: 'So11111111111111111111111111111111111111112',
+  USDC: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+  USDT: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
+  JUP: 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',
+  BONK: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
+  WIF: 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm',
+};
+
 export async function GET(request: NextRequest) {
   const corsHeaders = getCorsHeaders(request.headers.get('origin'));
   const { searchParams } = new URL(request.url);
-  const mint = searchParams.get('mint');
+  
+  // Support both 'mint' and 'symbol' parameters
+  let mint = searchParams.get('mint');
+  const symbol = searchParams.get('symbol')?.toUpperCase();
+  
+  // If symbol provided, resolve to mint
+  if (!mint && symbol) {
+    mint = SYMBOL_TO_MINT[symbol] || null;
+    if (!mint) {
+      return NextResponse.json(
+        { error: `Unknown symbol: ${symbol}. Use mint parameter instead.` }, 
+        { status: 400, headers: corsHeaders }
+      );
+    }
+  }
 
   if (!mint) {
     return NextResponse.json(
-      { error: 'Missing mint parameter' }, 
+      { error: 'Missing mint or symbol parameter' }, 
       { status: 400, headers: corsHeaders }
     );
   }
