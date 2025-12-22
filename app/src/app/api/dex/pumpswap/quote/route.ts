@@ -125,39 +125,56 @@ export async function GET(request: NextRequest) {
 
   const slippageBps = slippageBpsParam ? Math.min(10000, Math.max(0, Number(slippageBpsParam))) : 50;
 
-  // Try native on-chain quote first
-  try {
-    const connection = getConnection();
-    const nativeQuote = await getPumpSwapQuote(
-      connection,
-      inputMint,
-      outputMint,
-      amountIn,
-      slippageBps
-    );
+  // Check if Helius is configured - only try native if we have a fast RPC
+  const heliusKey = process.env.HELIUS_API_KEY || process.env.NEXT_PUBLIC_HELIUS_API_KEY;
+  const hasHelius = !!heliusKey;
 
-    if (nativeQuote) {
-      console.log("[PumpSwap] Native on-chain quote succeeded");
-      return NextResponse.json({
-        inputMint: nativeQuote.inputMint,
-        outputMint: nativeQuote.outputMint,
-        inputAmount: nativeQuote.inputAmount.toString(),
-        outputAmount: nativeQuote.outputAmount.toString(),
-        minOutAmount: nativeQuote.minOutputAmount.toString(),
-        priceImpactBps: nativeQuote.priceImpactBps,
-        slippageBps,
-        pool: nativeQuote.pool,
-        feeBps: nativeQuote.feeBps,
-        feeAmount: nativeQuote.feeAmount.toString(),
-        baseReserve: nativeQuote.baseReserve.toString(),
-        quoteReserve: nativeQuote.quoteReserve.toString(),
-        source: 'pumpswap-native',
-      }, { headers: responseHeaders });
+  // Only try native on-chain quote if we have Helius (fast RPC)
+  // Otherwise skip to DexScreener to avoid slow RPC timeout
+  if (hasHelius) {
+    try {
+      const connection = getConnection();
+      
+      // Add 3 second timeout to native quote
+      const nativeQuotePromise = getPumpSwapQuote(
+        connection,
+        inputMint,
+        outputMint,
+        amountIn,
+        slippageBps
+      );
+      
+      const timeoutPromise = new Promise<null>((resolve) => 
+        setTimeout(() => resolve(null), 3000)
+      );
+      
+      const nativeQuote = await Promise.race([nativeQuotePromise, timeoutPromise]);
+
+      if (nativeQuote) {
+        console.log("[PumpSwap] Native on-chain quote succeeded");
+        return NextResponse.json({
+          inputMint: nativeQuote.inputMint,
+          outputMint: nativeQuote.outputMint,
+          inputAmount: nativeQuote.inputAmount.toString(),
+          outputAmount: nativeQuote.outputAmount.toString(),
+          minOutAmount: nativeQuote.minOutputAmount.toString(),
+          priceImpactBps: nativeQuote.priceImpactBps,
+          slippageBps,
+          pool: nativeQuote.pool,
+          feeBps: nativeQuote.feeBps,
+          feeAmount: nativeQuote.feeAmount.toString(),
+          baseReserve: nativeQuote.baseReserve.toString(),
+          quoteReserve: nativeQuote.quoteReserve.toString(),
+          source: 'pumpswap-native',
+        }, { headers: responseHeaders });
+      }
+      
+      console.log("[PumpSwap] Native quote returned null or timeout, trying DexScreener fallback");
+    } catch (nativeError) {
+      console.warn("[PumpSwap] Native quote failed, trying DexScreener fallback:", nativeError);
     }
-    
-    console.log("[PumpSwap] Native quote returned null, trying DexScreener fallback");
-  } catch (nativeError) {
-    console.warn("[PumpSwap] Native quote failed, trying DexScreener fallback:", nativeError);
+  } else {
+    console.log("[PumpSwap] No Helius API key, skipping native quote, using DexScreener");
   }
 
   // Fallback to DexScreener
