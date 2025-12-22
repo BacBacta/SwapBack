@@ -103,20 +103,45 @@ export async function GET(request: NextRequest) {
   }
 
   // Si pairAddress n'est pas fourni, on découvre le pool via l'API Meteora
+  // On sélectionne le pool avec la plus haute liquidité pour de meilleurs quotes
   if (!pairAddress) {
     try {
       const pairsResponse = await fetch(
         `https://dlmm-api.meteora.ag/pair/all`,
-        { signal: AbortSignal.timeout(5000) }
+        { signal: AbortSignal.timeout(8000) }
       );
       if (pairsResponse.ok) {
         const pairs = await pairsResponse.json();
-        const matchingPool = pairs.find((p: any) => 
+        // Find ALL matching pools for this pair
+        const matchingPools = pairs.filter((p: any) => 
           (p.mint_x === inputMint && p.mint_y === outputMint) ||
           (p.mint_y === inputMint && p.mint_x === outputMint)
         );
-        if (matchingPool?.address) {
-          pairAddress = matchingPool.address;
+        
+        if (matchingPools.length > 0) {
+          // Sort by liquidity (descending) and pick the most liquid pool
+          const sortedPools = matchingPools.sort((a: any, b: any) => {
+            const liqA = parseFloat(a.liquidity || '0');
+            const liqB = parseFloat(b.liquidity || '0');
+            return liqB - liqA;
+          });
+          
+          // Try pools in order of liquidity until we find one that works
+          // Start with the top 3 most liquid pools
+          for (const pool of sortedPools.slice(0, 3)) {
+            const liq = parseFloat(pool.liquidity || '0');
+            if (liq > 0.1) { // Minimum liquidity threshold
+              pairAddress = pool.address;
+              console.log(`[Meteora] Selected pool ${pool.address} with liquidity ${liq}`);
+              break;
+            }
+          }
+          
+          // If no pool meets threshold, use the most liquid one anyway
+          if (!pairAddress && sortedPools[0]?.address) {
+            pairAddress = sortedPools[0].address;
+            console.log(`[Meteora] Using best available pool ${pairAddress}`);
+          }
         }
       }
     } catch (e) {

@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
   const quotes: VenueQuoteResult[] = [];
 
   // Fetch all quotes in parallel using INTERNAL APIs
-  // Now includes ALL venues: Raydium, Orca, Meteora, Phoenix, Lifinity, Saber
+  // Includes ALL 7 venues: Raydium, Orca, Meteora, Phoenix, Lifinity, Saber, PumpSwap
   const [
     raydiumResult, 
     orcaResult, 
@@ -112,6 +112,7 @@ export async function GET(request: NextRequest) {
     phoenixResult, 
     lifinityResult, 
     saberResult,
+    pumpswapResult,
     jupiterResult
   ] = await Promise.allSettled([
     fetchInternalQuote(baseUrl, 'raydium', inputMint, outputMint, amountNum, slippageBps),
@@ -120,6 +121,7 @@ export async function GET(request: NextRequest) {
     fetchInternalQuote(baseUrl, 'phoenix', inputMint, outputMint, amountNum, slippageBps),
     fetchInternalQuote(baseUrl, 'lifinity', inputMint, outputMint, amountNum, slippageBps),
     fetchInternalQuote(baseUrl, 'saber', inputMint, outputMint, amountNum, slippageBps),
+    fetchInternalQuote(baseUrl, 'pumpswap', inputMint, outputMint, amountNum, slippageBps),
     fetchJupiterQuote(inputMint, outputMint, amountNum),
   ]);
 
@@ -130,6 +132,7 @@ export async function GET(request: NextRequest) {
     phoenix: phoenixResult.status === 'fulfilled' ? phoenixResult.value?.outputAmount : 'rejected',
     lifinity: lifinityResult.status === 'fulfilled' ? lifinityResult.value?.outputAmount : 'rejected',
     saber: saberResult.status === 'fulfilled' ? saberResult.value?.outputAmount : 'rejected',
+    pumpswap: pumpswapResult.status === 'fulfilled' ? pumpswapResult.value?.outputAmount : 'rejected',
     jupiter: jupiterResult.status === 'fulfilled' ? jupiterResult.value?.outputAmount : 'rejected',
   });
 
@@ -156,6 +159,10 @@ export async function GET(request: NextRequest) {
 
   if (saberResult.status === 'fulfilled' && saberResult.value && saberResult.value.outputAmount > 0) {
     quotes.push(saberResult.value);
+  }
+
+  if (pumpswapResult.status === 'fulfilled' && pumpswapResult.value && pumpswapResult.value.outputAmount > 0) {
+    quotes.push(pumpswapResult.value);
   }
 
   // Jupiter benchmark
@@ -223,7 +230,7 @@ function getBaseUrl(request: NextRequest): string {
 
 async function fetchInternalQuote(
   baseUrl: string,
-  venue: 'raydium' | 'orca' | 'meteora' | 'phoenix' | 'lifinity' | 'saber',
+  venue: 'raydium' | 'orca' | 'meteora' | 'phoenix' | 'lifinity' | 'saber' | 'pumpswap',
   inputMint: string,
   outputMint: string,
   amount: number,
