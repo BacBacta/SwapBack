@@ -200,7 +200,7 @@ export function TokenSelectorModal({
           }
         } else {
           setSearchedTokens([]);
-          setSearchError("Token non trouvé. Vérifiez que l'adresse est un mint SPL valide.");
+          setSearchError("Token non trouvé sur Jupiter/DexScreener. Il peut être trop récent ou l'adresse invalide.");
         }
       }
     } catch (error) {

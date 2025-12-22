@@ -52,6 +52,7 @@ interface DexScreenerPair {
  */
 async function fetchFromDexScreener(address: string): Promise<JupiterToken | null> {
   try {
+    console.log(`🔍 [DexScreener] Searching for token: ${address}`);
     const response = await fetch(
       `https://api.dexscreener.com/tokens/v1/solana/${address}`,
       {
@@ -59,22 +60,39 @@ async function fetchFromDexScreener(address: string): Promise<JupiterToken | nul
         signal: AbortSignal.timeout(5000),
       }
     );
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.log(`❌ [DexScreener] API returned ${response.status}`);
+      return null;
+    }
     
     const pairs: DexScreenerPair[] = await response.json();
+    console.log(`📊 [DexScreener] Found ${pairs?.length || 0} pairs`);
+    
     if (!pairs || pairs.length === 0) return null;
     
-    // Find the pair where our address is the baseToken
+    // Find the pair where our address is the baseToken OR quoteToken
     const relevantPair = pairs.find(p => 
-      p.baseToken?.address?.toLowerCase() === address.toLowerCase()
+      p.baseToken?.address?.toLowerCase() === address.toLowerCase() ||
+      p.quoteToken?.address?.toLowerCase() === address.toLowerCase()
     );
     
-    if (!relevantPair?.baseToken) return null;
+    if (!relevantPair) {
+      console.log(`❌ [DexScreener] Token not found in any pair`);
+      return null;
+    }
+    
+    // Determine if we're looking at baseToken or quoteToken
+    const isBaseToken = relevantPair.baseToken?.address?.toLowerCase() === address.toLowerCase();
+    const tokenInfo = isBaseToken ? relevantPair.baseToken : relevantPair.quoteToken;
+    
+    if (!tokenInfo) return null;
+    
+    console.log(`✅ [DexScreener] Found: ${tokenInfo.symbol} (${tokenInfo.name})`);
     
     return {
-      address: relevantPair.baseToken.address,
-      symbol: relevantPair.baseToken.symbol || "UNKNOWN",
-      name: relevantPair.baseToken.name || "Unknown Token",
+      address: tokenInfo.address,
+      symbol: tokenInfo.symbol || "UNKNOWN",
+      name: tokenInfo.name || "Unknown Token",
       decimals: 9, // Default, will be updated by on-chain fetch if needed
       logoURI: relevantPair.info?.imageUrl,
       tags: ["dexscreener"],
@@ -91,41 +109,77 @@ async function fetchFromDexScreener(address: string): Promise<JupiterToken | nul
  */
 async function fetchFromOnChain(address: string): Promise<JupiterToken | null> {
   try {
-    const rpcUrl = process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_HELIUS_RPC_URL;
-    if (!rpcUrl) return null;
+    // Try multiple RPC endpoints
+    const heliusApiKey = process.env.HELIUS_API_KEY || process.env.NEXT_PUBLIC_HELIUS_API_KEY;
+    const rpcUrls = [
+      heliusApiKey ? `https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}` : null,
+      process.env.SOLANA_RPC_URL,
+      process.env.NEXT_PUBLIC_HELIUS_RPC_URL,
+      "https://api.mainnet-beta.solana.com",
+    ].filter(Boolean) as string[];
     
-    // Fetch account info to verify it's a valid mint
-    const response = await fetch(rpcUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "getAccountInfo",
-        params: [address, { encoding: "jsonParsed" }],
-      }),
-      signal: AbortSignal.timeout(5000),
-    });
+    console.log(`🔍 [On-chain] Checking mint: ${address} via ${rpcUrls.length} RPCs`);
     
-    if (!response.ok) return null;
-    const data = await response.json();
+    for (const rpcUrl of rpcUrls) {
+      try {
+        // Fetch account info to verify it's a valid mint
+        const response = await fetch(rpcUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "getAccountInfo",
+            params: [address, { encoding: "jsonParsed" }],
+          }),
+          signal: AbortSignal.timeout(5000),
+        });
+        
+        if (!response.ok) continue;
+        const data = await response.json();
+        
+        if (!data.result?.value) continue;
+        
+        const accountData = data.result.value.data;
+        
+        // Check if it's an SPL token mint
+        if (accountData?.program === "spl-token" && accountData?.parsed?.type === "mint") {
+          const mintInfo = accountData.parsed.info;
+          console.log(`✅ [On-chain] Found SPL mint with ${mintInfo?.decimals || 9} decimals`);
+          
+          return {
+            address,
+            symbol: "???",
+            name: `Token ${address.slice(0, 6)}...${address.slice(-4)}`,
+            decimals: mintInfo?.decimals ?? 9,
+            logoURI: undefined,
+            tags: ["on-chain", "unverified"],
+          };
+        }
+        
+        // Even if not parsed as spl-token, if account exists it might be valid
+        if (data.result?.value?.owner) {
+          console.log(`⚠️ [On-chain] Account exists but not recognized as SPL mint, owner: ${data.result.value.owner}`);
+          // Token-2022 program
+          if (data.result.value.owner === "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb") {
+            return {
+              address,
+              symbol: "???",
+              name: `Token-2022 ${address.slice(0, 6)}...`,
+              decimals: 9,
+              logoURI: undefined,
+              tags: ["on-chain", "token-2022", "unverified"],
+            };
+          }
+        }
+      } catch (e) {
+        console.log(`[On-chain] RPC ${rpcUrl.slice(0, 30)}... failed:`, e);
+        continue;
+      }
+    }
     
-    if (!data.result?.value) return null;
-    
-    const accountData = data.result.value.data;
-    if (accountData?.program !== "spl-token") return null;
-    
-    const mintInfo = accountData.parsed?.info;
-    if (!mintInfo) return null;
-    
-    return {
-      address,
-      symbol: "???", // Unknown symbol
-      name: `Token ${address.slice(0, 8)}...`,
-      decimals: mintInfo.decimals || 9,
-      logoURI: undefined,
-      tags: ["on-chain", "unverified"],
-    };
+    console.log(`❌ [On-chain] Could not verify mint: ${address}`);
+    return null;
   } catch (e) {
     console.warn("On-chain fetch failed:", e);
     return null;
@@ -250,6 +304,47 @@ export async function GET(request: NextRequest) {
         if (found) source = "dexscreener";
       }
       
+      // Try DexScreener search API as fallback (sometimes tokens/v1 misses new tokens)
+      if (!found) {
+        console.log(`🔍 Token ${address} not in DexScreener tokens, trying search API...`);
+        try {
+          const searchResponse = await fetch(
+            `https://api.dexscreener.com/latest/dex/search?q=${address}`,
+            {
+              headers: { Accept: "application/json", "User-Agent": "SwapBack/1.0" },
+              signal: AbortSignal.timeout(5000),
+            }
+          );
+          if (searchResponse.ok) {
+            const searchData = await searchResponse.json();
+            const pairs = searchData?.pairs || [];
+            // Find pair where address matches base or quote token
+            const matchingPair = pairs.find((p: DexScreenerPair) => 
+              p.chainId === "solana" && (
+                p.baseToken?.address?.toLowerCase() === address.toLowerCase() ||
+                p.quoteToken?.address?.toLowerCase() === address.toLowerCase()
+              )
+            );
+            if (matchingPair) {
+              const isBase = matchingPair.baseToken?.address?.toLowerCase() === address.toLowerCase();
+              const tokenInfo = isBase ? matchingPair.baseToken : matchingPair.quoteToken;
+              found = {
+                address: tokenInfo.address,
+                symbol: tokenInfo.symbol || "???",
+                name: tokenInfo.name || "Unknown",
+                decimals: 9,
+                logoURI: matchingPair.info?.imageUrl,
+                tags: ["dexscreener-search"],
+              };
+              source = "dexscreener-search";
+              console.log(`✅ [DexScreener Search] Found: ${tokenInfo.symbol}`);
+            }
+          }
+        } catch (e) {
+          console.log(`[DexScreener Search] Failed:`, e);
+        }
+      }
+      
       // Last resort: fetch on-chain metadata
       if (!found) {
         console.log(`🔍 Token ${address} not on DexScreener, trying on-chain...`);
@@ -275,7 +370,8 @@ export async function GET(request: NextRequest) {
         success: true,
         tokens: [],
         total: 0,
-        message: "Token not found. Make sure the address is a valid Solana mint.",
+        message: "Token not found on Jupiter, DexScreener, or on-chain. It may be too new or the address is invalid.",
+        searchedSources: ["jupiter-verified", "jupiter-all", "dexscreener", "dexscreener-search", "on-chain"],
       }, { headers: CORS_HEADERS });
     }
 
