@@ -33,6 +33,6 @@ primary_region = "cdg" # Paris - proche des utilisateurs EU
   path = "/api/health"
 
 [[vm]]
-  memory = "512mb"
+  memory = "1gb"
   cpu_kind = "shared"
   cpus = 1

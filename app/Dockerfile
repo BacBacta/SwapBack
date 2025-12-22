@@ -54,8 +54,8 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
-# Créer le dossier logs
-RUN mkdir -p logs && chown -R nextjs:nodejs logs
+# Créer les dossiers avec bonnes permissions (logs + cache Next.js)
+RUN mkdir -p logs .next/cache && chown -R nextjs:nodejs logs .next
 
 # Utiliser l'utilisateur non-root
 USER nextjs

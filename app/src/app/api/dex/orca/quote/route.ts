@@ -341,7 +341,10 @@ export async function GET(request: NextRequest) {
         isOrcaDiagnosticPayload(data);
 
       if (treatAsError) {
-        console.warn(`[Orca Quote API] Upstream error ${response.status}:`, body.slice(0, 200));
+        // Only log on first attempt to avoid spam
+        if (attempt === 0) {
+          console.warn(`[Orca Quote API] Upstream error ${response.status}:`, body.slice(0, 200));
+        }
         
         // Check if retryable
         if (isRetryableError(response.status, body) && attempt < MAX_RETRIES) {
