@@ -1,11 +1,11 @@
 /**
  * API Route: /api/dex/orca/quote
  *
- * Proxy serveur vers l'endpoint Orca officiel (côté serveur = pas de CORS).
- *
- * Important: l'ancienne implémentation renvoyait une estimation fixe (fee-only)
- * qui surévaluait souvent le outputAmount sur CLMM → minOut trop strict
- * → AnchorError AmountOutBelowMinimum (6036) au moment de la simulation.
+ * Quote Orca Whirlpools via SDK uniquement (plus stable que l'API REST).
+ * 
+ * L'API REST Orca (api.mainnet.orca.so) est derrière Cloudflare et retourne
+ * souvent des réponses "diagnostic" cachées qui causent des erreurs.
+ * Le SDK on-chain est plus fiable.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -21,7 +21,6 @@ import {
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { getOrcaWhirlpool, ORCA_WHIRLPOOL_PROGRAM_ID } from "@/sdk/config/orca-pools";
 
-// Route handler: toujours dynamique (aucune exécution au build)
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const runtime = "nodejs";
@@ -32,21 +31,11 @@ const BUILD_COMMIT =
   process.env.GITHUB_SHA ||
   "unknown";
 
-function withBuildHeaders(headers: Record<string, string>): Record<string, string> {
-  return {
-    ...headers,
-    "X-SwapBack-Commit": BUILD_COMMIT,
-  };
-}
-
 const NO_STORE_HEADERS: Record<string, string> = {
   "Cache-Control": "no-store",
   Pragma: "no-cache",
 };
 
-// Headers CORS (pattern repo)
-// Note: en prod, éviter `*` + credentials. Si ALLOWED_ORIGIN n'est pas défini,
-// on répond en mode "public" (pas de credentials) pour rester conforme.
 function getCorsHeaders(origin: string | null): Record<string, string> {
   const allowed = (process.env.ALLOWED_ORIGIN ?? "")
     .split(",")
@@ -62,9 +51,8 @@ function getCorsHeaders(origin: string | null): Record<string, string> {
 
   const headers: Record<string, string> = {
     "Access-Control-Allow-Origin": allowOrigin,
-    "Access-Control-Allow-Methods": "GET,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Requested-With",
-    "Access-Control-Max-Age": "86400",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
   };
 
   if (allowOrigin !== "*") {
@@ -75,54 +63,13 @@ function getCorsHeaders(origin: string | null): Record<string, string> {
   return headers;
 }
 
-// Retry config for transient Cloudflare/CDN errors (code 1016, 502, 503, 504)
-const MAX_RETRIES = 2;
-const RETRY_DELAY_MS = 500;
-
-/**
- * Safe JSON parse: returns null if body is not valid JSON
- */
-async function safeJsonParse(response: Response): Promise<{ json: unknown; text: string } | null> {
-  const text = await response.text();
-  try {
-    const json = JSON.parse(text);
-    return { json, text };
-  } catch {
-    return { json: null, text };
-  }
-}
-
-function isOrcaDiagnosticPayload(data: Record<string, unknown> | null): boolean {
-  if (!data) return false;
-  // Payload observé quand l'upstream renvoie du `text/plain` avec un JSON “diagnostic”
-  // ex: { headers: {...}, lasterror: "SyntaxError... error code: 1016" }
-  if (typeof data.lasterror === "string") return true;
-  if (data.headers && typeof data.headers === "object" && data.outAmount == null) return true;
-  return false;
+function withBuildHeaders(headers: Record<string, string>): Record<string, string> {
+  return { ...headers, "X-SwapBack-Commit": BUILD_COMMIT };
 }
 
 /**
- * Check if error is retryable (Cloudflare CDN errors, rate limits, etc.)
+ * ReadonlyWallet - Wallet minimal pour les quotes (pas de signature)
  */
-function isRetryableError(status: number, body: string): boolean {
-  // Cloudflare error codes in HTML body
-  if (body.includes("error code: 1016") || body.includes("error code: 1015")) {
-    return true;
-  }
-  // HTTP 502/503/504 are typically transient
-  if (status === 502 || status === 503 || status === 504 || status === 429) {
-    return true;
-  }
-  return false;
-}
-
-/**
- * Sleep helper
- */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 class ReadonlyWallet {
   publicKey: PublicKey;
   payer: Keypair;
@@ -143,6 +90,9 @@ class ReadonlyWallet {
   }
 }
 
+/**
+ * Quote via Orca Whirlpool SDK (on-chain)
+ */
 async function quoteWithOrcaWhirlpoolSdk(params: {
   rpcUrl: string;
   pool: string;
@@ -150,15 +100,13 @@ async function quoteWithOrcaWhirlpoolSdk(params: {
   outputMint: string;
   amountIn: number;
   slippageBps: number;
-}): Promise<{ outAmount: number }> {
+}): Promise<{ outAmount: number; priceImpact: number }> {
   const connection = new Connection(params.rpcUrl, "confirmed");
   const provider = new AnchorProvider(
     connection,
     new ReadonlyWallet() as any,
     AnchorProvider.defaultOptions()
   );
-  // NOTE: `withProvider(provider, fetcher?)` — le 2e argument est un *fetcher*, pas le programId.
-  // Passer un PublicKey ici casse `ctx.fetcher` (=> getPool is not a function).
   const ctx = WhirlpoolContext.withProvider(provider);
   const client = buildWhirlpoolClient(ctx);
 
@@ -176,7 +124,7 @@ async function quoteWithOrcaWhirlpoolSdk(params: {
 
   if (!aToB && !bToA) {
     throw new Error(
-      `Pool does not match input/output mints (tokenA=${tokenA.mint.toBase58()}, tokenB=${tokenB.mint.toBase58()})`
+      `Pool mints mismatch (tokenA=${tokenA.mint.toBase58()}, tokenB=${tokenB.mint.toBase58()})`
     );
   }
 
@@ -197,7 +145,11 @@ async function quoteWithOrcaWhirlpoolSdk(params: {
     throw new Error(`Invalid outAmount from SDK: ${quote.estimatedAmountOut.toString()}`);
   }
 
-  return { outAmount };
+  // Estimate price impact from the quote
+  // Price impact ≈ (amountIn / estimatedAmountIn - 1) or similar heuristic
+  const priceImpact = 0; // SDK doesn't provide this directly, set to 0
+
+  return { outAmount, priceImpact };
 }
 
 export async function OPTIONS(request: NextRequest) {
@@ -209,18 +161,26 @@ export async function OPTIONS(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const inputMint = searchParams.get('inputMint');
-  const outputMint = searchParams.get('outputMint');
-  const amount = searchParams.get('amount');
-  const pool = searchParams.get("pool");
+  const inputMint = searchParams.get("inputMint");
+  const outputMint = searchParams.get("outputMint");
+  const amount = searchParams.get("amount");
+  const poolParam = searchParams.get("pool");
   const slippageBpsParam = searchParams.get("slippageBps");
-  const forceFresh = searchParams.get("forceFresh") === "1" || searchParams.get("forceFresh") === "true";
+  
   const corsHeaders = getCorsHeaders(request.headers.get("origin"));
   const responseHeaders = withBuildHeaders({ ...corsHeaders, ...NO_STORE_HEADERS });
 
   if (!inputMint || !outputMint || !amount) {
     return NextResponse.json(
-      { error: 'Missing required parameters: inputMint, outputMint, amount' },
+      { error: "Missing required parameters: inputMint, outputMint, amount" },
+      { status: 400, headers: responseHeaders }
+    );
+  }
+
+  const amountIn = Number(amount);
+  if (!Number.isFinite(amountIn) || amountIn <= 0) {
+    return NextResponse.json(
+      { error: "Invalid amount" },
       { status: 400, headers: responseHeaders }
     );
   }
@@ -231,226 +191,77 @@ export async function GET(request: NextRequest) {
       ? Math.min(10_000, Math.max(0, Math.floor(slippageBpsRaw)))
       : 50;
 
-  try {
-    const amountIn = Number(amount);
-    if (!Number.isFinite(amountIn) || amountIn <= 0) {
-      return NextResponse.json(
-        { error: "Invalid amount" },
-        { status: 400, headers: responseHeaders }
-      );
+  // Resolve pool: either provided by caller or from our known pools
+  let poolAddress: string | null = poolParam ?? null;
+  
+  if (!poolAddress) {
+    try {
+      const inputPk = new PublicKey(inputMint);
+      const outputPk = new PublicKey(outputMint);
+      poolAddress = getOrcaWhirlpool(inputPk, outputPk)?.toBase58() ?? null;
+    } catch {
+      // Invalid mint format
     }
+  }
 
-    const rpcUrl =
-      process.env.SOLANA_RPC_URL ||
-      process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
-      "https://api.mainnet-beta.solana.com";
-
-    // Prefer SDK on-chain quotes when we can resolve a pool address.
-    // This avoids upstream Orca REST instability (Cloudflare diagnostic payloads).
-    const resolvedPool =
-      pool ||
-      (() => {
-        try {
-          return getOrcaWhirlpool(new PublicKey(inputMint), new PublicKey(outputMint))?.toBase58() ?? null;
-        } catch {
-          return null;
-        }
-      })();
-
-    let sdkErrorFirst: string | null = null;
-    if (resolvedPool) {
-      try {
-        const sdkQuote = await quoteWithOrcaWhirlpoolSdk({
-          rpcUrl,
-          pool: resolvedPool,
-          inputMint,
-          outputMint,
-          amountIn,
-          slippageBps,
-        });
-
-        return NextResponse.json(
-          {
-            inputMint,
-            outputMint,
-            inputAmount: amountIn,
-            outputAmount: sdkQuote.outAmount,
-            priceImpact: 0,
-            priceImpactBps: 0,
-            slippageBps,
-            pool: resolvedPool,
-            source: "orca-whirlpool-sdk",
-          },
-          { headers: responseHeaders }
-        );
-      } catch (sdkError) {
-        sdkErrorFirst = String(sdkError);
-        // If SDK fails (pool mismatch, RPC hiccup), continue and try REST retries.
-        console.warn("[Orca Quote API] SDK quote failed; falling back to REST", {
-          inputMint,
-          outputMint,
-          pool: resolvedPool,
-          error: sdkErrorFirst,
-        });
-      }
-    }
-
-    // Orca Quote API (déjà utilisée ailleurs dans le repo)
-    // Note: le paramètre `slippage` est en % (0.5 = 0.5%)
-    const slippagePct = (slippageBps / 100).toString();
-    const url =
-      `https://api.mainnet.orca.so/v1/quote?` +
-      new URLSearchParams({
+  if (!poolAddress) {
+    // No known Orca pool for this pair
+    return NextResponse.json(
+      { 
+        error: "No Orca Whirlpool found for this token pair",
         inputMint,
         outputMint,
-        amount: amountIn.toString(),
-        slippage: slippagePct,
-      });
+        hint: "This pair is not supported on Orca Whirlpools or the pool is not in our registry"
+      },
+      { status: 404, headers: responseHeaders }
+    );
+  }
 
-    let lastError: { status: number; body: string } | null = null;
+  // Get RPC URL
+  const rpcUrl =
+    process.env.SOLANA_RPC_URL ||
+    process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
+    "https://api.mainnet-beta.solana.com";
 
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      if (attempt > 0) {
-        console.log(`[Orca Quote API] Retry ${attempt}/${MAX_RETRIES} after transient error`);
-        await sleep(RETRY_DELAY_MS * attempt);
-      }
+  try {
+    const quote = await quoteWithOrcaWhirlpoolSdk({
+      rpcUrl,
+      pool: poolAddress,
+      inputMint,
+      outputMint,
+      amountIn,
+      slippageBps,
+    });
 
-      const response = await fetch(url, {
-        headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(7000),
-        ...(forceFresh
-          ? { cache: "no-store" as const }
-          : {
-              // Cache faible: l'état pool peut changer vite
-              next: { revalidate: 2 },
-            }),
-      });
-
-      const contentType = response.headers.get("content-type") ?? "";
-
-      // Parse response safely (may be HTML error page from Cloudflare)
-      const parsed = await safeJsonParse(response);
-      const body = parsed?.text ?? "";
-      const data = parsed?.json as Record<string, unknown> | null;
-
-      // Même avec status=200, Orca peut répondre en `text/plain` avec un JSON “diagnostic”
-      // ou une page HTML Cloudflare.
-      const treatAsError =
-        !response.ok ||
-        !contentType.toLowerCase().includes("application/json") ||
-        isOrcaDiagnosticPayload(data);
-
-      if (treatAsError) {
-        // Only log on first attempt to avoid spam
-        if (attempt === 0) {
-          console.warn(`[Orca Quote API] Upstream error ${response.status}:`, body.slice(0, 200));
-        }
-        
-        // Check if retryable
-        if (isRetryableError(response.status, body) && attempt < MAX_RETRIES) {
-          lastError = { status: response.status, body: body.slice(0, 500) };
-          continue; // retry
-        }
-
-        lastError = { status: response.status, body: body.slice(0, 500) };
-        break;
-      }
-
-      // Check if we got valid JSON
-      if (!data || typeof data !== "object") {
-        console.warn(`[Orca Quote API] Invalid JSON response:`, body.slice(0, 200));
-        
-        if (isRetryableError(200, body) && attempt < MAX_RETRIES) {
-          lastError = { status: 200, body: body.slice(0, 500) };
-          continue; // retry
-        }
-
-        return NextResponse.json(
-          { error: "Orca returned invalid JSON", body: body.slice(0, 500) },
-          { status: 502, headers: responseHeaders }
-        );
-      }
-
-      const outAmount = Number(data.outAmount ?? 0);
-      const priceImpactPercent = Number(data.priceImpactPercent ?? 0);
-      const priceImpactBps = Number.isFinite(priceImpactPercent)
-        ? Math.round(priceImpactPercent * 100)
-        : 0;
-
-      if (!Number.isFinite(outAmount) || outAmount <= 0) {
-        return NextResponse.json(
-          { error: "Invalid Orca quote response", data },
-          { status: 502, headers: responseHeaders }
-        );
-      }
-
-      return NextResponse.json(
-        {
-          inputMint,
-          outputMint,
-          inputAmount: amountIn,
-          outputAmount: outAmount,
-          priceImpact: Number.isFinite(priceImpactPercent) ? priceImpactPercent / 100 : 0,
-          priceImpactBps,
-          slippageBps,
-          source: "orca-api",
-        },
-        { headers: responseHeaders }
-      );
-    }
-
-    // If REST failed and we *only* have a pool provided by the client, keep the old behavior as final attempt.
-    if (pool && pool !== resolvedPool) {
-      try {
-        const sdkQuote = await quoteWithOrcaWhirlpoolSdk({
-          rpcUrl,
-          pool,
-          inputMint,
-          outputMint,
-          amountIn,
-          slippageBps,
-        });
-
-        return NextResponse.json(
-          {
-            inputMint,
-            outputMint,
-            inputAmount: amountIn,
-            outputAmount: sdkQuote.outAmount,
-            priceImpact: 0,
-            priceImpactBps: 0,
-            slippageBps,
-            pool,
-            source: "orca-whirlpool-sdk",
-          },
-          { headers: responseHeaders }
-        );
-      } catch (sdkError) {
-        return NextResponse.json(
-          {
-            error: "Orca quote unavailable (upstream + SDK fallback failed)",
-            lastError,
-            sdkError: String(sdkError),
-          },
-          { status: 503, headers: responseHeaders }
-        );
-      }
-    }
-
-    // All retries exhausted (no fallback possible)
     return NextResponse.json(
       {
-        error: "Orca API unavailable after retries",
-        lastError,
-        resolvedPool,
-        sdkError: sdkErrorFirst,
+        inputMint,
+        outputMint,
+        inputAmount: amountIn,
+        outputAmount: quote.outAmount,
+        priceImpact: quote.priceImpact,
+        priceImpactBps: Math.floor(quote.priceImpact * 100),
+        slippageBps,
+        pool: poolAddress,
+        venue: "ORCA",
+        source: "orca-whirlpool-sdk",
       },
-      { status: 503, headers: responseHeaders }
+      { headers: responseHeaders }
     );
   } catch (error) {
-    console.error('[Orca Quote API] Error:', error);
+    console.error("[Orca Quote] SDK error:", {
+      pool: poolAddress,
+      inputMint,
+      outputMint,
+      error: String(error),
+    });
+
     return NextResponse.json(
-      { error: 'Failed to fetch Orca quote', details: String(error) },
+      {
+        error: "Failed to get Orca quote",
+        pool: poolAddress,
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 502, headers: responseHeaders }
     );
   }
