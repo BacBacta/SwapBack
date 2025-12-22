@@ -192,9 +192,16 @@ export async function GET(request: NextRequest) {
 // ============================================================================
 
 function getBaseUrl(request: NextRequest): string {
-  // Try to get from request URL first
+  // For Fly.io: use internal URL for self-calls (faster, no external network)
+  // Fly.io sets FLY_APP_NAME environment variable
+  if (process.env.FLY_APP_NAME) {
+    // Use localhost for internal calls on Fly.io (same container)
+    return 'http://localhost:3000';
+  }
+  
+  // For Vercel: use the request origin
   const url = new URL(request.url);
-  if (url.origin && url.origin !== 'null') {
+  if (url.origin && url.origin !== 'null' && !url.origin.includes('localhost')) {
     return url.origin;
   }
   
