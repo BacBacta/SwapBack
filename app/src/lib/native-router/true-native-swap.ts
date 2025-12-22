@@ -50,6 +50,7 @@ import {
 } from "@/config/routing";
 import { benchmarkAgainstJupiter } from "./split-route";
 import { getTokenPrice } from "@/lib/price-service";
+import { VOLATILE_TOKEN_MINTS } from "./index";
 
 // ============================================================================
 // CONSTANTS
@@ -2523,6 +2524,8 @@ export class TrueNativeSwap {
       Math.floor((route.outputAmount * (10_000 - slippageBps)) / 10_000)
     );
 
+    // Pour Raydium AMM: TOUJOURS re-quoter juste avant la construction de la TX
+    // pour obtenir le prix le plus frais et éviter les erreurs de slippage 0x1e
     if (route.venue === "RAYDIUM_AMM") {
       const raydiumQuote = await this.getRaydiumQuote(
         inputMint,
@@ -2531,10 +2534,50 @@ export class TrueNativeSwap {
         route.dexAccounts,
         slippageBps
       );
-      if (raydiumQuote?.minOutAmount && Number.isFinite(raydiumQuote.minOutAmount)) {
-        const candidate = Math.max(0, Math.floor(raydiumQuote.minOutAmount));
-        if (candidate > 0) {
-          minAmountOut = candidate;
+      
+      if (raydiumQuote) {
+        // PRIORITÉ 1: Utiliser otherAmountThreshold si disponible (le plus sûr)
+        if (raydiumQuote.minOutAmount && Number.isFinite(raydiumQuote.minOutAmount)) {
+          const candidate = Math.max(0, Math.floor(raydiumQuote.minOutAmount));
+          if (candidate > 0) {
+            minAmountOut = candidate;
+            logger.debug("TrueNativeSwap", "Using Raydium otherAmountThreshold", {
+              minAmountOut,
+              originalMinOut: Math.floor((route.outputAmount * (10_000 - slippageBps)) / 10_000),
+            });
+          }
+        }
+        // PRIORITÉ 2: Si otherAmountThreshold absent, recalculer depuis le NOUVEAU outputAmount
+        else if (raydiumQuote.outputAmount > 0) {
+          const freshMinOut = Math.max(
+            0,
+            Math.floor((raydiumQuote.outputAmount * (10_000 - slippageBps)) / 10_000)
+          );
+          if (freshMinOut > 0 && freshMinOut < minAmountOut) {
+            logger.info("TrueNativeSwap", "Raydium re-quote: price dropped, using fresh minOut", {
+              oldMinOut: minAmountOut,
+              freshMinOut,
+              oldOutput: route.outputAmount,
+              freshOutput: raydiumQuote.outputAmount,
+              priceDrop: ((route.outputAmount - raydiumQuote.outputAmount) / route.outputAmount * 100).toFixed(2) + "%",
+            });
+            minAmountOut = freshMinOut;
+          }
+        }
+      } else {
+        // Re-quote a échoué - ajouter une marge de sécurité supplémentaire pour les tokens volatils
+        const isVolatile = VOLATILE_TOKEN_MINTS.has(inputMint.toBase58()) || 
+                          VOLATILE_TOKEN_MINTS.has(outputMint.toBase58());
+        if (isVolatile) {
+          // Réduire minAmountOut de 2% supplémentaire pour compenser le stale quote
+          const safetyMarginBps = 200;
+          const saferMinOut = Math.floor(minAmountOut * (10_000 - safetyMarginBps) / 10_000);
+          logger.warn("TrueNativeSwap", "Raydium re-quote failed for volatile token, applying safety margin", {
+            originalMinOut: minAmountOut,
+            saferMinOut,
+            safetyMarginBps,
+          });
+          minAmountOut = saferMinOut;
         }
       }
     }
