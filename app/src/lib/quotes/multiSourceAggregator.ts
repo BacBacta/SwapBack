@@ -204,27 +204,70 @@ async function fetchJupiterQuote(params: QuoteParams, endpoint: string): Promise
   return response.json();
 }
 
-// Raydium SDK (fallback)
+// Raydium via internal API (uses real Raydium transaction API)
 async function fetchRaydiumQuote(params: QuoteParams): Promise<JupiterQuoteResponse | null> {
   try {
-    // Raydium API pour les paires AMM
-    const url = `https://api.raydium.io/v2/main/price?tokens=${params.inputMint},${params.outputMint}`;
-    const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    const baseUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
+    const url = `${baseUrl}/api/dex/raydium/quote?inputMint=${params.inputMint}&outputMint=${params.outputMint}&amount=${Math.floor(params.amountLamports)}&slippageBps=${params.slippageBps}`;
+    
+    const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
     
     if (!response.ok) return null;
 
     const data = await response.json();
-    const inputPrice = data[params.inputMint]?.price || 0;
-    const outputPrice = data[params.outputMint]?.price || 0;
+    
+    if (data.error || !data.outputAmount || data.outputAmount <= 0) return null;
 
-    if (!inputPrice || !outputPrice) return null;
+    const inputLamports = Math.floor(params.amountLamports);
+    const outputLamports = data.outputAmount;
+    const priceImpact = data.priceImpact ?? 0;
 
-    // Estimation simple basée sur le prix
-    const amountInTokens = params.amountTokens;
-    const rate = inputPrice / outputPrice;
-    const outputAmountTokens = amountInTokens * rate * 0.997; // 0.3% fee estimation
-    const outputLamports = Math.floor(outputAmountTokens * Math.pow(10, params.outputDecimals));
-    const inputLamports = Math.floor(amountInTokens * Math.pow(10, params.inputDecimals));
+    // Format compatible Jupiter
+    return {
+      inputMint: params.inputMint,
+      outputMint: params.outputMint,
+      inAmount: inputLamports.toString(),
+      outAmount: outputLamports.toString(),
+      otherAmountThreshold: (data.minOutAmount || Math.floor(outputLamports * 0.99)).toString(),
+      priceImpactPct: (priceImpact * 100).toString(),
+      routePlan: [{
+        swapInfo: {
+          ammKey: data.poolId || "raydium-amm",
+          label: "Raydium",
+          inputMint: params.inputMint,
+          outputMint: params.outputMint,
+          inAmount: inputLamports.toString(),
+          outAmount: outputLamports.toString(),
+          feeAmount: (data.fee || 0).toString(),
+          feeMint: params.inputMint,
+        },
+        percent: 100,
+      }],
+      contextSlot: 0,
+      timeTaken: 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Orca via internal API (uses Orca Whirlpools SDK)
+async function fetchOrcaQuote(params: QuoteParams): Promise<JupiterQuoteResponse | null> {
+  try {
+    const baseUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
+    const url = `${baseUrl}/api/dex/orca/quote?inputMint=${params.inputMint}&outputMint=${params.outputMint}&amount=${Math.floor(params.amountLamports)}&slippageBps=${params.slippageBps}`;
+    
+    const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    
+    if (data.error || !data.outputAmount || data.outputAmount <= 0) return null;
+
+    const inputLamports = Math.floor(params.amountLamports);
+    const outputLamports = data.outputAmount;
+    const priceImpact = data.priceImpact ?? 0;
 
     // Format compatible Jupiter
     return {
@@ -233,56 +276,15 @@ async function fetchRaydiumQuote(params: QuoteParams): Promise<JupiterQuoteRespo
       inAmount: inputLamports.toString(),
       outAmount: outputLamports.toString(),
       otherAmountThreshold: Math.floor(outputLamports * 0.99).toString(),
-      priceImpactPct: "0.1",
+      priceImpactPct: (priceImpact * 100).toString(),
       routePlan: [{
         swapInfo: {
-          ammKey: "raydium-amm",
-          label: "Raydium",
+          ammKey: data.pool || "orca-whirlpool",
+          label: "Orca",
           inputMint: params.inputMint,
           outputMint: params.outputMint,
           inAmount: inputLamports.toString(),
           outAmount: outputLamports.toString(),
-          feeAmount: Math.floor(amountInTokens * 0.003 * Math.pow(10, params.inputDecimals)).toString(),
-          feeMint: params.inputMint,
-        },
-        percent: 100,
-      }],
-      contextSlot: 0,
-      timeTaken: 0,
-    };
-  } catch {
-    return null;
-  }
-}
-
-// Orca Whirlpool (fallback)
-async function fetchOrcaQuote(params: QuoteParams): Promise<JupiterQuoteResponse | null> {
-  try {
-    // Orca Whirlpool API
-    const url = `https://api.orca.so/v2/quote?inputMint=${params.inputMint}&outputMint=${params.outputMint}&amount=${params.amountLamports}&slippage=${params.slippageBps / 10000}`;
-    const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
-    
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    if (!data.outAmount) return null;
-
-    // Format compatible Jupiter
-    return {
-      inputMint: params.inputMint,
-      outputMint: params.outputMint,
-      inAmount: data.inAmount || params.amountLamports.toString(),
-      outAmount: data.outAmount,
-      otherAmountThreshold: Math.floor(Number(data.outAmount) * 0.99).toString(),
-      priceImpactPct: data.priceImpact || "0.1",
-      routePlan: [{
-        swapInfo: {
-          ammKey: "orca-whirlpool",
-          label: "Orca",
-          inputMint: params.inputMint,
-          outputMint: params.outputMint,
-          inAmount: data.inAmount || params.amountLamports.toString(),
-          outAmount: data.outAmount,
           feeAmount: "0",
           feeMint: params.inputMint,
         },
@@ -297,36 +299,41 @@ async function fetchOrcaQuote(params: QuoteParams): Promise<JupiterQuoteResponse
 }
 
 /**
- * Fetch quote depuis Phoenix CLOB
- * Utilise l'API Phoenix pour simuler un fill sur le carnet d'ordres
+ * Fetch quote depuis Phoenix CLOB via internal API
  */
 async function fetchPhoenixQuote(params: QuoteParams): Promise<JupiterQuoteResponse | null> {
   try {
-    // Phoenix API endpoint
-    const url = `https://api.phoenix.trade/v1/quote?inputMint=${params.inputMint}&outputMint=${params.outputMint}&amount=${params.amountLamports}&slippageBps=${params.slippageBps}`;
-    const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    const baseUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
+    const url = `${baseUrl}/api/dex/phoenix/quote?inputMint=${params.inputMint}&outputMint=${params.outputMint}&amount=${Math.floor(params.amountLamports)}&slippageBps=${params.slippageBps}`;
+    
+    const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
     
     if (!response.ok) return null;
 
     const data = await response.json();
-    if (!data.outAmount) return null;
+    
+    if (data.error || !data.outputAmount || data.outputAmount <= 0) return null;
+
+    const inputLamports = Math.floor(params.amountLamports);
+    const outputLamports = data.outputAmount;
+    const priceImpact = data.priceImpact ?? 0;
 
     return {
       inputMint: params.inputMint,
       outputMint: params.outputMint,
-      inAmount: params.amountLamports.toString(),
-      outAmount: data.outAmount.toString(),
-      otherAmountThreshold: Math.floor(Number(data.outAmount) * 0.99).toString(),
-      priceImpactPct: data.priceImpact?.toString() || "0.05",
+      inAmount: inputLamports.toString(),
+      outAmount: outputLamports.toString(),
+      otherAmountThreshold: Math.floor(outputLamports * 0.99).toString(),
+      priceImpactPct: (priceImpact * 100).toString(),
       routePlan: [{
         swapInfo: {
-          ammKey: "phoenix-clob",
+          ammKey: data.market || "phoenix-clob",
           label: "Phoenix",
           inputMint: params.inputMint,
           outputMint: params.outputMint,
-          inAmount: params.amountLamports.toString(),
-          outAmount: data.outAmount.toString(),
-          feeAmount: data.fee?.toString() || "0",
+          inAmount: inputLamports.toString(),
+          outAmount: outputLamports.toString(),
+          feeAmount: (data.fee || 0).toString(),
           feeMint: params.inputMint,
         },
         percent: 100,
@@ -340,35 +347,41 @@ async function fetchPhoenixQuote(params: QuoteParams): Promise<JupiterQuoteRespo
 }
 
 /**
- * Fetch quote depuis Lifinity (Oracle-based AMM)
+ * Fetch quote depuis Lifinity via internal API (Oracle-based AMM)
  */
 async function fetchLifinityQuote(params: QuoteParams): Promise<JupiterQuoteResponse | null> {
   try {
-    // Lifinity utilise un oracle pour le pricing - simulation via leur API
-    const url = `https://lifinity.io/api/v1/quote?inputMint=${params.inputMint}&outputMint=${params.outputMint}&amount=${params.amountLamports}`;
-    const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    const baseUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
+    const url = `${baseUrl}/api/dex/lifinity/quote?inputMint=${params.inputMint}&outputMint=${params.outputMint}&amount=${Math.floor(params.amountLamports)}&slippageBps=${params.slippageBps}`;
+    
+    const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
     
     if (!response.ok) return null;
 
     const data = await response.json();
-    if (!data.amountOut) return null;
+    
+    if (data.error || !data.outputAmount || data.outputAmount <= 0) return null;
+
+    const inputLamports = Math.floor(params.amountLamports);
+    const outputLamports = data.outputAmount;
+    const priceImpact = data.priceImpact ?? 0;
 
     return {
       inputMint: params.inputMint,
       outputMint: params.outputMint,
-      inAmount: params.amountLamports.toString(),
-      outAmount: data.amountOut.toString(),
-      otherAmountThreshold: Math.floor(Number(data.amountOut) * 0.99).toString(),
-      priceImpactPct: data.priceImpact?.toString() || "0.1",
+      inAmount: inputLamports.toString(),
+      outAmount: outputLamports.toString(),
+      otherAmountThreshold: Math.floor(outputLamports * 0.99).toString(),
+      priceImpactPct: (priceImpact * 100).toString(),
       routePlan: [{
         swapInfo: {
-          ammKey: "lifinity-oracle",
+          ammKey: data.pool || "lifinity-oracle",
           label: "Lifinity",
           inputMint: params.inputMint,
           outputMint: params.outputMint,
-          inAmount: params.amountLamports.toString(),
-          outAmount: data.amountOut.toString(),
-          feeAmount: data.fee?.toString() || "0",
+          inAmount: inputLamports.toString(),
+          outAmount: outputLamports.toString(),
+          feeAmount: (data.fee || 0).toString(),
           feeMint: params.inputMint,
         },
         percent: 100,
@@ -382,34 +395,41 @@ async function fetchLifinityQuote(params: QuoteParams): Promise<JupiterQuoteResp
 }
 
 /**
- * Fetch quote depuis Meteora DLMM (Dynamic Liquidity Market Maker)
+ * Fetch quote depuis Meteora via internal API (DLMM - Dynamic Liquidity Market Maker)
  */
 async function fetchMeteoraQuote(params: QuoteParams): Promise<JupiterQuoteResponse | null> {
   try {
-    const url = `https://dlmm-api.meteora.ag/pair/quote?inputMint=${params.inputMint}&outputMint=${params.outputMint}&amount=${params.amountLamports}&slippageBps=${params.slippageBps}`;
-    const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    const baseUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
+    const url = `${baseUrl}/api/dex/meteora/quote?inputMint=${params.inputMint}&outputMint=${params.outputMint}&amount=${Math.floor(params.amountLamports)}&slippageBps=${params.slippageBps}`;
+    
+    const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
     
     if (!response.ok) return null;
 
     const data = await response.json();
-    if (!data.outAmount) return null;
+    
+    if (data.error || !data.outputAmount || data.outputAmount <= 0) return null;
+
+    const inputLamports = Math.floor(params.amountLamports);
+    const outputLamports = data.outputAmount;
+    const priceImpact = data.priceImpact ?? 0;
 
     return {
       inputMint: params.inputMint,
       outputMint: params.outputMint,
-      inAmount: params.amountLamports.toString(),
-      outAmount: data.outAmount.toString(),
-      otherAmountThreshold: Math.floor(Number(data.outAmount) * 0.99).toString(),
-      priceImpactPct: data.priceImpact?.toString() || "0.1",
+      inAmount: inputLamports.toString(),
+      outAmount: outputLamports.toString(),
+      otherAmountThreshold: Math.floor(outputLamports * 0.99).toString(),
+      priceImpactPct: (priceImpact * 100).toString(),
       routePlan: [{
         swapInfo: {
-          ammKey: "meteora-dlmm",
+          ammKey: data.pool || "meteora-dlmm",
           label: "Meteora",
           inputMint: params.inputMint,
           outputMint: params.outputMint,
-          inAmount: params.amountLamports.toString(),
-          outAmount: data.outAmount.toString(),
-          feeAmount: data.fee?.toString() || "0",
+          inAmount: inputLamports.toString(),
+          outAmount: outputLamports.toString(),
+          feeAmount: (data.fee || 0).toString(),
           feeMint: params.inputMint,
         },
         percent: 100,
@@ -423,34 +443,41 @@ async function fetchMeteoraQuote(params: QuoteParams): Promise<JupiterQuoteRespo
 }
 
 /**
- * Fetch quote depuis Sanctum (LST swaps)
+ * Fetch quote depuis Saber via internal API (Stableswap)
  */
-async function fetchSanctumQuote(params: QuoteParams): Promise<JupiterQuoteResponse | null> {
+async function fetchSaberQuote(params: QuoteParams): Promise<JupiterQuoteResponse | null> {
   try {
-    const url = `https://api.sanctum.so/v1/quote?inputMint=${params.inputMint}&outputMint=${params.outputMint}&amount=${params.amountLamports}`;
-    const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    const baseUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
+    const url = `${baseUrl}/api/dex/saber/quote?inputMint=${params.inputMint}&outputMint=${params.outputMint}&amount=${Math.floor(params.amountLamports)}&slippageBps=${params.slippageBps}`;
+    
+    const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
     
     if (!response.ok) return null;
 
     const data = await response.json();
-    if (!data.outAmount) return null;
+    
+    if (data.error || !data.outputAmount || data.outputAmount <= 0) return null;
+
+    const inputLamports = Math.floor(params.amountLamports);
+    const outputLamports = data.outputAmount;
+    const priceImpact = data.priceImpact ?? 0;
 
     return {
       inputMint: params.inputMint,
       outputMint: params.outputMint,
-      inAmount: params.amountLamports.toString(),
-      outAmount: data.outAmount.toString(),
-      otherAmountThreshold: Math.floor(Number(data.outAmount) * 0.99).toString(),
-      priceImpactPct: data.priceImpact?.toString() || "0.05",
+      inAmount: inputLamports.toString(),
+      outAmount: outputLamports.toString(),
+      otherAmountThreshold: Math.floor(outputLamports * 0.99).toString(),
+      priceImpactPct: (priceImpact * 100).toString(),
       routePlan: [{
         swapInfo: {
-          ammKey: "sanctum-lst",
-          label: "Sanctum",
+          ammKey: data.pool || "saber-stableswap",
+          label: "Saber",
           inputMint: params.inputMint,
           outputMint: params.outputMint,
-          inAmount: params.amountLamports.toString(),
-          outAmount: data.outAmount.toString(),
-          feeAmount: "0",
+          inAmount: inputLamports.toString(),
+          outAmount: outputLamports.toString(),
+          feeAmount: (data.fee || 0).toString(),
           feeMint: params.inputMint,
         },
         percent: 100,
@@ -558,15 +585,15 @@ export class MultiSourceQuoteAggregator {
       },
     });
 
-    // Sanctum (LST swaps)
+    // Saber (Stableswap)
     this.sources.push({
-      name: "sanctum",
+      name: "saber",
       priority: 7,
       enabled: true,
       fetchQuote: async (params) => {
         const start = Date.now();
-        const quote = await fetchSanctumQuote(params);
-        return { source: "sanctum", quote, latencyMs: Date.now() - start };
+        const quote = await fetchSaberQuote(params);
+        return { source: "saber", quote, latencyMs: Date.now() - start };
       },
     });
   }
