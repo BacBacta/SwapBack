@@ -9,10 +9,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { Connection, PublicKey } from '@solana/web3.js';
+import { getMint } from '@solana/spl-token';
+import { getAmountOut } from '@lifinity/sdk';
 
 // Route handler: toujours dynamique (aucune exécution au build)
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+export const runtime = "nodejs";
 
 const NO_STORE_HEADERS: Record<string, string> = {
   "Cache-Control": "no-store",
@@ -54,31 +58,10 @@ export async function OPTIONS(request: NextRequest) {
   });
 }
 
-// Lifinity pools - oracle-based AMM with deep liquidity
-const LIFINITY_POOLS: Record<string, { pool: string; tokenAMint: string; tokenBMint: string }> = {
-  // SOL/USDC
-  'So11111111111111111111111111111111111111112:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': {
-    pool: 'Giqy94gE9y7Rf7H6Fz4pPx4nWmqvdFW7yFhRzEbhFqWJ',
-    tokenAMint: 'So11111111111111111111111111111111111111112',
-    tokenBMint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-  },
-  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v:So11111111111111111111111111111111111111112': {
-    pool: 'Giqy94gE9y7Rf7H6Fz4pPx4nWmqvdFW7yFhRzEbhFqWJ',
-    tokenAMint: 'So11111111111111111111111111111111111111112',
-    tokenBMint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-  },
-  // USDC/USDT
-  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v:Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': {
-    pool: '8NfHnKsKq5y2eCy1F6LJrSzZ5qezR3K9z7ER2WrLnWkT',
-    tokenAMint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-    tokenBMint: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
-  },
-  'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': {
-    pool: '8NfHnKsKq5y2eCy1F6LJrSzZ5qezR3K9z7ER2WrLnWkT',
-    tokenAMint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-    tokenBMint: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
-  },
-};
+async function getMintDecimals(connection: Connection, mint: PublicKey): Promise<number> {
+  const mintInfo = await getMint(connection, mint);
+  return mintInfo.decimals;
+}
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -111,37 +94,82 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if we have a pool for this pair
-    const pairKey = `${inputMint}:${outputMint}`;
-    const poolInfo = LIFINITY_POOLS[pairKey];
+    const rpcUrl =
+      process.env.SOLANA_RPC_URL ||
+      process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
+      "https://api.mainnet-beta.solana.com";
 
-    if (!poolInfo) {
+    const connection = new Connection(rpcUrl, "confirmed");
+    const fromMintPk = new PublicKey(inputMint);
+    const toMintPk = new PublicKey(outputMint);
+
+    // L'API venue-quotes passe `amount` en base units.
+    // @lifinity/sdk.getAmountOut attend un amount en "token units" (ex: 1.23 SOL).
+    const [fromDecimals, toDecimals] = await Promise.all([
+      getMintDecimals(connection, fromMintPk),
+      getMintDecimals(connection, toMintPk),
+    ]);
+
+    const fromDivisor = Math.pow(10, fromDecimals);
+    const amountInTokenUnits = amountIn / fromDivisor;
+    if (!Number.isFinite(amountInTokenUnits) || amountInTokenUnits <= 0) {
       return NextResponse.json(
-        { error: "No Lifinity pool for this pair", availablePairs: Object.keys(LIFINITY_POOLS).slice(0, 5) },
+        { error: "Invalid amount after decimals conversion" },
+        { status: 400, headers: responseHeaders }
+      );
+    }
+
+    // slippage: bps -> percent (0.5% pour 50 bps)
+    const slippagePercent = slippageBps / 100;
+
+    const quote = await getAmountOut(connection, amountInTokenUnits, fromMintPk, toMintPk, slippagePercent);
+    if (!quote) {
+      return NextResponse.json(
+        { error: "No Lifinity pool for this pair" },
         { status: 404, headers: responseHeaders }
       );
     }
 
-    // Lifinity uses oracle-based pricing, estimate output using oracle prices
-    // For now, use a conservative 0.3% fee estimate (30 bps)
-    // In production, this should query the Lifinity API or on-chain data
-    const FEE_BPS = 30;
-    const estimatedOutput = Math.floor(amountIn * (10000 - FEE_BPS) / 10000);
+    const amountOutTokenUnits = Number(quote.amountOutWithSlippage ?? quote.amountOut ?? 0);
+    const outMultiplier = Math.pow(10, toDecimals);
+    const outputAmount = Math.floor(amountOutTokenUnits * outMultiplier);
 
-    console.log(`[Lifinity] Quote for ${inputMint.slice(0, 8)}... -> ${outputMint.slice(0, 8)}...`);
-    console.log(`[Lifinity] Input: ${amountIn}, Output estimate: ${estimatedOutput}`);
+    if (!Number.isFinite(outputAmount) || outputAmount <= 0) {
+      return NextResponse.json(
+        { error: "Invalid Lifinity SDK quote output", details: quote },
+        { status: 502, headers: responseHeaders }
+      );
+    }
 
-    return NextResponse.json({
-      inputMint,
-      outputMint,
-      inputAmount: amountIn,
-      outputAmount: estimatedOutput,
-      priceImpact: 0.001, // Oracle-based AMM has minimal price impact
-      priceImpactBps: 1,
+    if (!Number.isSafeInteger(outputAmount)) {
+      return NextResponse.json(
+        { error: "Lifinity quote too large (unsafe integer)", outputAmount },
+        { status: 502, headers: responseHeaders }
+      );
+    }
+
+    console.log(`[Lifinity] Quote for ${inputMint.slice(0, 8)}... -> ${outputMint.slice(0, 8)}...`, {
+      amountIn,
+      amountInTokenUnits,
+      outputAmount,
+      amountOutTokenUnits,
       slippageBps,
-      pool: poolInfo.pool,
-      source: 'lifinity-estimated',
-    }, { headers: responseHeaders });
+      rpcUrl,
+    });
+
+    return NextResponse.json(
+      {
+        inputMint,
+        outputMint,
+        inputAmount: amountIn,
+        outputAmount,
+        priceImpactBps: 0,
+        slippageBps,
+        source: "lifinity-sdk",
+        feePercent: quote.feePercent,
+      },
+      { headers: responseHeaders }
+    );
 
   } catch (error) {
     console.error('[Lifinity Quote API] Error:', error);
