@@ -32,7 +32,12 @@ export function getApiUrl(path: string): string {
  * Endpoints API disponibles
  */
 export const API_ENDPOINTS = {
+  /** Endpoint unifié pour toutes les quotes (remplace swap/quote et venue-quotes) */
+  quotes: '/api/quotes',
+  /** @deprecated Utiliser 'quotes' à la place */
   quote: '/api/swap/quote',
+  /** Quotes par venue (legacy, redirige vers /api/quotes) */
+  venueQuotes: '/api/venue-quotes',
   health: '/api/health',
   tokens: '/api/tokens',
 } as const;

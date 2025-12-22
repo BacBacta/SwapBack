@@ -100,6 +100,8 @@ const DEX_FEES_BPS: Record<string, number> = {
   lifinity: 30,     // 0.3%
   sanctum: 10,      // LST swaps low fee
   saber: 4,         // Stableswap ~0.04%
+  pumpswap: 100,    // 1% Pump.fun fee
+  launchlab: 100,   // 1% LaunchLab fee
 };
 
 /**
@@ -490,6 +492,102 @@ async function fetchSaberQuote(params: QuoteParams): Promise<JupiterQuoteRespons
   }
 }
 
+/**
+ * Fetch quote depuis PumpSwap via internal API (Pump.fun AMM)
+ */
+async function fetchPumpSwapQuote(params: QuoteParams): Promise<JupiterQuoteResponse | null> {
+  try {
+    const baseUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
+    const url = `${baseUrl}/api/dex/pumpswap/quote?inputMint=${params.inputMint}&outputMint=${params.outputMint}&amount=${Math.floor(params.amountLamports)}&slippageBps=${params.slippageBps}`;
+    
+    const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    
+    if (data.error || !data.outputAmount || data.outputAmount <= 0) return null;
+
+    const inputLamports = Math.floor(params.amountLamports);
+    const outputLamports = data.outputAmount;
+    const priceImpact = data.priceImpact ?? 0;
+
+    return {
+      inputMint: params.inputMint,
+      outputMint: params.outputMint,
+      inAmount: inputLamports.toString(),
+      outAmount: outputLamports.toString(),
+      otherAmountThreshold: Math.floor(outputLamports * 0.99).toString(),
+      priceImpactPct: (priceImpact * 100).toString(),
+      routePlan: [{
+        swapInfo: {
+          ammKey: data.pool || "pumpswap-amm",
+          label: "PumpSwap",
+          inputMint: params.inputMint,
+          outputMint: params.outputMint,
+          inAmount: inputLamports.toString(),
+          outAmount: outputLamports.toString(),
+          feeAmount: (data.fee || 0).toString(),
+          feeMint: params.inputMint,
+        },
+        percent: 100,
+      }],
+      contextSlot: 0,
+      timeTaken: 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch quote depuis LaunchLab via internal API (DexScreener)
+ */
+async function fetchLaunchLabQuote(params: QuoteParams): Promise<JupiterQuoteResponse | null> {
+  try {
+    const baseUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
+    const url = `${baseUrl}/api/dex/launchlab/quote?inputMint=${params.inputMint}&outputMint=${params.outputMint}&amount=${Math.floor(params.amountLamports)}&slippageBps=${params.slippageBps}`;
+    
+    const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    
+    if (data.error || !data.outputAmount || data.outputAmount <= 0) return null;
+
+    const inputLamports = Math.floor(params.amountLamports);
+    const outputLamports = data.outputAmount;
+    const priceImpact = data.priceImpact ?? 0;
+
+    return {
+      inputMint: params.inputMint,
+      outputMint: params.outputMint,
+      inAmount: inputLamports.toString(),
+      outAmount: outputLamports.toString(),
+      otherAmountThreshold: Math.floor(outputLamports * 0.99).toString(),
+      priceImpactPct: (priceImpact * 100).toString(),
+      routePlan: [{
+        swapInfo: {
+          ammKey: data.pool || "launchlab-amm",
+          label: "LaunchLab",
+          inputMint: params.inputMint,
+          outputMint: params.outputMint,
+          inAmount: inputLamports.toString(),
+          outAmount: outputLamports.toString(),
+          feeAmount: (data.fee || 0).toString(),
+          feeMint: params.inputMint,
+        },
+        percent: 100,
+      }],
+      contextSlot: 0,
+      timeTaken: 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // === Aggregateur ===
 
 export class MultiSourceQuoteAggregator {
@@ -594,6 +692,30 @@ export class MultiSourceQuoteAggregator {
         const start = Date.now();
         const quote = await fetchSaberQuote(params);
         return { source: "saber", quote, latencyMs: Date.now() - start };
+      },
+    });
+
+    // PumpSwap (Pump.fun AMM - pour memecoins)
+    this.sources.push({
+      name: "pumpswap",
+      priority: 8,
+      enabled: true,
+      fetchQuote: async (params) => {
+        const start = Date.now();
+        const quote = await fetchPumpSwapQuote(params);
+        return { source: "pumpswap", quote, latencyMs: Date.now() - start };
+      },
+    });
+
+    // LaunchLab (via DexScreener - pour nouveaux tokens)
+    this.sources.push({
+      name: "launchlab",
+      priority: 9,
+      enabled: true,
+      fetchQuote: async (params) => {
+        const start = Date.now();
+        const quote = await fetchLaunchLabQuote(params);
+        return { source: "launchlab", quote, latencyMs: Date.now() - start };
       },
     });
   }

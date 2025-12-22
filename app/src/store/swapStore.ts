@@ -315,9 +315,9 @@ export const useSwapStore = create<SwapStore>()(
             );
             const slippageBps = Math.max(1, Math.floor(swap.slippageTolerance * 10000));
 
-            // Call API route (uses Fly.io in production to avoid Vercel DNS issues)
-            const apiUrl = getApiUrl(API_ENDPOINTS.quote);
-            console.log('🚀 [swapStore] Calling API:', apiUrl);
+            // Call unified quotes API (uses internal /api/dex/* routes for real DEX quotes)
+            const apiUrl = getApiUrl(API_ENDPOINTS.quotes);
+            console.log('🚀 [swapStore] Calling unified quotes API:', apiUrl);
             
             const response = await fetch(apiUrl, {
               method: "POST",
@@ -328,10 +328,10 @@ export const useSwapStore = create<SwapStore>()(
                 outputMint: swap.outputToken.mint,
                 amount: amountInSmallestUnit,
                 slippageBps,
-                routingStrategy,
                 userPublicKey: options?.userPublicKey ?? null,
                 // Lors des auto-refresh, on bypass le cache serveur pour éviter des prix figés.
                 forceFresh: isBackground,
+                includeAllVenues: true,
               }),
             });
             
@@ -343,12 +343,44 @@ export const useSwapStore = create<SwapStore>()(
             }
 
             const data = await response.json();
-            const nativeRoute = data.nativeRoute ?? null;
-            const npiOpportunity = data.npiOpportunity ?? null;
-            const multiSourceQuotes = Array.isArray(data.multiSourceQuotes) ? data.multiSourceQuotes : [];
-            const usedMultiSourceFallback = data.usedMultiSourceFallback === true;
             
-            // API returns {success: true, quote: {...}, routeInfo: {...}}
+            // === UNIFIED QUOTES API RESPONSE HANDLING ===
+            // Le nouvel endpoint /api/quotes retourne:
+            // - quote: JupiterQuoteResponse (best quote)
+            // - bestSource: string (jupiter, raydium, orca, etc.)
+            // - venueQuotes: VenueQuote[] (toutes les quotes par venue)
+            // - npiOpportunity: { hasOpportunity, estimatedNpiBps, etc. }
+            
+            // Convert venueQuotes to multiSourceQuotes format for compatibility
+            const multiSourceQuotes: MultiSourceQuoteSummary[] = (data.venueQuotes || []).map((vq: { venue: string; latencyMs: number; outputAmount: string; error?: string }) => ({
+              source: vq.venue,
+              latencyMs: vq.latencyMs,
+              ok: !vq.error && parseInt(vq.outputAmount) > 0,
+              outAmount: vq.outputAmount,
+              error: vq.error || null,
+            }));
+            
+            // Build nativeRoute from best native venue
+            const nativeRoute: NativeRouteMeta | null = data.bestNativeVenue ? {
+              provider: data.bestNativeVenue,
+              outAmount: data.bestNativeOutput?.toString(),
+              improvementBps: data.npiOpportunity?.estimatedNpiBps,
+              available: true,
+              fromCache: data.fromCache,
+            } : null;
+            
+            // NPI Opportunity (format compatible)
+            const npiOpportunity: NpiOpportunity | null = data.npiOpportunity?.hasOpportunity ? {
+              hasOpportunity: true,
+              npiBps: data.npiOpportunity.estimatedNpiBps,
+              rebateBps: data.npiOpportunity.estimatedRebateBps,
+              rebateUsd: data.npiOpportunity.estimatedRebateUsd,
+              estimatedRebateUsd: data.npiOpportunity.estimatedRebateUsd,
+            } : null;
+            
+            const usedMultiSourceFallback = data.bestSource !== 'jupiter';
+            
+            // API returns {success: true, quote: {...}, ...}
             if (!data.success || !data.quote) {
               throw new Error(data.error || "Invalid API response");
             }
