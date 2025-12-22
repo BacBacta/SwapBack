@@ -967,54 +967,100 @@ async function validateDlmmPairHasBins(
 }
 
 async function loadMeteoraDLMMClass(): Promise<any> {
-  // @meteora-ag/dlmm exports: default = DLMM class
+  // @meteora-ag/dlmm v1.8.0 exports:
+  // - ESM: { DLMM: class, default: class, ... }
+  // - CJS: module.exports = DLMM class (directly, via exports.default = DLMM + module.exports = exports.default)
+  //
   // IMPORTANT:
-  // - In browser/Next.js we keep pure ESM import.
-  // - In Node/tsx scripts, the ESM entry can fail because it imports
-  //   `import { BN } from "@coral-xyz/anchor"` but Anchor's ESM build does not export BN.
-  //   In that case we fallback to the CJS entry via createRequire.
+  // - In browser/Next.js bundled context, dynamic import() is transformed by webpack/turbopack
+  // - In Node/tsx scripts, the ESM entry can fail because Anchor ESM doesn't export BN
+  // - We MUST check if the loaded module has a valid `create` method to confirm success
+  
+  const isNode = typeof process !== "undefined" && !!process.versions?.node;
+  const isServerContext = typeof window === "undefined";
+  
+  // Strategy: try ESM first, then CJS fallback
+  let lastError: Error | null = null;
+  
+  // Attempt 1: ESM import
   try {
     const mod: any = await import("@meteora-ag/dlmm");
-    return mod?.DLMM ?? mod?.default ?? mod;
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    const isNode = typeof process !== "undefined" && !!process.versions?.node;
-    const missingBnExport = msg.includes("export named 'BN'") || msg.includes('export named "BN"');
-    if (isNode && missingBnExport) {
-      // Prevent webpack from trying to resolve the `node:` URI scheme at bundle-time.
-      // This branch is only ever executed in Node runtimes.
-      const nodeModule: any = await import(/* webpackIgnore: true */ "node:module");
-      const createRequire = nodeModule?.createRequire;
-      if (typeof createRequire !== "function") throw e;
-      const req = createRequire(import.meta.url);
-      // Load the CJS entry (dist/index.js) which uses require('@coral-xyz/anchor') where BN exists.
-      const mod: any = req("@meteora-ag/dlmm");
-      return mod?.DLMM ?? mod?.default ?? mod;
+    const DLMMClass = mod?.DLMM ?? mod?.default ?? mod;
+    if (typeof DLMMClass?.create === "function") {
+      return DLMMClass;
     }
-    throw e;
+    // ESM loaded but no create method - try CJS
+    console.warn("[MeteoraDLMM] ESM loaded but DLMM.create not found, trying CJS fallback");
+  } catch (e) {
+    lastError = e instanceof Error ? e : new Error(String(e));
+    const msg = lastError.message;
+    const missingBnExport = msg.includes("export named 'BN'") || msg.includes('export named "BN"');
+    if (missingBnExport) {
+      console.debug("[MeteoraDLMM] ESM failed due to Anchor BN export issue, trying CJS fallback");
+    } else {
+      console.warn("[MeteoraDLMM] ESM import failed:", msg.slice(0, 200));
+    }
   }
+  
+  // Attempt 2: CJS require (only in Node/server context)
+  if (isNode || isServerContext) {
+    try {
+      // Prevent webpack from bundling node:module at compile time
+      const nodeModule: any = await import(/* webpackIgnore: true */ "node:module");
+      const createRequire = nodeModule?.createRequire ?? nodeModule?.default?.createRequire;
+      if (typeof createRequire === "function") {
+        const req = createRequire(import.meta.url);
+        const DLMMClass: any = req("@meteora-ag/dlmm");
+        if (typeof DLMMClass?.create === "function") {
+          console.debug("[MeteoraDLMM] CJS fallback successful");
+          return DLMMClass;
+        }
+        console.warn("[MeteoraDLMM] CJS loaded but DLMM.create not found");
+      }
+    } catch (e) {
+      console.warn("[MeteoraDLMM] CJS fallback failed:", e instanceof Error ? e.message.slice(0, 200) : String(e));
+    }
+  }
+  
+  if (lastError) throw lastError;
+  throw new Error("[MeteoraDLMM] Failed to load DLMM class from @meteora-ag/dlmm");
 }
 
 async function loadMeteoraDlmmModule(): Promise<any> {
-  // IMPORTANT: keep this file browser-bundle-friendly (Next.js).
-  // In Node/tsx, the ESM entry can fail due to Anchor ESM not exporting BN.
+  // Same strategy as loadMeteoraDLMMClass but returns the full module
+  const isNode = typeof process !== "undefined" && !!process.versions?.node;
+  const isServerContext = typeof window === "undefined";
+  
+  let lastError: Error | null = null;
+  
+  // Attempt 1: ESM import
   try {
-    return await import("@meteora-ag/dlmm");
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    const isNode = typeof process !== "undefined" && !!process.versions?.node;
-    const missingBnExport = msg.includes("export named 'BN'") || msg.includes('export named "BN"');
-    if (isNode && missingBnExport) {
-      // Prevent webpack from trying to resolve the `node:` URI scheme at bundle-time.
-      // This branch is only ever executed in Node runtimes.
-      const nodeModule: any = await import(/* webpackIgnore: true */ "node:module");
-      const createRequire = nodeModule?.createRequire;
-      if (typeof createRequire !== "function") throw e;
-      const req = createRequire(import.meta.url);
-      return req("@meteora-ag/dlmm");
+    const mod: any = await import("@meteora-ag/dlmm");
+    // Validate module has expected exports
+    if (mod?.DLMM?.create || mod?.default?.create || mod?.deriveBinArray) {
+      return mod;
     }
-    throw e;
+    console.warn("[MeteoraDLMM] ESM module loaded but missing expected exports");
+  } catch (e) {
+    lastError = e instanceof Error ? e : new Error(String(e));
   }
+  
+  // Attempt 2: CJS require
+  if (isNode || isServerContext) {
+    try {
+      const nodeModule: any = await import(/* webpackIgnore: true */ "node:module");
+      const createRequire = nodeModule?.createRequire ?? nodeModule?.default?.createRequire;
+      if (typeof createRequire === "function") {
+        const req = createRequire(import.meta.url);
+        return req("@meteora-ag/dlmm");
+      }
+    } catch (e) {
+      console.warn("[MeteoraDLMM] CJS module fallback failed:", e instanceof Error ? e.message.slice(0, 200) : String(e));
+    }
+  }
+  
+  if (lastError) throw lastError;
+  throw new Error("[MeteoraDLMM] Failed to load @meteora-ag/dlmm module");
 }
 
 let meteoraLbPairMemcmpCache:

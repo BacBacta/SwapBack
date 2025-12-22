@@ -48,6 +48,40 @@ import {
 import { 
   decideSwapRoute, 
   formatRouteDecisionForLog,
+} from "@/lib/swap-routing";
+
+/**
+ * Parse simulation error for user-friendly message
+ */
+function parseSimulationError(logs: string[]): string | null {
+  const logsText = logs.join("\n");
+  
+  // Insufficient SOL balance
+  if (logsText.includes("insufficient lamports")) {
+    const match = logsText.match(/insufficient lamports (\d+), need (\d+)/);
+    if (match) {
+      const available = Number(match[1]) / 1e9;
+      const needed = Number(match[2]) / 1e9;
+      const missing = (needed - available).toFixed(6);
+      return `Solde SOL insuffisant. Il manque ~${missing} SOL pour couvrir les frais de transaction.`;
+    }
+    return "Solde SOL insuffisant pour les frais de transaction.";
+  }
+  
+  // Insufficient token balance
+  if (logsText.includes("insufficient funds") || logsText.includes("Error: insufficient")) {
+    return "Solde insuffisant pour effectuer ce swap.";
+  }
+  
+  // Slippage exceeded
+  if (logsText.includes("SlippageToleranceExceeded") || logsText.includes("ExceededSlippageLimit")) {
+    return "Le prix a changé. Augmentez le slippage ou réessayez.";
+  }
+  
+  return null;
+}
+
+import {
   getUIMessageForReason,
   type SwapRouteDecision,
 } from "@/lib/swap-routing";
@@ -949,6 +983,13 @@ export function useNativeSwap() {
 
         if (sim.value.err) {
           const logsTail = sim.value.logs?.slice(-30) ?? [];
+          
+          // Try to get user-friendly error message
+          const friendlyError = parseSimulationError(logsTail);
+          if (friendlyError) {
+            throw new Error(friendlyError);
+          }
+          
           throw new Error(
             `Simulation du swap natif échouée: ${JSON.stringify(sim.value.err)}` +
               (logsTail.length ? `\nLogs (tail):\n${logsTail.join("\n")}` : "")
@@ -1082,6 +1123,10 @@ export function useNativeSwap() {
             });
             if (sim2.value.err) {
               const logsTail2 = sim2.value.logs?.slice(-30) ?? [];
+              const friendlyError = parseSimulationError(logsTail2);
+              if (friendlyError) {
+                throw new Error(friendlyError);
+              }
               throw new Error(
                 `Simulation du swap natif échouée (retry): ${JSON.stringify(sim2.value.err)}` +
                   (logsTail2.length ? `\nLogs (tail):\n${logsTail2.join("\n")}` : "")
@@ -1115,6 +1160,10 @@ export function useNativeSwap() {
             });
             if (sim2.value.err) {
               const logsTail2 = sim2.value.logs?.slice(-30) ?? [];
+              const friendlyError = parseSimulationError(logsTail2);
+              if (friendlyError) {
+                throw new Error(friendlyError);
+              }
               throw new Error(
                 `Simulation du swap natif échouée (retry): ${JSON.stringify(sim2.value.err)}` +
                   (logsTail2.length ? `\nLogs (tail):\n${logsTail2.join("\n")}` : "")
