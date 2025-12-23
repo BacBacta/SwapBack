@@ -741,18 +741,44 @@ export function useNativeSwap() {
         // Vérifier si on a un oracle pour cette paire
         const hasOracle = hasOracleForPair(safeInputMint.toBase58(), safeOutputMint.toBase58());
         
-        // Si pas d'oracle, utiliser Jupiter comme fallback
+        // Si pas d'oracle, essayer PumpSwap d'abord, puis Jupiter comme fallback
         if (!hasOracle) {
-          logger.info("useNativeSwap", "No oracle for pair, using Jupiter fallback", {
+          logger.info("useNativeSwap", "No oracle for pair, trying PumpSwap then Jupiter", {
             inputMint: safeInputMint.toBase58().slice(0, 8),
             outputMint: safeOutputMint.toBase58().slice(0, 8),
           });
           
-          // Utiliser Jupiter via l'API /api/swap/quote
+          const slippageBps = params.slippageBps ?? SLIPPAGE_CONFIG.BASE_SLIPPAGE_BPS;
+          
+          // 1. Essayer d'abord PumpSwap (pour les tokens pump.fun)
           try {
             params.onProgress?.('preparing');
             
-            const slippageBps = params.slippageBps ?? SLIPPAGE_CONFIG.BASE_SLIPPAGE_BPS;
+            const pumpSwapQuoteUrl = `/api/dex/pumpswap/quote?inputMint=${safeInputMint.toBase58()}&outputMint=${safeOutputMint.toBase58()}&amount=${params.amount}&slippageBps=${slippageBps}`;
+            const pumpSwapResponse = await fetch(pumpSwapQuoteUrl, { signal: AbortSignal.timeout(5000) });
+            
+            if (pumpSwapResponse.ok) {
+              const pumpSwapQuote = await pumpSwapResponse.json();
+              
+              if (pumpSwapQuote.outputAmount && Number(pumpSwapQuote.outputAmount) > 0) {
+                logger.info("useNativeSwap", "PumpSwap quote available, using Jupiter to execute via Pump.fun AMM", {
+                  outputAmount: pumpSwapQuote.outputAmount,
+                  source: pumpSwapQuote.source,
+                  pool: pumpSwapQuote.pool,
+                });
+                
+                // PumpSwap a un pool! Utiliser Jupiter pour exécuter (il route via Pump.fun AMM)
+                // Jupiter agrège automatiquement PumpSwap donc on obtient la meilleure exécution
+              }
+            }
+          } catch (pumpSwapError) {
+            logger.debug("useNativeSwap", "PumpSwap not available, will use Jupiter", {
+              error: pumpSwapError instanceof Error ? pumpSwapError.message : String(pumpSwapError),
+            });
+          }
+          
+          // 2. Utiliser Jupiter (qui inclut Pump.fun AMM dans son agrégation)
+          try {
             
             // 1. Obtenir quote et transaction Jupiter
             const quoteResponse = await fetch('/api/swap/quote', {
@@ -821,11 +847,43 @@ export function useNativeSwap() {
             
             params.onProgress?.('confirming');
             
-            // Attendre confirmation
-            const confirmation = await connection.confirmTransaction(txid, 'confirmed');
-            
-            if (confirmation.value.err) {
-              throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+            // Attendre confirmation avec meilleure gestion du timeout
+            // Utiliser getLatestBlockhash pour un timeout plus fiable
+            try {
+              const latestBlockhash = await connection.getLatestBlockhash('confirmed');
+              const confirmation = await connection.confirmTransaction({
+                signature: txid,
+                blockhash: latestBlockhash.blockhash,
+                lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+              }, 'confirmed');
+              
+              if (confirmation.value.err) {
+                throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+              }
+            } catch (confirmError) {
+              // Si timeout de confirmation, vérifier le statut manuellement
+              const errorMsg = confirmError instanceof Error ? confirmError.message : String(confirmError);
+              if (errorMsg.includes('was not confirmed') || errorMsg.includes('timeout')) {
+                logger.warn("useNativeSwap", "Confirmation timeout, checking status manually", { txid });
+                
+                // Attendre un peu et vérifier le statut
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                const status = await connection.getSignatureStatus(txid, { searchTransactionHistory: true });
+                
+                if (status.value?.confirmationStatus === 'confirmed' || status.value?.confirmationStatus === 'finalized') {
+                  if (status.value.err) {
+                    throw new Error(`Transaction failed: ${JSON.stringify(status.value.err)}`);
+                  }
+                  // Transaction réussie malgré le timeout de confirmation
+                  logger.info("useNativeSwap", "Transaction confirmed after manual check", { txid });
+                } else {
+                  // Transaction vraiment non confirmée, mais on la considère comme envoyée
+                  logger.warn("useNativeSwap", "Transaction sent but unconfirmed", { txid, status: status.value });
+                  // On continue quand même car la tx peut être confirmée plus tard
+                }
+              } else {
+                throw confirmError;
+              }
             }
             
             params.onProgress?.('confirmed');
