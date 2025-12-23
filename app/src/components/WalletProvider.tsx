@@ -184,7 +184,16 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
   }, []);
 
   return (
-    <ConnectionProvider endpoint={endpoint}>
+    <ConnectionProvider 
+      endpoint={endpoint}
+      config={{
+        commitment: 'confirmed',
+        // Désactiver WebSocket - Vercel ne supporte pas les WebSockets
+        // La confirmation de transaction utilisera HTTP polling via getSignatureStatus
+        wsEndpoint: undefined,
+        disableRetryOnRateLimit: false,
+      }}
+    >
       <SolanaWalletProvider
         wallets={wallets}
         autoConnect={autoConnect}
